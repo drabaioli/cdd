@@ -1,6 +1,6 @@
 Scope the next roadmap task and produce a handoff file for a fresh implementation session.
 
-This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.claude-handoffs/`.
+This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.claude-handoffs/cdd/`.
 
 ## 1. Read the roadmap
 
@@ -11,7 +11,7 @@ Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.
 List existing handoff files:
 
 ```bash
-ls ~/.claude-handoffs/ 2>/dev/null
+ls ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")/ 2>/dev/null
 ```
 
 For each file `<branch>.md`, check whether the branch still exists locally:
@@ -20,7 +20,7 @@ For each file `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/<branch>.md`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")/<branch>.md`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
@@ -77,7 +77,7 @@ If the discussion surfaced changes the roadmap should reflect (new tasks to add,
 
 ## 7. Write the handoff file
 
-On approval, write `~/.claude-handoffs/<branch>.md` with this structure:
+On approval, write `~/.claude-handoffs/cdd/<branch>.md` with this structure:
 
 ```markdown
 # Task: <short title>
@@ -95,10 +95,10 @@ On approval, write `~/.claude-handoffs/<branch>.md` with this structure:
 <deferred open questions for the implementation session, proposed roadmap edits, caveats — or "None" if clean>
 ```
 
-Create `~/.claude-handoffs/` if it doesn't exist:
+Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
-mkdir -p ~/.claude-handoffs
+mkdir -p ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")
 ```
 
 ## 8. Print the next command
@@ -106,7 +106,7 @@ mkdir -p ~/.claude-handoffs
 After writing, print exactly:
 
 ```
-Handoff written: ~/.claude-handoffs/<branch>.md
+Handoff written: ~/.claude-handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
 ```
 

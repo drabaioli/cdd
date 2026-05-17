@@ -16,8 +16,9 @@
 #                               suggested first prompt to the clipboard, and
 #                               launch `claude` in plan mode in the new
 #                               worktree. Requires a handoff file at
-#                               ~/.claude-handoffs/<branch>.md (run /next-step
-#                               first). Run from the main worktree.
+#                               ~/.claude-handoffs/<repo-name>/<branch>.md
+#                               (run /next-step first). Run from the main
+#                               worktree.
 #
 #   PROJECT-worktree-done       After the feature branch has landed (or you've
 #                               decided to abandon it), run this from the
@@ -29,10 +30,11 @@
 #                               GitHub, otherwise prompt), and delete the
 #                               handoff file iff the branch was deleted.
 #
-#   PROJECT-worktree-list       List all active handoffs in ~/.claude-handoffs/
-#                               with worktree / branch / PR status. Highlights
-#                               stale entries (handoff with no branch and no
-#                               worktree) so they're obvious to clean up.
+#   PROJECT-worktree-list       List all active handoffs in
+#                               ~/.claude-handoffs/<repo-name>/ with worktree
+#                               / branch / PR status. Highlights stale entries
+#                               (handoff with no branch and no worktree) so
+#                               they're obvious to clean up.
 
 PROJECT-worktree() {
   local branch="$1"
@@ -41,7 +43,11 @@ PROJECT-worktree() {
     return 1
   fi
 
-  local handoff="$HOME/.claude-handoffs/${branch}.md"
+  # Derive repo name from the main worktree so this works from any worktree.
+  local repo_name
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
+  local handoff="${handoff_dir}/${branch}.md"
   if [[ ! -f "$handoff" ]]; then
     echo "No handoff file at $handoff" >&2
     echo "Run /next-step in an exploratory session first to produce one." >&2
@@ -97,7 +103,10 @@ PROJECT-worktree-done() {
   fi
 
   local feature_path="$PWD"
-  local handoff="$HOME/.claude-handoffs/${branch}.md"
+  # Derive repo name from the main worktree so this works from any worktree.
+  local repo_name
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local handoff="$HOME/.claude-handoffs/${repo_name}/${branch}.md"
 
   cd "$main_path" || return 1
   if ! git pull --ff-only origin main; then
@@ -169,7 +178,10 @@ PROJECT-worktree-done() {
 }
 
 PROJECT-worktree-list() {
-  local handoff_dir="$HOME/.claude-handoffs"
+  # Derive repo name from the main worktree so this works from any worktree.
+  local repo_name
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
   if [[ ! -d "$handoff_dir" ]]; then
     echo "No handoff directory at $handoff_dir."
     return 0
