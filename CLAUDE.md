@@ -1,0 +1,67 @@
+# CDD (Claude-Driven Development) — Claude Code Context
+
+CDD is a human-in-the-loop workflow for evolving software projects together with Claude Code. This repository contains the process document (the philosophy and lifecycle) and the template (copy-paste material for bootstrapping new projects). The CDD repo itself uses CDD on itself; the template under `template/` is content this project ships, not the project's own scaffolding.
+
+## Key references
+
+| Topic                                                | Location                                          |
+| ---------------------------------------------------- | ------------------------------------------------- |
+| Process document (philosophy, lifecycle, edit rules) | `doc/knowledge_base/claude-driven-development.md` |
+| Implementation roadmap                               | `doc/knowledge_base/roadmap.md`                   |
+| Architecture of this repo                            | `doc/architecture/index.md`                       |
+| Features of this repo                                | `doc/features/index.md`                           |
+| Template (what gets copied into new projects)        | `template/`                                       |
+
+**Read `doc/knowledge_base/claude-driven-development.md` before making any structural change to the workflow or template.** The process doc is the source of truth; the template is its instantiation. Changes flow process-first, template-second.
+
+## Critical constraints (quick reference)
+
+- Two layers, kept consistent: process doc (`doc/knowledge_base/claude-driven-development.md`) and template (`template/`). A PR that touches the process doc but not the template (or vice versa) is suspicious and should be justified explicitly.
+- Human-in-the-loop checkpoints are load-bearing. Do not propose removing or weakening any of the six checkpoints in section 4 of the process doc without explicit discussion.
+- Template files use `<PROJECT_NAME>` and `PROJECT` as placeholders, plus free-form `<...>` for fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable.
+- The template is generic. Do not introduce content drawn from a specific downstream project (e.g. firmware-specific conventions, web-specific build commands) into `template/` files. Per-project-type variants are deferred design (see process doc section 6).
+- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. Treat divergence as something to either justify or fix.
+
+## Build & test
+
+This repo is documentation and shell scripts; there is no build step. Verification is done by hand:
+
+```bash
+# Shell script sanity (template worktree helper).
+bash -n template/tools/PROJECT-worktree.sh
+
+# Look for stale placeholders or accidental concrete-project references.
+grep -rn 'PROJECT' template/ tools/        # expected only in template/
+grep -rn '<PROJECT_NAME>' template/        # expected only in template/
+```
+
+When `/pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
+
+## Module layout
+
+| Directory                          | Purpose                                                   |
+| ---------------------------------- | --------------------------------------------------------- |
+| `doc/knowledge_base/`              | Process doc, roadmap, decision records                    |
+| `doc/architecture/`                | How this repo is structured                               |
+| `doc/features/`                    | What this repo provides (process + template)              |
+| `template/`                        | Copy-paste material for new projects                      |
+| `template/.claude/commands/`       | Slash commands shipped to new projects                    |
+| `template/doc/`                    | Doc skeletons shipped to new projects                     |
+| `template/tools/`                  | Worktree helper shipped to new projects                   |
+| `.claude/commands/`                | This repo's own slash commands                            |
+| `tools/`                           | This repo's own worktree helper (`cdd-worktree.sh`)       |
+
+## Architecture
+
+Two layers. The process doc describes the workflow abstractly: artifacts, lifecycle, edit rules, checkpoints. The template instantiates the workflow as concrete files a new project can copy. Changes should land in the process doc first, then propagate to the template, never the other way around. Architecture docs for this repo will grow as the structure stabilizes; for now, the layout above is the architecture.
+
+See `doc/knowledge_base/claude-driven-development.md` for the full picture.
+
+## Workflow
+
+This project uses CDD on itself.
+
+- **Before opening a PR**: run `/pre-pr` to verify the process doc and template are consistent and the roadmap reflects what landed.
+- **To start a new task**: run `/next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the implementation worktree.
+- **When main has advanced under a feature branch**: run `/merge-main` from the feature branch.
+- Keep the process doc, template, and roadmap consistent as part of every change. Process-first, then template.
