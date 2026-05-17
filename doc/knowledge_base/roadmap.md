@@ -9,9 +9,9 @@ Status: in progress.
 - [x] Write the process document (`doc/knowledge_base/claude-driven-development.md`).
 - [x] Draft the template files (CLAUDE.md skeleton, slash commands, worktree helper, doc skeletons, template README).
 - [x] Establish the CDD-uses-CDD pattern: process doc in `doc/knowledge_base/`, template under `template/`, repo gets its own thin CDD scaffolding.
-- [ ] Initialise the GitHub repo with the structure above and push.
+- [x] Initialise the GitHub repo with the structure above and push.
 - [ ] Source `tools/cdd-worktree.sh` from `~/.bashrc` and verify the worktree helpers work end-to-end on this repo.
-- [ ] Run `/next-step` once on the CDD repo itself to confirm the workflow is usable on the meta-project.
+- [x] Run `/next-step` once on the CDD repo itself to confirm the workflow is usable on the meta-project.
 
 **Milestone:** CDD repo on GitHub, self-hosting CDD, ready to be used for a real downstream project.
 

@@ -69,15 +69,9 @@ After this you should have no `<PROJECT_NAME>` or bare `PROJECT` literals left (
 
 5. **Write the initial roadmap** in `doc/knowledge_base/roadmap.md`. This is the one piece of content the template does not generate for you. Phases and tasks should reflect what you actually want to build.
 
-6. **Create the handoffs directory:**
+6. **Commit the initial state** to git and push. (`/next-step` creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand the first time you run it.)
 
-   ```bash
-   mkdir -p ~/.claude-handoffs
-   ```
-
-7. **Commit the initial state** to git and push.
-
-8. **Start the first task**: run `claude` from your project root and invoke `/next-step`.
+7. **Start the first task**: run `claude` from your project root and invoke `/next-step`.
 
 ## Per-project customization
 

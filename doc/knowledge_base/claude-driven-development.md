@@ -67,9 +67,9 @@ Project metadata and history. The roadmap lives here. So do:
 
 The knowledge base is mostly append-only. Decisions are not rewritten when they are superseded; new decisions are added that supersede them, with a reference back. This preserves the reasoning trail.
 
-### 2.6 Handoff files (`~/.claude-handoffs/<branch>.md`)
+### 2.6 Handoff files (`~/.claude-handoffs/<repo-name>/<branch>.md`)
 
-The contract between the `next-step` session and the implementation session. Lives outside the repo (branch-scoped, ephemeral). Created by `/next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
+The contract between the `next-step` session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
 
 Schema:
 
@@ -315,8 +315,7 @@ Bootstrap procedure for a new project:
 3. Source the worktree script from `~/.bashrc`.
 4. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
 5. Write the initial roadmap by hand (or generate with a one-off Claude session).
-6. Create `~/.claude-handoffs/` directory.
-7. Start the first `/next-step` session.
+6. Start the first `/next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand).
 
 ### 7.1 The CDD repo as its own project
 
