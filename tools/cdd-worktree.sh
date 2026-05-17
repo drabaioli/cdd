@@ -101,6 +101,7 @@ cdd-worktree-done() {
   fi
 
   local feature_path="$PWD"
+  # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   local handoff="$HOME/.claude-handoffs/${repo_name}/${branch}.md"
@@ -175,6 +176,7 @@ cdd-worktree-done() {
 }
 
 cdd-worktree-list() {
+  # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
