@@ -41,7 +41,10 @@ cdd-worktree() {
     return 1
   fi
 
-  local handoff_dir="$HOME/.claude-handoffs/cdd"
+  # Derive repo name from the main worktree so this works from any worktree.
+  local repo_name
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
   local handoff="${handoff_dir}/${branch}.md"
   if [[ ! -f "$handoff" ]]; then
     echo "No handoff file at $handoff" >&2
@@ -98,7 +101,9 @@ cdd-worktree-done() {
   fi
 
   local feature_path="$PWD"
-  local handoff="$HOME/.claude-handoffs/cdd/${branch}.md"
+  local repo_name
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local handoff="$HOME/.claude-handoffs/${repo_name}/${branch}.md"
 
   cd "$main_path" || return 1
   if ! git pull --ff-only origin main; then
@@ -170,7 +175,9 @@ cdd-worktree-done() {
 }
 
 cdd-worktree-list() {
-  local handoff_dir="$HOME/.claude-handoffs/cdd"
+  local repo_name
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
   if [[ ! -d "$handoff_dir" ]]; then
     echo "No handoff directory at $handoff_dir."
     return 0

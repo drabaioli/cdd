@@ -11,7 +11,7 @@ Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.
 List existing handoff files:
 
 ```bash
-ls ~/.claude-handoffs/cdd/ 2>/dev/null
+ls ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")/ 2>/dev/null
 ```
 
 For each file `<branch>.md`, check whether the branch still exists locally:
@@ -20,7 +20,7 @@ For each file `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/cdd/<branch>.md`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")/<branch>.md`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
@@ -98,7 +98,7 @@ On approval, write `~/.claude-handoffs/cdd/<branch>.md` with this structure:
 Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
-mkdir -p ~/.claude-handoffs/cdd
+mkdir -p ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")
 ```
 
 ## 8. Print the next command
