@@ -36,12 +36,13 @@ CLAUDE.md is updated by the agent during `/pre-pr` when module layout, build com
 
 ### 2.2 The roadmap (`doc/knowledge_base/roadmap.md` or similar)
 
-A checklist of tasks, grouped into phases. Each phase ends with a milestone statement. Each task is a checkbox; completed tasks are annotated inline with what landed, what was deferred, and any caveats. The roadmap is simultaneously a plan, a progress log, and a context document for future sessions.
+A checklist of tasks, grouped into phases. Each phase ends with a milestone statement. Each task is a checkbox. The roadmap is simultaneously a plan, a progress log, and a context document for future sessions.
 
-Two rules govern the roadmap:
+Three rules govern the roadmap:
 
 1. **Only the implementation session edits the roadmap file.** The `next-step` session may discuss roadmap changes during clarification but does not edit the file. It records desired edits in the handoff and instructs the implementation session to apply them.
 2. **Roadmap edits beyond ticking a checkbox require human approval.** Adding, removing, or splitting tasks; restructuring phases; reordering priorities, the agent proposes, the human approves.
+3. **Inline annotations stay terse.** When ticking a completed task, do not restate what the task did or describe how it was implemented — that lives in the commit, the PR description, and (for any lasting behaviour change) the process / architecture / feature docs, which the agent updates as part of the same change. Annotate inline *only* when a future session needs information that none of those sources will carry: a deferred sub-item, a surprising caveat, or a scope change. If there is nothing of that nature, just tick the box. One short clause, not a sentence with a parenthetical.
 
 The roadmap is the central artifact. If it drifts from reality, the workflow loses its anchor.
 
