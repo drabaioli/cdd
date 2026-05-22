@@ -110,4 +110,4 @@ Handoff written: ~/.claude-handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
 ```
 
-The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt queued on the clipboard.
+The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

@@ -36,12 +36,13 @@ CLAUDE.md is updated by the agent during `/pre-pr` when module layout, build com
 
 ### 2.2 The roadmap (`doc/knowledge_base/roadmap.md` or similar)
 
-A checklist of tasks, grouped into phases. Each phase ends with a milestone statement. Each task is a checkbox; completed tasks are annotated inline with what landed, what was deferred, and any caveats. The roadmap is simultaneously a plan, a progress log, and a context document for future sessions.
+A checklist of tasks, grouped into phases. Each phase ends with a milestone statement. Each task is a checkbox. The roadmap is simultaneously a plan, a progress log, and a context document for future sessions.
 
-Two rules govern the roadmap:
+Three rules govern the roadmap:
 
 1. **Only the implementation session edits the roadmap file.** The `next-step` session may discuss roadmap changes during clarification but does not edit the file. It records desired edits in the handoff and instructs the implementation session to apply them.
 2. **Roadmap edits beyond ticking a checkbox require human approval.** Adding, removing, or splitting tasks; restructuring phases; reordering priorities, the agent proposes, the human approves.
+3. **Inline annotations stay terse.** When ticking a completed task, do not restate what the task did or describe how it was implemented — that lives in the commit, the PR description, and (for any lasting behaviour change) the process / architecture / feature docs, which the agent updates as part of the same change. Annotate inline *only* when a future session needs information that none of those sources will carry: a deferred sub-item, a surprising caveat, or a scope change. If there is nothing of that nature, just tick the box. One short clause, not a sentence with a parenthetical.
 
 The roadmap is the central artifact. If it drifts from reality, the workflow loses its anchor.
 
@@ -106,7 +107,7 @@ Slash commands are declarative: they describe what to do, not how to orchestrate
 
 A bash script providing three commands, sourced from `~/.bashrc`:
 
-- `<project>-worktree <branch>`, creates a worktree for `<branch>`, copies the first prompt to the clipboard, launches Claude Code in plan mode. Requires a handoff file to exist.
+- `<project>-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
 - `<project>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to main, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
 - `<project>-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
 
@@ -196,7 +197,7 @@ The `next-step` session does not edit the roadmap file. If roadmap edits are nee
 
 ### 3.2 Worktree creation
 
-The human closes the `next-step` session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree, copies a one-line first prompt to the clipboard (`Read <handoff path> and follow the Implementation prompt.`), and launches Claude Code in plan mode in the new worktree.
+The human closes the `next-step` session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree and launches Claude Code in plan mode in it, passing the one-line first prompt (`Read <handoff path> and follow the Implementation prompt.`) as the initial user message so the implementation session opens already processing it.
 
 ### 3.3 Session 2: implementation (on the new worktree)
 

@@ -2,7 +2,7 @@
 
 Ordered implementation sequence for building <PROJECT_NAME>. Each phase builds on the previous one. Phases are roughly sequential, but some work within a phase can be parallelized in separate worktrees as long as the tasks touch non-overlapping modules.
 
-This file is the central artifact of the Claude-Driven Development workflow. It is simultaneously a plan, a progress log, and a context document for future sessions. Completed items are annotated inline with what landed, what was deferred, and any caveats, this is how context is preserved across sessions.
+This file is the central artifact of the Claude-Driven Development workflow. It is simultaneously a plan, a progress log, and a context document for future sessions. See "Annotation conventions" below for what (and what not) to write next to a completed checkbox.
 
 ## Phase 1: <Phase title>
 
@@ -36,10 +36,12 @@ Use this section to record principles that apply across phases. Examples:
 
 ## Annotation conventions
 
-When a task is completed, tick its checkbox and add an inline annotation describing what landed and what was deferred. Example:
+The default is no annotation. Tick the box and stop.
+
+Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change.
+
+If you do annotate, keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
 
 ```
-- [x] <Task description> — <one-line summary of what landed; deferred items: <list>; caveats: <list>>
+- [x] <Task description> — <one short clause: deferred X / caveat Y / out-of-scope Z>
 ```
-
-This annotation is read by future Claude Code sessions to understand the current state without re-reading the entire commit history. Keep it accurate.
