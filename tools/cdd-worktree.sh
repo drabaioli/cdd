@@ -12,10 +12,10 @@
 # (Adjust the path to wherever you've cloned the CDD repo.)
 #
 # Provides:
-#   cdd-worktree <branch>   Create a new worktree for <branch>, copy the
-#                               suggested first prompt to the clipboard, and
-#                               launch `claude` in plan mode in the new
-#                               worktree. Requires a handoff file at
+#   cdd-worktree <branch>   Create a new worktree for <branch> and launch
+#                               `claude` in plan mode in it with the suggested
+#                               first prompt already submitted. Requires a
+#                               handoff file at
 #                               ~/.claude-handoffs/cdd/<branch>.md (run
 #                               /next-step first). Run from the main worktree.
 #
@@ -60,21 +60,7 @@ cdd-worktree() {
   cd "$worktree_path" || return 1
 
   local first_prompt="Read ${handoff} and follow the Implementation prompt."
-  if command -v wl-copy >/dev/null 2>&1; then
-    printf '%s' "$first_prompt" | wl-copy
-    echo "Suggested first prompt copied to clipboard (wl-copy)."
-  elif command -v xclip >/dev/null 2>&1; then
-    printf '%s' "$first_prompt" | xclip -selection clipboard
-    echo "Suggested first prompt copied to clipboard (xclip)."
-  elif command -v pbcopy >/dev/null 2>&1; then
-    printf '%s' "$first_prompt" | pbcopy
-    echo "Suggested first prompt copied to clipboard (pbcopy)."
-  else
-    echo "Suggested first prompt:"
-    echo "  $first_prompt"
-  fi
-
-  claude --permission-mode plan
+  claude --permission-mode plan "$first_prompt"
 }
 
 cdd-worktree-done() {

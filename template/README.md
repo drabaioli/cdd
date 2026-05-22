@@ -88,7 +88,6 @@ The workflow depends on:
 
 - `git` (with worktree support, any modern version).
 - `gh` (GitHub CLI), used by `PROJECT-worktree-done` and `PROJECT-worktree-list` to query PR state. Optional but recommended.
-- A clipboard tool (one of `wl-copy`, `xclip`, or `pbcopy`), used by `PROJECT-worktree` to copy the first prompt to the clipboard. Optional, the prompt is printed if no tool is available.
 - `claude` (Claude Code CLI).
 
 ## Reference

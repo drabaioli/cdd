@@ -110,4 +110,4 @@ Handoff written: ~/.claude-handoffs/<repo-name>/<branch>.md
 Next: <PROJECT_NAME>-worktree <branch>
 ```
 
-The user will close this session, run `<PROJECT_NAME>-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt queued on the clipboard.
+The user will close this session, run `<PROJECT_NAME>-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

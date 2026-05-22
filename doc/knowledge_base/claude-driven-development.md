@@ -106,7 +106,7 @@ Slash commands are declarative: they describe what to do, not how to orchestrate
 
 A bash script providing three commands, sourced from `~/.bashrc`:
 
-- `<project>-worktree <branch>`, creates a worktree for `<branch>`, copies the first prompt to the clipboard, launches Claude Code in plan mode. Requires a handoff file to exist.
+- `<project>-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
 - `<project>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to main, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
 - `<project>-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
 
@@ -196,7 +196,7 @@ The `next-step` session does not edit the roadmap file. If roadmap edits are nee
 
 ### 3.2 Worktree creation
 
-The human closes the `next-step` session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree, copies a one-line first prompt to the clipboard (`Read <handoff path> and follow the Implementation prompt.`), and launches Claude Code in plan mode in the new worktree.
+The human closes the `next-step` session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree and launches Claude Code in plan mode in it, passing the one-line first prompt (`Read <handoff path> and follow the Implementation prompt.`) as the initial user message so the implementation session opens already processing it.
 
 ### 3.3 Session 2: implementation (on the new worktree)
 
