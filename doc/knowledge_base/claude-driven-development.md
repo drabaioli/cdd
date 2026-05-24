@@ -103,19 +103,31 @@ Project-level Claude Code slash commands. CDD ships four:
 
 Slash commands are declarative: they describe what to do, not how to orchestrate it. Orchestration (worktree creation, branch lifecycle) lives in the shell helpers.
 
-### 2.8 Worktree shell helpers (`tools/<project>-worktree.sh`)
+### 2.8 Worktree shell helpers (`tools/<slug>-worktree.sh`)
 
 A bash script providing three commands, sourced from `~/.bashrc`:
 
-- `<project>-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
-- `<project>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to main, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
-- `<project>-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
+- `<slug>-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
+- `<slug>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to main, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
+- `<slug>-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
 
 These helpers encode an invariant worth stating explicitly:
 
 > Handoff deletion is tied to branch deletion. Branch deletion is tied to "merged, or human explicitly approved discard." A handoff is never deleted while its branch still exists.
 
 This invariant prevents losing in-flight work and prevents stale handoffs from accumulating.
+
+### 2.9 The three-identifier model
+
+Every CDD project carries three distinct identifiers, and the template encodes them as separate placeholders so substitution can't conflate them:
+
+- **`<PROJECT_NAME>`** — the display name. Human-readable, may contain spaces and mixed case. Example: `Sprint Planning Automation POC`. Used in document titles and prose references to the project.
+- **`<PROJECT_SLUG>`** — the shell-command slug. A valid shell identifier prefix (lowercase, no spaces, hyphen-safe). Example: `spa-poc`. Used wherever a worktree command is referenced (`<PROJECT_SLUG>-worktree <branch>`, `<PROJECT_SLUG>-worktree-list`, etc.).
+- **`<PROJECT_DIR>`** — the directory and repo slug. Used in `$HOME/Code/<PROJECT_DIR>/...` paths and as the working tree's directory name. Example: `sprint-planning-automation-poc`. Often the same as the slug but allowed to differ for projects whose directory name is more verbose than the typed command.
+
+Internally, `template/tools/PROJECT-worktree.sh` also uses a bare `PROJECT` token where shell function names are defined; angle-bracketed placeholders aren't valid shell identifiers, so this token is a substitution artifact local to that file. It receives the same value as `<PROJECT_SLUG>` during bootstrap.
+
+Substitution order is significant: `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>` are substituted first (the angle brackets keep them unambiguous), and bare `PROJECT` only inside the renamed worktree script. The bootstrap script (see Section 6) enforces this.
 
 ## 3. Lifecycle
 
@@ -277,7 +289,7 @@ Three areas are intentionally out of scope for the first version of the template
 
 **Greenfield bootstrap.** How a project gets its first roadmap, its first CLAUDE.md, and its first architecture skeleton. Exploratory work (research, prototyping, reading) generally happens outside Claude Code. A `/bootstrap` command could plausibly take a project brief and a draft roadmap and produce structured starting files, but the exploratory work itself doesn't fit cleanly inside the git + Claude Code substrate. Worth revisiting once the template has been used on a few greenfield projects.
 
-The current recommended approach for greenfield bootstrap is therefore manual: do the up-front thinking outside Claude Code (decide language, tooling, top-level architecture), write a thin initial roadmap by hand (three to five phases, a handful of tasks each is plenty), then copy the template and start. The roadmap will be refined during the first few `/next-step` sessions; the workflow is designed for that. Resist the urge to make it perfect before starting.
+The current recommended approach for greenfield bootstrap is to run `bootstrap-cdd-project.sh` from the CDD repo root (see `template/BOOTSTRAP.md` for the procedure): it copies the template into a fresh directory, performs the placeholder substitution non-interactively, and runs the initial `git init` + scaffold commit. The up-front thinking — language, tooling, top-level architecture, the thin initial roadmap (three to five phases, a handful of tasks each) — still happens outside Claude Code. The roadmap will be refined during the first few `/next-step` sessions; the workflow is designed for that. Resist the urge to make it perfect before starting.
 
 **Parallel-merge structure.** When two worktrees land in sequence, the second needs to integrate the first. Today this is partly automated (`/merge-main` covers it) and partly manual (the human decides when to trigger). A more structured approach, perhaps with a "second worktree must re-run pre-pr after merge-main", may be warranted once parallel work is common. The invariant is clear: a feature branch must integrate main and re-pass pre-pr before it's ready to merge.
 
@@ -287,11 +299,11 @@ The current recommended approach for greenfield bootstrap is therefore manual: d
 
 ## 7. Template directory layout
 
-The template ships as a directory you copy into a new project root:
+The template ships as a directory copied into a new project root by `bootstrap-cdd-project.sh` (which lives at the CDD repo root, not inside `template/`). The bootstrapped tree looks like:
 
 ```
-<project>/
-├── CLAUDE.md                                 # skeleton with placeholders
+<PROJECT_DIR>/
+├── CLAUDE.md                                 # skeleton with placeholders, filled by hand after bootstrap
 ├── .claude/
 │   └── commands/
 │       ├── next-step.md
@@ -306,17 +318,19 @@ The template ships as a directory you copy into a new project root:
 │       ├── roadmap.md                        # placeholder
 │       └── README.md                         # explains the knowledge base
 └── tools/
-    └── <project>-worktree.sh                 # rename to actual project name
+    └── <PROJECT_SLUG>-worktree.sh            # renamed and substituted by bootstrap
 ```
+
+`template/BOOTSTRAP.md` is meta-documentation that lives in the template directory but is **not** copied into the bootstrapped project; the bootstrap script excludes it. Likewise, the bootstrap script itself stays at the CDD repo root and is not part of the bootstrapped tree.
 
 Bootstrap procedure for a new project:
 
-1. Copy the template directory into the new project root.
-2. Rename `tools/<project>-worktree.sh` to use the actual project name; update the function names inside.
-3. Source the worktree script from `~/.bashrc`.
-4. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
-5. Write the initial roadmap by hand (or generate with a one-off Claude session).
-6. Start the first `/next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand).
+1. From the CDD repo root, run:
+   `./bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --dir dir-slug`
+2. Add the worktree-helper source line to `~/.bashrc` (the script prints the exact line on success).
+3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
+4. Write the initial roadmap by hand (or generate with a one-off Claude session).
+5. Start the first `/next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand).
 
 ### 7.1 The CDD repo as its own project
 
@@ -327,7 +341,7 @@ Concretely, the CDD repo has two layers:
 - **Its own CDD scaffolding** at the repo root: `./CLAUDE.md`, `./.claude/commands/`, `./doc/{architecture,features,knowledge_base}/`, `./tools/cdd-worktree.sh`. This is how Claude Code works on the CDD repo itself.
 - **The template** under `./template/`: the copy-paste material that gets dropped into new projects. This is content, not scaffolding.
 
-The two layers share a shape but serve different purposes. `./CLAUDE.md` is the CDD project's actual context (it references the process doc, lists open work, points at the template). `./template/CLAUDE.md` is a skeleton with placeholders, intended to be copied and filled in for a different project.
+The two layers share a shape but serve different purposes. `./CLAUDE.md` is the CDD project's actual context (it references the process doc, lists open work, points at the template). `./template/CLAUDE.md` is a skeleton with placeholders, intended to be copied and filled in for a different project. `./template/BOOTSTRAP.md` documents the bootstrap recipe (it is template-adjacent meta-doc, not content that ships into the bootstrapped project), and `./bootstrap-cdd-project.sh` at the CDD repo root automates the copy + substitution.
 
 The duplication between `./.claude/commands/` and `./template/.claude/commands/` is real but small, and it is the right duplication: the template ships a snapshot, the CDD repo's own copy can drift slightly if a command needs CDD-specific behaviour, and divergence is visible at review time. A `/pre-pr` check for accidental drift is a possible future addition; low priority.
 

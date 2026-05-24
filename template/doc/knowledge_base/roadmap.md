@@ -4,6 +4,8 @@ Ordered implementation sequence for building <PROJECT_NAME>. Each phase builds o
 
 This file is the central artifact of the Claude-Driven Development workflow. It is simultaneously a plan, a progress log, and a context document for future sessions. See "Annotation conventions" below for what (and what not) to write next to a completed checkbox.
 
+The bootstrap script has already initialised the git repository and laid down the CDD scaffold (`CLAUDE.md`, `.claude/commands/`, `doc/`, `tools/`). Phase 1 should start from "add language/tooling scaffold" or whatever the first project-specific step actually is — not from "initialise the repo".
+
 ## Phase 1: <Phase title>
 
 <One paragraph: what this phase achieves and what milestone it ends on.>

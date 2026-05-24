@@ -8,7 +8,6 @@
 | -------------------------------- | ------------------------------------------------- |
 | System architecture & design     | `doc/architecture/` (start with `index.md`)       |
 | Feature documentation            | `doc/features/` (start with `index.md`)           |
-| Coding standards                 | `doc/knowledge_base/<coding-standard-filename>.md`|
 | Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
 | Design decisions                 | `doc/knowledge_base/` (decision records)          |
 
@@ -25,7 +24,7 @@ Keep architecture and feature docs current as part of every change.
 <- Required idioms (error handling type, ownership conventions)>
 <- Hard limits (no global mutable state, no blocking calls in X, etc.)>
 
-Full details in the coding standard linked above.
+Once a coding standard exists, link it from the Key references table and reference it here.
 
 ## Build & test
 
@@ -55,6 +54,6 @@ See `doc/architecture/index.md` for the full picture.
 This project uses the Claude-Driven Development workflow.
 
 - **Before opening a PR**: run `/pre-pr` to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change.
-- **To start a new task**: run `/next-step` from the main worktree to produce a handoff, then run `<PROJECT_NAME>-worktree <branch>` to spin up the implementation worktree.
+- **To start a new task**: run `/next-step` from the main worktree to produce a handoff, then run `<PROJECT_SLUG>-worktree <branch>` to spin up the implementation worktree.
 - **When main has advanced under a feature branch**: run `/merge-main` from the feature branch.
 - Keep `doc/architecture/`, `doc/features/`, and this file current as part of every change.

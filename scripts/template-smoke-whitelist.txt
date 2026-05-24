@@ -1,0 +1,28 @@
+# Whitelisted free-form <...> tokens allowed to remain in .claude/commands/
+# after bootstrap. One token per line, comment lines start with #.
+#
+# If you add a new <...> placeholder to a template slash command, add it here
+# too. The template-smoke CI workflow fails otherwise.
+<branch>
+<branch_name>
+<build command>
+<count>
+<count or "none">
+<deferred open questions for the implementation session, proposed roadmap edits, caveats — or "None" if clean>
+<exact checkbox line(s) from the roadmap being addressed>
+<file>
+<format check command>
+<integration test cmd>
+<lint command>
+<M>
+<mechanical | logical | structural>
+<N>
+<new convention / new utility / refactored interface>
+<one-line description>
+<one-line description of what was adopted from main>
+<one-line implication>
+<one of:>
+<repo-name>
+<short title>
+<the self-contained prompt from step 5>
+<unit test command>

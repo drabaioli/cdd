@@ -22,7 +22,7 @@ git branch --list <branch>
 
 If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")/<branch>.md`). Never delete without explicit confirmation.
 
-For a richer view that also reports worktree / PR status, suggest `<PROJECT_NAME>-worktree-list`.
+For a richer view that also reports worktree / PR status, suggest `<PROJECT_SLUG>-worktree-list`.
 
 ## 3. Propose the next task
 
@@ -107,7 +107,10 @@ After writing, print exactly:
 
 ```
 Handoff written: ~/.claude-handoffs/<repo-name>/<branch>.md
-Next: <PROJECT_NAME>-worktree <branch>
+Next: <PROJECT_SLUG>-worktree <branch>
+
+If `<PROJECT_SLUG>-worktree` reports "command not found", the worktree helper isn't sourced. Add this to ~/.bashrc (or ~/.zshrc) and open a new shell:
+  [[ -f "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh"
 ```
 
-The user will close this session, run `<PROJECT_NAME>-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.
+The user will close this session, run `<PROJECT_SLUG>-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

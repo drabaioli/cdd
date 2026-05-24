@@ -11,6 +11,8 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
+| Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
+| Non-interactive bootstrap script                     | `bootstrap-cdd-project.sh` (repo root)            |
 
 **Read `doc/knowledge_base/claude-driven-development.md` before making any structural change to the workflow or template.** The process doc is the source of truth; the template is its instantiation. Changes flow process-first, template-second.
 
@@ -18,7 +20,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 
 - Two layers, kept consistent: process doc (`doc/knowledge_base/claude-driven-development.md`) and template (`template/`). A PR that touches the process doc but not the template (or vice versa) is suspicious and should be justified explicitly.
 - Human-in-the-loop checkpoints are load-bearing. Do not propose removing or weakening any of the six checkpoints in section 4 of the process doc without explicit discussion.
-- Template files use `<PROJECT_NAME>` and `PROJECT` as placeholders, plus free-form `<...>` for fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable.
+- Template files use a three-identifier placeholder model — `<PROJECT_NAME>` (display), `<PROJECT_SLUG>` (shell-command slug), `<PROJECT_DIR>` (directory/repo slug) — plus a bare `PROJECT` token internal to `template/tools/PROJECT-worktree.sh` (substitution artifact, valued the same as `<PROJECT_SLUG>`). Free-form `<...>` text is fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable. See section 2.9 of the process doc for the model, and `template/BOOTSTRAP.md` for the bootstrap recipe.
 - The template is generic. Do not introduce content drawn from a specific downstream project (e.g. firmware-specific conventions, web-specific build commands) into `template/` files. Per-project-type variants are deferred design (see process doc section 6).
 - The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. Treat divergence as something to either justify or fix.
 
@@ -27,13 +29,19 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 This repo is documentation and shell scripts; there is no build step. Verification is done by hand:
 
 ```bash
-# Shell script sanity (template worktree helper).
+# Shell script sanity.
 bash -n template/tools/PROJECT-worktree.sh
+bash -n bootstrap-cdd-project.sh
+bash -n scripts/template-smoke-assert.sh
 
-# Look for stale placeholders or accidental concrete-project references.
-grep -rn 'PROJECT' template/ tools/        # expected only in template/
-grep -rn '<PROJECT_NAME>' template/        # expected only in template/
+# End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
+rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
+./bootstrap-cdd-project.sh --name "Demo Project" --slug demo --dir demo-project \
+  --target /tmp/cdd-smoke/demo-project
+./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
 ```
+
+The `template-smoke` GitHub Actions workflow runs the same end-to-end smoke on every PR.
 
 When `/pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
 
@@ -48,6 +56,10 @@ When `/pre-pr` runs in this repo, the "build / format / lint / test" gates colla
 | `template/.claude/commands/`       | Slash commands shipped to new projects                    |
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
 | `template/tools/`                  | Worktree helper shipped to new projects                   |
+| `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
+| `bootstrap-cdd-project.sh`         | Non-interactive bootstrap script (repo root)              |
+| `scripts/`                         | Smoke-test assertions + whitelist for the template        |
+| `.github/workflows/`               | CI: `template-smoke.yml` runs the bootstrap end-to-end    |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `tools/`                           | This repo's own worktree helper (`cdd-worktree.sh`)       |
 
