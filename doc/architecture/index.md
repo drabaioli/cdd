@@ -39,8 +39,4 @@ The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conc
 
 - Whether per-project-type variants live as parallel template directories, as a single template with a variant flag, or as post-bootstrap transformation scripts. Deferred until there is enough usage to compare across project types.
 
-Resolved:
-
-- The bootstrap script lives at the CDD repo root (`bootstrap-cdd-project.sh`) and operates on a target directory, not inside `template/`. Decided after the first downstream bootstrap (`sprint-planning-automation-poc`); the placement keeps the template free of one-shot tooling and lets CI smoke-test the bootstrap end-to-end. See `doc/knowledge_base/friction-log.md` for the friction that drove this.
-
 This document will grow as the structure stabilizes. It is intentionally thin while the repo is still small.
