@@ -1,15 +1,7 @@
 # <PROJECT_NAME> worktree helpers.
 #
-# This file is part of the Claude-Driven Development template. Before using:
-#   1. Rename this file from PROJECT-worktree.sh to <project>-worktree.sh
-#      where <project> matches your project name (lowercase, no spaces).
-#   2. Replace all occurrences of PROJECT in this file with the same name.
-#      The function names use <project>-worktree-... so they must be valid
-#      shell identifiers.
-#
 # Source this file from ~/.bashrc:
-#   [[ -f "$HOME/Code/<PROJECT_NAME>/tools/<project>-worktree.sh" ]] && \
-#     source "$HOME/Code/<PROJECT_NAME>/tools/<project>-worktree.sh"
+#   [[ -f "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh"
 #
 # Provides:
 #   PROJECT-worktree <branch>   Create a new worktree for <branch> and launch

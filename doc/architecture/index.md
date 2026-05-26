@@ -14,12 +14,16 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 .
 ├── CLAUDE.md                                 # this repo's Claude Code context
 ├── README.md                                 # repo entry point
+├── bootstrap-cdd-project.sh                  # non-interactive bootstrap for new projects
 ├── .claude/
 │   └── commands/                             # this repo's slash commands
+├── .github/
+│   └── workflows/                            # CI (template-smoke runs the bootstrap end-to-end)
 ├── doc/
 │   ├── architecture/                         # this file
 │   ├── features/                             # what this repo provides
 │   └── knowledge_base/                       # process doc, roadmap, decisions
+├── scripts/                                  # smoke-test assertions + whitelist for the template
 ├── template/                                 # copy-paste material for new projects
 └── tools/
     └── cdd-worktree.sh                       # this repo's worktree helper
@@ -33,7 +37,6 @@ The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conc
 
 ## Open structural questions
 
-- Whether a `bootstrap.sh` lives in the template (a tool a user runs once) or in the CDD repo root (a tool that operates on a target directory). Deferred until the first downstream project is bootstrapped manually and the friction is real.
 - Whether per-project-type variants live as parallel template directories, as a single template with a variant flag, or as post-bootstrap transformation scripts. Deferred until there is enough usage to compare across project types.
 
 This document will grow as the structure stabilizes. It is intentionally thin while the repo is still small.

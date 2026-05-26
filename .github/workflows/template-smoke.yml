@@ -1,0 +1,30 @@
+name: template-smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure git identity for the scaffold commit
+        run: |
+          git config --global user.email "ci@example.com"
+          git config --global user.name "CI Bootstrap"
+
+      - name: Bootstrap a demo project from the template
+        run: |
+          ./bootstrap-cdd-project.sh \
+            --name "Demo Project" \
+            --slug demo \
+            --path /tmp/smoke/demo-project
+
+      - name: Assert the bootstrapped tree is clean
+        run: ./scripts/template-smoke-assert.sh /tmp/smoke/demo-project
+
+      - name: Show the scaffold commit
+        run: git -C /tmp/smoke/demo-project log --oneline

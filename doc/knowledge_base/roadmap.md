@@ -23,7 +23,7 @@ Status: not started.
 - [ ] Do the exploratory work outside CDD: language, tooling, top-level architecture, hand-written initial roadmap.
 - [ ] Bootstrap the new project from `template/`, including the placeholder substitution.
 - [ ] Run the first `/next-step` → implementation → `/pre-pr` → PR cycle on the downstream project.
-- [ ] Keep a friction log: every awkward or missing piece, recorded outside the downstream project.
+- [x] Keep a friction log: every awkward or missing piece, recorded outside the downstream project. — landed as `doc/knowledge_base/friction-log.md`
 - [ ] Complete at least three task cycles before drawing conclusions.
 
 **Milestone:** one real downstream project running CDD, with a friction log feeding back into the CDD roadmap.
@@ -33,8 +33,9 @@ Status: not started.
 Status: not started. Tasks here will be refined based on the friction log from Phase 2.
 
 - [ ] Refine `/merge-main` based on first real merge encountered (logic is currently untested).
-- [ ] Improve the placeholder-substitution recipe in the template README (current weak spot, known limitation).
-- [ ] Add a `bootstrap.sh` script to the template that does rename + substitution non-interactively.
+- [x] Improve the placeholder-substitution recipe in the template README (current weak spot, known limitation). — README renamed to `template/BOOTSTRAP.md`; sed recipe replaced by `bootstrap-cdd-project.sh`
+- [x] Add a `bootstrap.sh` script to the template that does rename + substitution non-interactively. — script lives at the CDD repo root (`bootstrap-cdd-project.sh`), not under `template/`; three-identifier model (`<PROJECT_NAME>` / `<PROJECT_SLUG>` / `<PROJECT_DIR>`)
+- [x] Add a `template-smoke` CI workflow that asserts the bootstrap produces a clean, link-valid tree. — `.github/workflows/template-smoke.yml` + `scripts/template-smoke-assert.sh`
 - [ ] Resolve any divergence between `./.claude/commands/` and `template/.claude/commands/` introduced during Phase 2.
 - [ ] Add a `/pre-pr` check (in the CDD repo) for unintended drift between the two command sets.
 
