@@ -5,8 +5,10 @@
 #   bootstrap-cdd-project.sh \
 #     --name "Display Name" \
 #     --slug shell-slug \
-#     --dir dir-slug \
-#     [--target /absolute/path]
+#     --path /path/to/dir-slug
+#
+# The basename of --path becomes the directory slug (<PROJECT_DIR>). The path
+# may be absolute or relative; it must not exist, or must be an empty directory.
 #
 # See template/BOOTSTRAP.md for the full procedure and the three-identifier model.
 
@@ -14,27 +16,26 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --dir dir-slug [--target /path]
+usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug
 
-  --name    Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
-  --slug    Shell-command slug; lowercase, hyphens OK. Used in <slug>-worktree commands.
-  --dir     Directory / repo slug. Used as the working tree directory name.
-  --target  Optional explicit target path. Defaults to ./<dir> relative to CWD.
+  --name  Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
+  --slug  Shell-command slug; lowercase, hyphens OK. Used in <slug>-worktree commands.
+  --path  Path where the project will be created (absolute or relative). The basename
+          becomes the directory slug. The path must not exist, or must be an empty
+          directory.
 EOF
   exit 2
 }
 
 PROJECT_NAME=""
 PROJECT_SLUG=""
-PROJECT_DIR=""
 TARGET=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --name)   PROJECT_NAME="${2:-}"; shift 2 ;;
-    --slug)   PROJECT_SLUG="${2:-}"; shift 2 ;;
-    --dir)    PROJECT_DIR="${2:-}";  shift 2 ;;
-    --target) TARGET="${2:-}";       shift 2 ;;
+    --name) PROJECT_NAME="${2:-}"; shift 2 ;;
+    --slug) PROJECT_SLUG="${2:-}"; shift 2 ;;
+    --path) TARGET="${2:-}";       shift 2 ;;
     -h|--help) usage ;;
     *) echo "unknown arg: $1" >&2; usage ;;
   esac
@@ -42,7 +43,12 @@ done
 
 [[ -n "$PROJECT_NAME" ]] || { echo "error: --name is required" >&2; usage; }
 [[ -n "$PROJECT_SLUG" ]] || { echo "error: --slug is required" >&2; usage; }
-[[ -n "$PROJECT_DIR"  ]] || { echo "error: --dir is required"  >&2; usage; }
+[[ -n "$TARGET"       ]] || { echo "error: --path is required" >&2; usage; }
+
+# Derive the directory slug from the basename of --path. Strip any trailing slashes
+# so `--path foo/` yields `foo`, not an empty basename.
+TARGET="${TARGET%/}"
+PROJECT_DIR="$(basename "$TARGET")"
 
 # Slug and dir must be safe for shell identifiers and filesystem paths.
 if ! [[ "$PROJECT_SLUG" =~ ^[a-z][a-z0-9_-]*$ ]]; then
@@ -50,7 +56,7 @@ if ! [[ "$PROJECT_SLUG" =~ ^[a-z][a-z0-9_-]*$ ]]; then
   exit 2
 fi
 if ! [[ "$PROJECT_DIR" =~ ^[a-z][a-z0-9_-]*$ ]]; then
-  echo "error: --dir must match ^[a-z][a-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
+  echo "error: basename of --path must match ^[a-z][a-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
   exit 2
 fi
 
@@ -58,11 +64,6 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/template"
 [[ -d "$TEMPLATE_DIR" ]] || { echo "error: template/ not found next to script at $TEMPLATE_DIR" >&2; exit 1; }
-
-# Default target to ./<dir> relative to CWD.
-if [[ -z "$TARGET" ]]; then
-  TARGET="$PWD/$PROJECT_DIR"
-fi
 
 # Refuse if target exists and is non-empty.
 if [[ -e "$TARGET" ]]; then
@@ -124,18 +125,21 @@ sed -i -E "s#\\bPROJECT\\b#${SLUG_ESC}#g" "$TARGET/tools/${PROJECT_SLUG}-worktre
   git -c commit.gpgsign=false commit -m "Initial CDD scaffold" >/dev/null
 )
 
+# Resolve the absolute target path for the printed instructions.
+TARGET_ABS="$(cd "$TARGET" && pwd)"
+
 cat <<EOF
 
 Bootstrapped CDD project: $PROJECT_NAME
-Location: $TARGET
+Location: $TARGET_ABS
 
 Next steps:
 
   1. Add this line to your ~/.bashrc (or ~/.zshrc) and open a new shell:
 
-       [[ -f "\$HOME/Code/${PROJECT_DIR}/tools/${PROJECT_SLUG}-worktree.sh" ]] && source "\$HOME/Code/${PROJECT_DIR}/tools/${PROJECT_SLUG}-worktree.sh"
+       [[ -f "${TARGET_ABS}/tools/${PROJECT_SLUG}-worktree.sh" ]] && source "${TARGET_ABS}/tools/${PROJECT_SLUG}-worktree.sh"
 
-  2. cd into $TARGET, fill in CLAUDE.md placeholders, and write the initial roadmap
+  2. cd into $TARGET_ABS, fill in CLAUDE.md placeholders, and write the initial roadmap
      in doc/knowledge_base/roadmap.md.
 
   3. Run \`claude\` and invoke /next-step to start the first task.

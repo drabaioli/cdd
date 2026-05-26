@@ -50,10 +50,10 @@ From the CDD repo root:
 ./bootstrap-cdd-project.sh \
   --name "My Project Display Name" \
   --slug myproject \
-  --dir my-project
+  --path ../my-project
 ```
 
-By default the script writes into `./my-project` (relative to the current directory). Pass `--target /absolute/path` to override.
+`--path` is where the project will be created (absolute or relative to the current directory). Its basename becomes the directory slug (`<PROJECT_DIR>`). The path must not exist, or must be an empty directory.
 
 The script will:
 

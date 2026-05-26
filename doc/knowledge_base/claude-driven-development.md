@@ -326,7 +326,8 @@ The template ships as a directory copied into a new project root by `bootstrap-c
 Bootstrap procedure for a new project:
 
 1. From the CDD repo root, run:
-   `./bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --dir dir-slug`
+   `./bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug`
+   The basename of `--path` becomes the `<PROJECT_DIR>` slug.
 2. Add the worktree-helper source line to `~/.bashrc` (the script prints the exact line on success).
 3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
 4. Write the initial roadmap by hand (or generate with a one-off Claude session).

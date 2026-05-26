@@ -36,8 +36,8 @@ bash -n scripts/template-smoke-assert.sh
 
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
-./bootstrap-cdd-project.sh --name "Demo Project" --slug demo --dir demo-project \
-  --target /tmp/cdd-smoke/demo-project
+./bootstrap-cdd-project.sh --name "Demo Project" --slug demo \
+  --path /tmp/cdd-smoke/demo-project
 ./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
 ```
 
