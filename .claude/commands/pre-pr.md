@@ -81,12 +81,13 @@ If there is no output, report "no drift" and continue.
 
 If there is output, present each hunk to the user. For each, the user judges whether it is **expected substitution drift** (the CDD copy hard-codes values that the template parameterises) or **unintended drift** that needs reconciliation. There is no allowlist and no reverse-substitution logic — the human decides.
 
-Known-expected substitutions today (flag these as "expected" when they appear, currently only in `next-step.md`):
+Known-expected drift today (flag these as "expected" when they appear):
 
-- `cdd` ↔ `<PROJECT_SLUG>`
-- `cdd-worktree` / `cdd-worktree-list` ↔ `<PROJECT_SLUG>-worktree` / `<PROJECT_SLUG>-worktree-list`
-- `~/.claude-handoffs/cdd/` ↔ `~/.claude-handoffs/<repo-name>/`
-- The template's extra `~/.bashrc` sourcing snippet block under "Next:" (present in template, absent in the CDD copy)
+- In `next-step.md`: `cdd` ↔ `<PROJECT_SLUG>`
+- In `next-step.md`: `cdd-worktree` / `cdd-worktree-list` ↔ `<PROJECT_SLUG>-worktree` / `<PROJECT_SLUG>-worktree-list`
+- In `next-step.md`: `~/.claude-handoffs/cdd/` ↔ `~/.claude-handoffs/<repo-name>/`
+- In `next-step.md`: the template's extra `~/.bashrc` sourcing snippet block under "Next:" (present in template, absent in the CDD copy)
+- In `pre-pr.md`: this Section 7 ("Command-set drift") is CDD-meta-specific and intentionally absent from the template copy
 
 Apply any fixes only on user approval. Do not auto-edit either tree from this step.
 
