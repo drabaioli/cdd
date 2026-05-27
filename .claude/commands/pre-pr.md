@@ -69,7 +69,29 @@ git log --oneline HEAD..origin/main
 
 If `origin/main` has advanced beyond the branch point, mention it and recommend running `/merge-main` before opening the PR. Do not merge from this session.
 
-## 7. Summary
+## 7. Command-set drift
+
+This check is specific to the CDD repo (the meta-project): it surfaces unintended divergence between the repo's own `.claude/commands/` and the `template/.claude/commands/` it ships to downstream projects.
+
+```bash
+diff -r .claude/commands template/.claude/commands
+```
+
+If there is no output, report "no drift" and continue.
+
+If there is output, present each hunk to the user. For each, the user judges whether it is **expected substitution drift** (the CDD copy hard-codes values that the template parameterises) or **unintended drift** that needs reconciliation. There is no allowlist and no reverse-substitution logic — the human decides.
+
+Known-expected drift today (flag these as "expected" when they appear):
+
+- In `next-step.md`: `cdd` ↔ `<PROJECT_SLUG>`
+- In `next-step.md`: `cdd-worktree` / `cdd-worktree-list` ↔ `<PROJECT_SLUG>-worktree` / `<PROJECT_SLUG>-worktree-list`
+- In `next-step.md`: `~/.claude-handoffs/cdd/` ↔ `~/.claude-handoffs/<repo-name>/`
+- In `next-step.md`: the template's extra `~/.bashrc` sourcing snippet block under "Next:" (present in template, absent in the CDD copy)
+- In `pre-pr.md`: this Section 7 ("Command-set drift") is CDD-meta-specific and intentionally absent from the template copy
+
+Apply any fixes only on user approval. Do not auto-edit either tree from this step.
+
+## 8. Summary
 
 Present a checklist summary:
 
@@ -87,6 +109,7 @@ Present a checklist summary:
 - [ ] Roadmap up to date
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] No upstream drift (or: /merge-main recommended)
+- [ ] Command-set drift reviewed
 ```
 
 Mark each item as pass ✓ or needs attention ✗ with details.

@@ -37,7 +37,7 @@ Status: not started. Tasks here will be refined based on the friction log from P
 - [x] Add a `bootstrap.sh` script to the template that does rename + substitution non-interactively. — script lives at the CDD repo root (`bootstrap-cdd-project.sh`), not under `template/`; three-identifier model (`<PROJECT_NAME>` / `<PROJECT_SLUG>` / `<PROJECT_DIR>`)
 - [x] Add a `template-smoke` CI workflow that asserts the bootstrap produces a clean, link-valid tree. — `.github/workflows/template-smoke.yml` + `scripts/template-smoke-assert.sh`
 - [ ] Resolve any divergence between `./.claude/commands/` and `template/.claude/commands/` introduced during Phase 2.
-- [ ] Add a `/pre-pr` check (in the CDD repo) for unintended drift between the two command sets.
+- [x] Add a `/pre-pr` check (in the CDD repo) for unintended drift between the two command sets.
 
 **Milestone:** template is ergonomic enough that bootstrapping a new project takes under five minutes.
 
