@@ -19,6 +19,10 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 │   └── commands/                             # this repo's slash commands
 ├── .github/
 │   └── workflows/                            # CI (template-smoke runs the bootstrap end-to-end)
+├── demo/                                     # filled-in seed + create/teardown automation (third artifact)
+│   ├── seed/                                 # concrete "Markdown Renderer" project content
+│   ├── setup.sh / teardown.sh / lib.sh       # create + tear down demo/dogfood instances
+│   └── README.md                             # what the demo builds; the phases 1-3 demo script
 ├── doc/
 │   ├── architecture/                         # this file
 │   ├── features/                             # what this repo provides
@@ -34,6 +38,12 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 The process doc references the template by example (it describes what a CLAUDE.md should contain; the template provides a concrete skeleton). The template does not reference the process doc by default. A downstream project using the template does not get a copy of the process doc; the template is self-sufficient for users who don't need the philosophy.
 
 The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conceptually the same files, with the repo's own copy free to drift if it needs CDD-specific behaviour. Unintended drift is a defect.
+
+## The demo layer
+
+`demo/` is a **third artifact**, distinct from both layers above and from `scripts/`. It is *not* part of the template: it holds a **filled-in** seed project ("Markdown Renderer", under `demo/seed/`) plus create/teardown automation (`demo/setup.sh`, `demo/teardown.sh`, `demo/lib.sh`). Concrete, project-specific content is allowed here precisely because it lives under `demo/` and never leaks into `template/`, which stays generic.
+
+The automation does not duplicate bootstrap logic: `setup.sh` wraps `bootstrap-cdd-project.sh` with its `--overlay` flag, which copies the seed over the template tree before placeholder substitution, so the seed's `<PROJECT_NAME>`/`<PROJECT_SLUG>`/`<PROJECT_DIR>` placeholders are substituted by the same single code path. The seed doubles as a reproducible demo of the CDD task cycle (one reviewable PR, two parallel branches that conflict, a `/merge-main` that both resolves the conflict and delivers a dependency) and as the Phase 2 dogfooding greenfield. See `demo/README.md`.
 
 ## Open structural questions
 

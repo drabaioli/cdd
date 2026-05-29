@@ -13,6 +13,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Template (what gets copied into new projects)        | `template/`                                       |
 | Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
 | Non-interactive bootstrap script                     | `bootstrap-cdd-project.sh` (repo root)            |
+| Demo / dogfooding subsystem (seed + automation)      | `demo/` (start with `demo/README.md`)             |
 
 **Read `doc/knowledge_base/claude-driven-development.md` before making any structural change to the workflow or template.** The process doc is the source of truth; the template is its instantiation. Changes flow process-first, template-second.
 
@@ -22,6 +23,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 - Human-in-the-loop checkpoints are load-bearing. Do not propose removing or weakening any of the six checkpoints in section 4 of the process doc without explicit discussion.
 - Template files use a three-identifier placeholder model — `<PROJECT_NAME>` (display), `<PROJECT_SLUG>` (shell-command slug), `<PROJECT_DIR>` (directory/repo slug) — plus a bare `PROJECT` token internal to `template/tools/PROJECT-worktree.sh` (substitution artifact, valued the same as `<PROJECT_SLUG>`). Free-form `<...>` text is fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable. See section 2.9 of the process doc for the model, and `template/BOOTSTRAP.md` for the bootstrap recipe.
 - The template is generic. Do not introduce content drawn from a specific downstream project (e.g. firmware-specific conventions, web-specific build commands) into `template/` files. Per-project-type variants are deferred design (see process doc section 6).
+- `demo/` is a third artifact, separate from `template/` and `scripts/`. Its filled-in seed (`demo/seed/`) holds concrete "Markdown Renderer" project content — which is allowed *because* it lives under `demo/`. None of it may leak into `template/`. `demo/setup.sh` must keep wrapping `bootstrap-cdd-project.sh` (via `--overlay`) rather than duplicating the substitution logic.
 - The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. Treat divergence as something to either justify or fix.
 
 ## Build & test
@@ -33,15 +35,20 @@ This repo is documentation and shell scripts; there is no build step. Verificati
 bash -n template/tools/PROJECT-worktree.sh
 bash -n bootstrap-cdd-project.sh
 bash -n scripts/template-smoke-assert.sh
+bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
 ./bootstrap-cdd-project.sh --name "Demo Project" --slug demo \
   --path /tmp/cdd-smoke/demo-project
 ./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
+
+# Demo subsystem smoke: bootstrap + seed overlay into a tmp base, no GitHub side effects.
+rm -rf /tmp/cdd-demo-smoke
+demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
 ```
 
-The `template-smoke` GitHub Actions workflow runs the same end-to-end smoke on every PR.
+The `template-smoke` GitHub Actions workflow runs the same end-to-end smoke on every PR, including the demo seed-overlay step.
 
 When `/pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
 
@@ -58,6 +65,9 @@ When `/pre-pr` runs in this repo, the "build / format / lint / test" gates colla
 | `template/tools/`                  | Worktree helper shipped to new projects                   |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
 | `bootstrap-cdd-project.sh`         | Non-interactive bootstrap script (repo root)              |
+| `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
+| `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
+| `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
 | `scripts/`                         | Smoke-test assertions + whitelist for the template        |
 | `.github/workflows/`               | CI: `template-smoke.yml` runs the bootstrap end-to-end    |
 | `.claude/commands/`                | This repo's own slash commands                            |
@@ -65,7 +75,7 @@ When `/pre-pr` runs in this repo, the "build / format / lint / test" gates colla
 
 ## Architecture
 
-Two layers. The process doc describes the workflow abstractly: artifacts, lifecycle, edit rules, checkpoints. The template instantiates the workflow as concrete files a new project can copy. Changes should land in the process doc first, then propagate to the template, never the other way around. Architecture docs for this repo will grow as the structure stabilizes; for now, the layout above is the architecture.
+Two layers. The process doc describes the workflow abstractly: artifacts, lifecycle, edit rules, checkpoints. The template instantiates the workflow as concrete files a new project can copy. Changes should land in the process doc first, then propagate to the template, never the other way around. A third artifact, `demo/`, instantiates a concrete project from a filled-in seed to both demo and dogfood the workflow; it is downstream of the template and never feeds back into it. Architecture docs for this repo will grow as the structure stabilizes; for now, the layout above is the architecture.
 
 See `doc/knowledge_base/claude-driven-development.md` for the full picture.
 

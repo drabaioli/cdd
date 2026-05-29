@@ -5,10 +5,16 @@
 #   bootstrap-cdd-project.sh \
 #     --name "Display Name" \
 #     --slug shell-slug \
-#     --path /path/to/dir-slug
+#     --path /path/to/dir-slug \
+#     [--overlay /path/to/seed ...]
 #
 # The basename of --path becomes the directory slug (<PROJECT_DIR>). The path
 # may be absolute or relative; it must not exist, or must be an empty directory.
+#
+# --overlay DIR (repeatable) copies DIR over the template tree before placeholder
+# substitution, so overlaid files are substituted too. Used by the demo/ subsystem
+# to lay a filled-in seed project over the generic template. Order is preserved:
+# later overlays win over earlier ones and over the template.
 #
 # See template/BOOTSTRAP.md for the full procedure and the three-identifier model.
 
@@ -16,13 +22,15 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug
+usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug [--overlay DIR ...]
 
-  --name  Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
-  --slug  Shell-command slug; lowercase, hyphens OK. Used in <slug>-worktree commands.
-  --path  Path where the project will be created (absolute or relative). The basename
-          becomes the directory slug. The path must not exist, or must be an empty
-          directory.
+  --name     Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
+  --slug     Shell-command slug; lowercase, hyphens OK. Used in <slug>-worktree commands.
+  --path     Path where the project will be created (absolute or relative). The basename
+             becomes the directory slug. The path must not exist, or must be an empty
+             directory.
+  --overlay  Directory copied over the template before substitution (repeatable). Lets a
+             filled-in seed override template files; overlaid files are substituted too.
 EOF
   exit 2
 }
@@ -30,12 +38,14 @@ EOF
 PROJECT_NAME=""
 PROJECT_SLUG=""
 TARGET=""
+OVERLAYS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --name) PROJECT_NAME="${2:-}"; shift 2 ;;
-    --slug) PROJECT_SLUG="${2:-}"; shift 2 ;;
-    --path) TARGET="${2:-}";       shift 2 ;;
+    --name)    PROJECT_NAME="${2:-}"; shift 2 ;;
+    --slug)    PROJECT_SLUG="${2:-}"; shift 2 ;;
+    --path)    TARGET="${2:-}";       shift 2 ;;
+    --overlay) OVERLAYS+=("${2:-}");  shift 2 ;;
     -h|--help) usage ;;
     *) echo "unknown arg: $1" >&2; usage ;;
   esac
@@ -65,6 +75,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/template"
 [[ -d "$TEMPLATE_DIR" ]] || { echo "error: template/ not found next to script at $TEMPLATE_DIR" >&2; exit 1; }
 
+# Validate overlay directories up front so we fail before touching the target.
+for overlay in "${OVERLAYS[@]}"; do
+  [[ -d "$overlay" ]] || { echo "error: --overlay dir not found: $overlay" >&2; exit 1; }
+done
+
 # Refuse if target exists and is non-empty.
 if [[ -e "$TARGET" ]]; then
   if [[ ! -d "$TARGET" ]]; then
@@ -87,6 +102,16 @@ else
   cp -a "$TEMPLATE_DIR/." "$TARGET/"
   rm -f "$TARGET/BOOTSTRAP.md"
 fi
+
+# Overlay any seed directories over the template tree, in order. Overlaid files
+# overwrite template files of the same path; substitution below covers them all.
+for overlay in "${OVERLAYS[@]}"; do
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a "$overlay/" "$TARGET/"
+  else
+    cp -a "$overlay/." "$TARGET/"
+  fi
+done
 
 # Rename the worktree script before substitution.
 mv "$TARGET/tools/PROJECT-worktree.sh" "$TARGET/tools/${PROJECT_SLUG}-worktree.sh"
