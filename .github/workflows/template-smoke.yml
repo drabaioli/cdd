@@ -11,6 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Syntax-check the shell scripts
+        run: |
+          bash -n bootstrap-cdd-project.sh
+          bash -n scripts/template-smoke-assert.sh
+          bash -n template/tools/PROJECT-worktree.sh
+          bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
+
       - name: Configure git identity for the scaffold commit
         run: |
           git config --global user.email "ci@example.com"
