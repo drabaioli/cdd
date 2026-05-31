@@ -94,11 +94,12 @@ The implementation prompt is self-contained: it includes only context the implem
 
 ### 2.7 Slash commands (`.claude/commands/`)
 
-Project-level Claude Code slash commands. CDD ships four:
+Project-level Claude Code slash commands. CDD ships four active commands plus one deferred:
 
 - `/next-step`, exploratory session, run on main, produces a handoff.
 - `/pre-pr`, verification session, run on the feature branch, runs CI and reconciles docs.
 - `/merge-main`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
+- `/process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
 - `/bootstrap`, optional, used once at project start to scaffold the workflow files. Defer for now (see Section 6).
 
 Slash commands are declarative: they describe what to do, not how to orchestrate it. Orchestration (worktree creation, branch lifecycle) lives in the shell helpers.
@@ -131,7 +132,7 @@ Substitution order is significant: `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT
 
 ## 3. Lifecycle
 
-A task flows through CDD in five sessions plus one optional side-loop. Each session is a fresh Claude Code conversation with its own clean context.
+A task flows through CDD in five sessions plus two optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session is a fresh Claude Code conversation with its own clean context.
 
 ```
                        (on main worktree)
@@ -184,6 +185,19 @@ A task flows through CDD in five sessions plus one optional side-loop. Each sess
                             │
                             ▼
                      gh pr create + human review
+                            │
+                            │  (optional, if review left comments)
+                            ▼
+            ┌──────────────────────────────────┐
+            │ Session 5 (optional): /process-pr│
+            │                                  │
+            │ Read the PR's review comments.   │
+            │ Triage; human sees the plan.     │
+            │ Address them, pushing back       │
+            │ where warranted. Auto-post       │
+            │ replies, commit + push.          │
+            │ Back to PR review.               │
+            └──────────────────────────────────┘
                             │
                             ▼
                        gh pr merge (squash)
@@ -248,7 +262,15 @@ Output is a pass/fail summary across all the gates.
 
 The human runs `gh pr create`, reviews the PR (with full Claude assistance if desired, but in a fresh session, not the implementation session), and merges. Squash-merge is the default; the worktree script handles squash-merged branches as a first-class case.
 
-### 3.7 Worktree teardown
+### 3.7 Session 5 (optional): `/process-pr`
+
+Run on the feature branch when a review has left comments that need addressing. A fresh session reads the open PR's review comments (inline review threads, review summary bodies, and general conversation comments), processes only the unresolved ones, and triages them: change-request, question, nit, or discussion. It presents the triage plan to the human, then implements the change-requests and nits, answers the questions, and pushes back — disagreeing and explaining in the reply — on any change-request it judges wrong or risky rather than implementing it blindly.
+
+Unlike the other sessions, the GitHub-side actions are not gated: `/process-pr` auto-posts an in-thread reply to each processed comment and auto-commits and pushes the resulting changes. The rationale and the one checkpoint it retains are described in Section 4.
+
+After processing, the human re-runs `/pre-pr` before the PR goes back for re-review. This loop can repeat across review rounds.
+
+### 3.8 Worktree teardown
 
 The human runs `<project>-worktree-done` from the feature worktree. The script returns to main, pulls, removes the worktree (handling root-owned Docker artifacts via `sudo` with confirmation), resolves the branch, and deletes the handoff iff the branch was deleted.
 
@@ -264,6 +286,12 @@ Six explicit checkpoints. The human is also free to interject at any other point
 6. **PR merge** (after `/pre-pr`): standard GitHub PR review and merge.
 
 These six are the gates. The agent should never proceed past a gate without explicit human confirmation.
+
+### 4.1 The `/process-pr` exception
+
+`/process-pr` (Section 3.7) is a deliberate, documented exception to the rule above: it auto-posts GitHub replies and auto-commits + pushes **without** a confirmation gate. This is a conscious trade-off, not an oversight. It is justified by the loop's context: a single-user, fast review-iteration loop where the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Adding a gate before each reply or push would defeat the purpose of a tight address-and-re-review cycle.
+
+The command does retain one in-session checkpoint — it presents its triage plan (which comments it will address, and how) to the human before editing any files. And human-in-the-loop reasoning is preserved at the code level: the command pushes back on change-requests it judges wrong rather than implementing them blindly. What is dropped is only the confirmation gate on the outbound GitHub actions, not the judgment behind them.
 
 ## 5. Edit rules: who edits what, when
 

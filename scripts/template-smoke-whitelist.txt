@@ -23,6 +23,7 @@
 <one-line implication>
 <one of:>
 <repo-name>
+<sha>
 <short title>
 <the self-contained prompt from step 5>
 <unit test command>

@@ -39,6 +39,8 @@ Status: not started. Tasks here will be refined based on the friction log from P
 - [x] Add a `template-smoke` CI workflow that asserts the bootstrap produces a clean, link-valid tree. — `.github/workflows/template-smoke.yml` + `scripts/template-smoke-assert.sh`
 - [ ] Resolve any divergence between `./.claude/commands/` and `template/.claude/commands/` introduced during Phase 2.
 - [x] Add a `/pre-pr` check (in the CDD repo) for unintended drift between the two command sets.
+- [x] Add a `/process-pr` command: read the open PR's review comments for the current branch, triage and address them in-session (implement change-requests, answer questions), auto-post replies to each thread, and auto-commit + push the resulting changes. — `.claude/commands/process-pr.md` + byte-identical template copy; process doc §2.7 (command list), §3.7 (lifecycle box + prose), §4.1 (deliberate no-gate checkpoint exception). Auto-posts replies and commits/pushes without a gate by design; retains the in-session triage checkpoint.
+- [x] Auto-allow worktree sessions to read their handoff file (`~/.claude-handoffs/<project>/*`) so `cdd-worktree` no longer prompts for read permission on first launch. — committed `.claude/settings.json` (repo, scoped to `~/.claude-handoffs/cdd/**`) and `template/.claude/settings.json` (scoped to `~/.claude-handoffs/<PROJECT_DIR>/**`, substituted at bootstrap); worktrees inherit it via the checked-out tree.
 
 **Milestone:** template is ergonomic enough that bootstrapping a new project takes under five minutes.
 
