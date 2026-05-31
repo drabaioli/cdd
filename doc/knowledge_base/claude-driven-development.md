@@ -132,7 +132,7 @@ Substitution order is significant: `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT
 
 ## 3. Lifecycle
 
-A task flows through CDD in five sessions plus two optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session is a fresh Claude Code conversation with its own clean context.
+A task flows through CDD in up to five sessions, two of them optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session is a fresh Claude Code conversation with its own clean context.
 
 ```
                        (on main worktree)

@@ -16,7 +16,8 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── README.md                                 # repo entry point
 ├── bootstrap-cdd-project.sh                  # non-interactive bootstrap for new projects
 ├── .claude/
-│   └── commands/                             # this repo's slash commands
+│   ├── commands/                             # this repo's slash commands
+│   └── settings.json                         # auto-allows worktree sessions to read their handoff file
 ├── .github/
 │   └── workflows/                            # CI (template-smoke runs the bootstrap end-to-end)
 ├── demo/                                     # filled-in seed + create/teardown automation (third artifact)
