@@ -11,6 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Syntax-check the shell scripts
+        run: |
+          bash -n bootstrap-cdd-project.sh
+          bash -n scripts/template-smoke-assert.sh
+          bash -n template/tools/PROJECT-worktree.sh
+          bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
+
       - name: Configure git identity for the scaffold commit
         run: |
           git config --global user.email "ci@example.com"
@@ -28,3 +35,18 @@ jobs:
 
       - name: Show the scaffold commit
         run: git -C /tmp/smoke/demo-project log --oneline
+
+      - name: Create a demo instance via the seed overlay (no GitHub side effects)
+        run: ./demo/setup.sh mdr_demo_99 --base /tmp/smoke --local-only
+
+      - name: Assert the seeded instance is clean and carries the conflict seam
+        run: |
+          T=/tmp/smoke/mdr_demo_99
+          if grep -rnE '<PROJECT_(NAME|SLUG|DIR)>|\bPROJECT\b' "$T"; then
+            echo "found leftover placeholder tokens in the seeded instance" >&2
+            exit 1
+          fi
+          grep -q 'ACTIONS' "$T/doc/knowledge_base/roadmap.md"
+          grep -q 'inline_styles' "$T/doc/knowledge_base/roadmap.md"
+          test -f "$T/tools/mdr_demo_99-worktree.sh"
+          echo "demo seed overlay is clean"

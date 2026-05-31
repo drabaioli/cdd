@@ -17,14 +17,15 @@ Status: in progress.
 
 ## Phase 2: First downstream dogfooding
 
-Status: not started.
+Status: in progress.
 
-- [ ] Pick a small greenfield project to use as the first CDD trial.
-- [ ] Do the exploratory work outside CDD: language, tooling, top-level architecture, hand-written initial roadmap.
-- [ ] Bootstrap the new project from `template/`, including the placeholder substitution.
+- [x] Pick a small greenfield project to use as the first CDD trial. — Markdown Renderer (paste Markdown → live preview → copy as rich text for email/docs); see `demo/`
+- [x] Do the exploratory work outside CDD: language, tooling, top-level architecture, hand-written initial roadmap. — done in the `/next-step` discussion: Python/Flask, `markdown` library, an actions-pipeline architecture, and a 6-phase roadmap (`demo/seed/`)
+- [x] Bootstrap the new project from `template/`, including the placeholder substitution. — automated by `demo/setup.sh`, which wraps `bootstrap-cdd-project.sh --overlay demo/seed`
 - [ ] Run the first `/next-step` → implementation → `/pre-pr` → PR cycle on the downstream project.
 - [x] Keep a friction log: every awkward or missing piece, recorded outside the downstream project. — landed as `doc/knowledge_base/friction-log.md`
 - [ ] Complete at least three task cycles before drawing conclusions.
+- [x] Build the `demo/` subsystem: a filled-in seed (`demo/seed/`) plus create/teardown automation (`demo/setup.sh`, `demo/teardown.sh`) that doubles as a reproducible demo of the task cycle and the dogfooding greenfield. — third repo artifact alongside `template/` and `scripts/`
 
 **Milestone:** one real downstream project running CDD, with a friction log feeding back into the CDD roadmap.
 
