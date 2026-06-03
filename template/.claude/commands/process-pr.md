@@ -2,7 +2,7 @@ Address the open PR's review feedback: read the review comments for the current 
 
 Run this command on the feature branch (not on main), after a PR has been opened and someone has reviewed it. It is a post-review side-loop, analogous in position to `/merge-main`.
 
-**Note on automation:** unlike the other CDD commands, this one does **not** gate its GitHub-side actions. It auto-posts replies and auto-commits + pushes without asking. This is a deliberate exception (see the process doc, "The `/process-pr` exception"), justified by the single-user, fast review-iteration loop where the PR is open and every change is visible and revertable in git. The one checkpoint it keeps is the triage plan in step 4. Do not add confirmation gates around the GitHub actions.
+**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates (see the process doc, "The `/process-pr` exception"). Do not add per-action gates after the plan is approved. Review threads are never resolved by this command; the user resolves them.
 
 ## 1. Discover the open PR
 
@@ -37,7 +37,6 @@ query($owner:String!, $repo:String!, $pr:Int!) {
     pullRequest(number:$pr) {
       reviewThreads(first:100) {
         nodes {
-          id
           isResolved
           isOutdated
           comments(first:100) {
@@ -50,7 +49,7 @@ query($owner:String!, $repo:String!, $pr:Int!) {
 }' -F owner=OWNER -F repo=REPO -F pr=NUMBER
 ```
 
-Each thread node has a GraphQL `id` (used to reply/resolve) and a list of comments; the first comment's `databaseId` is the REST id used to reply in-thread.
+Each thread is a list of comments; the first comment's `databaseId` is the REST id used to reply in-thread.
 
 **Review summary bodies (the text a reviewer writes when approving / requesting changes):**
 
@@ -71,9 +70,10 @@ gh api repos/OWNER/REPO/issues/NUMBER/comments
 Process **only** what still needs action:
 
 - Skip any review thread where `isResolved` is `true`.
+- Skip any thread whose latest comment is your own reply (compare `author.login` against `gh api user -q .login`) — it was addressed in a previous run and is waiting on the reviewer.
 - Skip comments that are already addressed (e.g. a later commit or reply already handled them).
 
-This keeps re-runs idempotent: running `/process-pr` again after a review round only picks up the newly-unresolved items.
+This keeps re-runs idempotent: since the command never resolves threads itself, a re-run after a review round only picks up items with new reviewer activity.
 
 If nothing is unresolved, report "no open review feedback to process" and stop.
 
@@ -97,7 +97,7 @@ Present the plan compactly, e.g.:
 4. [nit]             general comment — "typo in log" → will fix.
 ```
 
-This is the one human checkpoint in this command. Wait for the user to confirm the triage before proceeding to edit. (The GitHub actions in steps 6–7 are not gated.)
+This is the one human checkpoint in this command. Wait for the user to confirm the triage before proceeding to edit. That approval covers the rest of the run, including the GitHub actions in steps 6–7.
 
 ## 5. Address the feedback
 
@@ -107,7 +107,7 @@ Implement the change-requests and nits. Apply project conventions from CLAUDE.md
 
 For questions, prepare the answer text. For discussion comments, prepare a brief reply.
 
-## 6. Post replies (no confirmation gate)
+## 6. Post replies
 
 Reply **in-thread** to each processed review thread — reply to the specific comment, not just a top-level PR comment — using the first comment's `databaseId`:
 
@@ -115,20 +115,14 @@ Reply **in-thread** to each processed review thread — reply to the specific co
 gh api -X POST repos/OWNER/REPO/pulls/NUMBER/comments/COMMENT_ID/replies -f body='...'
 ```
 
-Reply content by triage class:
+Keep every reply short — a sentence or two. Content by triage class:
 
 - **change-request (implemented):** a short "Addressed in `<sha>`." (reference the commit from step 7; if you commit first, you will have the sha; otherwise post the reply after committing).
-- **question:** the answer.
-- **declined change-request:** the reasoning for declining — clearly, not dismissively.
-- **nit / discussion:** a brief acknowledgement or reply.
+- **question:** the answer, briefly.
+- **declined change-request:** the reason for declining in a few plain sentences — direct, not dismissive, no essays.
+- **nit / discussion:** a one-line acknowledgement or reply.
 
-After a thread is genuinely addressed (change-request implemented or question answered), resolve it so re-runs skip it:
-
-```bash
-gh api graphql -f query='mutation($id:ID!){ resolveReviewThread(input:{threadId:$id}){ thread { isResolved } } }' -F id=THREAD_ID
-```
-
-Leave **declined** threads unresolved, so the human sees the open disagreement.
+Do **not** resolve threads — leave all of them, including addressed ones, for the user to resolve during re-review.
 
 For review-summary bodies and general conversation comments that have no inline thread to reply into, respond with a single top-level comment that references them:
 
@@ -136,7 +130,7 @@ For review-summary bodies and general conversation comments that have no inline 
 gh pr comment NUMBER --body '...'
 ```
 
-## 7. Commit and push (no confirmation gate)
+## 7. Commit and push
 
 Commit the code changes in logical groups, with messages referencing what each addressed. Follow the repo's commit conventions from CLAUDE.md, including the `Co-Authored-By` trailer.
 
@@ -158,8 +152,4 @@ Summarize what was processed:
 - Questions answered: <count>
 - Change-requests declined: <count> (replies explain why)
 - Commits pushed: <count>
-
-Next: re-run /pre-pr in a fresh session before the PR goes back for re-review.
 ```
-
-The user should re-run `/pre-pr` before re-requesting review, so the updated branch passes all gates.

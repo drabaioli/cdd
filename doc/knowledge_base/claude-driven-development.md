@@ -192,7 +192,7 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
             │ Session 5 (optional): /process-pr│
             │                                  │
             │ Read the PR's review comments.   │
-            │ Triage; human sees the plan.     │
+            │ Triage; human approves the plan. │
             │ Address them, pushing back       │
             │ where warranted. Auto-post       │
             │ replies, commit + push.          │
@@ -266,9 +266,9 @@ The human runs `gh pr create`, reviews the PR (with full Claude assistance if de
 
 Run on the feature branch when a review has left comments that need addressing. A fresh session reads the open PR's review comments (inline review threads, review summary bodies, and general conversation comments), processes only the unresolved ones, and triages them: change-request, question, nit, or discussion. It presents the triage plan to the human, then implements the change-requests and nits, answers the questions, and pushes back — disagreeing and explaining in the reply — on any change-request it judges wrong or risky rather than implementing it blindly.
 
-Unlike the other sessions, the GitHub-side actions are not gated: `/process-pr` auto-posts an in-thread reply to each processed comment and auto-commits and pushes the resulting changes. The rationale and the one checkpoint it retains are described in Section 4.
+Approving the triage plan is the session's single checkpoint: once the human approves it, the rest of the run — the edits, the in-thread replies, the commit, the push — executes without further confirmation gates. The rationale is described in Section 4. Review threads are never resolved by the command; resolving them is the human's call during re-review.
 
-After processing, the human re-runs `/pre-pr` before the PR goes back for re-review. This loop can repeat across review rounds.
+This loop can repeat across review rounds.
 
 ### 3.8 Worktree teardown
 
@@ -289,9 +289,9 @@ These six are the gates. The agent should never proceed past a gate without expl
 
 ### 4.1 The `/process-pr` exception
 
-`/process-pr` (Section 3.7) is a deliberate, documented exception to the rule above: it auto-posts GitHub replies and auto-commits + pushes **without** a confirmation gate. This is a conscious trade-off, not an oversight. It is justified by the loop's context: a single-user, fast review-iteration loop where the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Adding a gate before each reply or push would defeat the purpose of a tight address-and-re-review cycle.
+In `/process-pr` (Section 3.7) the gate sits up front rather than on each action: the human approves the triage plan (which comments will be addressed, and how) before any file is edited, and that single approval authorizes everything that follows — the edits, the in-thread replies, the commit, and the push. There is no second confirmation before the GitHub-side actions. This is a conscious trade-off, not an oversight: in a single-user, fast review-iteration loop the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Re-confirming each reply or push after the plan was already approved would defeat the purpose of a tight address-and-re-review cycle.
 
-The command does retain one in-session checkpoint — it presents its triage plan (which comments it will address, and how) to the human before editing any files. And human-in-the-loop reasoning is preserved at the code level: the command pushes back on change-requests it judges wrong rather than implementing them blindly. What is dropped is only the confirmation gate on the outbound GitHub actions, not the judgment behind them.
+Human-in-the-loop judgment is preserved where it matters: the plan is approved before execution, and the command pushes back on change-requests it judges wrong rather than implementing them blindly. What is dropped is only repeated confirmation of the outbound actions that execute the approved plan. Review threads are also never auto-resolved — the human resolves them during re-review.
 
 ## 5. Edit rules: who edits what, when
 
