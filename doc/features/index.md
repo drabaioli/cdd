@@ -13,7 +13,8 @@ Audience: developers considering whether to adopt CDD on their own projects; con
 A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`bootstrap-cdd-project.sh` at the CDD repo root) that together start a new project on CDD. Template contents:
 
 - `CLAUDE.md` skeleton with placeholders for project-specific content.
-- `.claude/commands/{next-step,pre-pr,merge-main}.md`: the three slash commands.
+- `.claude/commands/{next-step,pre-pr,merge-main,process-pr}.md`: the four slash commands.
+- `.claude/settings.json`: auto-allows worktree sessions to read their handoff file (`~/.claude-handoffs/<PROJECT_DIR>/**`), substituted at bootstrap.
 - `doc/{architecture,features,knowledge_base}/`: doc directory skeletons.
 - `tools/PROJECT-worktree.sh`: worktree helper, renamed and substituted to `<PROJECT_SLUG>-worktree.sh` by the bootstrap script.
 - `BOOTSTRAP.md`: meta-documentation for the bootstrap recipe. Not copied into the bootstrapped tree.
@@ -39,6 +40,6 @@ Audience: anyone demoing CDD to others, and the maintainer dogfooding CDD on a r
 
 ## Status
 
-Both features are usable. The process doc is complete enough to follow. The template + bootstrap script have been used to bootstrap the first downstream project (`sprint-planning-automation-poc`); the friction surfaced there is recorded in `doc/knowledge_base/friction-log.md` and folded back into the template and process doc. The manual sed recipe that was the known weak spot has been replaced by the non-interactive script and is CI-guarded.
+All three are usable. The process doc is complete enough to follow. The template + bootstrap script have been used to bootstrap the first downstream project (`sprint-planning-automation-poc`); the friction surfaced there is recorded in `doc/knowledge_base/friction-log.md` and folded back into the template and process doc. The manual sed recipe that was the known weak spot has been replaced by the non-interactive script and is CI-guarded.
 
 See `doc/knowledge_base/roadmap.md` for the planned work.
