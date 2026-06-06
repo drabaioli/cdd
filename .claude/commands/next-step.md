@@ -34,6 +34,8 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 
 If multiple items could reasonably be "next" (including items that could be done in parallel in separate worktrees), present them and let the user pick. Be explicit about which items overlap in the modules they would touch; parallel work assumes minimal overlap.
 
+**First-task survey hook.** If `doc/architecture/index.md` and `doc/features/index.md` are still unfilled skeletons and the roadmap contains no real unchecked tasks (only placeholder content), this is a freshly bootstrapped or freshly retrofitted project. In that case, propose as the first task: survey the existing codebase, draft the initial architecture doc, and generate a roadmap from the current backlog. Treat it as a normal candidate task — it still goes through the discussion and handoff steps below.
+
 ## 4. Iterate (cheap clarification only)
 
 Discuss with the user. Ask clarifying questions, but keep them to the requirements that are **cheap to resolve here**: questions where the right answer follows from the roadmap, from architecture docs, or from a brief discussion. Examples of cheap clarification:

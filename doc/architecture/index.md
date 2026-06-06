@@ -38,7 +38,9 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 
 The process doc references the template by example (it describes what a CLAUDE.md should contain; the template provides a concrete skeleton). The template does not reference the process doc by default. A downstream project using the template does not get a copy of the process doc; the template is self-sufficient for users who don't need the philosophy.
 
-The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conceptually the same files, with the repo's own copy free to drift if it needs CDD-specific behaviour. Unintended drift is a defect.
+The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conceptually the same files, with the repo's own copy free to drift if it needs CDD-specific behaviour. Unintended drift is a defect. One command is deliberately one-sided: `/retrofit` (`.claude/commands/retrofit.md`) lives only in the CDD repo — it installs CDD into an existing project or upgrades a project already on CDD, operating *on* targets from a CDD-repo session, so the template ships no copy.
+
+Like `demo/setup.sh`, `/retrofit` does not duplicate substitution logic: its install mode drives `bootstrap-cdd-project.sh --stage`, a render-only mode (no `git init`, no scaffold commit) that stages a fully substituted template tree which the command then merges into the target interactively. Its upgrade mode additionally uses `--template-dir` to render an old template snapshot through the same single code path. The bootstrap script writes a one-line baseline marker, `.claude/cdd-baseline` (the CDD repo commit the template was rendered from), into every bootstrapped or staged tree; upgrade mode uses it as the three-way merge base for distinguishing template evolution from local customization.
 
 ## The demo layer
 

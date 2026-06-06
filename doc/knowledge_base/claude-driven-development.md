@@ -102,6 +102,8 @@ Project-level Claude Code slash commands. CDD ships four active commands plus on
 - `/process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
 - `/bootstrap`, optional, used once at project start to scaffold the workflow files. Defer for now (see Section 6).
 
+One additional command exists in the CDD repo only and is deliberately not shipped in the template: `/retrofit`, which installs CDD into an existing project or upgrades a project already running it (see Section 6). It operates *on* target projects from a CDD-repo session, so downstream projects have no use for a copy; this is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/`.
+
 Slash commands are declarative: they describe what to do, not how to orchestrate it. Orchestration (worktree creation, branch lifecycle) lives in the shell helpers.
 
 ### 2.8 Worktree shell helpers (`tools/<slug>-worktree.sh`)
@@ -129,6 +131,12 @@ Every CDD project carries three distinct identifiers, and the template encodes t
 Internally, `template/tools/PROJECT-worktree.sh` also uses a bare `PROJECT` token where shell function names are defined; angle-bracketed placeholders aren't valid shell identifiers, so this token is a substitution artifact local to that file. It receives the same value as `<PROJECT_SLUG>` during bootstrap.
 
 Substitution order is significant: `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>` are substituted first (the angle brackets keep them unambiguous), and bare `PROJECT` only inside the renamed worktree script. The bootstrap script (see Section 6) enforces this.
+
+### 2.10 The template baseline marker (`.claude/cdd-baseline`)
+
+Every bootstrapped or retrofitted project carries a one-line marker file, `.claude/cdd-baseline`, holding the commit hash of the CDD repo the template was rendered from (or the literal `unknown` when the bootstrap script runs outside a git checkout of the CDD repo). The marker is written by `bootstrap-cdd-project.sh` and by `/retrofit`; no template file ships it, because its value only exists at render time.
+
+Its sole purpose is to anchor `/retrofit`'s upgrade mode: with the baseline hash, the old template a project started from can be recovered (`git show <hash>:template/<file>` in the CDD repo) and a three-way comparison can distinguish "the CDD template evolved" from "the project customized this file". Projects bootstrapped before the marker existed fall back to heuristic two-way diffing; the first upgrade writes the marker going forward.
 
 ## 3. Lifecycle
 
@@ -313,7 +321,7 @@ The `next-step` session is read-only on the repo. This keeps its job narrow: rea
 
 ## 6. Known gaps and deferred design
 
-Three areas are intentionally out of scope for the first version of the template.
+Several areas were intentionally out of scope for the first version of the template; the last of them (adapting an existing project) is now addressed by `/retrofit`.
 
 **Greenfield bootstrap.** How a project gets its first roadmap, its first CLAUDE.md, and its first architecture skeleton. Exploratory work (research, prototyping, reading) generally happens outside Claude Code. A `/bootstrap` command could plausibly take a project brief and a draft roadmap and produce structured starting files, but the exploratory work itself doesn't fit cleanly inside the git + Claude Code substrate. Worth revisiting once the template has been used on a few greenfield projects.
 
@@ -323,7 +331,12 @@ The current recommended approach for greenfield bootstrap is to run `bootstrap-c
 
 **Template opinionation per project type.** The current template encodes the workflow, but the project-specific bits (build commands, language constraints, module layout) are placeholders. Different project archetypes (firmware, web app, library, data pipeline) probably want different opinionated defaults for those placeholders. Worth deriving from real usage rather than guessing up front.
 
-**Adapting an existing project.** Out of scope for now. A retrofit process likely looks like: write CLAUDE.md, write an initial architecture doc by having Claude survey the codebase, generate a roadmap from the current backlog, then start using the workflow. The doc-reconciliation discipline is the bigger ask; existing projects without it will have a painful first few PRs as the docs are made to reflect reality. Revisit after greenfield template is stable.
+**Adapting an existing project.** Addressed by `/retrofit`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session with the target project's path as argument. It auto-detects which of two modes applies:
+
+- *Install mode* — the target has no CDD scaffolding. A files-only install of the template: slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, with placeholder substitution done by `bootstrap-cdd-project.sh` in a render-only staging mode (the command never reimplements substitution). Files missing from the target are copied; collisions with existing files (a project's own `CLAUDE.md`, for instance) are merged interactively, one file at a time, with human approval — never overwritten silently. No codebase survey happens at install time: the project's first `/next-step` detects the still-skeleton docs and empty roadmap and proposes the survey — draft the initial architecture doc and generate a roadmap from the current backlog — as the first task.
+- *Upgrade mode* — the target already runs CDD. Using the baseline marker (Section 2.10) as the merge base, each CDD-managed file is compared three ways: improvements the CDD template has accrued are proposed for application; local customizations are preserved; files changed on both sides get an interactive merge. Local changes that look general rather than project-specific are not silently kept local — they are surfaced as candidates to upstream into the CDD repo. Every change that touches a project file is approved per file; the checkpoints of Section 4 apply in spirit here too.
+
+The doc-reconciliation discipline remains the bigger ask; existing projects without it will have a painful first few PRs as the docs are made to reflect reality.
 
 ## 7. Template directory layout
 

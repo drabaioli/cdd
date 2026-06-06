@@ -56,9 +56,10 @@ Status: not started. Depends on Phase 2 and 3 surfacing what the manual flow act
 
 ## Phase 5: Retrofit existing projects
 
-Status: not started. Depends on the greenfield path being solid.
+Status: in progress.
 
-- [ ] Design a retrofit playbook: survey existing codebase with Claude, produce initial architecture doc, generate roadmap from current backlog, install slash commands and worktree helper.
+- [x] Implement a /retrofit command (CDD repo) that installs CDD into an existing project (files-only) or upgrades a project already on CDD, preserving local customizations and surfacing upstreamable improvements.
+- [x] Extend the template /next-step to propose codebase survey + initial architecture doc + roadmap generation when docs are still skeletons.
 - [ ] Trial the retrofit on one existing project.
 - [ ] Document the doc-reconciliation cost: existing projects without prior discipline will likely have a painful first few PRs as the docs are made to reflect reality.
 

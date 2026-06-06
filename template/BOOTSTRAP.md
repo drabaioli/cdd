@@ -12,6 +12,7 @@ After bootstrap, the new project directory contains:
 <PROJECT_DIR>/
 ├── CLAUDE.md                                 # entry point Claude Code reads
 ├── .claude/
+│   ├── cdd-baseline                          # CDD repo commit the template was rendered from
 │   └── commands/
 │       ├── next-step.md                      # exploratory session
 │       ├── pre-pr.md                         # verification session
@@ -61,8 +62,9 @@ The script will:
 2. Copy `template/` into the target, excluding this `BOOTSTRAP.md`.
 3. Rename `tools/PROJECT-worktree.sh` → `tools/<slug>-worktree.sh`.
 4. Substitute `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>`, and the in-script bare `PROJECT` token, in that order.
-5. Run `git init -b main` and create an initial scaffold commit.
-6. Print a "next steps" block including the exact `source` line to add to your `~/.bashrc`.
+5. Write the baseline marker `.claude/cdd-baseline` (the CDD repo commit hash the template was rendered from; used later by `/retrofit`'s upgrade mode).
+6. Run `git init -b main` and create an initial scaffold commit.
+7. Print a "next steps" block including the exact `source` line to add to your `~/.bashrc`.
 
 ## After bootstrap
 
