@@ -7,6 +7,7 @@
 #   - BOOTSTRAP.md was not copied
 #   - relative markdown links in CLAUDE.md and the roadmap resolve
 #   - .claude/commands/ contains no <...> tokens outside the whitelist
+#   - the baseline marker .claude/cdd-baseline is present and well-formed
 #
 # Usage: scripts/template-smoke-assert.sh /path/to/bootstrapped/tree
 
@@ -71,6 +72,7 @@ check_links() {
 }
 
 check_links CLAUDE.md
+check_links doc/index.md
 check_links doc/knowledge_base/roadmap.md
 
 # 5. .claude/commands/*.md: no <...> tokens outside the whitelist.
@@ -95,5 +97,12 @@ for tok in "${found_tokens[@]}"; do
 done
 [[ $unexpected -eq 0 ]] || fail "$unexpected unexpected <...> token(s) in .claude/commands/ — update scripts/template-smoke-whitelist.txt if intentional"
 pass ".claude/commands/ tokens all whitelisted"
+
+# 6. Baseline marker: present, single line, a commit hash or "unknown".
+[[ -f .claude/cdd-baseline ]] || fail ".claude/cdd-baseline marker missing"
+if ! grep -qxE '[0-9a-f]{7,40}|unknown' .claude/cdd-baseline; then
+  fail ".claude/cdd-baseline is not a commit hash or 'unknown': $(cat .claude/cdd-baseline)"
+fi
+pass ".claude/cdd-baseline marker present and well-formed"
 
 echo "all smoke checks passed"

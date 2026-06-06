@@ -8,6 +8,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | ---------------------------------------------------- | ------------------------------------------------- |
 | Process document (philosophy, lifecycle, edit rules) | `doc/knowledge_base/claude-driven-development.md` |
 | Implementation roadmap                               | `doc/knowledge_base/roadmap.md`                   |
+| Documentation map                                    | `doc/index.md`                                    |
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
@@ -17,6 +18,8 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 
 **Read `doc/knowledge_base/claude-driven-development.md` before making any structural change to the workflow or template.** The process doc is the source of truth; the template is its instantiation. Changes flow process-first, template-second.
 
+Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need.
+
 ## Critical constraints (quick reference)
 
 - Two layers, kept consistent: process doc (`doc/knowledge_base/claude-driven-development.md`) and template (`template/`). A PR that touches the process doc but not the template (or vice versa) is suspicious and should be justified explicitly.
@@ -24,7 +27,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 - Template files use a three-identifier placeholder model — `<PROJECT_NAME>` (display), `<PROJECT_SLUG>` (shell-command slug), `<PROJECT_DIR>` (directory/repo slug) — plus a bare `PROJECT` token internal to `template/tools/PROJECT-worktree.sh` (substitution artifact, valued the same as `<PROJECT_SLUG>`). Free-form `<...>` text is fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable. See section 2.9 of the process doc for the model, and `template/BOOTSTRAP.md` for the bootstrap recipe.
 - The template is generic. Do not introduce content drawn from a specific downstream project (e.g. firmware-specific conventions, web-specific build commands) into `template/` files. Per-project-type variants are deferred design (see process doc section 6).
 - `demo/` is a third artifact, separate from `template/` and `scripts/`. Its filled-in seed (`demo/seed/`) holds concrete "Markdown Renderer" project content — which is allowed *because* it lives under `demo/`. None of it may leak into `template/`. `demo/setup.sh` must keep wrapping `bootstrap-cdd-project.sh` (via `--overlay`) rather than duplicating the substitution logic.
-- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. Treat divergence as something to either justify or fix.
+- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. Treat divergence as something to either justify or fix. One justified one-sided case: `/retrofit` (`.claude/commands/retrofit.md`) lives only in the CDD repo — it operates *on* target projects from a CDD session, so the template ships no copy.
 
 ## Build & test
 

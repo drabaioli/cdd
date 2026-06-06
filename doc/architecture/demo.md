@@ -1,0 +1,5 @@
+# The demo layer
+
+`demo/` is a **third artifact**, distinct from the process and template layers and from `scripts/`. It is *not* part of the template: it holds a **filled-in** seed project ("Markdown Renderer", under `demo/seed/`) plus create/teardown automation (`demo/setup.sh`, `demo/teardown.sh`, `demo/lib.sh`). Concrete, project-specific content is allowed here precisely because it lives under `demo/` and never leaks into `template/`, which stays generic.
+
+The automation does not duplicate bootstrap logic: `setup.sh` wraps `bootstrap-cdd-project.sh` with its `--overlay` flag, which copies the seed over the template tree before placeholder substitution, so the seed's `<PROJECT_NAME>`/`<PROJECT_SLUG>`/`<PROJECT_DIR>` placeholders are substituted by the same single code path. The seed doubles as a reproducible demo of the CDD task cycle (one reviewable PR, two parallel branches that conflict, a `/merge-main` that both resolves the conflict and delivers a dependency) and as the Phase 2 dogfooding greenfield. See `demo/README.md`.

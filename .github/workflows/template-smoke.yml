@@ -36,6 +36,28 @@ jobs:
       - name: Show the scaffold commit
         run: git -C /tmp/smoke/demo-project log --oneline
 
+      - name: Stage a render-only tree and assert it is clean
+        run: |
+          ./bootstrap-cdd-project.sh --stage \
+            --name "Stage Test" \
+            --slug stagetest \
+            --dir stage-test \
+            --path /tmp/smoke/stage-render
+          test ! -d /tmp/smoke/stage-render/.git
+          ./scripts/template-smoke-assert.sh /tmp/smoke/stage-render
+
+      - name: Render from an extracted template snapshot via --template-dir
+        run: |
+          mkdir -p /tmp/smoke/snapshot
+          git archive HEAD template | tar -x -C /tmp/smoke/snapshot
+          ./bootstrap-cdd-project.sh --stage \
+            --name "Snapshot Test" \
+            --slug snaptest \
+            --dir snap-test \
+            --template-dir /tmp/smoke/snapshot/template \
+            --path /tmp/smoke/snapshot-render
+          ./scripts/template-smoke-assert.sh /tmp/smoke/snapshot-render
+
       - name: Create a demo instance via the seed overlay (no GitHub side effects)
         run: ./demo/setup.sh mdr_demo_99 --base /tmp/smoke --local-only
 
