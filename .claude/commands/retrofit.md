@@ -37,7 +37,7 @@ State the detected mode and the evidence to the user before proceeding, and let 
 
 ## 3. Install mode
 
-A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the project's first `/next-step` proposes that as the first task (the template's survey hook fires when the docs are still skeletons).
+A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/next-step` picks those up as the next unchecked tasks.
 
 ### 3.1 Confirm the three identifiers
 
@@ -75,7 +75,7 @@ Walk every file in `$STAGE/render`:
 
 - Remove `$STAGE`.
 - Do **not** run any git commands in the target (the project owns its git history); suggest the user review and commit the new files themselves.
-- Print next steps, mirroring the bootstrap script's output: the exact `source` line for `<target>/tools/<PROJECT_SLUG>-worktree.sh` to add to `~/.bashrc`; fill in any `CLAUDE.md` stubs; then run `/next-step` in the target — it will propose the codebase survey + initial architecture doc + roadmap generation as the first task.
+- Print next steps, mirroring the bootstrap script's output: the exact `source` line for `<target>/tools/<PROJECT_SLUG>-worktree.sh` to add to `~/.bashrc`; then run `/next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task.
 
 ## 4. Upgrade mode
 
@@ -122,7 +122,7 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 
 ### 4.4 Three-way comparison, per CDD-managed file
 
-The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/README.md`, `tools/<slug>-worktree.sh`. (`CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
+The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/README.md`, `tools/<slug>-worktree.sh`. (`CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
 
 For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file:
 

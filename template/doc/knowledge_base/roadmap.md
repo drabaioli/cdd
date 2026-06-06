@@ -4,7 +4,18 @@ Ordered implementation sequence for building <PROJECT_NAME>. Each phase builds o
 
 This file is the central artifact of the Claude-Driven Development workflow. It is simultaneously a plan, a progress log, and a context document for future sessions. See "Annotation conventions" below for what (and what not) to write next to a completed checkbox.
 
-## Phase 1: <Phase title>
+## Phase 1: CDD bootstrap
+
+Get the CDD substrate to reflect reality: survey what exists, write the initial docs, and turn this file into a real plan. On a greenfield project some of these tasks are near-trivial — do the thin version and move on.
+
+- [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted. For a greenfield project, write architecture guidelines and intentions instead.
+- [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability. Likely empty for a greenfield project.
+- [ ] Fill in the `CLAUDE.md` stubs: project description, critical constraints, build/test commands, module layout.
+- [ ] Fill in this roadmap: replace the placeholder phases below with the project's real plan, slotting in items from "Suggested infrastructure tasks" where they fit.
+
+**Milestone: the docs describe the project as it actually is, and the roadmap below is a real plan.**
+
+## Phase 2: <Phase title>
 
 <One paragraph: what this phase achieves and what milestone it ends on.>
 
@@ -14,7 +25,7 @@ This file is the central artifact of the Claude-Driven Development workflow. It 
 
 **Milestone: <one sentence describing the observable end state of this phase>.**
 
-## Phase 2: <Phase title>
+## Phase 3: <Phase title>
 
 <One paragraph.>
 
@@ -25,6 +36,18 @@ This file is the central artifact of the Claude-Driven Development workflow. It 
 ## Phase N: <...>
 
 <Continue as needed.>
+
+## Suggested infrastructure tasks
+
+Slot these into the phases above where they fit — usually spread across the early phases, not bundled into one. Drop the ones that don't apply; delete this section once it has been folded in.
+
+- Set up CI: build + tests on every PR.
+- Add linting and a format check (and a pre-commit hook if wanted).
+- Establish coding guidelines (under `doc/knowledge_base/`), if the language or team needs them.
+- Add unit tests; add integration tests once there are module boundaries worth crossing.
+- Write or refresh the README: what the project is, how to build and run it.
+- Pin or lock dependencies; document the toolchain versions.
+- Set up release / versioning conventions, if the project ships artifacts.
 
 ## Key principles
 
