@@ -4,7 +4,7 @@ This is the central workflow artifact for the CDD project. Tasks are grouped int
 
 ## Phase 1: MVP shipped
 
-Status: in progress.
+Write the process document, draft the template, and get the repo self-hosting CDD on GitHub.
 
 - [x] Write the process document (`doc/knowledge_base/claude-driven-development.md`).
 - [x] Draft the template files (CLAUDE.md skeleton, slash commands, worktree helper, doc skeletons, template README).
@@ -17,7 +17,7 @@ Status: in progress.
 
 ## Phase 2: First downstream dogfooding
 
-Status: in progress.
+Run the workflow end-to-end on a first real downstream project and capture every awkward or missing piece.
 
 - [x] Pick a small greenfield project to use as the first CDD trial. — Markdown Renderer (paste Markdown → live preview → copy as rich text for email/docs); see `demo/`
 - [x] Do the exploratory work outside CDD: language, tooling, top-level architecture, hand-written initial roadmap. — done in the `/next-step` discussion: Python/Flask, `markdown` library, an actions-pipeline architecture, and a 6-phase roadmap (`demo/seed/`)
@@ -31,7 +31,7 @@ Status: in progress.
 
 ## Phase 3: Template refinement from real usage
 
-Status: not started. Tasks here will be refined based on the friction log from Phase 2.
+Fold the Phase 2 friction log back into the template and commands; tasks here are refined as friction surfaces.
 
 - [ ] Refine `/merge-main` based on first real merge encountered (logic is currently untested).
 - [x] Improve the placeholder-substitution recipe in the template README (current weak spot, known limitation). — README renamed to `template/BOOTSTRAP.md`; sed recipe replaced by `bootstrap-cdd-project.sh`
@@ -46,7 +46,7 @@ Status: not started. Tasks here will be refined based on the friction log from P
 
 ## Phase 4: Greenfield bootstrap automation
 
-Status: not started. Depends on Phase 2 and 3 surfacing what the manual flow actually looks like.
+Turn the manual greenfield start into a single `/bootstrap` command. Depends on Phases 2 and 3 surfacing what the manual flow actually looks like.
 
 - [ ] Design a `/bootstrap` slash command that takes a project brief and a draft roadmap and produces structured starting files.
 - [ ] Decide where `/bootstrap` runs: outside any project (one-shot CLI), inside the empty target directory, or inside the CDD repo with an output path argument.
@@ -56,10 +56,10 @@ Status: not started. Depends on Phase 2 and 3 surfacing what the manual flow act
 
 ## Phase 5: Retrofit existing projects
 
-Status: in progress.
+Bring CDD to projects that already exist: files-only install, baseline-anchored upgrade, and a first real retrofit trial.
 
 - [x] Implement a /retrofit command (CDD repo) that installs CDD into an existing project (files-only) or upgrades a project already on CDD, preserving local customizations and surfacing upstreamable improvements.
-- [x] Extend the template /next-step to propose codebase survey + initial architecture doc + roadmap generation when docs are still skeletons.
+- [x] Have a freshly bootstrapped or retrofitted project propose the codebase survey + initial docs as its first task. — landed as a pre-filled bootstrap phase in the template roadmap (review moved it out of the /next-step hook)
 - [ ] Trial the retrofit on one existing project.
 - [ ] Document the doc-reconciliation cost: existing projects without prior discipline will likely have a painful first few PRs as the docs are made to reflect reality.
 
@@ -67,7 +67,7 @@ Status: in progress.
 
 ## Phase 6: Per-project-type variants
 
-Status: not started. Depends on having two or three filled-in `CLAUDE.md` files across project types to compare.
+Offer opinionated template variants per project archetype. Depends on having two or three filled-in `CLAUDE.md` files across project types to compare.
 
 - [ ] Identify variant axes (language, build tooling, test categories, deployment shape).
 - [ ] Propose a minimal set of opinionated variants (e.g. firmware, web app, library, data pipeline).
@@ -78,7 +78,7 @@ Status: not started. Depends on having two or three filled-in `CLAUDE.md` files 
 
 ## Phase 7: Team-mode extensions
 
-Status: not started. Depends on single-user usage being solid across several projects.
+Extend CDD from a single human in the loop to a small team. Depends on single-user usage being solid across several projects.
 
 - [ ] Decide where handoff files live in team mode (shared filesystem, repo-tracked under `.handoffs/`, or issue-tracker integration).
 - [ ] Design task selection visibility: how `/next-step` sees other team members' in-flight worktrees.
