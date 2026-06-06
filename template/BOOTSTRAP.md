@@ -13,15 +13,18 @@ After bootstrap, the new project directory contains:
 ├── CLAUDE.md                                 # entry point Claude Code reads
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
+│   ├── settings.json                         # auto-allows worktree sessions to read their handoff file
 │   └── commands/
 │       ├── next-step.md                      # exploratory session
 │       ├── pre-pr.md                         # verification session
-│       └── merge-main.md                     # merge from main, with dry-run
+│       ├── merge-main.md                     # merge from main, with dry-run
+│       └── process-pr.md                     # address PR review feedback
 ├── doc/
-│   ├── architecture/index.md                 # what the system is, structurally
-│   ├── features/index.md                     # what the system does
+│   ├── index.md                              # documentation map (pointer to the directories below)
+│   ├── architecture/index.md                 # what the system is, structurally (pointer index)
+│   ├── features/index.md                     # what the system does (pointer index)
 │   └── knowledge_base/
-│       ├── roadmap.md                        # central workflow artifact
+│       ├── roadmap.md                        # central workflow artifact, Phase 1 pre-filled
 │       └── README.md                         # explains the knowledge base
 └── tools/
     └── <PROJECT_SLUG>-worktree.sh            # worktree helper, already renamed
@@ -78,7 +81,7 @@ The script will:
 
 2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you.
 
-3. **Write the initial roadmap** in `doc/knowledge_base/roadmap.md`. The template ships an empty Phase 1 / Phase 2 / Phase N skeleton; the content is yours to write. Note that bootstrap has already initialised git and laid down the CDD scaffold, so Phase 1 should start from "add language/tooling scaffold" rather than "initialise the repo".
+3. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
 
 4. **Start the first task**: run `claude` from the project root and invoke `/next-step`. The per-repo handoff directory `~/.claude-handoffs/<PROJECT_DIR>/` is created on demand.
 

@@ -50,6 +50,8 @@ The roadmap is the central artifact. If it drifts from reality, the workflow los
 
 "What the system is now," structurally. Module boundaries, data flow, key interfaces, deployment topology, threading model. Updated continuously by the implementation session as it changes the system, and reconciled by `/pre-pr` against the diff.
 
+The directory is organised as an index plus per-topic documents. `index.md` is a pure pointer list — one link per document with a one-line summary — and the content lives in the per-topic docs (`overview.md`, `message-bus.md`, …). A session reads the index, then loads only the documents relevant to its task; this is the context-economy counterpart of CLAUDE.md staying thin. A top-level `doc/index.md` points at the architecture, features, and knowledge-base directories so a session can navigate the whole doc tree from one file, and CLAUDE.md's key-references table points at the indexes.
+
 Architecture docs are load-bearing for the agent: when a new session opens with no memory of previous work, these docs (linked from CLAUDE.md) are how it rebuilds its mental model. If the architecture docs are wrong, the agent's plans will be wrong.
 
 ### 2.4 Feature docs (`doc/features/`)
@@ -57,6 +59,8 @@ Architecture docs are load-bearing for the agent: when a new session opens with 
 "What the system does," from a capability/user perspective. One doc per significant feature. Created or updated by the implementation session whenever a feature is added or changed in a user-visible way. Reconciled by `/pre-pr`.
 
 Feature docs serve human readers (what does this system do today?) and the agent (what's the contract this feature must preserve when I refactor near it?). On projects with no external "users" yet (greenfield internal tools, firmware), the audience is future-you and future-collaborators.
+
+The same index convention as architecture docs applies: `doc/features/index.md` is a pointer list; each feature doc carries the content.
 
 ### 2.5 Knowledge base (`doc/knowledge_base/`)
 
@@ -67,6 +71,8 @@ Project metadata and history. The roadmap lives here. So do:
 - Investigation notes: deep dives done in the course of the project that don't fit into architecture or feature docs.
 
 The knowledge base is mostly append-only. Decisions are not rewritten when they are superseded; new decisions are added that supersede them, with a reference back. This preserves the reasoning trail.
+
+A common member of the knowledge base is the project's **founding document**: the investigation that led to creating and structuring the project, usually written before any code exists, and the main input to the first roadmap. Founding documents follow the decision-record rule: they are not kept current. After bootstrap their purpose shifts from driving the project to preserving the reasoning trail — why the project is shaped the way it is. Living context belongs to the architecture and feature docs and the roadmap; when a founding document contains structural description that proves durable, migrate it into `doc/architecture/` as the structure stabilises rather than maintaining it in place. (This repo's own `claude-driven-development.md` is a special case: here the founding document is also the shipped product, so unlike an ordinary founding document it *is* kept current — edits to it are edits to the deliverable.)
 
 ### 2.6 Handoff files (`~/.claude-handoffs/<repo-name>/<branch>.md`)
 
@@ -333,7 +339,7 @@ The current recommended approach for greenfield bootstrap is to run `bootstrap-c
 
 **Adapting an existing project.** Addressed by `/retrofit`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session with the target project's path as argument. It auto-detects which of two modes applies:
 
-- *Install mode* — the target has no CDD scaffolding. A files-only install of the template: slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, with placeholder substitution done by `bootstrap-cdd-project.sh` in a render-only staging mode (the command never reimplements substitution). Files missing from the target are copied; collisions with existing files (a project's own `CLAUDE.md`, for instance) are merged interactively, one file at a time, with human approval — never overwritten silently. No codebase survey happens at install time: the project's first `/next-step` detects the still-skeleton docs and empty roadmap and proposes the survey — draft the initial architecture doc and generate a roadmap from the current backlog — as the first task.
+- *Install mode* — the target has no CDD scaffolding. A files-only install of the template: slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, with placeholder substitution done by `bootstrap-cdd-project.sh` in a render-only staging mode (the command never reimplements substitution). Files missing from the target are copied; collisions with existing files (a project's own `CLAUDE.md`, for instance) are merged interactively, one file at a time, with human approval — never overwritten silently. No codebase survey happens at install time: the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/next-step` picks those up as the next unchecked tasks.
 - *Upgrade mode* — the target already runs CDD. Using the baseline marker (Section 2.10) as the merge base, each CDD-managed file is compared three ways: improvements the CDD template has accrued are proposed for application; local customizations are preserved; files changed on both sides get an interactive merge. Local changes that look general rather than project-specific are not silently kept local — they are surfaced as candidates to upstream into the CDD repo. Every change that touches a project file is approved per file; the checkpoints of Section 4 apply in spirit here too.
 
 The doc-reconciliation discipline remains the bigger ask; existing projects without it will have a painful first few PRs as the docs are made to reflect reality.
@@ -346,17 +352,21 @@ The template ships as a directory copied into a new project root by `bootstrap-c
 <PROJECT_DIR>/
 ├── CLAUDE.md                                 # skeleton with placeholders, filled by hand after bootstrap
 ├── .claude/
+│   ├── cdd-baseline                          # written at render time, not shipped in the template
+│   ├── settings.json                         # auto-allows worktree sessions to read their handoff file
 │   └── commands/
 │       ├── next-step.md
 │       ├── pre-pr.md
-│       └── merge-main.md
+│       ├── merge-main.md
+│       └── process-pr.md
 ├── doc/
+│   ├── index.md                              # top-level pointer to the doc directories
 │   ├── architecture/
-│   │   └── index.md                          # placeholder
+│   │   └── index.md                          # pointer-list skeleton
 │   ├── features/
-│   │   └── index.md                          # placeholder
+│   │   └── index.md                          # pointer-list skeleton
 │   └── knowledge_base/
-│       ├── roadmap.md                        # placeholder
+│       ├── roadmap.md                        # pre-filled bootstrap phase + placeholder phases
 │       └── README.md                         # explains the knowledge base
 └── tools/
     └── <PROJECT_SLUG>-worktree.sh            # renamed and substituted by bootstrap
@@ -371,8 +381,7 @@ Bootstrap procedure for a new project:
    The basename of `--path` becomes the `<PROJECT_DIR>` slug.
 2. Add the worktree-helper source line to `~/.bashrc` (the script prints the exact line on success).
 3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
-4. Write the initial roadmap by hand (or generate with a one-off Claude session).
-5. Start the first `/next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand).
+4. Start the first `/next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand). The roadmap's pre-filled bootstrap phase carries the first tasks: survey the codebase, draft the initial architecture docs, and replace the placeholder phases with the project's real plan — a suggested-infrastructure list (CI, linting, tests, …) helps populate the early phases.
 
 ### 7.1 The CDD repo as its own project
 

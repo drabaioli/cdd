@@ -8,6 +8,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | ---------------------------------------------------- | ------------------------------------------------- |
 | Process document (philosophy, lifecycle, edit rules) | `doc/knowledge_base/claude-driven-development.md` |
 | Implementation roadmap                               | `doc/knowledge_base/roadmap.md`                   |
+| Documentation map                                    | `doc/index.md`                                    |
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
@@ -16,6 +17,8 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Demo / dogfooding subsystem (seed + automation)      | `demo/` (start with `demo/README.md`)             |
 
 **Read `doc/knowledge_base/claude-driven-development.md` before making any structural change to the workflow or template.** The process doc is the source of truth; the template is its instantiation. Changes flow process-first, template-second.
+
+Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need.
 
 ## Critical constraints (quick reference)
 

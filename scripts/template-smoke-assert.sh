@@ -72,6 +72,7 @@ check_links() {
 }
 
 check_links CLAUDE.md
+check_links doc/index.md
 check_links doc/knowledge_base/roadmap.md
 
 # 5. .claude/commands/*.md: no <...> tokens outside the whitelist.

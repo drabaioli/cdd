@@ -6,14 +6,17 @@
 
 | Topic                            | Location                                          |
 | -------------------------------- | ------------------------------------------------- |
-| System architecture & design     | `doc/architecture/` (start with `index.md`)       |
-| Feature documentation            | `doc/features/` (start with `index.md`)           |
+| Documentation map                | `doc/index.md`                                    |
+| System architecture & design     | `doc/architecture/index.md`                       |
+| Feature documentation            | `doc/features/index.md`                           |
 | Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
 | Design decisions                 | `doc/knowledge_base/` (decision records)          |
 
-**Read `doc/architecture/` before planning any feature or structural change.**
-**Read `doc/features/` before changing user-visible behaviour.**
-Keep architecture and feature docs current as part of every change.
+Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need.
+
+**Read `doc/architecture/index.md` (and the linked docs you need) before planning any feature or structural change.**
+**Read `doc/features/index.md` (and the relevant feature docs) before changing user-visible behaviour.**
+Keep architecture and feature docs — and their indexes — current as part of every change.
 
 ## Critical constraints (quick reference)
 
