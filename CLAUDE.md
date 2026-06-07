@@ -10,6 +10,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Implementation roadmap                               | `doc/knowledge_base/roadmap.md`                   |
 | Documentation map                                    | `doc/index.md`                                    |
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
+| Architecture decision records                        | `doc/architecture/adr/` (Nygard style)            |
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
 | Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
