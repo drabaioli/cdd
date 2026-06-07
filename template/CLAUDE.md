@@ -8,11 +8,12 @@
 | -------------------------------- | ------------------------------------------------- |
 | Documentation map                | `doc/index.md`                                    |
 | System architecture & design     | `doc/architecture/index.md`                       |
+| Architecture decision records    | `doc/architecture/adr/` (Nygard style)            |
 | Feature documentation            | `doc/features/index.md`                           |
 | Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
 | Design decisions                 | `doc/knowledge_base/` (decision records)          |
 
-Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need.
+Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need. **`index.md` files are pointer lists only — content belongs in named subdocuments, not in the index itself.**
 
 **Read `doc/architecture/index.md` (and the linked docs you need) before planning any feature or structural change.**
 **Read `doc/features/index.md` (and the relevant feature docs) before changing user-visible behaviour.**

@@ -13,11 +13,16 @@ The seed project is **Markdown Renderer**: a small local Flask app where you pas
 
 ```
 demo/seed/
-├── CLAUDE.md                         # filled-in project context (Flask + markdown lib, actions pipeline)
+├── CLAUDE.md                              # filled-in project context (Flask + markdown lib, actions pipeline)
 └── doc/
-    ├── knowledge_base/roadmap.md     # the 6-phase roadmap
-    ├── architecture/index.md         # the actions-pipeline architecture
-    └── features/index.md             # the product's features
+    ├── knowledge_base/roadmap.md          # the 6-phase roadmap
+    ├── architecture/
+    │   ├── index.md                       # pointer list
+    │   ├── overview.md                    # the actions-pipeline architecture
+    │   └── adr/0000-template.md           # ADR template
+    └── features/
+        ├── index.md                       # pointer list
+        └── overview.md                    # planned features by phase
 ```
 
 The seed ships only the CDD scaffolding for the project — **no app code**. The Flask app is built by running CDD cycles (`/next-step` → implement → `/pre-pr` → PR) on a created instance; that is the demo/dogfooding itself.
@@ -39,11 +44,21 @@ demo/setup.sh mdr             # the kept dogfood instance "Markdown Renderer"
 demo/setup.sh mdr_demo_07     # a specific instance
 ```
 
-`setup.sh` wraps the repo-root `bootstrap-cdd-project.sh` (it does **not** reimplement substitution): bootstrap copies `template/`, overlays `demo/seed/` via `--overlay`, substitutes the identifiers, runs `git init`, and makes the scaffold commit. Then `setup.sh` always creates and pushes a GitHub repo with `gh repo create --source . --push` (private by default; pass `--public` to share).
+`setup.sh` wraps the repo-root `bootstrap-cdd-project.sh` (it does **not** reimplement substitution): bootstrap copies `template/`, overlays `demo/seed/` via `--overlay`, substitutes the identifiers, runs `git init`, and makes the scaffold commit. Then `setup.sh` creates and pushes a GitHub repo with `gh repo create --source . --push` (private by default; pass `--public` to share).
+
+After setup, `setup.sh` appends a marker-guarded block to `~/.bashrc` (default) so the instance's worktree helper is sourced automatically in new shells:
+
+```bash
+# --- CDD demo: mdr_demo_01 BEGIN ---
+[[ -f "$HOME/Code/mdr_demo_01/tools/mdr_demo_01-worktree.sh" ]] && source "$HOME/Code/mdr_demo_01/tools/mdr_demo_01-worktree.sh"
+# --- CDD demo: mdr_demo_01 END ---
+```
+
+The marker embeds the instance name so multiple parked demos coexist in the same rc file, and teardown removes exactly its own block. Use `--rc FILE` to target a different rc file. Under `--local-only` the rc file is not touched.
 
 Auto-numbering checks **both** local directories under the base **and** existing GitHub repos, so a parked demo (local or remote) never gets a colliding number.
 
-Options: `--name "Display Name"`, `--base DIR`, `--public`, `--local-only` (skip all GitHub steps — used by the smoke test).
+Options: `--name "Display Name"`, `--base DIR`, `--public`, `--rc FILE`, `--local-only` (skip GitHub steps and rc update — used by the smoke test).
 
 ## Teardown
 
@@ -51,6 +66,8 @@ Options: `--name "Display Name"`, `--base DIR`, `--public`, `--local-only` (skip
 demo/teardown.sh mdr_demo_03         # remove the local dir and delete the GitHub repo
 demo/teardown.sh mdr_demo_03 --local-only   # remove only the local directory
 ```
+
+Teardown removes the instance's marker-guarded block from `~/.bashrc` (default) before removing the local directory. Use `--rc FILE` to target the same file you passed to `setup.sh`. Under `--local-only`, the rc file is not touched.
 
 Teardown refuses to delete a directory that does not look like a bootstrapped CDD project (it checks for `CLAUDE.md` + `tools/*-worktree.sh`), and prompts for confirmation unless you pass `--yes`.
 

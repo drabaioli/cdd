@@ -23,17 +23,17 @@ Run the workflow end-to-end on a first real downstream project and capture every
 - [x] Do the exploratory work outside CDD: language, tooling, top-level architecture, hand-written initial roadmap. — done in the `/next-step` discussion: Python/Flask, `markdown` library, an actions-pipeline architecture, and a 6-phase roadmap (`demo/seed/`)
 - [x] Bootstrap the new project from `template/`, including the placeholder substitution. — automated by `demo/setup.sh`, which wraps `bootstrap-cdd-project.sh --overlay demo/seed`
 - [ ] Run the first `/next-step` → implementation → `/pre-pr` → PR cycle on the downstream project.
-- [x] Keep a friction log: every awkward or missing piece, recorded outside the downstream project. — landed as `doc/knowledge_base/friction-log.md`
+- [x] Keep a friction log: every awkward or missing piece, recorded outside the downstream project. — landed as `doc/knowledge_base/friction-log.md`; retired after mdr_demo_01 (friction addressed directly or via roadmap)
 - [ ] Complete at least three task cycles before drawing conclusions.
 - [x] Build the `demo/` subsystem: a filled-in seed (`demo/seed/`) plus create/teardown automation (`demo/setup.sh`, `demo/teardown.sh`) that doubles as a reproducible demo of the task cycle and the dogfooding greenfield. — third repo artifact alongside `template/` and `scripts/`
 
-**Milestone:** one real downstream project running CDD, with a friction log feeding back into the CDD roadmap.
+**Milestone:** one real downstream project running CDD, with friction from early usage folded back into the template.
 
 ## Phase 3: Template refinement from real usage
 
-Fold the Phase 2 friction log back into the template and commands; tasks here are refined as friction surfaces.
+Refine the template and commands from real usage; tasks here are driven by friction surfaced during dogfooding.
 
-- [ ] Refine `/merge-main` based on first real merge encountered (logic is currently untested).
+- [x] Refine `/merge-main` based on first real merge encountered — first real merge (mdr_demo_01 Phase 3, ACTIONS/toolbar conflict + `inline_styles()` delivery) succeeded with no changes needed.
 - [x] Improve the placeholder-substitution recipe in the template README (current weak spot, known limitation). — README renamed to `template/BOOTSTRAP.md`; sed recipe replaced by `bootstrap-cdd-project.sh`
 - [x] Add a `bootstrap.sh` script to the template that does rename + substitution non-interactively. — script lives at the CDD repo root (`bootstrap-cdd-project.sh`), not under `template/`; three-identifier model (`<PROJECT_NAME>` / `<PROJECT_SLUG>` / `<PROJECT_DIR>`)
 - [x] Add a `template-smoke` CI workflow that asserts the bootstrap produces a clean, link-valid tree. — `.github/workflows/template-smoke.yml` + `scripts/template-smoke-assert.sh`
@@ -41,6 +41,10 @@ Fold the Phase 2 friction log back into the template and commands; tasks here ar
 - [x] Add a `/pre-pr` check (in the CDD repo) for unintended drift between the two command sets.
 - [x] Add a `/process-pr` command: triage and address the open PR's review feedback, post in-thread replies, commit + push. — `.claude/commands/process-pr.md` + template copy; process doc §3.7, §4.1.
 - [x] Auto-allow worktree sessions to read their handoff file so `cdd-worktree` no longer prompts on first launch. — `.claude/settings.json` + template copy.
+- [x] Fix readable handoff path in `/next-step`: replace bash contraption with `<PROJECT_DIR>` placeholder (template) / `cdd` literal (CDD repo); add bash allow rules to settings.json. — mdr_demo_01 friction round
+- [x] rc-install in demo setup/teardown: `demo/setup.sh` appends a marker-guarded sourcing block to `~/.bashrc`; `demo/teardown.sh` removes it by marker. — mdr_demo_01 friction round
+- [x] Index-as-pointers rule: encode in process doc + template CLAUDE.md + skeleton index.md files; restructure demo seed docs into subdocuments. — mdr_demo_01 friction round
+- [x] ADRs: Nygard-style `doc/architecture/adr/NNNN-title.md`; ship template + CDD repo ADR directory; reference in process doc and CLAUDE.md. — mdr_demo_01 friction round
 
 **Milestone:** template is ergonomic enough that bootstrapping a new project takes under five minutes.
 

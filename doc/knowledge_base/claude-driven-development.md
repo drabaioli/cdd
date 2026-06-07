@@ -52,6 +52,10 @@ The roadmap is the central artifact. If it drifts from reality, the workflow los
 
 The directory is organised as an index plus per-topic documents. `index.md` is a pure pointer list — one link per document with a one-line summary — and the content lives in the per-topic docs (`overview.md`, `message-bus.md`, …). A session reads the index, then loads only the documents relevant to its task; this is the context-economy counterpart of CLAUDE.md staying thin. A top-level `doc/index.md` points at the architecture, features, and knowledge-base directories so a session can navigate the whole doc tree from one file, and CLAUDE.md's key-references table points at the indexes.
 
+**The `index.md` is a pointer list only.** Substantive content — descriptions, rationale, data flows — belongs in the named subdocuments, not in the index. An index that accumulates content defeats the selective-loading model: a session that reads the index to decide which subdoc to load ends up reading all the content anyway. If content is worth writing, it belongs in a named file.
+
+Architecture decision records (ADRs) live at `doc/architecture/adr/NNNN-short-title.md` and are listed from `doc/architecture/index.md`. Write an ADR for any structural decision that is not recoverable from the code or the existing docs: a choice of framework, a significant interface design, a constraint accepted for non-obvious reasons, a pattern adopted across the codebase. Nygard style: Title, Status, Context, Decision, Consequences. The ADR template lives at `doc/architecture/adr/0000-template.md`. ADRs are append-only; when a decision is superseded, add a new ADR and update the old one's Status to "Superseded by NNNN".
+
 Architecture docs are load-bearing for the agent: when a new session opens with no memory of previous work, these docs (linked from CLAUDE.md) are how it rebuilds its mental model. If the architecture docs are wrong, the agent's plans will be wrong.
 
 ### 2.4 Feature docs (`doc/features/`)
@@ -60,7 +64,7 @@ Architecture docs are load-bearing for the agent: when a new session opens with 
 
 Feature docs serve human readers (what does this system do today?) and the agent (what's the contract this feature must preserve when I refactor near it?). On projects with no external "users" yet (greenfield internal tools, firmware), the audience is future-you and future-collaborators.
 
-The same index convention as architecture docs applies: `doc/features/index.md` is a pointer list; each feature doc carries the content.
+The same index convention as architecture docs applies: `doc/features/index.md` is a pointer list; each feature doc carries the content. Do not accumulate feature descriptions in the index itself — put them in per-feature documents and link from the index.
 
 ### 2.5 Knowledge base (`doc/knowledge_base/`)
 
