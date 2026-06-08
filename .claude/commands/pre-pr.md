@@ -85,7 +85,7 @@ Known-expected drift today (flag these as "expected" when they appear):
 
 - In `next-step.md`: `cdd` ↔ `<PROJECT_SLUG>`
 - In `next-step.md`: `cdd-worktree` / `cdd-worktree-list` ↔ `<PROJECT_SLUG>-worktree` / `<PROJECT_SLUG>-worktree-list`
-- In `next-step.md`: `~/.claude-handoffs/cdd/` ↔ `~/.claude-handoffs/<repo-name>/`
+- In `next-step.md`: `~/.claude-handoffs/cdd/` ↔ `~/.claude-handoffs/<PROJECT_DIR>/`
 - In `next-step.md`: the template's extra `~/.bashrc` sourcing snippet block under "Next:" (present in template, absent in the CDD copy)
 - In `pre-pr.md`: this Section 7 ("Command-set drift") is CDD-meta-specific and intentionally absent from the template copy
 - `retrofit.md` exists only in `.claude/commands/` and intentionally has no template counterpart: it is a CDD-repo-only command that operates *on* target projects from a CDD session (see the process doc, Section 2.7). `diff -r` reports it as "Only in .claude/commands: retrofit.md" — flag as expected.

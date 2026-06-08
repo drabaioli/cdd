@@ -10,6 +10,6 @@ What this repo provides. This index is a pointer list — the content lives in t
 
 ## Status
 
-All three are usable. The process doc is complete enough to follow. The template + bootstrap script have been used to bootstrap the first downstream project (`sprint-planning-automation-poc`); the friction surfaced there is recorded in `doc/knowledge_base/friction-log.md` and folded back into the template and process doc. The manual sed recipe that was the known weak spot has been replaced by the non-interactive script and is CI-guarded.
+All three are usable. The process doc is complete enough to follow. The template + bootstrap script have been used to bootstrap the first downstream projects (`sprint-planning-automation-poc`, Markdown Renderer demo); friction surfaced from those uses has been folded back into the template and process doc. The manual sed recipe that was the known weak spot has been replaced by the non-interactive script and is CI-guarded.
 
 See `doc/knowledge_base/roadmap.md` for the planned work.

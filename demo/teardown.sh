@@ -8,6 +8,8 @@
 # Options:
 #   --base DIR     Base directory the instance lives in (default: $CDD_DEMO_BASE or ~/Code).
 #   --local-only   Only remove the local directory; leave the GitHub repo alone.
+#                  Also skips rc-file cleanup (mirrors setup.sh --local-only behaviour).
+#   --rc FILE      RC file to clean up (default: ~/.bashrc). Ignored under --local-only.
 #   --yes          Skip the confirmation prompt.
 #
 # Deleting the GitHub repo requires the 'delete_repo' scope on your gh token:
@@ -24,11 +26,13 @@ INSTANCE=""
 BASE_ARG=""
 LOCAL_ONLY=0
 ASSUME_YES=0
+RC_FILE="${HOME}/.bashrc"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --base)       BASE_ARG="${2:-}"; shift 2 ;;
     --local-only) LOCAL_ONLY=1; shift ;;
+    --rc)         RC_FILE="${2:-}"; shift 2 ;;
     --yes|-y)     ASSUME_YES=1; shift ;;
     -h|--help)    grep '^#' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
     -*)           demo_die "unknown option: $1" ;;
@@ -36,7 +40,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$INSTANCE" ]] || demo_die "usage: teardown.sh <instance> [--base DIR] [--local-only] [--yes]"
+[[ -n "$INSTANCE" ]] || demo_die "usage: teardown.sh <instance> [--base DIR] [--local-only] [--rc FILE] [--yes]"
 
 BASE="$(demo_base "$BASE_ARG")"
 TARGET="$BASE/$INSTANCE"
@@ -63,6 +67,19 @@ echo
 if (( ! ASSUME_YES )); then
   read -r -p "Proceed? [y/N] " reply
   [[ "$reply" == "y" || "$reply" == "Y" ]] || demo_die "aborted"
+fi
+
+# Remove the marker-guarded sourcing block from the rc file before removing the
+# local directory. Skipped under --local-only (mirrors setup.sh behaviour).
+if (( ! LOCAL_ONLY )); then
+  RC_MARKER_BEGIN="# --- CDD demo: ${INSTANCE} BEGIN ---"
+  RC_MARKER_END="# --- CDD demo: ${INSTANCE} END ---"
+  if [[ -f "$RC_FILE" ]] && grep -qF "$RC_MARKER_BEGIN" "$RC_FILE"; then
+    # Delete from BEGIN line to END line inclusive (works on GNU and BSD sed).
+    sed -i.bak "/$(printf '%s' "$RC_MARKER_BEGIN" | sed 's/[\/&]/\\&/g')/,/$(printf '%s' "$RC_MARKER_END" | sed 's/[\/&]/\\&/g')/d" "$RC_FILE" \
+      && rm -f "${RC_FILE}.bak"
+    echo "Removed worktree helper block for '${INSTANCE}' from $RC_FILE"
+  fi
 fi
 
 if [[ -d "$TARGET" ]]; then
