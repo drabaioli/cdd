@@ -336,6 +336,7 @@ The matrix below resolves any ambiguity about which session is allowed to touch 
 | Architecture docs       | no           | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
 | Feature docs            | no           | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
 | CLAUDE.md               | no           | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
+| README.md               | no           | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
 | Knowledge base (other)  | no           | yes if needed      | no            | yes if needed          | yes if review-driven   |
 | Code                    | no           | yes                | yes (merge)   | yes (review-driven)    | yes (review-driven)    |
 | Handoff file            | yes (write)  | no (read-only)     | no            | no                     | no                     |

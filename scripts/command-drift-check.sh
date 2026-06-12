@@ -10,9 +10,16 @@
 #     `<!-- cdd-only-end -->` lines (CDD-meta content), which are stripped before the
 #     comparison.
 #
-# Also asserts that the handoff schema headings match between the process doc (section
-# 2.6) and .claude/commands/next-step.md; the template copy of next-step.md is already
-# covered by the render-diff.
+# Also asserts:
+#   - the handoff schema headings match between the process doc (section 2.6) and
+#     .claude/commands/next-step.md; the template copy of next-step.md is already
+#     covered by the render-diff.
+#   - the worktree helpers (tools/cdd-worktree.sh vs the rendered template helper)
+#     match from the first function definition onward; everything above it is header
+#     commentary that intentionally differs between the two copies.
+#   - no cdd-only markers appear in template/.claude/commands/ — they belong in the
+#     repo copies only; a marker in the template would be stripped from both sides
+#     of the comparison above and hide real drift.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -66,6 +73,28 @@ for name in "${names[@]}"; do
     fail=1
   fi
 done
+
+# cdd-only fences belong in the repo copies only; strip_cdd_only runs on both sides,
+# so a marker in the template would silently hide the fenced content from the diff.
+if grep -rn 'cdd-only-\(begin\|end\)' template/.claude/commands/ >&2; then
+  echo "ERROR: cdd-only markers found in template/.claude/commands/ (see above); they belong in the repo copies only" >&2
+  fail=1
+fi
+
+# Worktree-helper consistency: the repo's own helper and the rendered template helper
+# must match from the first function definition onward. The header comment blocks
+# above it (sourcing instructions, usage docs) intentionally differ.
+helper_body() {
+  awk '!started && /^[A-Za-z_][A-Za-z0-9_-]*\(\)/ { started = 1 } started { print }' "$1"
+}
+
+if ! diff -u \
+    --label "tools/cdd-worktree.sh (from first function)" \
+    --label "template/tools/PROJECT-worktree.sh (rendered, from first function)" \
+    <(helper_body tools/cdd-worktree.sh) \
+    <(helper_body "$TMP/render/tools/cdd-worktree.sh"); then
+  fail=1
+fi
 
 # Handoff-schema consistency: print the `## ` headings inside the handoff schema block
 # (from the "# Task:" line to the end of its fenced code block) and compare.
