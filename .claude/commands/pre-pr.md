@@ -43,6 +43,7 @@ Check and **update** documentation based on the changes:
 - **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc to reflect it. Edit directly.
 - **Feature docs** (`doc/features/`): if user-visible behaviour changed or a new feature landed, update or add the relevant feature doc. Edit directly.
 - **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly.
+- **README.md**: if anything it states — quick start, layout, status, links — went stale relative to the change, update it. Edit directly.
 - **Roadmap** (`doc/knowledge_base/roadmap.md`):
   1. Tick any newly completed checkboxes directly.
   2. Identify items that should be **added, modified, or removed** based on what was implemented. Present these suggestions explicitly to the user **before** making any edits. Apply only on approval.
@@ -69,30 +70,22 @@ git log --oneline HEAD..origin/main
 
 If `origin/main` has advanced beyond the branch point, mention it and recommend running `/merge-main` before opening the PR. Do not merge from this session.
 
-## 7. Command-set drift
+<!-- cdd-only-begin -->
+## Command-set drift (CDD repo only)
 
 This check is specific to the CDD repo (the meta-project): it surfaces unintended divergence between the repo's own `.claude/commands/` and the `template/.claude/commands/` it ships to downstream projects.
 
 ```bash
-diff -r .claude/commands template/.claude/commands
+./scripts/command-drift-check.sh
 ```
 
-If there is no output, report "no drift" and continue.
+The script renders the template through `bootstrap-cdd-project.sh --stage` with this repo's own identifiers, so expected substitution drift cancels out mechanically. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-meta-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. The same script asserts that the handoff schema headings match between the process doc (Section 2.6) and `next-step.md`. CI runs it on every PR via `template-smoke.yml`.
 
-If there is output, present each hunk to the user. For each, the user judges whether it is **expected substitution drift** (the CDD copy hard-codes values that the template parameterises) or **unintended drift** that needs reconciliation. There is no allowlist and no reverse-substitution logic — the human decides.
+If the script exits 0, report "no drift" and continue. If it reports divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence). Apply fixes only on user approval. Do not auto-edit either tree from this step.
 
-Known-expected drift today (flag these as "expected" when they appear):
-
-- In `next-step.md`: `cdd` ↔ `<PROJECT_SLUG>`
-- In `next-step.md`: `cdd-worktree` / `cdd-worktree-list` ↔ `<PROJECT_SLUG>-worktree` / `<PROJECT_SLUG>-worktree-list`
-- In `next-step.md`: `~/.claude-handoffs/cdd/` ↔ `~/.claude-handoffs/<PROJECT_DIR>/`
-- In `next-step.md`: the template's extra `~/.bashrc` sourcing snippet block under "Next:" (present in template, absent in the CDD copy)
-- In `pre-pr.md`: this Section 7 ("Command-set drift") is CDD-meta-specific and intentionally absent from the template copy
-- `retrofit.md` exists only in `.claude/commands/` and intentionally has no template counterpart: it is a CDD-repo-only command that operates *on* target projects from a CDD session (see the process doc, Section 2.7). `diff -r` reports it as "Only in .claude/commands: retrofit.md" — flag as expected.
-
-Apply any fixes only on user approval. Do not auto-edit either tree from this step.
-
-## 8. Summary
+When presenting the step 7 checklist, append a `- [ ] Command-set drift clean` line to it.
+<!-- cdd-only-end -->
+## 7. Summary
 
 Present a checklist summary:
 
@@ -107,10 +100,10 @@ Present a checklist summary:
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
 - [ ] CLAUDE.md up to date
+- [ ] README up to date
 - [ ] Roadmap up to date
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] No upstream drift (or: /merge-main recommended)
-- [ ] Command-set drift reviewed
 ```
 
 Mark each item as pass ✓ or needs attention ✗ with details.

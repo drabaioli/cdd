@@ -168,7 +168,10 @@ SLUG_ESC=$(escape_sed_repl "$PROJECT_SLUG")
 DIR_ESC=$(escape_sed_repl "$PROJECT_DIR")
 
 # Walk every regular file in the target and substitute the angle-bracketed placeholders.
+# Skip binary files (grep -I treats them as non-matching) so an overlay can carry
+# images or other binary assets without sed corrupting them.
 while IFS= read -r -d '' f; do
+  grep -Iq . "$f" || continue
   sed -i \
     -e "s#<PROJECT_NAME>#${NAME_ESC}#g" \
     -e "s#<PROJECT_SLUG>#${SLUG_ESC}#g" \

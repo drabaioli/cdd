@@ -6,9 +6,11 @@ This document describes the philosophy, the artifacts, the lifecycle, and the ru
 
 ## 1. Philosophy
 
-Three commitments shape every decision in this workflow.
+Four commitments shape every decision in this workflow.
 
 **The human is in the loop at every gate.** The agent never picks the next task, never approves a plan, never merges its own PR, never restructures the roadmap unilaterally. It proposes; the human disposes. The agent's value is throughput inside a clearly-scoped task and consistency in keeping docs current, not autonomous decision-making.
+
+**Automate everything except decisions.** The positive dual of the first commitment: CDD drives toward maximal SDLC automation — implementation, verification, documentation reconciliation, merge mechanics, even the consistency checks that keep the workflow itself honest — while reserving human attention for decisions. The six checkpoints (Section 4) are where automation deliberately stops. Everywhere else, a recurring manual step is a gap: convert it into a mechanism.
 
 **The project documents itself as it grows.** Architecture and feature documentation are first-class deliverables, not afterthoughts. They serve dual duty: human reference and agent context. The same `pre-pr` step that runs CI also reconciles the docs against the code. A change isn't done until the docs match it.
 
@@ -40,7 +42,7 @@ A checklist of tasks, grouped into phases. Each phase ends with a milestone stat
 
 Three rules govern the roadmap:
 
-1. **Only the implementation session edits the roadmap file.** The `next-step` session may discuss roadmap changes during clarification but does not edit the file. It records desired edits in the handoff and instructs the implementation session to apply them.
+1. **The handoff session never edits the roadmap file.** It may discuss roadmap changes during clarification, but it records desired edits in the handoff and instructs the implementation session to apply them. Two reinforcing reasons: its context is already spent on cross-phase reasoning rather than any single task, and it runs on main, which is protected from direct edits and pushes — so the restriction is structural, not just convention. Roadmap edits happen in worktree sessions: the implementation session, and the pre-PR session per the Section 5 matrix.
 2. **Roadmap edits beyond ticking a checkbox require human approval.** Adding, removing, or splitting tasks; restructuring phases; reordering priorities, the agent proposes, the human approves.
 3. **Inline annotations stay terse.** When ticking a completed task, do not restate what the task did or describe how it was implemented — that lives in the commit, the PR description, and (for any lasting behaviour change) the process / architecture / feature docs, which the agent updates as part of the same change. Annotate inline *only* when a future session needs information that none of those sources will carry: a deferred sub-item, a surprising caveat, or a scope change. If there is nothing of that nature, just tick the box. One short clause, not a sentence with a parenthetical.
 
@@ -80,7 +82,7 @@ A common member of the knowledge base is the project's **founding document**: th
 
 ### 2.6 Handoff files (`~/.claude-handoffs/<repo-name>/<branch>.md`)
 
-The contract between the `next-step` session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
+The contract between the handoff session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
 
 Schema:
 
@@ -104,13 +106,13 @@ The implementation prompt is self-contained: it includes only context the implem
 
 ### 2.7 Slash commands (`.claude/commands/`)
 
-Project-level Claude Code slash commands. CDD ships four active commands plus one deferred:
+Project-level Claude Code slash commands. CDD ships four active commands plus one planned:
 
 - `/next-step`, exploratory session, run on main, produces a handoff.
 - `/pre-pr`, verification session, run on the feature branch, runs CI and reconciles docs.
 - `/merge-main`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
 - `/process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
-- `/bootstrap`, optional, used once at project start to scaffold the workflow files. Defer for now (see Section 6).
+- `/bootstrap`, planned, used once at project start to scaffold the workflow files; not yet implemented (see Section 6). It will live in the CDD repo only, for the same reason as `/retrofit` below: it operates on a target path and needs `template/` plus the bootstrap script, so the template will ship no copy.
 
 One additional command exists in the CDD repo only and is deliberately not shipped in the template: `/retrofit`, which installs CDD into an existing project or upgrades a project already running it (see Section 6). It operates *on* target projects from a CDD-repo session, so downstream projects have no use for a copy; this is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/`.
 
@@ -121,8 +123,10 @@ Slash commands are declarative: they describe what to do, not how to orchestrate
 A bash script providing three commands, sourced from `~/.bashrc`:
 
 - `<slug>-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
-- `<slug>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to main, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
+- `<slug>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to the default branch, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
 - `<slug>-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
+
+The helpers derive the repository's default branch from `origin`'s HEAD (falling back to `main`) and assume the remote is named `origin`; the remote-name assumption is documented in `template/BOOTSTRAP.md`.
 
 These helpers encode an invariant worth stating explicitly:
 
@@ -150,12 +154,22 @@ Its sole purpose is to anchor `/retrofit`'s upgrade mode: with the baseline hash
 
 ## 3. Lifecycle
 
-A task flows through CDD in up to five sessions, two of them optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session is a fresh Claude Code conversation with its own clean context.
+A task flows through CDD in up to five sessions, two of them optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session type has a name, one command, and one job:
+
+| Session            | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
+| ------------------ | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| **Handoff**        | `/next-step`                                  | main worktree                        | the handoff file only — repo is read-only  |
+| **Implementation** | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
+| **Merge** (opt.)   | `/merge-main`                                 | feature worktree                     | merge resolution, docs if needed           |
+| **Pre-PR**         | `/pre-pr`                                     | feature worktree                     | doc reconciliation, approved roadmap edits |
+| **PR-review** (opt.) | `/process-pr`                               | feature worktree                     | review-driven code and replies             |
+
+The blanket invariant: **every CDD session is a fresh context doing exactly one job.** This is a rule, not a per-command judgment call — the merge and PR-review sessions get fresh contexts for the same reason the pre-PR session does, even when the previous session's window is still open and would be convenient to reuse. A sixth session type, a **bootstrap session** for greenfield project setup, will join this taxonomy when `/bootstrap` lands (see Section 6).
 
 ```
                        (on main worktree)
             ┌──────────────────────────────────┐
-            │ Session 1: /next-step            │
+            │ Handoff session: /next-step      │
             │                                  │
             │ Read roadmap, discuss what next, │
             │ clarify cheap requirements,      │
@@ -169,7 +183,7 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
                             ▼
                        (on new worktree)
             ┌──────────────────────────────────┐
-            │ Session 2: implementation        │
+            │ Implementation session           │
             │                                  │
             │ Read handoff + roadmap + docs.   │
             │ Clarify expensive requirements   │
@@ -182,7 +196,7 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
                             │  (optional, if main moved)
                             ▼
             ┌──────────────────────────────────┐
-            │ Session 3 (optional): /merge-main│
+            │ Merge session: /merge-main       │
             │                                  │
             │ Dry-run conflict assessment.     │
             │ Human approves. Merge main into  │
@@ -191,7 +205,7 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
                             │
                             ▼
             ┌──────────────────────────────────┐
-            │ Session 4: /pre-pr               │
+            │ Pre-PR session: /pre-pr          │
             │                                  │
             │ Run build, format, lint, tests,  │
             │ integration tests. Code review.  │
@@ -207,7 +221,7 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
                             │  (optional, if review left comments)
                             ▼
             ┌──────────────────────────────────┐
-            │ Session 5 (optional): /process-pr│
+            │ PR-review session: /process-pr   │
             │                                  │
             │ Read the PR's review comments.   │
             │ Triage; human approves the plan. │
@@ -227,23 +241,23 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
                     back on main, clean
 ```
 
-### 3.1 Session 1: `/next-step` (on main)
+### 3.1 Handoff session: `/next-step` (on main)
 
 Goal: pick what to do next and produce a clean handoff.
 
 The session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task. It clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
 
-The reason for this split is context, not git topology: the `next-step` session's context is necessarily polluted by reading the whole roadmap and reasoning across phases. The implementation session's context is clean and dedicated to one task, which is the right environment for the harder, more focused clarification.
+Two reinforcing rationales drive this split. The first is context economy: the handoff session's context is necessarily polluted by reading the whole roadmap and reasoning across phases, while the implementation session's context is clean and dedicated to one task — the right environment for the harder, more focused clarification. The second is structural: the handoff session runs on main, which is protected from direct edits and pushes, so it cannot edit the roadmap even by accident; all roadmap edits happen in worktree sessions.
 
 The session ends by writing the handoff file and printing the `<project>-worktree <branch>` command.
 
-The `next-step` session does not edit the roadmap file. If roadmap edits are needed, it notes them in the handoff and instructs the implementation session to make them.
+The handoff session does not edit the roadmap file. If roadmap edits are needed, it notes them in the handoff and instructs the implementation session to make them.
 
 ### 3.2 Worktree creation
 
-The human closes the `next-step` session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree and launches Claude Code in plan mode in it, passing the one-line first prompt (`Read <handoff path> and follow the Implementation prompt.`) as the initial user message so the implementation session opens already processing it.
+The human closes the handoff session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree and launches Claude Code in plan mode in it, passing the one-line first prompt (`Read <handoff path> and follow the Implementation prompt.`) as the initial user message so the implementation session opens already processing it.
 
-### 3.3 Session 2: implementation (on the new worktree)
+### 3.3 Implementation session (on the new worktree)
 
 The session opens in plan mode, reads the handoff, and rebuilds its context from CLAUDE.md, the roadmap, and the architecture/feature docs. It surfaces any deferred or freshly-discovered open questions and confirms scope with the human, then presents a plan.
 
@@ -251,7 +265,7 @@ Plan mode is the load-bearing checkpoint here: the agent cannot modify files whi
 
 Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits.
 
-### 3.4 Session 3 (optional): `/merge-main`
+### 3.4 Merge session (optional): `/merge-main`
 
 Run on the feature branch when main has advanced and the feature branch needs to integrate the new state, either because the PR will conflict or because the feature work depends on something that just landed on main.
 
@@ -262,7 +276,7 @@ Two-phase:
 
 This is also where the agent can pull in improvements from main that are useful here without scheduling an explicit roadmap task (small refactors, new utilities, updated conventions).
 
-### 3.5 Session 4: `/pre-pr`
+### 3.5 Pre-PR session: `/pre-pr`
 
 A fresh session on the feature branch, started after the implementation session has closed. This isolation is deliberate: a fresh context avoids the implementation session grading its own homework, and any "propose to the human" step in `/pre-pr` is a proposal to the human running this session, not to another session. Runs the CI gates, reads the diff, code-reviews changed files, and reconciles documentation.
 
@@ -280,7 +294,7 @@ Output is a pass/fail summary across all the gates.
 
 The human runs `gh pr create`, reviews the PR (with full Claude assistance if desired, but in a fresh session, not the implementation session), and merges. Squash-merge is the default; the worktree script handles squash-merged branches as a first-class case.
 
-### 3.7 Session 5 (optional): `/process-pr`
+### 3.7 PR-review session (optional): `/process-pr`
 
 Run on the feature branch when a review has left comments that need addressing. A fresh session reads the open PR's review comments (inline review threads, review summary bodies, and general conversation comments), processes only the unresolved ones, and triages them: change-request, question, nit, or discussion. It presents the triage plan to the human, then implements the change-requests and nits, answers the questions, and pushes back — disagreeing and explaining in the reply — on any change-request it judges wrong or risky rather than implementing it blindly.
 
@@ -313,27 +327,29 @@ Human-in-the-loop judgment is preserved where it matters: the plan is approved b
 
 ## 5. Edit rules: who edits what, when
 
-The matrix below resolves any ambiguity about which session is allowed to touch which artifact.
+The matrix below resolves any ambiguity about which session is allowed to touch which artifact. Columns are the session types named in Section 3.
 
-| Artifact                | `/next-step` | implementation     | `/merge-main` | `/pre-pr`              |
-| ----------------------- | ------------ | ------------------ | ------------- | ---------------------- |
-| Roadmap (tick)          | no           | yes                | no            | yes                    |
-| Roadmap (add/mod/rm)    | no           | yes (pre-approved) | no            | yes (human-approved)   |
-| Architecture docs       | no           | yes                | yes if needed | yes (reconcile)        |
-| Feature docs            | no           | yes                | yes if needed | yes (reconcile)        |
-| CLAUDE.md               | no           | yes if needed      | no            | yes (reconcile)        |
-| Knowledge base (other)  | no           | yes if needed      | no            | yes if needed          |
-| Code                    | no           | yes                | yes (merge)   | yes (review-driven)    |
-| Handoff file            | yes (write)  | no (read-only)     | no            | no                     |
-| CI config               | no           | yes if in scope    | no            | yes (human-approved)   |
+| Artifact                | Handoff      | Implementation     | Merge         | Pre-PR                 | PR-review              |
+| ----------------------- | ------------ | ------------------ | ------------- | ---------------------- | ---------------------- |
+| Roadmap (tick)          | no           | yes                | no            | yes                    | yes if review-driven   |
+| Roadmap (add/mod/rm)    | no           | yes (pre-approved) | no            | yes (human-approved)   | no                     |
+| Architecture docs       | no           | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
+| Feature docs            | no           | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
+| CLAUDE.md               | no           | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
+| Knowledge base (other)  | no           | yes if needed      | no            | yes if needed          | yes if review-driven   |
+| Code                    | no           | yes                | yes (merge)   | yes (review-driven)    | yes (review-driven)    |
+| Handoff file            | yes (write)  | no (read-only)     | no            | no                     | no                     |
+| CI config               | no           | yes if in scope    | no            | yes (human-approved)   | yes if review-driven   |
 
-The `next-step` session is read-only on the repo. This keeps its job narrow: read, discuss, write the handoff. Everything else happens in worktrees.
+The handoff session is read-only on the repo. This keeps its job narrow: read, discuss, write the handoff. Everything else happens in worktrees. "Review-driven" in the PR-review column means the edit was requested by a reviewer and covered by the approved triage plan (Section 3.7); the PR-review session initiates no edits of its own.
 
 ## 6. Known gaps and deferred design
 
 Several areas were intentionally out of scope for the first version of the template; the last of them (adapting an existing project) is now addressed by `/retrofit`.
 
-**Greenfield bootstrap.** How a project gets its first roadmap, its first CLAUDE.md, and its first architecture skeleton. Exploratory work (research, prototyping, reading) generally happens outside Claude Code. A `/bootstrap` command could plausibly take a project brief and a draft roadmap and produce structured starting files, but the exploratory work itself doesn't fit cleanly inside the git + Claude Code substrate. Worth revisiting once the template has been used on a few greenfield projects.
+**Greenfield bootstrap.** How a project gets its first roadmap, its first CLAUDE.md, and its first architecture skeleton. Exploratory work (research, prototyping, reading) generally happens outside Claude Code. A `/bootstrap` command could plausibly take a project brief and a draft roadmap and produce structured starting files, but the exploratory work itself doesn't fit cleanly inside the git + Claude Code substrate.
+
+Where `/bootstrap` runs is decided (after the first dogfooding rounds): it will live in the CDD repo only, like `/retrofit` — it operates on a target path and needs `template/` plus the bootstrap script, so the template ships no copy. The intended mechanism: a guided bootstrap session helps the user produce the project definition and draft roadmap, writes the generated artifacts to a staging directory, and invokes `bootstrap-cdd-project.sh` with `--overlay` (the `demo/setup.sh` pattern) — one bootstrap invocation, no post-hoc copying. The command itself is not yet implemented.
 
 The current recommended approach for greenfield bootstrap is to run `bootstrap-cdd-project.sh` from the CDD repo root (see `template/BOOTSTRAP.md` for the procedure): it copies the template into a fresh directory, performs the placeholder substitution non-interactively, and runs the initial `git init` + scaffold commit. The up-front thinking — language, tooling, top-level architecture, the thin initial roadmap (three to five phases, a handful of tasks each) — still happens outside Claude Code. The roadmap will be refined during the first few `/next-step` sessions; the workflow is designed for that. Resist the urge to make it perfect before starting.
 

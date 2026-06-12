@@ -43,6 +43,7 @@ Check and **update** documentation based on the changes:
 - **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc to reflect it. Edit directly.
 - **Feature docs** (`doc/features/`): if user-visible behaviour changed or a new feature landed, update or add the relevant feature doc. Edit directly.
 - **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly.
+- **README.md**: if anything it states — quick start, layout, status, links — went stale relative to the change, update it. Edit directly.
 - **Roadmap** (`doc/knowledge_base/roadmap.md`):
   1. Tick any newly completed checkboxes directly.
   2. Identify items that should be **added, modified, or removed** based on what was implemented. Present these suggestions explicitly to the user **before** making any edits. Apply only on approval.
@@ -84,6 +85,7 @@ Present a checklist summary:
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
 - [ ] CLAUDE.md up to date
+- [ ] README up to date
 - [ ] Roadmap up to date
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] No upstream drift (or: /merge-main recommended)

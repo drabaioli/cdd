@@ -55,9 +55,10 @@ See `doc/architecture/index.md` for the full picture.
 
 ## Workflow
 
-This project uses the Claude-Driven Development workflow.
+This project uses the Claude-Driven Development workflow. Every CDD session is a fresh context doing exactly one job.
 
-- **Before opening a PR**: run `/pre-pr` to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change.
-- **To start a new task**: run `/next-step` from the main worktree to produce a handoff, then run `<PROJECT_SLUG>-worktree <branch>` to spin up the implementation worktree.
-- **When main has advanced under a feature branch**: run `/merge-main` from the feature branch.
+- **To start a new task** (handoff session): run `/next-step` from the main worktree to produce a handoff, then run `<PROJECT_SLUG>-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode).
+- **When main has advanced under a feature branch** (merge session): run `/merge-main` in a fresh context on the feature branch.
+- **Before opening a PR** (pre-PR session): run `/pre-pr` in a fresh context to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change.
+- **When a PR review leaves comments** (PR-review session): run `/process-pr` in a fresh context on the feature branch.
 - Keep `doc/architecture/`, `doc/features/`, and this file current as part of every change.

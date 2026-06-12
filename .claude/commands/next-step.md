@@ -108,6 +108,9 @@ After writing, print exactly:
 ```
 Handoff written: ~/.claude-handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
+
+If `cdd-worktree` reports "command not found", the worktree helper isn't sourced. Add this to ~/.bashrc (or ~/.zshrc) and open a new shell:
+  [[ -f "$HOME/Code/cdd/tools/cdd-worktree.sh" ]] && source "$HOME/Code/cdd/tools/cdd-worktree.sh"
 ```
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

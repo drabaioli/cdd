@@ -15,10 +15,10 @@ After bootstrap, the new project directory contains:
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
 │   ├── settings.json                         # auto-allows worktree sessions to read their handoff file
 │   └── commands/
-│       ├── next-step.md                      # exploratory session
-│       ├── pre-pr.md                         # verification session
-│       ├── merge-main.md                     # merge from main, with dry-run
-│       └── process-pr.md                     # address PR review feedback
+│       ├── next-step.md                      # handoff session
+│       ├── pre-pr.md                         # pre-PR session
+│       ├── merge-main.md                     # merge session (merge from main, with dry-run)
+│       └── process-pr.md                     # PR-review session (address PR review feedback)
 ├── doc/
 │   ├── index.md                              # documentation map (pointer to the directories below)
 │   ├── architecture/index.md                 # what the system is, structurally (pointer index)
@@ -93,6 +93,7 @@ A few things you'll want to add or change as the project takes shape:
 - **Decision records** under `doc/knowledge_base/` as you make significant tooling or design choices. Append-only.
 - **Build commands** in `CLAUDE.md` and in `pre-pr.md` step 2. Replace the `<build command>`-style placeholders with the actual commands.
 - **Test categories** in `pre-pr.md` step 2. Add or remove jobs as appropriate.
+- **Remote name**: the worktree helper assumes the remote is named `origin`. It derives the default branch from `origin`'s HEAD (falling back to `main`), so repos whose default branch is `master` work unchanged; a differently-named remote requires editing `tools/<PROJECT_SLUG>-worktree.sh`.
 
 ## Required CLI tools
 

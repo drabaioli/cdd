@@ -34,10 +34,31 @@
 #                               stale entries (handoff with no branch and no
 #                               worktree) so they're obvious to clean up.
 
+# Resolve the repo's default branch from origin's HEAD, falling back to "main".
+# The remote is assumed to be named "origin" (see template/BOOTSTRAP.md).
+cdd-worktree-default-branch() {
+  local ref
+  if ref="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
+    printf '%s\n' "${ref#origin/}"
+  else
+    printf 'main\n'
+  fi
+}
+
 cdd-worktree() {
   local branch="$1"
   if [[ -z "$branch" ]]; then
     echo "usage: cdd-worktree <branch>" >&2
+    return 1
+  fi
+
+  # The sibling worktree name is derived from $PWD; run from a feature worktree
+  # this would nest names, so insist on the main worktree.
+  local default_branch current_branch
+  default_branch="$(cdd-worktree-default-branch)"
+  current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
+  if [[ "$current_branch" != "$default_branch" ]]; then
+    echo "Run this from the main worktree on '$default_branch' (current: '$current_branch')." >&2
     return 1
   fi
 
@@ -64,10 +85,12 @@ cdd-worktree() {
 }
 
 cdd-worktree-done() {
+  local default_branch
+  default_branch="$(cdd-worktree-default-branch)"
   local branch
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
-  if [[ -z "$branch" || "$branch" == "main" || "$branch" == "HEAD" ]]; then
-    echo "Run this from the feature branch worktree, not main (current: '$branch')." >&2
+  if [[ -z "$branch" || "$branch" == "$default_branch" || "$branch" == "HEAD" ]]; then
+    echo "Run this from the feature branch worktree, not $default_branch (current: '$branch')." >&2
     return 1
   fi
 
@@ -77,12 +100,12 @@ cdd-worktree-done() {
   fi
 
   local main_path
-  main_path="$(git worktree list --porcelain | awk '
+  main_path="$(git worktree list --porcelain | awk -v ref="refs/heads/$default_branch" '
     $1 == "worktree" { path = $2 }
-    $1 == "branch"   && $2 == "refs/heads/main" { print path; exit }
+    $1 == "branch"   && $2 == ref { print path; exit }
   ')"
   if [[ -z "$main_path" ]]; then
-    echo "Could not locate a worktree checked out on main, aborting." >&2
+    echo "Could not locate a worktree checked out on $default_branch, aborting." >&2
     return 1
   fi
 
@@ -93,7 +116,7 @@ cdd-worktree-done() {
   local handoff="$HOME/.claude-handoffs/${repo_name}/${branch}.md"
 
   cd "$main_path" || return 1
-  if ! git pull --ff-only origin main; then
+  if ! git pull --ff-only origin "$default_branch"; then
     echo "git pull failed, aborting before cleanup." >&2
     return 1
   fi
@@ -117,12 +140,12 @@ cdd-worktree-done() {
   # 2. Branch resolution.
   local branch_deleted=0
 
-  if git branch --merged main --format='%(refname:short)' | grep -qx "$branch"; then
+  if git branch --merged "$default_branch" --format='%(refname:short)' | grep -qx "$branch"; then
     git branch -d "$branch" && branch_deleted=1
   else
     local pr_num=""
     if command -v gh >/dev/null 2>&1; then
-      pr_num="$(gh pr list --state merged --base main --head "$branch" \
+      pr_num="$(gh pr list --state merged --base "$default_branch" --head "$branch" \
                   --json number --jq '.[0].number' 2>/dev/null)"
     fi
     if [[ -n "$pr_num" ]]; then
@@ -130,9 +153,9 @@ cdd-worktree-done() {
       git branch -D "$branch" && branch_deleted=1
     else
       echo
-      echo "Branch '$branch' is not merged into main and has no merged PR."
+      echo "Branch '$branch' is not merged into $default_branch and has no merged PR."
       echo "Unmerged commits:"
-      git log main.."$branch" --oneline
+      git log "$default_branch".."$branch" --oneline
       echo
       local choice
       read -r -p "[d]elete (-D) / [k]eep / [a]bort? " choice
@@ -158,7 +181,7 @@ cdd-worktree-done() {
     echo "Kept handoff: $handoff"
   fi
 
-  echo "Done. In $main_path on main at $(git rev-parse --short HEAD)."
+  echo "Done. In $main_path on $default_branch at $(git rev-parse --short HEAD)."
 }
 
 cdd-worktree-list() {

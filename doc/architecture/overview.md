@@ -29,7 +29,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 │   ├── architecture/                         # how this repo is structured
 │   ├── features/                             # what this repo provides
 │   └── knowledge_base/                       # process doc, roadmap, decisions
-├── scripts/                                  # smoke-test assertions + whitelist for the template
+├── scripts/                                  # template smoke assertions + command-set drift check (with whitelists)
 ├── template/                                 # copy-paste material for new projects
 └── tools/
     └── cdd-worktree.sh                       # this repo's worktree helper
@@ -39,7 +39,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 
 The process doc references the template by example (it describes what a CLAUDE.md should contain; the template provides a concrete skeleton). The template does not reference the process doc by default. A downstream project using the template does not get a copy of the process doc; the template is self-sufficient for users who don't need the philosophy.
 
-The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conceptually the same files, with the repo's own copy free to drift if it needs CDD-specific behaviour. Unintended drift is a defect. One command is deliberately one-sided: `/retrofit` (`.claude/commands/retrofit.md`) lives only in the CDD repo — it installs CDD into an existing project or upgrades a project already on CDD, operating *on* targets from a CDD-repo session, so the template ships no copy. See [Bootstrap & retrofit](bootstrap-and-retrofit.md) for how `/retrofit` shares the bootstrap pipeline.
+The CDD repo's own `.claude/commands/` and `template/.claude/commands/` are conceptually the same files, with the repo's own copy free to drift if it needs CDD-specific behaviour. Unintended drift is a defect, and is checked mechanically: `scripts/command-drift-check.sh` (run by CI and `/pre-pr`) renders the template via the bootstrap script's stage mode with this repo's own identifiers and diffs the result against `.claude/commands/`, so substitution differences cancel out and only real divergence surfaces. Justified exceptions are either whole one-sided files listed in `scripts/command-drift-whitelist.txt` or CDD-meta sections of shared files fenced between `<!-- cdd-only-begin -->` / `<!-- cdd-only-end -->` markers in the repo copy. One command is deliberately one-sided: `/retrofit` (`.claude/commands/retrofit.md`) lives only in the CDD repo — it installs CDD into an existing project or upgrades a project already on CDD, operating *on* targets from a CDD-repo session, so the template ships no copy; the planned `/bootstrap` will follow the same pattern. See [Bootstrap & retrofit](bootstrap-and-retrofit.md) for how `/retrofit` shares the bootstrap pipeline.
 
 ## Open structural questions
 
