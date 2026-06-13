@@ -10,7 +10,7 @@ Get the CDD substrate to reflect reality: survey what exists, write the initial 
 
 - [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted. For a greenfield project, write architecture guidelines and intentions instead.
 - [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability. Likely empty for a greenfield project.
-- [ ] Fill in the `CLAUDE.md` stubs: project description, critical constraints, build/test commands, module layout.
+- [ ] Fill in the project charter at `doc/knowledge_base/project-overview.md` (what it is, goals, non-goals, constraints, architecture intentions) and the `CLAUDE.md` stubs (project description, critical constraints, build/test commands, module layout).
 - [ ] Fill in this roadmap: replace the placeholder phases below with the project's real plan, slotting in items from "Suggested infrastructure tasks" where they fit.
 
 **Milestone: the docs describe the project as it actually is, and the roadmap below is a real plan.**

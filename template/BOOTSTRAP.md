@@ -24,6 +24,7 @@ After bootstrap, the new project directory contains:
 │   ├── architecture/index.md                 # what the system is, structurally (pointer index)
 │   ├── features/index.md                     # what the system does (pointer index)
 │   └── knowledge_base/
+│       ├── project-overview.md               # project charter skeleton (what it is, goals, non-goals)
 │       ├── roadmap.md                        # central workflow artifact, Phase 1 pre-filled
 │       └── README.md                         # explains the knowledge base
 └── tools/
@@ -79,7 +80,7 @@ The script will:
 
    Open a new shell or `source ~/.bashrc`. The slash commands rely on `<PROJECT_SLUG>-worktree` being on `PATH`; `/next-step` prints a reminder of this line after the `Next:` instruction so a missing source line is a one-paste fix rather than a hunt.
 
-2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you.
+2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 
 3. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
 

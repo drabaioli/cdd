@@ -6,6 +6,7 @@
 
 | Topic                            | Location                                          |
 | -------------------------------- | ------------------------------------------------- |
+| Project overview (charter)       | `doc/knowledge_base/project-overview.md`          |
 | Documentation map                | `doc/index.md`                                    |
 | System architecture & design     | `doc/architecture/index.md`                       |
 | Architecture decision records    | `doc/architecture/adr/` (Nygard style)            |

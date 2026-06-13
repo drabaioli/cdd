@@ -48,7 +48,7 @@ pass "bash -n ${worktree_scripts[0]}"
 [[ ! -e BOOTSTRAP.md ]] || fail "BOOTSTRAP.md was copied into the bootstrapped tree"
 pass "BOOTSTRAP.md not present"
 
-# 4. Relative markdown links in CLAUDE.md and the roadmap must resolve.
+# 4. Relative markdown links in CLAUDE.md, the overview, and the roadmap must resolve.
 check_links() {
   local file="$1"
   local missing=0
@@ -73,6 +73,7 @@ check_links() {
 
 check_links CLAUDE.md
 check_links doc/index.md
+check_links doc/knowledge_base/project-overview.md
 check_links doc/knowledge_base/roadmap.md
 
 # 5. .claude/commands/*.md: no <...> tokens outside the whitelist.
