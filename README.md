@@ -14,14 +14,15 @@ Two ideas do most of the work:
 A task flows through up to five sessions, each driven by one slash command:
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'background':'#101c24', 'primaryColor':'#16252f', 'primaryTextColor':'#88fb7a', 'primaryBorderColor':'#88fb7a', 'lineColor':'#5fae57', 'textColor':'#a9d6a0', 'edgeLabelBackground':'#101c24', 'fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace', 'fontSize':'14px'}, 'flowchart': {'curve':'basis'}}}%%
 flowchart TD
-    NS(["Handoff session<br>/next-step, on the main worktree"]):::agent
-    IMPL(["Implementation session<br>opens in plan mode — ③ plan approved —<br>implement, update docs + roadmap, commit"]):::agent
-    MM(["Merge session<br>/merge-main: integrate main, dry-run first"]):::opt
-    PP(["Pre-PR session<br>/pre-pr: CI gates, code review, doc reconciliation"]):::agent
-    REV["Human reviews the PR on GitHub"]:::human
-    PPR(["PR-review session<br>/process-pr: triage + address review comments"]):::opt
-    DONE["Squash-merge, worktree teardown"]:::human
+    NS("Handoff session<br>/next-step, on the main worktree"):::agent
+    IMPL("Implementation session<br>opens in plan mode — ③ plan approved —<br>implement, update docs + roadmap, commit"):::agent
+    MM("Merge session<br>/merge-main: integrate main, dry-run first"):::opt
+    PP("Pre-PR session<br>/pre-pr: CI gates, code review, doc reconciliation"):::agent
+    REV("Human reviews the PR on GitHub"):::human
+    PPR("PR-review session<br>/process-pr: triage + address review comments"):::opt
+    DONE("Squash-merge, worktree teardown"):::human
 
     NS -->|"① task selected  ② handoff approved<br>a fresh worktree is spun up"| IMPL
     IMPL --> PP
@@ -32,12 +33,12 @@ flowchart TD
     PPR -.-> REV
     REV -->|"⑥ human merges"| DONE
 
-    classDef agent fill:#1f6feb,stroke:#1158c7,color:#ffffff
-    classDef opt fill:#6e40c9,stroke:#553098,color:#ffffff,stroke-dasharray: 6 4
-    classDef human fill:#238636,stroke:#1a6329,color:#ffffff
+    classDef agent fill:#16252f,stroke:#88fb7a,color:#88fb7a,stroke-width:2px
+    classDef opt fill:#16252f,stroke:#4f9e48,color:#7fd773,stroke-width:2px,stroke-dasharray: 6 4
+    classDef human fill:#88fb7a,stroke:#88fb7a,color:#101c24,stroke-width:2px
 ```
 
-Blue boxes are Claude sessions (fresh context, one job each), green are human/GitHub steps, dashed are optional side-loops. ①–⑥ are the six human checkpoints — the agent never proceeds past one without explicit confirmation. The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, and the edit rules.
+Dark boxes with a green outline are Claude sessions (fresh context, one job each); solid-green boxes are human/GitHub steps; dashed outlines are optional side-loops. ①–⑥ are the six human checkpoints — the agent never proceeds past one without explicit confirmation. The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, and the edit rules.
 
 ## Quick start (using CDD on a new project)
 
@@ -54,18 +55,19 @@ The script copies the template, substitutes the placeholders, and makes the init
 ## What's in this repo
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'background':'#101c24', 'primaryColor':'#16252f', 'primaryTextColor':'#88fb7a', 'primaryBorderColor':'#88fb7a', 'lineColor':'#5fae57', 'textColor':'#a9d6a0', 'edgeLabelBackground':'#101c24', 'fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace', 'fontSize':'14px'}, 'flowchart': {'curve':'basis'}}}%%
 flowchart LR
-    PD["Process document<br>doc/knowledge_base/"]:::layer
-    T["Template<br>template/ + bootstrap-cdd-project.sh"]:::layer
-    NEW["Your project, running CDD"]:::out
-    DEMO["Demo / dogfood instance<br>demo/"]:::out
+    PD("Process document<br>doc/knowledge_base/"):::layer
+    T("Template<br>template/ + bootstrap-cdd-project.sh"):::layer
+    NEW("Your project, running CDD"):::out
+    DEMO("Demo / dogfood instance<br>demo/"):::out
 
     PD -->|"instantiated as"| T
     T -->|"bootstrap"| NEW
     T -->|"bootstrap --overlay demo/seed"| DEMO
 
-    classDef layer fill:#1f6feb,stroke:#1158c7,color:#ffffff
-    classDef out fill:#238636,stroke:#1a6329,color:#ffffff
+    classDef layer fill:#16252f,stroke:#88fb7a,color:#88fb7a,stroke-width:2px
+    classDef out fill:#88fb7a,stroke:#88fb7a,color:#101c24,stroke-width:2px
 ```
 
 - **The process document**: [`doc/knowledge_base/claude-driven-development.md`](doc/knowledge_base/claude-driven-development.md). The philosophy, the lifecycle, the artifacts, the edit rules. Read this first if you want to understand what CDD is and why.
