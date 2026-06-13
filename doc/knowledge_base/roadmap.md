@@ -70,7 +70,8 @@ Bring CDD to projects that already exist: files-only install, baseline-anchored 
 
 - [x] Implement a /retrofit command (CDD repo) that installs CDD into an existing project (files-only) or upgrades a project already on CDD, preserving local customizations and surfacing upstreamable improvements.
 - [x] Have a freshly bootstrapped or retrofitted project propose the codebase survey + initial docs as its first task. — landed as a pre-filled bootstrap phase in the template roadmap (review moved it out of the /next-step hook)
-- [ ] Trial the retrofit on one existing project.
+- [x] Trial the retrofit on one existing project. — Colibri (Zephyr/C++); surfaced the change-isolation defect below.
+- [x] Make `/retrofit` stage its changes on a dedicated branch + worktree in the target rather than the target's current branch, and commit them there for review.
 - [ ] Document the doc-reconciliation cost: existing projects without prior discipline will likely have a painful first few PRs as the docs are made to reflect reality.
 
 **Milestone:** at least one existing (non-greenfield) project running CDD.
