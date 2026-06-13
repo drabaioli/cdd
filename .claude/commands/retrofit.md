@@ -114,7 +114,7 @@ Sync improvements the CDD template has accrued into the target **without changin
 
 ### 4.1 Establish the baseline
 
-Read `<target>/.claude/cdd-baseline`.
+Read `$WT/.claude/cdd-baseline` (the section 2.5 worktree, which mirrors HEAD).
 
 - **Present and a valid commit in this CDD repo** (`git cat-file -e <hash>^{commit}`) → three-way mode.
 - **Missing, `unknown`, or not a known commit** → pre-marker fallback: two-way mode (target vs. current template only), where *every* difference is presented to the user to classify as "apply the template's version", "keep local", or "merge". Be conservative; when in doubt, keep local. The marker is written at the end regardless, so the next upgrade gets the three-way path.
@@ -123,9 +123,9 @@ Read `<target>/.claude/cdd-baseline`.
 
 The marker stores only the hash, so re-infer and confirm with the user:
 
-- `<PROJECT_SLUG>`: from the worktree helper filename `<target>/tools/*-worktree.sh` (most reliable); fall back to asking.
+- `<PROJECT_SLUG>`: from the worktree helper filename `$WT/tools/*-worktree.sh` (most reliable); fall back to asking.
 - `<PROJECT_DIR>`: basename of the target path.
-- `<PROJECT_NAME>`: from the title of `<target>/CLAUDE.md` if recognizable; otherwise ask.
+- `<PROJECT_NAME>`: from the title of `$WT/CLAUDE.md` if recognizable; otherwise ask.
 
 ### 4.3 Render both template versions with the target's identifiers
 
