@@ -14,7 +14,7 @@ Two ideas do most of the work:
 A task flows through up to five sessions, each driven by one slash command:
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': {'background':'#0e1417', 'primaryColor':'#1b282b', 'primaryTextColor':'#d7e0db', 'primaryBorderColor':'#8fa9a3', 'lineColor':'#6e8983', 'textColor':'#c4d2cd', 'edgeLabelBackground':'#0e1417', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
+%%{init: {'theme':'base', 'themeVariables': {'background':'#0a0f1a', 'primaryColor':'#16243a', 'primaryTextColor':'#cfe3f0', 'primaryBorderColor':'#6f9fc4', 'lineColor':'#4a6c8c', 'textColor':'#b9d2e6', 'edgeLabelBackground':'#0a0f1a', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
 flowchart TD
     NS("Handoff session<br>/next-step, on the main worktree"):::agent
     IMPL("Implementation session<br>opens in plan mode — ③ plan approved —<br>implement, update docs + roadmap, commit"):::agent
@@ -33,12 +33,12 @@ flowchart TD
     PPR -.-> REV
     REV -->|"  ⑥ human merges  "| DONE
 
-    classDef agent fill:#1b282b,stroke:#8fa9a3,color:#d7e0db,stroke-width:2px
-    classDef opt fill:#1b282b,stroke:#5f7771,color:#9fb2ac,stroke-width:2px,stroke-dasharray: 6 4
-    classDef human fill:#b9c7c1,stroke:#b9c7c1,color:#0e1417,stroke-width:2px
+    classDef agent fill:#16243a,stroke:#6f9fc4,color:#cfe3f0,stroke-width:2px
+    classDef opt fill:#16243a,stroke:#41617f,color:#9db8cf,stroke-width:2px,stroke-dasharray: 6 4
+    classDef human fill:#9cc4dd,stroke:#9cc4dd,color:#0a0f1a,stroke-width:2px
 ```
 
-Dark teal boxes with a pale outline are Claude sessions (fresh context, one job each); solid pale boxes are human/GitHub steps; dashed outlines are optional side-loops. ①–⑥ are the six human checkpoints — the agent never proceeds past one without explicit confirmation. The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, and the edit rules.
+Deep-blue boxes with a pale outline are Claude sessions (fresh context, one job each); solid pale-blue boxes are human/GitHub steps; dashed outlines are optional side-loops. ①–⑥ are the six human checkpoints — the agent never proceeds past one without explicit confirmation. The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, and the edit rules.
 
 ## Quick start (using CDD on a new project)
 
@@ -55,7 +55,7 @@ The script copies the template, substitutes the placeholders, and makes the init
 ## What's in this repo
 
 ```mermaid
-%%{init: {'theme':'base', 'themeVariables': {'background':'#0e1417', 'primaryColor':'#1b282b', 'primaryTextColor':'#d7e0db', 'primaryBorderColor':'#8fa9a3', 'lineColor':'#6e8983', 'textColor':'#c4d2cd', 'edgeLabelBackground':'#0e1417', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
+%%{init: {'theme':'base', 'themeVariables': {'background':'#0a0f1a', 'primaryColor':'#16243a', 'primaryTextColor':'#cfe3f0', 'primaryBorderColor':'#6f9fc4', 'lineColor':'#4a6c8c', 'textColor':'#b9d2e6', 'edgeLabelBackground':'#0a0f1a', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
 flowchart LR
     PD("Process document<br>doc/knowledge_base/"):::layer
     T("Template<br>template/ + bootstrap-cdd-project.sh"):::layer
@@ -66,8 +66,8 @@ flowchart LR
     T -->|"  bootstrap  "| NEW
     T -->|"  bootstrap --overlay demo/seed  "| DEMO
 
-    classDef layer fill:#1b282b,stroke:#8fa9a3,color:#d7e0db,stroke-width:2px
-    classDef out fill:#b9c7c1,stroke:#b9c7c1,color:#0e1417,stroke-width:2px
+    classDef layer fill:#16243a,stroke:#6f9fc4,color:#cfe3f0,stroke-width:2px
+    classDef out fill:#9cc4dd,stroke:#9cc4dd,color:#0a0f1a,stroke-width:2px
 ```
 
 - **The process document**: [`doc/knowledge_base/claude-driven-development.md`](doc/knowledge_base/claude-driven-development.md). The philosophy, the lifecycle, the artifacts, the edit rules. Read this first if you want to understand what CDD is and why.
