@@ -1,28 +1,14 @@
-Scaffold a new greenfield project on the CDD workflow, at the path given as argument: `/bootstrap <target-path>`.
+Scaffold a new greenfield project on the CDD workflow: `/bootstrap` (takes no argument).
 
 Run this command from a CDD-repo session (it needs the CDD repo's `template/` and `bootstrap-cdd-project.sh`). This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* a new target project, so downstream projects have no use for it — see the process doc, Section 2.7). It is the greenfield sibling of `/retrofit`: `/retrofit` adapts an *existing* project, `/bootstrap` creates a *new* one.
 
 This is a **guided** command, not a brief-to-files converter. The discovery conversation is part of the job: you walk the user through defining the project, then encode the result into the initial docs and roadmap, then scaffold the project in a single bootstrap invocation. The generated project starts with a real, filled-in overview, `CLAUDE.md`, and roadmap — not the template's pre-filled "survey the codebase" bootstrap phase, which is for files-only installs.
 
-**Checkpoint discipline:** confirm the project definition, then the draft roadmap, then the three identifiers — each before moving on. Nothing is rendered until all three are approved. The scaffold commit is created only after the roadmap is approved. Outward-facing actions (creating a GitHub repo, editing `~/.bashrc`) are confirmed separately and never done silently.
+The command takes **no argument**: the project's name, slug, directory, and location all emerge from the discovery conversation, so there is nothing meaningful to pass up front. The target path is proposed and confirmed in step 4, once the identifiers are settled.
 
-Target path: `$ARGUMENTS`
+**Checkpoint discipline:** confirm the project definition (step 1), then the draft roadmap (step 2), then the three identifiers and the target location (steps 3–4) — each before moving on. Nothing is rendered until all are approved. The scaffold commit is created only after the roadmap is approved. Outward-facing actions (creating a GitHub repo, editing `~/.bashrc`) are confirmed separately and never done silently.
 
-## 1. Resolve and validate the target
-
-If no argument was given, ask the user for the target path.
-
-Resolve it to an absolute path. The bootstrap script refuses a path that already exists and is non-empty, so check first:
-
-```bash
-[[ -e "<target>" && -n "$(ls -A "<target>" 2>/dev/null)" ]] && echo "exists and non-empty"
-```
-
-If it exists and is non-empty, stop and report — `/bootstrap` is for greenfield. (Suggest `/retrofit` if the user meant to install CDD into an existing project.) An absent path or an empty directory is fine.
-
-Note the basename of the target path — it becomes the default `<PROJECT_DIR>` in step 4.
-
-## 2. Guided discovery
+## 1. Guided discovery
 
 Have a conversation to define the project. Do not dump a rigid questionnaire; ask in natural batches, probe vague or one-word answers, and reflect back what you heard. Cover, at minimum:
 
@@ -38,7 +24,7 @@ The user may not have firm answers for everything; capture intent and mark genui
 
 **Checkpoint:** present a structured summary of the captured definition (the seven headings above). Get explicit confirmation or corrections before writing anything.
 
-## 3. Draft the initial roadmap
+## 2. Draft the initial roadmap
 
 From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Slot in the template's suggested infrastructure tasks (CI, linting, tests, README, dependency pinning, release/versioning) where they fit the early phases.
 
@@ -48,15 +34,29 @@ Keep the roadmap's "Annotation conventions" and "Key principles" scaffolding fro
 
 **Checkpoint:** show the drafted roadmap; the user approves or edits it. It is approved *now*, before the scaffold, because it will be committed as part of the initial scaffold commit (step 6) — there is no separate post-commit edit pass.
 
-## 4. Confirm the three identifiers
+## 3. Confirm the three identifiers
 
 Propose, then confirm with the user before rendering (never pick silently — see the three-identifier model, process doc Section 2.9):
 
-- `<PROJECT_DIR>` — basename of the target path. Must match `^[a-z][a-z0-9_-]*$`; if it doesn't, ask for a conforming value (this is the directory/repo slug).
-- `<PROJECT_SLUG>` — propose the dir slug, sanitized to `^[a-z][a-z0-9_-]*$`. This becomes the `<slug>-worktree` command the user will type; let them shorten it.
-- `<PROJECT_NAME>` — the display name from discovery, or a title-cased form of the directory name; free text.
+- `<PROJECT_NAME>` — the display name from discovery; free text, may contain spaces.
+- `<PROJECT_SLUG>` — a shell-safe slug derived from the name, matching `^[a-z][a-z0-9_-]*$`. This becomes the `<slug>-worktree` command the user will type; let them shorten it.
+- `<PROJECT_DIR>` — the directory / repo slug, matching `^[a-z][a-z0-9_-]*$`. Propose the slug; let it differ if the user wants a more verbose directory name.
 
-**Checkpoint:** confirm all three before staging the overlay.
+**Checkpoint:** confirm all three before proceeding.
+
+## 4. Confirm the target location
+
+The path is derived, not passed in. Propose the CDD convention `$HOME/Code/<PROJECT_DIR>` as the default and let the user override (the basename should match `<PROJECT_DIR>`, since the worktree helper and handoff paths assume it).
+
+The bootstrap script refuses a path that already exists and is non-empty, so check before staging:
+
+```bash
+[[ -e "<target>" && -n "$(ls -A "<target>" 2>/dev/null)" ]] && echo "exists and non-empty"
+```
+
+If it exists and is non-empty, stop and ask for a different location — `/bootstrap` is for greenfield. (Suggest `/retrofit` if the user actually meant to install CDD into an existing project.) An absent path or an empty directory is fine.
+
+**Checkpoint:** confirm the target path before staging the overlay.
 
 ## 5. Stage the overlay
 
@@ -70,7 +70,7 @@ mkdir -p "$OVERLAY/doc/knowledge_base"
 Write, into `$OVERLAY`:
 
 - `doc/knowledge_base/project-overview.md` — the project charter, filled from the discovery summary (the section structure ships in the template skeleton: what it is / goals / what it does / what it explicitly does not do / constraints / architecture intentions / audience).
-- `doc/knowledge_base/roadmap.md` — the roadmap approved in step 3.
+- `doc/knowledge_base/roadmap.md` — the roadmap approved in step 2.
 - `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (leave genuinely-unknown build/test commands as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
 - *Optionally* `doc/architecture/overview.md` — only if discovery produced enough concrete structural intent to be worth committing; otherwise leave the template's architecture index pointing at a doc the project writes in its first phase.
 
@@ -83,11 +83,11 @@ Reuse the bootstrap script — do not reimplement copying or substitution:
 ```bash
 ./bootstrap-cdd-project.sh \
   --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> \
-  --path "<target>" \
+  --path "<target>" --dir <PROJECT_DIR> \
   --overlay "$OVERLAY"
 ```
 
-This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the three identifiers plus the in-script bare `PROJECT` token, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
+(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the three identifiers plus the in-script bare `PROJECT` token, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
 
 Then remove the overlay: `rm -rf "$OVERLAY"`.
 
