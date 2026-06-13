@@ -1,0 +1,9 @@
+# Files allowed to exist on only one side of the .claude/commands/ ↔
+# template/.claude/commands/ comparison (see scripts/command-drift-check.sh).
+# One file name per line; lines starting with # and blank lines are ignored.
+
+# CDD-repo-only: operates *on* target projects from a CDD session (process doc §2.7).
+retrofit.md
+
+# CDD-repo-only, planned: /bootstrap will follow the /retrofit pattern (process doc §6).
+bootstrap.md

@@ -22,9 +22,9 @@ Run the workflow end-to-end on a first real downstream project and capture every
 - [x] Pick a small greenfield project to use as the first CDD trial. — Markdown Renderer (paste Markdown → live preview → copy as rich text for email/docs); see `demo/`
 - [x] Do the exploratory work outside CDD: language, tooling, top-level architecture, hand-written initial roadmap. — done in the `/next-step` discussion: Python/Flask, `markdown` library, an actions-pipeline architecture, and a 6-phase roadmap (`demo/seed/`)
 - [x] Bootstrap the new project from `template/`, including the placeholder substitution. — automated by `demo/setup.sh`, which wraps `bootstrap-cdd-project.sh --overlay demo/seed`
-- [ ] Run the first `/next-step` → implementation → `/pre-pr` → PR cycle on the downstream project.
+- [x] Run the first `/next-step` → implementation → `/pre-pr` → PR cycle on the downstream project. — mdr_demo_01
 - [x] Keep a friction log: every awkward or missing piece, recorded outside the downstream project. — landed as `doc/knowledge_base/friction-log.md`; retired after mdr_demo_01 (friction addressed directly or via roadmap)
-- [ ] Complete at least three task cycles before drawing conclusions.
+- [x] Complete at least three task cycles before drawing conclusions. — mdr_demo_01
 - [x] Build the `demo/` subsystem: a filled-in seed (`demo/seed/`) plus create/teardown automation (`demo/setup.sh`, `demo/teardown.sh`) that doubles as a reproducible demo of the task cycle and the dogfooding greenfield. — third repo artifact alongside `template/` and `scripts/`
 
 **Milestone:** one real downstream project running CDD, with friction from early usage folded back into the template.
@@ -37,7 +37,7 @@ Refine the template and commands from real usage; tasks here are driven by frict
 - [x] Improve the placeholder-substitution recipe in the template README (current weak spot, known limitation). — README renamed to `template/BOOTSTRAP.md`; sed recipe replaced by `bootstrap-cdd-project.sh`
 - [x] Add a `bootstrap.sh` script to the template that does rename + substitution non-interactively. — script lives at the CDD repo root (`bootstrap-cdd-project.sh`), not under `template/`; three-identifier model (`<PROJECT_NAME>` / `<PROJECT_SLUG>` / `<PROJECT_DIR>`)
 - [x] Add a `template-smoke` CI workflow that asserts the bootstrap produces a clean, link-valid tree. — `.github/workflows/template-smoke.yml` + `scripts/template-smoke-assert.sh`
-- [ ] Resolve any divergence between `./.claude/commands/` and `template/.claude/commands/` introduced during Phase 2.
+- [x] Resolve any divergence between `./.claude/commands/` and `template/.claude/commands/` introduced during Phase 2. — reconciled; enforced mechanically by `scripts/command-drift-check.sh` going forward
 - [x] Add a `/pre-pr` check (in the CDD repo) for unintended drift between the two command sets.
 - [x] Add a `/process-pr` command: triage and address the open PR's review feedback, post in-thread replies, commit + push. — `.claude/commands/process-pr.md` + template copy; process doc §3.7, §4.1.
 - [x] Auto-allow worktree sessions to read their handoff file so `cdd-worktree` no longer prompts on first launch. — `.claude/settings.json` + template copy.
@@ -45,6 +45,12 @@ Refine the template and commands from real usage; tasks here are driven by frict
 - [x] rc-install in demo setup/teardown: `demo/setup.sh` appends a marker-guarded sourcing block to `~/.bashrc`; `demo/teardown.sh` removes it by marker. — mdr_demo_01 friction round
 - [x] Index-as-pointers rule: encode in process doc + template CLAUDE.md + skeleton index.md files; restructure demo seed docs into subdocuments. — mdr_demo_01 friction round
 - [x] ADRs: Nygard-style `doc/architecture/adr/NNNN-title.md`; ship template + CDD repo ADR directory; reference in process doc and CLAUDE.md. — mdr_demo_01 friction round
+- [x] Encode the session taxonomy: named session types in process doc §3, edit-rules matrix keyed by them, fresh-context-per-job stated as a blanket invariant; mirrored in README and both CLAUDE.md workflow sections.
+- [x] Reconcile README.md (bootstrap one-liner, BOOTSTRAP.md link, dogfooding status) and add it to `/pre-pr` doc reconciliation in both command copies.
+- [x] Replace the hand-maintained command-drift list with a render-then-diff check (`scripts/command-drift-check.sh` + whitelist), run by CI and `/pre-pr`; includes the handoff-schema assertion, worktree-helper body comparison, and a template `cdd-only`-marker guard.
+- [x] Add shellcheck to CI over all repo shell scripts.
+- [x] Worktree helpers: main-worktree guard on `<slug>-worktree`; default branch derived from origin's HEAD (fallback `main`), `origin` assumption documented in BOOTSTRAP.md.
+- [x] Restrict bootstrap placeholder substitution to text files so binary overlay assets survive.
 
 **Milestone:** template is ergonomic enough that bootstrapping a new project takes under five minutes.
 
@@ -53,7 +59,7 @@ Refine the template and commands from real usage; tasks here are driven by frict
 Turn the manual greenfield start into a single `/bootstrap` command. Depends on Phases 2 and 3 surfacing what the manual flow actually looks like.
 
 - [ ] Design a `/bootstrap` slash command that takes a project brief and a draft roadmap and produces structured starting files.
-- [ ] Decide where `/bootstrap` runs: outside any project (one-shot CLI), inside the empty target directory, or inside the CDD repo with an output path argument.
+- [x] Decide where `/bootstrap` runs: outside any project (one-shot CLI), inside the empty target directory, or inside the CDD repo with an output path argument. — CDD-repo-only, like `/retrofit`
 - [ ] Implement `/bootstrap` and validate against a second greenfield project.
 
 **Milestone:** a new project can be bootstrapped end-to-end with a single command and a brief.

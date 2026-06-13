@@ -1,30 +1,81 @@
 # Claude-Driven Development (CDD)
 
-A human-in-the-loop workflow for evolving software projects together with Claude Code. Built around a self-updating `CLAUDE.md`, a roadmap, architecture and feature docs, and a small set of slash commands that drive task selection, implementation, merge, and PR review across git worktrees.
+[![template-smoke](https://github.com/drabaioli/cdd/actions/workflows/template-smoke.yml/badge.svg)](https://github.com/drabaioli/cdd/actions/workflows/template-smoke.yml)
 
-## What's in this repo
+You want to build real software with Claude Code without losing control of the decisions — and without the docs, the roadmap, and the agent's context rotting as the project grows. CDD is a human-in-the-loop workflow for exactly that: the agent carries the implementation, verification, and documentation work across git worktrees, while every decision passes through an explicit human checkpoint.
 
-- **The process document**: [`doc/knowledge_base/claude-driven-development.md`](doc/knowledge_base/claude-driven-development.md). The philosophy, the lifecycle, the artifacts, the edit rules. Read this first if you want to understand what CDD is and why.
-- **The template**: [`template/`](template/). Copy-paste material for bootstrapping a new project. See [`template/README.md`](template/README.md) for the bootstrap procedure.
+Two ideas do most of the work:
 
-This repo uses CDD on itself. Its own scaffolding (`CLAUDE.md`, `.claude/commands/`, `doc/`, `tools/cdd-worktree.sh`) sits at the root; the template is content this project ships, under `template/`.
+- **Every session is a fresh context doing exactly one job.** Sessions hand off through files (a handoff file, the roadmap, the docs), never by sharing a chat window.
+- **Automate everything except decisions.** Six checkpoints are where automation deliberately stops; the human chooses, approves, and merges — the agent does the rest.
+
+## The lifecycle
+
+A task flows through up to five sessions, each driven by one slash command:
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'background':'#0a0f1a', 'primaryColor':'#16243a', 'primaryTextColor':'#cfe3f0', 'primaryBorderColor':'#6f9fc4', 'lineColor':'#4a6c8c', 'textColor':'#b9d2e6', 'edgeLabelBackground':'#0a0f1a', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
+flowchart TD
+    NS("Handoff session<br>/next-step, on the main worktree"):::agent
+    IMPL("Implementation session<br>opens in plan mode — ③ plan approved —<br>implement, update docs + roadmap, commit"):::agent
+    MM("Merge session<br>/merge-main: integrate main, dry-run first"):::opt
+    PP("Pre-PR session<br>/pre-pr: CI gates, code review, doc reconciliation"):::agent
+    REV("Human reviews the PR on GitHub"):::human
+    PPR("PR-review session<br>/process-pr: triage + address review comments"):::opt
+    DONE("Squash-merge, worktree teardown"):::human
+
+    NS -->|"  ① task selected  ② handoff approved<br>a fresh worktree is spun up  "| IMPL
+    IMPL --> PP
+    IMPL -.->|"  main moved?  "| MM
+    MM -.->|"  ④ merge approved  "| PP
+    PP -->|"  ⑤ roadmap edits approved  "| REV
+    REV -.->|"  review left comments  "| PPR
+    PPR -.-> REV
+    REV -->|"  ⑥ human merges  "| DONE
+
+    classDef agent fill:#16243a,stroke:#6f9fc4,color:#cfe3f0,stroke-width:2px
+    classDef opt fill:#16243a,stroke:#41617f,color:#9db8cf,stroke-width:2px,stroke-dasharray: 6 4
+    classDef human fill:#9cc4dd,stroke:#9cc4dd,color:#0a0f1a,stroke-width:2px
+```
+
+Deep-blue boxes with a pale outline are Claude sessions (fresh context, one job each); solid pale-blue boxes are human/GitHub steps; dashed outlines are optional side-loops. ①–⑥ are the six human checkpoints — the agent never proceeds past one without explicit confirmation. The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, and the edit rules.
 
 ## Quick start (using CDD on a new project)
 
 ```bash
-git clone <this-repo> /tmp/cdd
-mkdir -p ~/Code/<your-project> && cd ~/Code/<your-project>
-cp -r /tmp/cdd/template/. .
-
-# Substitute placeholders (see template/README.md for the recipe).
-# Fill in CLAUDE.md and doc/knowledge_base/roadmap.md.
-# Source tools/<project>-worktree.sh from ~/.bashrc.
-# Create ~/.claude-handoffs/.
-# Run `claude` and start with /next-step.
+git clone https://github.com/drabaioli/cdd.git ~/Code/cdd && cd ~/Code/cdd
+./bootstrap-cdd-project.sh \
+  --name "My Project" \
+  --slug myproj \
+  --path ~/Code/my-project
 ```
 
-The placeholder substitution is currently manual; automating it is on the roadmap.
+The script copies the template, substitutes the placeholders, and makes the initial scaffold commit. Then fill in `CLAUDE.md` and `doc/knowledge_base/roadmap.md`, source `tools/myproj-worktree.sh` from `~/.bashrc`, run `claude`, and start with `/next-step`. Full procedure in [`template/BOOTSTRAP.md`](template/BOOTSTRAP.md). To install CDD into an *existing* project, use `/retrofit` from a Claude Code session in this repo instead.
+
+## What's in this repo
+
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': {'background':'#0a0f1a', 'primaryColor':'#16243a', 'primaryTextColor':'#cfe3f0', 'primaryBorderColor':'#6f9fc4', 'lineColor':'#4a6c8c', 'textColor':'#b9d2e6', 'edgeLabelBackground':'#0a0f1a', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
+flowchart LR
+    PD("Process document<br>doc/knowledge_base/"):::layer
+    T("Template<br>template/ + bootstrap-cdd-project.sh"):::layer
+    NEW("Your project, running CDD"):::out
+    DEMO("Demo / dogfood instance<br>demo/"):::out
+
+    PD -->|"  instantiated as  "| T
+    T -->|"  bootstrap  "| NEW
+    T -->|"  bootstrap --overlay demo/seed  "| DEMO
+
+    classDef layer fill:#16243a,stroke:#6f9fc4,color:#cfe3f0,stroke-width:2px
+    classDef out fill:#9cc4dd,stroke:#9cc4dd,color:#0a0f1a,stroke-width:2px
+```
+
+- **The process document**: [`doc/knowledge_base/claude-driven-development.md`](doc/knowledge_base/claude-driven-development.md). The philosophy, the lifecycle, the artifacts, the edit rules. Read this first if you want to understand what CDD is and why.
+- **The template**: [`template/`](template/). Copy-paste material for bootstrapping a new project. See [`template/BOOTSTRAP.md`](template/BOOTSTRAP.md) for the bootstrap procedure.
+- **The demo subsystem**: [`demo/`](demo/). A filled-in seed project ("Markdown Renderer") plus create/teardown automation, used both to demo the workflow and to dogfood it.
+
+Changes flow process-first, template-second, and never from the demo back into the template. This repo uses CDD on itself: its own scaffolding (`CLAUDE.md`, `.claude/commands/`, `doc/`, `tools/cdd-worktree.sh`) sits at the root, and the template is content this project ships.
 
 ## Status
 
-Early. The template has not yet been used on a real downstream project; the first dogfooding pass is the next milestone. See [`doc/knowledge_base/roadmap.md`](doc/knowledge_base/roadmap.md) for what's done and what's next.
+In active use. The workflow has been dogfooded end-to-end on a downstream demo project (see [`demo/`](demo/)), including full task cycles with real merges and PR reviews, and the friction found has been folded back into the template. See [`doc/knowledge_base/roadmap.md`](doc/knowledge_base/roadmap.md) for what's done and what's next.

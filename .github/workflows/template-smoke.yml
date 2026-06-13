@@ -14,9 +14,19 @@ jobs:
       - name: Syntax-check the shell scripts
         run: |
           bash -n bootstrap-cdd-project.sh
-          bash -n scripts/template-smoke-assert.sh
+          bash -n scripts/*.sh
+          bash -n tools/cdd-worktree.sh
           bash -n template/tools/PROJECT-worktree.sh
           bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
+
+      - name: Shellcheck the shell scripts
+        run: |
+          shellcheck bootstrap-cdd-project.sh scripts/*.sh demo/*.sh
+          # The worktree helpers are sourced (no shebang), so the dialect is explicit.
+          shellcheck -s bash tools/cdd-worktree.sh template/tools/PROJECT-worktree.sh
+
+      - name: Command-set drift check (repo commands vs rendered template)
+        run: ./scripts/command-drift-check.sh
 
       - name: Configure git identity for the scaffold commit
         run: |
