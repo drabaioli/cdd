@@ -58,9 +58,9 @@ Refine the template and commands from real usage; tasks here are driven by frict
 
 Turn the manual greenfield start into a single `/bootstrap` command. Depends on Phases 2 and 3 surfacing what the manual flow actually looks like.
 
-- [ ] Design a `/bootstrap` slash command that *guides the user through producing* the project definition and a draft roadmap via conversation, then feeds the result into `bootstrap-cdd-project.sh` — discovery is part of the command, not a precondition.
+- [x] Design a `/bootstrap` slash command that *guides the user through producing* the project definition and a draft roadmap via conversation, then feeds the result into `bootstrap-cdd-project.sh` — discovery is part of the command, not a precondition.
 - [x] Decide where `/bootstrap` runs: outside any project (one-shot CLI), inside the empty target directory, or inside the CDD repo with an output path argument. — CDD-repo-only, like `/retrofit`
-- [ ] Implement `/bootstrap` (guided discovery → overlay → one bootstrap invocation) and validate it by bootstrapping a second greenfield project end-to-end.
+- [x] Implement `/bootstrap` (guided discovery → overlay → one bootstrap invocation) and validate it by bootstrapping a second greenfield project end-to-end.
 
 **Milestone:** a new project can be bootstrapped end-to-end through one guided `/bootstrap` session — definition, overview, and real roadmap included.
 
