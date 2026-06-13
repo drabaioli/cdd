@@ -14,7 +14,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
 | Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
-| Guided greenfield bootstrap command                  | `.claude/commands/bootstrap.md` (`/bootstrap`)    |
+| Guided greenfield bootstrap                          | `.claude/commands/bootstrap.md` (`/bootstrap`)    |
 | Non-interactive bootstrap script                     | `bootstrap-cdd-project.sh` (repo root)            |
 | Demo / dogfooding subsystem (seed + automation)      | `demo/` (start with `demo/README.md`)             |
 
