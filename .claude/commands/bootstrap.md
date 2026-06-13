@@ -83,11 +83,12 @@ Reuse the bootstrap script — do not reimplement copying or substitution:
 ```bash
 ./bootstrap-cdd-project.sh \
   --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> \
-  --path "<target>" --dir <PROJECT_DIR> \
+  --path "<target>" \
   --overlay "$OVERLAY"
+# add `--dir <PROJECT_DIR>` only if <PROJECT_DIR> differs from the basename of <target>
 ```
 
-(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the three identifiers plus the in-script bare `PROJECT` token, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
+(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived, so the example omits it.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the three identifiers plus the in-script bare `PROJECT` token, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
 
 Then remove the overlay: `rm -rf "$OVERLAY"`.
 
