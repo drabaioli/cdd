@@ -4,6 +4,7 @@ Project documentation map. Each directory keeps an `index.md` pointer list: read
 
 ## Structure
 
+- [`knowledge_base/project-overview.md`](knowledge_base/project-overview.md) — the project charter: what it is, why it exists, what it does and does not do. **Read this first.**
 - [`architecture/`](architecture/index.md) — system design documents: what the system is, structurally
 - [`features/`](features/index.md) — feature documentation: what the system does, per capability
 - [`knowledge_base/`](knowledge_base/README.md) — the roadmap, decision records, coding guidelines, investigation notes

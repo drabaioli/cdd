@@ -50,7 +50,9 @@ git clone https://github.com/drabaioli/cdd.git ~/Code/cdd && cd ~/Code/cdd
   --path ~/Code/my-project
 ```
 
-The script copies the template, substitutes the placeholders, and makes the initial scaffold commit. Then fill in `CLAUDE.md` and `doc/knowledge_base/roadmap.md`, source `tools/myproj-worktree.sh` from `~/.bashrc`, run `claude`, and start with `/next-step`. Full procedure in [`template/BOOTSTRAP.md`](template/BOOTSTRAP.md). To install CDD into an *existing* project, use `/retrofit` from a Claude Code session in this repo instead.
+The script copies the template, substitutes the placeholders, and makes the initial scaffold commit. Then fill in `CLAUDE.md` and `doc/knowledge_base/roadmap.md`, source `tools/myproj-worktree.sh` from `~/.bashrc`, run `claude`, and start with `/next-step`. Full procedure in [`template/BOOTSTRAP.md`](template/BOOTSTRAP.md).
+
+For a guided greenfield start instead of the manual recipe, run `/bootstrap` from a Claude Code session in this repo: it walks you through defining the project, drafts a real roadmap and project overview, and scaffolds the new project — overview, `CLAUDE.md`, and roadmap already filled in — in one go. To install CDD into an *existing* project, use `/retrofit` from a Claude Code session in this repo instead.
 
 ## What's in this repo
 

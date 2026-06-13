@@ -58,18 +58,18 @@ Refine the template and commands from real usage; tasks here are driven by frict
 
 Turn the manual greenfield start into a single `/bootstrap` command. Depends on Phases 2 and 3 surfacing what the manual flow actually looks like.
 
-- [ ] Design a `/bootstrap` slash command that takes a project brief and a draft roadmap and produces structured starting files.
+- [x] Design a `/bootstrap` slash command that *guides the user through producing* the project definition and a draft roadmap via conversation, then feeds the result into `bootstrap-cdd-project.sh` — discovery is part of the command, not a precondition.
 - [x] Decide where `/bootstrap` runs: outside any project (one-shot CLI), inside the empty target directory, or inside the CDD repo with an output path argument. — CDD-repo-only, like `/retrofit`
-- [ ] Implement `/bootstrap` and validate against a second greenfield project.
+- [x] Implement `/bootstrap` (guided discovery → overlay → one bootstrap invocation) and validate it by bootstrapping a second greenfield project end-to-end.
 
-**Milestone:** a new project can be bootstrapped end-to-end with a single command and a brief.
+**Milestone:** a new project can be bootstrapped end-to-end through one guided `/bootstrap` session — definition, overview, and real roadmap included.
 
 ## Phase 5: Retrofit existing projects
 
 Bring CDD to projects that already exist: files-only install, baseline-anchored upgrade, and a first real retrofit trial.
 
 - [x] Implement a /retrofit command (CDD repo) that installs CDD into an existing project (files-only) or upgrades a project already on CDD, preserving local customizations and surfacing upstreamable improvements.
-- [x] Have a freshly bootstrapped or retrofitted project propose the codebase survey + initial docs as its first task. — landed as a pre-filled bootstrap phase in the template roadmap (review moved it out of the /next-step hook)
+- [x] Have a freshly bootstrapped or retrofitted project propose the codebase survey + initial docs as its first task. — landed as a pre-filled bootstrap phase in the template roadmap; scope refined to files-only starts only (retrofit install + manual bootstrap script), since guided `/bootstrap` writes those docs through discovery and ships a real roadmap without the phase
 - [x] Trial the retrofit on one existing project. — Colibri (Zephyr/C++); surfaced the change-isolation defect below.
 - [x] Make `/retrofit` stage its changes on a dedicated branch + worktree in the target rather than the target's current branch, and commit them there for review.
 - [ ] Document the doc-reconciliation cost: existing projects without prior discipline will likely have a painful first few PRs as the docs are made to reflect reality.

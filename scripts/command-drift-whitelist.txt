@@ -5,5 +5,5 @@
 # CDD-repo-only: operates *on* target projects from a CDD session (process doc §2.7).
 retrofit.md
 
-# CDD-repo-only, planned: /bootstrap will follow the /retrofit pattern (process doc §6).
+# CDD-repo-only: scaffolds a new greenfield project from a CDD session (process doc §2.7, §6).
 bootstrap.md

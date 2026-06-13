@@ -6,13 +6,20 @@ A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`b
 - `.claude/commands/{next-step,pre-pr,merge-main,process-pr}.md`: the four slash commands.
 - `.claude/settings.json`: auto-allows worktree sessions to read their handoff file (`~/.claude-handoffs/<PROJECT_DIR>/**`), substituted at bootstrap.
 - `doc/index.md` plus `doc/{architecture,features,knowledge_base}/`: the documentation map and doc directory skeletons; the architecture and features skeletons follow the index-plus-per-topic-docs convention.
-- `doc/knowledge_base/roadmap.md`: roadmap skeleton with a pre-filled Phase 1 of CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to distribute across the project's real phases.
+- `doc/knowledge_base/project-overview.md`: the project-charter skeleton (what it is, goals, what it does and does not do, constraints, architecture intentions) — a living document, kept current. Filled by `/bootstrap` from discovery, or by hand otherwise.
+- `doc/knowledge_base/roadmap.md`: roadmap skeleton with a pre-filled Phase 1 of CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md and overview stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to distribute across the project's real phases. The pre-filled phase serves files-only starts (`/retrofit` install + the manual script); `/bootstrap` writes those docs through discovery and ships a real roadmap without it.
 - `tools/PROJECT-worktree.sh`: worktree helper, renamed and substituted to `<PROJECT_SLUG>-worktree.sh` by the bootstrap script.
 - `BOOTSTRAP.md`: meta-documentation for the bootstrap recipe. Not copied into the bootstrapped tree.
 
 The bootstrap script substitutes the three identifiers (`<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>`) and the bare `PROJECT` token inside the worktree helper, writes the baseline marker `.claude/cdd-baseline` (the CDD repo commit the template was rendered from), runs `git init`, and creates the scaffold commit. It also offers a render-only mode (`--stage`, with `--dir` and `--template-dir` overrides) that skips the git steps; `/retrofit` drives it. A GitHub Actions workflow (`template-smoke`) exercises the script on every PR — including a staged render — and asserts that the bootstrapped tree has no stale placeholders, no dangling internal links, and a well-formed marker.
 
 Audience: developers starting a new project who have decided to use CDD.
+
+## The `/bootstrap` command
+
+A CDD-repo-only slash command (`.claude/commands/bootstrap.md`, deliberately not shipped in the template) for starting a new greenfield project on CDD. Run from a CDD-repo session with no argument — the project's name, slug, directory, and target location all emerge from the conversation — it is a **guided** session rather than a brief-to-files converter: a discovery conversation defines the project (what it is, goals, non-goals, constraints, architecture intentions, audience), and from that it produces the project overview, a filled-in `CLAUDE.md`, and a draft roadmap — each confirmed with the user, along with the target path (defaulting to `$HOME/Code/<PROJECT_DIR>`), before anything is rendered. It then writes those artifacts into a staging overlay and runs `bootstrap-cdd-project.sh --overlay` once (the `demo/setup.sh` path), so the filled docs land in the initial scaffold commit. Because the docs are written through discovery, the generated roadmap starts at the project's real first phase and carries no pre-filled survey phase. Optionally creates and pushes a GitHub repo on explicit confirmation.
+
+Audience: developers starting a new project who want a guided setup rather than the manual `bootstrap-cdd-project.sh` recipe.
 
 ## The `/retrofit` command
 
