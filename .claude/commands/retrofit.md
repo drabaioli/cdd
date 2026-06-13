@@ -17,10 +17,10 @@ git -C <target> rev-parse --is-inside-work-tree 2>/dev/null
 git -C <target> status --porcelain 2>/dev/null
 ```
 
-- If the target is not a git repo, warn the user (retrofit changes won't be revertable via git) and ask whether to proceed.
-- If the working tree is **dirty**, warn and require an explicit go-ahead; recommend committing or stashing first so the retrofit's changes land in isolation and are reviewable.
+- If the target is not a git repo, warn the user (retrofit changes won't be revertable via git, and the isolated-worktree step in section 2.5 won't run) and ask whether to proceed.
+- A **dirty working tree no longer blocks the retrofit**: section 2.5 writes into a fresh worktree branched from HEAD, so the target's current checkout is untouched. Do *not* hard-stop on a dirty tree. There is one nuance to warn about: because the worktree is taken from HEAD, any **uncommitted local edits to CDD-managed files** (the set listed in section 4.4) are invisible to the upgrade comparison. If `git status --porcelain` shows uncommitted changes to those files, tell the user to commit them first or they won't be considered, then let them decide whether to proceed.
 
-Also note `<target>/.gitignore`: if any path the retrofit will write (`.claude/`, `doc/`, `tools/`) is gitignored, warn that those writes will not show in `git status`, and include this in the final summary.
+Also note `<target>/.gitignore`: if any path the retrofit will write (`.claude/`, `doc/`, `tools/`) is gitignored, warn that those writes will not show in `git status` (and won't be staged by the retrofit commit in sections 3.4 / 4.6), and include this in the final summary.
 
 ## 2. Detect the mode
 
@@ -34,6 +34,30 @@ ls <target>/.claude/commands/next-step.md <target>/doc/knowledge_base/roadmap.md
 - Neither present → **install mode** (section 3).
 
 State the detected mode and the evidence to the user before proceeding, and let them override if the detection is wrong (e.g. a half-finished previous install).
+
+## 2.5 Create the isolated worktree
+
+Retrofit changes must land on a dedicated branch, isolated from the target's current checkout, so the user reviews and merges them through a normal PR instead of finding scaffolding strewn across the current branch (usually the default branch). Set this up **before** rendering or copying anything; every write in sections 3 and 4 goes into the worktree, referred to below as `$WT`.
+
+Derive the branch and path (mirroring `tools/cdd-worktree.sh` conventions — sibling of the target):
+
+```bash
+BRANCH=cdd-retrofit
+WT="$(dirname "<target>")/$(basename "<target>")-$BRANCH"
+```
+
+- **Collision:** if `$BRANCH` already exists (`git -C <target> rev-parse --verify --quiet "$BRANCH"`) or `$WT` already exists, append a numeric suffix (`cdd-retrofit-2`, `-3`, …) until both are free, or ask the user for a name. Never reuse or clobber an existing branch or worktree.
+- **Create it** from the target's HEAD:
+
+  ```bash
+  git -C <target> worktree add -b "$BRANCH" "$WT"
+  ```
+
+  On success, set `$WT` as the destination for all subsequent writes and the source for any reads of the project's current files (in upgrade mode the worktree is identical to HEAD).
+
+- **Fallbacks — warn, then degrade; never silently skip isolation:**
+  - Target is **not a git repo** (from section 1) → no worktree possible. Warn, set `$WT` = `<target>` (in-place writes, today's behavior), and **skip the commit step** in sections 3.4 / 4.6.
+  - Target git repo has **no commits / unborn or detached HEAD** (`worktree add -b` fails) → warn and fall back to a plain `git -C <target> switch -c "$BRANCH"` in the existing checkout, with `$WT` = `<target>`; if even that fails, fall back to in-place writes and skip the commit step.
 
 ## 3. Install mode
 
@@ -60,22 +84,29 @@ STAGE=$(mktemp -d)
 
 The staging tree is fully substituted, has no `.git`, and contains the baseline marker `.claude/cdd-baseline`.
 
-### 3.3 Copy staging → target, per file
+### 3.3 Copy staging → worktree, per file
 
-Walk every file in `$STAGE/render`:
+Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated worktree from section 2.5), and presence is judged against `$WT` — which, for a fresh worktree, mirrors the target's HEAD:
 
-- **Absent in the target** → copy it directly (create parent dirs as needed). This covers the slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, and the marker in the common case.
-- **Present in the target** (collision — typically `CLAUDE.md`, sometimes `doc/` files or `.claude/settings.json`) → propose a merge interactively, one file at a time:
+- **Absent in `$WT`** → copy it directly (create parent dirs as needed). This covers the slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, and the marker in the common case.
+- **Present in `$WT`** (collision — typically `CLAUDE.md`, sometimes `doc/` files or `.claude/settings.json`) → propose a merge interactively, one file at a time:
   - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/next-step`, `/pre-pr`, `/merge-main`). Show the proposed result; apply only on approval.
   - `.claude/settings.json`: merge the `permissions.allow` arrays (union); show the result before writing.
   - Anything else: show both versions and propose the merge; the user decides per file.
-- Never delete or move existing target files.
+- Never delete or move existing files.
 
 ### 3.4 Finish
 
 - Remove `$STAGE`.
-- Do **not** run any git commands in the target (the project owns its git history); suggest the user review and commit the new files themselves.
-- Print next steps, mirroring the bootstrap script's output: the exact `source` line for `<target>/tools/<PROJECT_SLUG>-worktree.sh` to add to `~/.bashrc`; then run `/next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task.
+- **Commit on the retrofit branch** (skip this if section 2.5 fell back to in-place writes with no branch). The retrofit session holds the context for a good message, so write a real one:
+
+  ```bash
+  git -C "$WT" add -A
+  git -C "$WT" commit -m "Install CDD scaffolding" -m "<short body: files added/merged>"
+  ```
+
+  Stage with `add -A` — the worktree was fresh, so this captures exactly the retrofit's writes. Gitignored paths won't be staged (see the section 1 gitignore warning). Commit only on this dedicated branch; never commit onto the target's existing branches.
+- Print next steps: the exact `source` line for `$WT/tools/<PROJECT_SLUG>-worktree.sh` (and, after merge, `<target>/tools/...`) to add to `~/.bashrc`; how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task.
 
 ## 4. Upgrade mode
 
@@ -83,7 +114,7 @@ Sync improvements the CDD template has accrued into the target **without changin
 
 ### 4.1 Establish the baseline
 
-Read `<target>/.claude/cdd-baseline`.
+Read `$WT/.claude/cdd-baseline` (the section 2.5 worktree, which mirrors HEAD).
 
 - **Present and a valid commit in this CDD repo** (`git cat-file -e <hash>^{commit}`) → three-way mode.
 - **Missing, `unknown`, or not a known commit** → pre-marker fallback: two-way mode (target vs. current template only), where *every* difference is presented to the user to classify as "apply the template's version", "keep local", or "merge". Be conservative; when in doubt, keep local. The marker is written at the end regardless, so the next upgrade gets the three-way path.
@@ -92,9 +123,9 @@ Read `<target>/.claude/cdd-baseline`.
 
 The marker stores only the hash, so re-infer and confirm with the user:
 
-- `<PROJECT_SLUG>`: from the worktree helper filename `<target>/tools/*-worktree.sh` (most reliable); fall back to asking.
+- `<PROJECT_SLUG>`: from the worktree helper filename `$WT/tools/*-worktree.sh` (most reliable); fall back to asking.
 - `<PROJECT_DIR>`: basename of the target path.
-- `<PROJECT_NAME>`: from the title of `<target>/CLAUDE.md` if recognizable; otherwise ask.
+- `<PROJECT_NAME>`: from the title of `$WT/CLAUDE.md` if recognizable; otherwise ask.
 
 ### 4.3 Render both template versions with the target's identifiers
 
@@ -124,7 +155,7 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 
 The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/README.md`, `tools/<slug>-worktree.sh`. (`CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
 
-For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file:
+For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file **read from `$WT`** (the section 2.5 worktree, which mirrors HEAD; this is why section 1 warns when CDD-managed files have uncommitted edits — those won't be reflected here):
 
 | Comparison | Meaning | Action |
 | --- | --- | --- |
@@ -135,29 +166,37 @@ For each file, with `old` = staged old render, `current` = staged current render
 | file absent in old render | newer than the project's baseline | propose adding it as a new file |
 | file absent in target | project deleted it | ask: deliberate removal (respect it) or accident (restore)? |
 
-Every application is per-file interactive: show the diff, get approval, write.
+Every application is per-file interactive: show the diff, get approval, write into `$WT`.
 
 ### 4.5 Upstream candidates
 
 For each preserved local customization, judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Do not silently keep general improvements local: collect them into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. Do not auto-apply anything to the CDD repo in this session.
 
-### 4.6 Update the marker
+### 4.6 Update the marker and commit
 
-After all approved changes are applied:
+After all approved changes are applied, write the marker into the worktree (run `git rev-parse` from the CDD repo root, redirect into `$WT`):
 
 ```bash
-git rev-parse HEAD > <target>/.claude/cdd-baseline
+git rev-parse HEAD > "$WT/.claude/cdd-baseline"
 ```
 
-(Run from the CDD repo root.) Clean up `$STAGE` and `$OLD_TPL`.
+Then **commit on the retrofit branch** (skip if section 2.5 fell back to in-place writes with no branch):
+
+```bash
+git -C "$WT" add -A
+git -C "$WT" commit -m "Upgrade CDD scaffolding to $(git rev-parse --short HEAD)" -m "<short body: files upgraded/merged/preserved>"
+```
+
+(The `$(git rev-parse --short HEAD)` runs in the CDD repo before `-C "$WT"` takes effect — capture it into a variable first if needed.) Commit only on this dedicated branch; never onto the target's existing branches. Then clean up `$STAGE` and `$OLD_TPL`.
 
 ## 5. Summary
 
 Report, in both modes:
 
 - Mode detected, identifiers used.
+- The isolation: the worktree path (`$WT`), the branch name, and the commit hash made on it — or, if section 2.5 fell back, that writes landed in place with no commit and why.
 - Files copied / upgraded / merged / preserved (and any the user declined).
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.
-- The next command for the user to run (review + commit in the target; `/next-step` for fresh installs).
+- The next steps for the user: review the retrofit branch and open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/next-step` for fresh installs.
