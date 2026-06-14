@@ -7,3 +7,6 @@ retrofit.md
 
 # CDD-repo-only: scaffolds a new greenfield project from a CDD session (process doc §2.7, §6).
 bootstrap.md
+
+# CDD-repo-only: produces a lightweight one-off deliverable from a CDD session (process doc §2.7, §6).
+quick-create.md

@@ -106,3 +106,15 @@ Make the per-task session loop nicer to drive once a project is already on CDD.
 - [x] Extend `/next-step` with an optional intent prompt: with a task prompt it runs an intent-driven flow (skip candidate proposal, adaptive context load, overlap check, roadmap-belonging decision recorded for the implementation session); with no argument it keeps the roadmap-driven flow. One command, two front-ends. — process doc §3.1 + both `next-step.md` copies + both CLAUDE.md workflow bullets.
 
 **Milestone:** starting an off-roadmap task is a first-class, structured `/next-step` flow.
+
+## Phase 9: Lightweight one-off deliverables
+
+Support producing a small, self-contained deliverable without the full CDD project substrate, with a clean escalation path when it turns out to be a project.
+
+- [x] Document the shared scope-triage heuristic ("deliverable or project?") once in the process doc, referenced by both commands.
+- [x] Implement `/quick-create`: lightweight guided discovery, files-first write, optional smoke test, separately-offered local commit and GitHub repo.
+- [x] Add the bidirectional off-ramps: `/quick-create` → `/bootstrap` when project-signals trip, and `/bootstrap` → `/quick-create` when the task is a trivial single artifact.
+- [x] Register `/quick-create` as CDD-repo-only in the command-drift whitelist (no template copy).
+- [ ] Validate `/quick-create` end-to-end against a real one-off deliverable.
+
+**Milestone:** a trivial standalone artifact can be produced through one guided `/quick-create` session, with an escalation path to `/bootstrap` when it turns out to be a project.
