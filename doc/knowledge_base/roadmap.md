@@ -98,3 +98,11 @@ Extend CDD from a single human in the loop to a small team. Depends on single-us
 - [ ] Trial team mode on a real team.
 
 **Milestone:** CDD usable by a small team without process workarounds.
+
+## Phase 8: In-session workflow ergonomics
+
+Make the per-task session loop nicer to drive once a project is already on CDD.
+
+- [x] Extend `/next-step` with an optional intent prompt: with a task prompt it runs an intent-driven flow (skip candidate proposal, adaptive context load, overlap check, roadmap-belonging decision recorded for the implementation session); with no argument it keeps the roadmap-driven flow. One command, two front-ends. — process doc §3.1 + both `next-step.md` copies + both CLAUDE.md workflow bullets.
+
+**Milestone:** starting an off-roadmap task is a first-class, structured `/next-step` flow.
