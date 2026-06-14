@@ -116,7 +116,7 @@ Project-level Claude Code slash commands. CDD ships four commands in the per-tas
 - `/merge-main`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
 - `/process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
 
-Two further commands exist in the CDD repo only and are deliberately not shipped in the template, because each operates *on* a target project from a CDD-repo session and needs `template/` plus the bootstrap script — downstream projects have no use for a copy. This is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/` (recorded in `scripts/command-drift-whitelist.txt`):
+Three further commands exist in the CDD repo only and are deliberately not shipped in the template, because each operates *on* a target from a CDD-repo session — so downstream projects have no use for a copy. (`/bootstrap` and `/retrofit` additionally need `template/` plus the bootstrap script; `/quick-create` needs neither, as its bullet notes.) This is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/` (recorded in `scripts/command-drift-whitelist.txt`):
 
 - `/bootstrap`, used once at project start: a guided session that helps the user produce the project definition and a draft roadmap, then scaffolds a new greenfield project from the template in a single bootstrap invocation (see Section 6).
 - `/retrofit`, which installs CDD into an existing project or upgrades a project already running it (see Section 6).
