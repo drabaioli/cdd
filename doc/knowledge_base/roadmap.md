@@ -98,3 +98,15 @@ Extend CDD from a single human in the loop to a small team. Depends on single-us
 - [ ] Trial team mode on a real team.
 
 **Milestone:** CDD usable by a small team without process workarounds.
+
+## Phase 8: Lightweight one-off deliverables
+
+Support producing a small, self-contained deliverable without the full CDD project substrate, with a clean escalation path when it turns out to be a project.
+
+- [x] Document the shared scope-triage heuristic ("deliverable or project?") once in the process doc, referenced by both commands.
+- [x] Implement `/quick-create`: lightweight guided discovery, files-first write, optional smoke test, separately-offered local commit and GitHub repo.
+- [x] Add the bidirectional off-ramps: `/quick-create` → `/bootstrap` when project-signals trip, and `/bootstrap` → `/quick-create` when the task is a trivial single artifact.
+- [x] Register `/quick-create` as CDD-repo-only in the command-drift whitelist (no template copy).
+- [ ] Validate `/quick-create` end-to-end against a real one-off deliverable.
+
+**Milestone:** a trivial standalone artifact can be produced through one guided `/quick-create` session, with an escalation path to `/bootstrap` when it turns out to be a project.
