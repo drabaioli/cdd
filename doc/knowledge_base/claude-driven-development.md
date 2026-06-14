@@ -179,9 +179,10 @@ The five rows above are the per-task lifecycle. Three further session types sit 
             ┌──────────────────────────────────┐
             │ Handoff session: /next-step      │
             │                                  │
-            │ Read roadmap, discuss what next, │
-            │ clarify cheap requirements,      │
-            │ write handoff file.              │
+            │ Read roadmap (or take a task     │
+            │ prompt), discuss/scope, clarify  │
+            │ cheap requirements, write        │
+            │ handoff file.                    │
             └──────────────────────────────────┘
                             │
                             │  handoff file
@@ -253,7 +254,12 @@ The five rows above are the per-task lifecycle. Three further session types sit 
 
 Goal: pick what to do next and produce a clean handoff.
 
-The session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task. It clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
+The session has two triggers, and converges on the same handoff either way:
+
+- **Roadmap-driven** (`/next-step`, no argument): the session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task.
+- **Intent-driven** (`/next-step <prompt describing a task to start>`): the task is already chosen by the human, so candidate proposal is skipped. This supports the common case where the human wants to start something off-roadmap rather than picking the next checkbox. The session loads context adaptively — the roadmap and the architecture/feature *indexes*, then selectively only the docs the described task actually touches — enough to scope it and detect overlap, not an exhaustive read (the implementation session rebuilds detailed context). It then does two things proposal mode does not: an **overlap check** — if the prompt substantially matches an existing (especially unchecked) roadmap item, surface that and ask whether to proceed as that item rather than silently creating a duplicate — and a **roadmap-belonging decision** — judge whether this new task belongs on the roadmap (substantive, evolving, will be referenced → yes; trivial throwaway → maybe not), asking the human if it's unclear. The verdict is recorded in the handoff's Notes as an instruction to the implementation session, which makes the actual roadmap edit.
+
+Either way, the session then clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
 
 Two reinforcing rationales drive this split. The first is context economy: the handoff session's context is necessarily polluted by reading the whole roadmap and reasoning across phases, while the implementation session's context is clean and dedicated to one task — the right environment for the harder, more focused clarification. The second is structural: the handoff session runs on main, which is protected from direct edits and pushes, so it cannot edit the roadmap even by accident; all roadmap edits happen in worktree sessions.
 
@@ -377,7 +383,9 @@ This raises a recurring question — *is the task a deliverable or a project?* �
 
 In both modes the retrofit isolates its writes from the target's current branch. Before rendering anything, it creates a dedicated branch (`cdd-retrofit`) and a sibling worktree off the target's HEAD, directs every write into that worktree, and — once all per-file approvals are done — makes a single commit on the branch so the user reviews and merges the scaffolding through a normal PR rather than finding it strewn across the current branch (usually the default branch). This is the one place CDD runs history-mutating git in a target, and it is deliberately scoped: the command only ever creates the dedicated branch and commits onto *it*, never onto the target's existing branches. On the happy path — a sibling worktree off HEAD — it never touches the current checkout. If the target is not a git repo, the command warns and falls back to writing in place without committing; if it is a git repo with no commits yet (an unborn HEAD, where a worktree can't be created), it falls back to a plain branch in the existing checkout and commits there. Because the worktree branches from HEAD, uncommitted local edits to CDD-managed files are not seen by the upgrade comparison; the command warns when it detects them rather than hard-stopping on any dirty tree.
 
-The doc-reconciliation discipline remains the bigger ask; existing projects without it will have a painful first few PRs as the docs are made to reflect reality.
+The doc-reconciliation discipline remains the bigger ask, and it is where retrofitting actually costs. The `/retrofit` session itself is cheap — it installs or upgrades files. The cost lands on the **first few PRs afterward**, as the project's architecture and feature docs are forced to reflect reality for the first time. That reconciliation is deliberately not done during `/retrofit`: that session is context-heavy, and surveying what the docs do and don't say needs its own focused session. So it is deferred to the project's first `/next-step`, which picks up the template roadmap's pre-filled "CDD bootstrap" phase (survey the codebase, draft the architecture and feature docs, fill the roadmap). For a greenfield project those tasks are near-trivial; for an existing project without prior doc discipline they are the opposite, and they may span several heavier-than-usual early PRs before the docs and the code agree.
+
+Two things temper this. First, the don't-disrupt-existing-docs stance: a retrofitted project often already has *some* documentation, and the first reconciliation should reconcile and adopt it into CDD's structure rather than overwrite it into the template layout. This is guidance, not an algorithm — the point is to preserve what the project already knows about itself, not to follow a fixed merge procedure. Second, the cost is a **first-time** cost. An upgrade retrofit (a project already running CDD) can assume the discipline already holds: its docs already track the code, so the heavy reconciliation does not recur. Only a first-time install faces the full bill. The command does not try to detect prior discipline beyond the install-vs-upgrade mode it already distinguishes; the two paths are described so the human knows which one they are on.
 
 ## 7. Template directory layout
 

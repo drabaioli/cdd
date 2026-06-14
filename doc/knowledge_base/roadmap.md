@@ -72,7 +72,7 @@ Bring CDD to projects that already exist: files-only install, baseline-anchored 
 - [x] Have a freshly bootstrapped or retrofitted project propose the codebase survey + initial docs as its first task. — landed as a pre-filled bootstrap phase in the template roadmap; scope refined to files-only starts only (retrofit install + manual bootstrap script), since guided `/bootstrap` writes those docs through discovery and ships a real roadmap without the phase
 - [x] Trial the retrofit on one existing project. — Colibri (Zephyr/C++); surfaced the change-isolation defect below.
 - [x] Make `/retrofit` stage its changes on a dedicated branch + worktree in the target rather than the target's current branch, and commit them there for review.
-- [ ] Document the doc-reconciliation cost: existing projects without prior discipline will likely have a painful first few PRs as the docs are made to reflect reality.
+- [x] Document the doc-reconciliation cost and make the retrofit path honest about it: name the cost in the process doc, strengthen template Phase 1 for the existing-project case with don't-disrupt-existing-docs guidance (keeping the greenfield thin path), describe the upgrade-vs-first-time distinction, and have `/retrofit` flag the slow first `/next-step`.
 
 **Milestone:** at least one existing (non-greenfield) project running CDD.
 
@@ -99,7 +99,15 @@ Extend CDD from a single human in the loop to a small team. Depends on single-us
 
 **Milestone:** CDD usable by a small team without process workarounds.
 
-## Phase 8: Lightweight one-off deliverables
+## Phase 8: In-session workflow ergonomics
+
+Make the per-task session loop nicer to drive once a project is already on CDD.
+
+- [x] Extend `/next-step` with an optional intent prompt: with a task prompt it runs an intent-driven flow (skip candidate proposal, adaptive context load, overlap check, roadmap-belonging decision recorded for the implementation session); with no argument it keeps the roadmap-driven flow. One command, two front-ends. — process doc §3.1 + both `next-step.md` copies + both CLAUDE.md workflow bullets.
+
+**Milestone:** starting an off-roadmap task is a first-class, structured `/next-step` flow.
+
+## Phase 9: Lightweight one-off deliverables
 
 Support producing a small, self-contained deliverable without the full CDD project substrate, with a clean escalation path when it turns out to be a project.
 

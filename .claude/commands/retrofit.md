@@ -106,7 +106,7 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
   ```
 
   Stage with `add -A` — the worktree was fresh, so this captures exactly the retrofit's writes. Gitignored paths won't be staged (see the section 1 gitignore warning). Commit only on this dedicated branch; never commit onto the target's existing branches.
-- Print next steps: the exact `source` line for `$WT/tools/<PROJECT_SLUG>-worktree.sh` (and, after merge, `<target>/tools/...`) to add to `~/.bashrc`; how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task.
+- Print next steps: the exact `source` line for `$WT/tools/<PROJECT_SLUG>-worktree.sh` (and, after merge, `<target>/tools/...`) to add to `~/.bashrc`; how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting.
 
 ## 4. Upgrade mode
 
@@ -199,4 +199,4 @@ Report, in both modes:
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.
-- The next steps for the user: review the retrofit branch and open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/next-step` for fresh installs.
+- The next steps for the user: review the retrofit branch and open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/next-step` for fresh installs — noting that for a first-time install without prior doc discipline that first `/next-step` is a doc reconciliation that may be slow and span several early PRs (expected, not a fault).
