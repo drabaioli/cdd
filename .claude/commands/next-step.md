@@ -2,9 +2,20 @@ Scope the next roadmap task and produce a handoff file for a fresh implementatio
 
 This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.claude-handoffs/cdd/`.
 
-## 1. Read the roadmap
+## 0. Mode: roadmap-driven or intent-driven
+
+This command has one optional argument: a prompt describing a task the user wants to start.
+
+- **No argument** → **roadmap-driven** mode: pick the next item off the roadmap. Run §1–§8 as written.
+- **Argument present** (`$ARGUMENTS`) → **intent-driven** mode: the task is already chosen by the user, so skip candidate proposal (§3 is replaced by §3-intent below). Use this when the user wants to start something off-roadmap rather than picking the next checkbox.
+
+Both modes converge on the same machinery from §4 onward (stale-handoff sweep in §2 runs in both). Do not fork the flow beyond what §1 and §3 describe.
+
+## 1. Read context
 
 Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the implementation session will rebuild detailed context.
+
+**Intent-driven mode**, load context adaptively to preserve context economy: after the roadmap and the two indexes above, selectively open only the docs the described task actually touches — enough to scope it and detect overlap with existing work, not an exhaustive read.
 
 ## 2. Check for stale handoffs
 
@@ -24,7 +35,7 @@ If the branch is gone, the handoff is stale. For each stale handoff, prompt the 
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
-## 3. Propose the next task
+## 3. Propose the next task (roadmap-driven mode)
 
 Identify the next unchecked item(s) in the roadmap. Summarize:
 
@@ -33,6 +44,15 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 - Ambiguity or open design questions you can see from the roadmap alone.
 
 If multiple items could reasonably be "next" (including items that could be done in parallel in separate worktrees), present them and let the user pick. Be explicit about which items overlap in the modules they would touch; parallel work assumes minimal overlap.
+
+## 3-intent. Scope the given task (intent-driven mode)
+
+The task is already chosen — do **not** propose candidates. Instead:
+
+- **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than silently creating a duplicate.
+- **Roadmap-belonging decision**: judge whether this new task belongs on the roadmap — substantive, evolving, or likely to be referenced later → yes; a trivial throwaway → maybe not. If it's unclear, ask the user. Record the verdict in §6 as an instruction to the implementation session (the implementation session makes the actual roadmap edit; this session never edits the roadmap).
+
+Then continue with §4.
 
 ## 4. Iterate (cheap clarification only)
 

@@ -178,9 +178,10 @@ The five rows above are the per-task lifecycle. Two further session types sit ou
             ┌──────────────────────────────────┐
             │ Handoff session: /next-step      │
             │                                  │
-            │ Read roadmap, discuss what next, │
-            │ clarify cheap requirements,      │
-            │ write handoff file.              │
+            │ Read roadmap (or take a task     │
+            │ prompt), discuss/scope, clarify  │
+            │ cheap requirements, write        │
+            │ handoff file.                    │
             └──────────────────────────────────┘
                             │
                             │  handoff file
@@ -252,7 +253,12 @@ The five rows above are the per-task lifecycle. Two further session types sit ou
 
 Goal: pick what to do next and produce a clean handoff.
 
-The session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task. It clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
+The session has two triggers, and converges on the same handoff either way:
+
+- **Roadmap-driven** (`/next-step`, no argument): the session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task.
+- **Intent-driven** (`/next-step <prompt describing a task to start>`): the task is already chosen by the human, so candidate proposal is skipped. This supports the common case where the human wants to start something off-roadmap rather than picking the next checkbox. The session loads context adaptively — the roadmap and the architecture/feature *indexes*, then selectively only the docs the described task actually touches — enough to scope it and detect overlap, not an exhaustive read (the implementation session rebuilds detailed context). It then does two things proposal mode does not: an **overlap check** — if the prompt substantially matches an existing (especially unchecked) roadmap item, surface that and ask whether to proceed as that item rather than silently creating a duplicate — and a **roadmap-belonging decision** — judge whether this new task belongs on the roadmap (substantive, evolving, will be referenced → yes; trivial throwaway → maybe not), asking the human if it's unclear. The verdict is recorded in the handoff's Notes as an instruction to the implementation session, which makes the actual roadmap edit.
+
+Either way, the session then clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
 
 Two reinforcing rationales drive this split. The first is context economy: the handoff session's context is necessarily polluted by reading the whole roadmap and reasoning across phases, while the implementation session's context is clean and dedicated to one task — the right environment for the harder, more focused clarification. The second is structural: the handoff session runs on main, which is protected from direct edits and pushes, so it cannot edit the roadmap even by accident; all roadmap edits happen in worktree sessions.
 
