@@ -6,12 +6,14 @@ This is the exploratory-session command. Run on the main worktree. Output is a h
 
 This command has one optional argument. Dispatch on its shape:
 
-| `$ARGUMENTS`                        | Mode                          | Next        |
+| `$ARGUMENTS`                        | Mode                          | Branches at |
 | ----------------------------------- | ----------------------------- | ----------- |
 | empty                               | **roadmap-driven**            | §3          |
 | `#123` or a bare integer `123`      | **issue-driven**, direct      | §0b         |
 | `issue` or `issues`                 | **issue-driven**, browse      | §0b         |
 | anything else                       | **intent-driven**             | §3-intent   |
+
+Every mode first runs §1 (read context) and §2 (stale-handoff sweep); the "Branches at" column is only where the mode-specific path begins after that.
 
 - **Roadmap-driven**: pick the next item off the roadmap. Run §1–§8 as written.
 - **Intent-driven**: the task is already chosen by the user, so skip candidate proposal (§3 is replaced by §3-intent below). Use this when the user wants to start something off-roadmap rather than picking the next checkbox.

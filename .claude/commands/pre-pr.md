@@ -122,12 +122,7 @@ If either is missing, say so in one line and skip this step (the checklist above
 
 If §6 found upstream drift, restate the recommendation to run `/merge-main` before opening the PR, and let the user decide whether to proceed anyway.
 
-Ask: **"Open a PR now?"**
+Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **Title/body**: derive a title from the branch/commits and confirm it with the user; build the body from the change summary. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge.
-- **On yes**: run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL.
-- **On no**: print the ready-to-run command (including `Closes #NN` when applicable) so the user can open it later:
-
-  ```bash
-  gh pr create --title "<title>" --body "<body>"
-  ```
+- **On yes**: derive a title from the branch/commits and a body from the change summary, then run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge.
+- **On no**: stop. The checklist above already stands on its own.
