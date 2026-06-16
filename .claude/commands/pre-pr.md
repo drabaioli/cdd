@@ -107,3 +107,27 @@ Present a checklist summary:
 ```
 
 Mark each item as pass ✓ or needs attention ✗ with details.
+
+## 8. Open PR (optional)
+
+After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
+
+**Preconditions.** Needs the `gh` CLI authenticated and a GitHub `origin`:
+
+```bash
+gh auth status && git remote get-url origin   # origin should be a github.com URL
+```
+
+If either is missing, say so in one line and skip this step (the checklist above still stands).
+
+If §6 found upstream drift, restate the recommendation to run `/merge-main` before opening the PR, and let the user decide whether to proceed anyway.
+
+Ask: **"Open a PR now?"**
+
+- **Title/body**: derive a title from the branch/commits and confirm it with the user; build the body from the change summary. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge.
+- **On yes**: run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL.
+- **On no**: print the ready-to-run command (including `Closes #NN` when applicable) so the user can open it later:
+
+  ```bash
+  gh pr create --title "<title>" --body "<body>"
+  ```

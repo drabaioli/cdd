@@ -254,10 +254,11 @@ The five rows above are the per-task lifecycle. Three further session types sit 
 
 Goal: pick what to do next and produce a clean handoff.
 
-The session has two triggers, and converges on the same handoff either way:
+The session has three front-ends, and converges on the same handoff whichever one is used:
 
 - **Roadmap-driven** (`/next-step`, no argument): the session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task.
 - **Intent-driven** (`/next-step <prompt describing a task to start>`): the task is already chosen by the human, so candidate proposal is skipped. This supports the common case where the human wants to start something off-roadmap rather than picking the next checkbox. The session loads context adaptively — the roadmap and the architecture/feature *indexes*, then selectively only the docs the described task actually touches — enough to scope it and detect overlap, not an exhaustive read (the implementation session rebuilds detailed context). It then does two things proposal mode does not: an **overlap check** — if the prompt substantially matches an existing (especially unchecked) roadmap item, surface that and ask whether to proceed as that item rather than silently creating a duplicate — and a **roadmap-belonging decision** — judge whether this new task belongs on the roadmap (substantive, evolving, will be referenced → yes; trivial throwaway → maybe not), asking the human if it's unclear. The verdict is recorded in the handoff's Notes as an instruction to the implementation session, which makes the actual roadmap edit.
+- **Issue-driven** (`/next-step #123` or a bare integer scopes that issue directly; `/next-step issue` / `issues` lists open issues and lets the human pick): a thin front-end onto intent-driven mode where the intent text comes from a GitHub issue rather than being typed. The issue's title, body, and comments seed the *same* intent machinery — adaptive context load, overlap check, roadmap-belonging decision — so issues are an inbox feeding the roadmap, which remains the source of truth, not a parallel backlog. The browse list excludes issues that already have a local branch/worktree or an open PR. The session has **no side-effects on the issue** (it does not assign, comment, or relabel); the issue number is threaded forward solely through the branch name, `gh_issue_NN_<slug>`, and the issue auto-closes when the PR merges (see §3.5/§3.6). This mode needs `gh` and a GitHub `origin`; if either is absent it degrades to a clear message rather than failing. (The other two modes are unaffected — they never touch `gh`.)
 
 Either way, the session then clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
 
@@ -302,11 +303,11 @@ Doc reconciliation has three parts:
 
 `/pre-pr` also performs a conditional CI-improvement check: if the change introduces a category of work that the existing CI doesn't cover (new file type, new test category, a tool that should be linted but isn't), propose improvements to the human. On approval, apply them as part of the same PR; alternatively, the human may defer them as a new roadmap task. The default is silence. The agent should not propose CI improvements every run; only when the change genuinely surfaces a gap.
 
-Output is a pass/fail summary across all the gates.
+Output is a pass/fail summary across all the gates. After the summary, `/pre-pr` offers an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. On approval it runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If §6 detected upstream drift, the step restates the `/merge-main` recommendation before offering. If the human declines, it prints the ready-to-run `gh pr create` command instead. The gate preserves the checkpoint model: `/pre-pr` never opens a PR without explicit confirmation.
 
 ### 3.6 PR review and merge
 
-The human runs `gh pr create`, reviews the PR (with full Claude assistance if desired, but in a fresh session, not the implementation session), and merges. Squash-merge is the default; the worktree script handles squash-merged branches as a first-class case.
+The PR is opened either from the `/pre-pr` session's opt-in step (§3.5) or by the human running `gh pr create` manually. The human then reviews the PR (with full Claude assistance if desired, but in a fresh session, not the implementation session), and merges. Squash-merge is the default; the worktree script handles squash-merged branches as a first-class case.
 
 ### 3.7 PR-review session (optional): `/process-pr`
 

@@ -91,8 +91,8 @@ See `doc/knowledge_base/claude-driven-development.md` for the full picture.
 
 This project uses CDD on itself. Every CDD session is a fresh context doing exactly one job (see process doc section 3 for the session taxonomy).
 
-- **To start a new task** (handoff session): run `/next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode). `/next-step` optionally takes a prompt describing a task to start (intent-driven mode, for off-roadmap work); with no argument it picks the next roadmap item.
+- **To start a new task** (handoff session): run `/next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode). `/next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and `#NN` / a bare integer / the `issue`/`issues` keyword sources the task from a GitHub issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
 - **When main has advanced under a feature branch** (merge session): run `/merge-main` in a fresh context on the feature branch.
-- **Before opening a PR** (pre-PR session): run `/pre-pr` in a fresh context to verify the process doc and template are consistent and the roadmap reflects what landed.
+- **Before opening a PR** (pre-PR session): run `/pre-pr` in a fresh context to verify the process doc and template are consistent and the roadmap reflects what landed; it ends with an opt-in step to open the PR (adding `Closes #NN` when the branch carries the `gh_issue_NN` token).
 - **When a PR review leaves comments** (PR-review session): run `/process-pr` in a fresh context on the feature branch.
 - Keep the process doc, template, and roadmap consistent as part of every change. Process-first, then template.
