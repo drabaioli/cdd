@@ -6,9 +6,12 @@ This session is **fresh and separate** from the implementation session by design
 
 ```bash
 git diff main...HEAD --name-only
+git status --porcelain
 ```
 
 Capture the list of changed files. Use it as the scope for steps 3 and 4.
+
+Also record the `git status --porcelain` output as the **entry snapshot**. The tree should be clean here (the implementation session commits its own work). If it is already dirty, those are changes this session did not create — note them now; step 8 must not sweep them into the auto-commit.
 
 ## 2. Build & QA
 
@@ -104,11 +107,28 @@ Present a checklist summary:
 - [ ] Roadmap up to date
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] No upstream drift (or: /merge-main recommended)
+- [ ] Reconciliation edits committed
 ```
 
 Mark each item as pass ✓ or needs attention ✗ with details.
 
-## 8. Open PR (optional)
+## 8. Commit reconciliation edits
+
+Commit the documentation reconciliation edits this session made in steps 3–6 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). This is a local commit only — **no push**. Pushing happens, if at all, in step 9.
+
+First check the entry snapshot from step 1:
+
+- **If the tree was already dirty on entry** (changes this session did not create), **stop and surface** them: list those paths, state that the auto-commit is skipped so unrelated work isn't swept in, and let the user resolve it. The checklist above still stands on its own.
+- **Otherwise**, commit only the files this session edited. Add them by path — do not `git add -A`:
+
+```bash
+git add <files reconciled in steps 3–6>
+git commit -m '<message>'
+```
+
+Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
+
+## 9. Open PR (optional)
 
 After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
 

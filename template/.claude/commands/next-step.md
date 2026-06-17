@@ -125,9 +125,11 @@ Do **not** restate project conventions, coding style, build commands, or anythin
 
 **Issue-driven mode**: open the implementation prompt by noting the source issue inline — `Sourced from GitHub issue #NN ("<title>", <url>).` — then write the scoped prompt as usual. The issue reference lives in the prose, not a separate handoff field.
 
-End the implementation prompt with this standing instruction (verbatim):
+End the implementation prompt with these standing instructions (verbatim):
 
 > Before writing a plan, surface any remaining open questions and confirm scope with the user.
+>
+> When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
 
 Show the draft to the user for approval. Iterate if needed.
 

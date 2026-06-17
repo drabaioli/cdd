@@ -158,6 +158,18 @@ Every bootstrapped or retrofitted project carries a one-line marker file, `.clau
 
 Its sole purpose is to anchor `/retrofit`'s upgrade mode: with the baseline hash, the old template a project started from can be recovered (`git show <hash>:template/<file>` in the CDD repo) and a three-way comparison can distinguish "the CDD template evolved" from "the project customized this file". Projects bootstrapped before the marker existed fall back to heuristic two-way diffing; the first upgrade writes the marker going forward.
 
+### 2.11 Commit conventions
+
+Several sessions auto-commit at their gate so that a session never leaves a dirty tree for the next one to inherit. Five rules keep this non-disruptive:
+
+1. **A gate commits only the changes it produced.** It adds the specific files the session edited — never `git add -A` over a tree it didn't author. If the working tree is already dirty on entry with changes the gate did not create, the gate **stops and surfaces** them and skips the auto-commit, rather than sweeping unrelated work into the commit.
+2. **Auto-commits are local — no push.** The sole exception is `/process-pr` (§3.7), which commits *and* pushes to the open PR branch; it is the one auto-push gate.
+3. **Messages follow the project's own commit conventions from `CLAUDE.md`**, including the `Co-Authored-By` trailer. The convention here is generic; each project defines its own message format.
+4. **Each gate surfaces a short summary of what it committed** in its output (the commit subject and the files included).
+5. **An auto-commit is not a checkpoint.** A local commit with no push is reversible — it adds no gate and removes none. It is not a seventh checkpoint (see §4); the human checkpoints are unchanged by it.
+
+Which sessions auto-commit: the implementation session (§3.3) and `/pre-pr` (§3.5) commit their own changes locally; `/process-pr` (§3.7) commits and pushes; `/merge-main` (§3.4) produces a merge commit and enforces a clean tree before merging. All four follow the rules above.
+
 ## 3. Lifecycle
 
 A task flows through CDD in up to five sessions, two of them optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session type has a name, one command, and one job:
@@ -278,7 +290,7 @@ The session opens in plan mode, reads the handoff, and rebuilds its context from
 
 Plan mode is the load-bearing checkpoint here: the agent cannot modify files while in plan mode, so the human gets a guaranteed approval gate before any code is written.
 
-Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits.
+Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits its own changes locally (no push) per the commit conventions (§2.11) — stopping and surfacing rather than committing if the tree holds changes it didn't make. Because the implementation session has no command file, this commit is reinforced by a standing instruction in the handoff prompt that `/next-step` generates.
 
 ### 3.4 Merge session (optional): `/merge-main`
 
@@ -303,7 +315,7 @@ Doc reconciliation has three parts:
 
 `/pre-pr` also performs a conditional CI-improvement check: if the change introduces a category of work that the existing CI doesn't cover (new file type, new test category, a tool that should be linted but isn't), propose improvements to the human. On approval, apply them as part of the same PR; alternatively, the human may defer them as a new roadmap task. The default is silence. The agent should not propose CI improvements every run; only when the change genuinely surfaces a gap.
 
-Output is a pass/fail summary across all the gates. After the summary, `/pre-pr` offers an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If §6 detected upstream drift, the step restates the `/merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/pre-pr` never opens a PR without explicit confirmation.
+Output is a pass/fail summary across all the gates. After the summary, `/pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If §6 detected upstream drift, the step restates the `/merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/pre-pr` never opens a PR without explicit confirmation.
 
 ### 3.6 PR review and merge
 
@@ -313,7 +325,7 @@ The PR is opened either from the `/pre-pr` session's opt-in step (§3.5) or by t
 
 Run on the feature branch when a review has left comments that need addressing. A fresh session reads the open PR's review comments (inline review threads, review summary bodies, and general conversation comments), processes only the unresolved ones, and triages them: change-request, question, nit, or discussion. It presents the triage plan to the human, then implements the change-requests and nits, answers the questions, and pushes back — disagreeing and explaining in the reply — on any change-request it judges wrong or risky rather than implementing it blindly.
 
-Approving the triage plan is the session's single checkpoint: once the human approves it, the rest of the run — the edits, the in-thread replies, the commit, the push — executes without further confirmation gates. The rationale is described in Section 4. Review threads are never resolved by the command; resolving them is the human's call during re-review.
+Approving the triage plan is the session's single checkpoint: once the human approves it, the rest of the run — the edits, the in-thread replies, the commit, the push — executes without further confirmation gates. `/process-pr` is the one gate that pushes (the auto-push exception in §2.11): the PR branch is already open and under review, so the commit goes straight to it. The rationale is described in Section 4. Review threads are never resolved by the command; resolving them is the human's call during re-review.
 
 This loop can repeat across review rounds.
 
@@ -333,6 +345,8 @@ Six explicit checkpoints. The human is also free to interject at any other point
 6. **PR merge** (after `/pre-pr`): standard GitHub PR review and merge.
 
 These six are the gates. The agent should never proceed past a gate without explicit human confirmation.
+
+The auto-commits some sessions make at their gates (§2.11) do not change this count. A local commit with no push is reversible from git history, so it adds no checkpoint and removes none — it is not a seventh gate. The only gate that pushes is `/process-pr`, and its single up-front checkpoint is described in §4.1.
 
 ### 4.1 The `/process-pr` exception
 
