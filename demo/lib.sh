@@ -16,7 +16,7 @@ REPO_ROOT="$(cd "$_DEMO_LIB_DIR/.." && pwd)"
 # shellcheck disable=SC2034  # consumed by the scripts that source this file
 SEED_DIR="$_DEMO_LIB_DIR/seed"
 # shellcheck disable=SC2034  # consumed by the scripts that source this file
-BOOTSTRAP="$REPO_ROOT/bootstrap-cdd-project.sh"
+BOOTSTRAP="$REPO_ROOT/tools/bootstrap-cdd-project.sh"
 
 # Numbered demo instances share this prefix; the dogfood instance is just "mdr".
 DEMO_PREFIX="mdr_demo_"

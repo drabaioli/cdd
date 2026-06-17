@@ -44,7 +44,7 @@ Deep-blue boxes with a pale outline are Claude sessions (fresh context, one job 
 
 ```bash
 git clone https://github.com/drabaioli/cdd.git ~/Code/cdd && cd ~/Code/cdd
-./bootstrap-cdd-project.sh \
+./tools/bootstrap-cdd-project.sh \
   --name "My Project" \
   --slug myproj \
   --path ~/Code/my-project
@@ -60,7 +60,7 @@ For a guided greenfield start instead of the manual recipe, run `/bootstrap` fro
 %%{init: {'theme':'base', 'themeVariables': {'background':'#0a0f1a', 'primaryColor':'#16243a', 'primaryTextColor':'#cfe3f0', 'primaryBorderColor':'#6f9fc4', 'lineColor':'#4a6c8c', 'textColor':'#b9d2e6', 'edgeLabelBackground':'#0a0f1a', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
 flowchart LR
     PD("Process document<br>doc/knowledge_base/"):::layer
-    T("Template<br>template/ + bootstrap-cdd-project.sh"):::layer
+    T("Template<br>template/ + tools/bootstrap-cdd-project.sh"):::layer
     NEW("Your project, running CDD"):::out
     DEMO("Demo / dogfood instance<br>demo/"):::out
 
