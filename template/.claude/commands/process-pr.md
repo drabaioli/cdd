@@ -132,7 +132,7 @@ gh pr comment NUMBER --body '...'
 
 ## 7. Commit and push
 
-Commit the code changes in logical groups, with messages referencing what each addressed. Follow the repo's commit conventions from CLAUDE.md, including the `Co-Authored-By` trailer.
+Commit the code changes in logical groups, with messages referencing what each addressed. Follow the repo's commit conventions from CLAUDE.md.
 
 ```bash
 git add -A

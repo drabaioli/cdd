@@ -129,7 +129,7 @@ End the implementation prompt with these standing instructions (verbatim):
 
 > Before writing a plan, surface any remaining open questions and confirm scope with the user.
 >
-> When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md including the `Co-Authored-By` trailer. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
+> When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
 
 Show the draft to the user for approval. Iterate if needed.
 

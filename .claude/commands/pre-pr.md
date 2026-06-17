@@ -126,7 +126,7 @@ git add <files reconciled in steps 3–6>
 git commit -m '<message>'
 ```
 
-Follow the repo's commit conventions from CLAUDE.md, including the `Co-Authored-By` trailer. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
+Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
 
 ## 9. Open PR (optional)
 
