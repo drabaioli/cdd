@@ -105,6 +105,7 @@ Make the per-task session loop nicer to drive once a project is already on CDD.
 
 - [x] Extend `/next-step` with an optional intent prompt: with a task prompt it runs an intent-driven flow (skip candidate proposal, adaptive context load, overlap check, roadmap-belonging decision recorded for the implementation session); with no argument it keeps the roadmap-driven flow. One command, two front-ends. — process doc §3.1 + both `next-step.md` copies + both CLAUDE.md workflow bullets.
 - [x] Add a GitHub-issue front-end to `/next-step` (an issue number or the `issue`/`issues` keyword sources the task; branch named `gh_issue_NN_<slug>`), plus an opt-in "open the PR?" step in `/pre-pr` that adds `Closes #NN` on `gh_issue_NN` branches. — process doc §3.1/§3.5/§3.6 + both `next-step.md` + both `pre-pr.md` copies + both CLAUDE.md workflow bullets.
+- [x] Auto-commit at workflow gates: the implementation session and `/pre-pr` commit their own changes automatically (local, no push) in a non-disruptive way; `/process-pr` and `/merge-main` reviewed to fit one shared commit convention. — issue #20. Process doc §2.11 (new) + §3.3/§3.5/§3.7/§4 + both `pre-pr.md` and `next-step.md` copies + both CLAUDE.md `/pre-pr` bullets.
 
 **Milestone:** starting an off-roadmap task — typed or sourced from a GitHub issue — is a first-class, structured `/next-step` flow.
 
