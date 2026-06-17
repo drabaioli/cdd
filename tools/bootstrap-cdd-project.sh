@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap a new CDD project from the template/ directory next to this script.
+# Bootstrap a new CDD project from the repo-root template/ directory.
 #
 # Usage:
 #   bootstrap-cdd-project.sh \
@@ -22,8 +22,8 @@
 # Because a staging path's basename is typically a throwaway tmp name, --dir is
 # required with --stage to supply the real <PROJECT_DIR> value.
 #
-# --template-dir DIR substitutes from DIR instead of the template/ next to this
-# script. Used by /retrofit upgrade mode to render an old template snapshot
+# --template-dir DIR substitutes from DIR instead of the repo-root template/.
+# Used by /retrofit upgrade mode to render an old template snapshot
 # (extracted via `git show`) through the same substitution path.
 #
 # In both modes the script writes a one-line baseline marker, .claude/cdd-baseline,
@@ -51,7 +51,7 @@ usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /
                   into an existing project.
   --dir           Override the directory slug (<PROJECT_DIR>) instead of deriving it from the
                   basename of --path. Required with --stage.
-  --template-dir  Substitute from this directory instead of the template/ next to the script.
+  --template-dir  Substitute from this directory instead of the repo-root template/.
                   Used by /retrofit upgrade mode to render an old template snapshot.
 EOF
   exit 2
@@ -108,9 +108,11 @@ if ! [[ "$PROJECT_DIR" =~ ^[a-z][a-z0-9_-]*$ ]]; then
 fi
 
 # Resolve template/ relative to this script's location so the script works from
-# any CWD; --template-dir overrides it (e.g. an old template snapshot).
+# any CWD; --template-dir overrides it (e.g. an old template snapshot). The script
+# lives in tools/, so template/ is one level up at the repo root.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEMPLATE_DIR="${TEMPLATE_DIR_OVERRIDE:-$SCRIPT_DIR/template}"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TEMPLATE_DIR="${TEMPLATE_DIR_OVERRIDE:-$REPO_ROOT/template}"
 [[ -d "$TEMPLATE_DIR" ]] || { echo "error: template dir not found: $TEMPLATE_DIR" >&2; exit 1; }
 
 # Validate overlay directories up front so we fail before touching the target.

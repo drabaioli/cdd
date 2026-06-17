@@ -14,7 +14,6 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 .
 ├── CLAUDE.md                                 # this repo's Claude Code context
 ├── README.md                                 # repo entry point
-├── bootstrap-cdd-project.sh                  # non-interactive bootstrap for new projects
 ├── .claude/
 │   ├── commands/                             # this repo's slash commands
 │   └── settings.json                         # auto-allows worktree sessions to read their handoff file
@@ -32,6 +31,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── scripts/                                  # template smoke assertions + command-set drift check (with whitelists)
 ├── template/                                 # copy-paste material for new projects
 └── tools/
+    ├── bootstrap-cdd-project.sh              # non-interactive bootstrap for new projects
     └── cdd-worktree.sh                       # this repo's worktree helper
 ```
 

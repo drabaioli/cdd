@@ -13,7 +13,7 @@ jobs:
 
       - name: Syntax-check the shell scripts
         run: |
-          bash -n bootstrap-cdd-project.sh
+          bash -n tools/bootstrap-cdd-project.sh
           bash -n scripts/*.sh
           bash -n tools/cdd-worktree.sh
           bash -n template/tools/PROJECT-worktree.sh
@@ -21,7 +21,7 @@ jobs:
 
       - name: Shellcheck the shell scripts
         run: |
-          shellcheck bootstrap-cdd-project.sh scripts/*.sh demo/*.sh
+          shellcheck tools/bootstrap-cdd-project.sh scripts/*.sh demo/*.sh
           # The worktree helpers are sourced (no shebang), so the dialect is explicit.
           shellcheck -s bash tools/cdd-worktree.sh template/tools/PROJECT-worktree.sh
 
@@ -35,7 +35,7 @@ jobs:
 
       - name: Bootstrap a demo project from the template
         run: |
-          ./bootstrap-cdd-project.sh \
+          ./tools/bootstrap-cdd-project.sh \
             --name "Demo Project" \
             --slug demo \
             --path /tmp/smoke/demo-project
@@ -48,7 +48,7 @@ jobs:
 
       - name: Stage a render-only tree and assert it is clean
         run: |
-          ./bootstrap-cdd-project.sh --stage \
+          ./tools/bootstrap-cdd-project.sh --stage \
             --name "Stage Test" \
             --slug stagetest \
             --dir stage-test \
@@ -60,7 +60,7 @@ jobs:
         run: |
           mkdir -p /tmp/smoke/snapshot
           git archive HEAD template | tar -x -C /tmp/smoke/snapshot
-          ./bootstrap-cdd-project.sh --stage \
+          ./tools/bootstrap-cdd-project.sh --stage \
             --name "Snapshot Test" \
             --slug snaptest \
             --dir snap-test \

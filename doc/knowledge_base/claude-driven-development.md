@@ -367,7 +367,7 @@ Several areas were intentionally out of scope for the first version of the templ
 
 The mechanism is the `demo/setup.sh` pattern: `/bootstrap` writes the generated artifacts into a staging overlay directory and invokes `bootstrap-cdd-project.sh` once with `--overlay`, so the overlay overrides the template stubs and the filled-in docs land in the initial scaffold commit — no post-hoc copying. Because `/bootstrap` writes the architecture intentions, the overview, and a real roadmap through the conversation, the generated roadmap starts at the project's real first phase and does **not** carry the template's pre-filled "CDD bootstrap" phase (survey the codebase / write the docs / fill the roadmap). That pre-filled phase exists for files-only starts — `/retrofit` install mode and the manual bootstrap-script path below — where the docs have not yet been written.
 
-The manual fallback is to run `bootstrap-cdd-project.sh` from the CDD repo root (see `template/BOOTSTRAP.md` for the procedure): it copies the template into a fresh directory, performs the placeholder substitution non-interactively, and runs the initial `git init` + scaffold commit, leaving the stubs and the pre-filled bootstrap phase to be filled in by hand and by the first few `/next-step` sessions. Use this when guided discovery isn't wanted; otherwise prefer `/bootstrap`.
+The manual fallback is to run `tools/bootstrap-cdd-project.sh` from the CDD repo (see `template/BOOTSTRAP.md` for the procedure): it copies the template into a fresh directory, performs the placeholder substitution non-interactively, and runs the initial `git init` + scaffold commit, leaving the stubs and the pre-filled bootstrap phase to be filled in by hand and by the first few `/next-step` sessions. Use this when guided discovery isn't wanted; otherwise prefer `/bootstrap`.
 
 **Lightweight one-off deliverables.** Not every task is a project. Sometimes the right output is a single self-contained artifact — a script plus a README — that future-you can use as-is, with no roadmap, no `doc/` tree, no worktree helper, and no per-task lifecycle to maintain. The motivating example is a ~240-line PEP723 `uv` script with a short README and one local commit. Addressed by `/quick-create`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session. It is **guided but deliberately lighter than `/bootstrap`**: instead of the seven discovery headings it asks only a few natural questions — what it is, its goal, its non-goals — then writes the artifact(s) and a focused README directly into the target. It writes plain files; it does not use `template/`, the bootstrap script, or an overlay, because a one-off has no template. The default target is a sibling of the CDD repo (the parent of the CDD checkout, e.g. `$HOME/Code/<name>`), proposed and confirmed. The flow is **files-first**: the deliverable is written before any version control happens, and only then are two outward-facing actions offered separately and confirmed individually — a local `git init` plus a single commit, and (independently) creating and pushing a GitHub repo. Neither is the default. The engineering floor is a focused README and clean single-purpose code (required); declaring dependencies inline where the language supports it (e.g. PEP723), a quick smoke run, and a license/authorship header are offered, not forced, and not over-prescribed by language. If a deliverable later grows into a project, `/retrofit` can install CDD onto it.
 
@@ -390,7 +390,7 @@ Two things temper this. First, the don't-disrupt-existing-docs stance: a retrofi
 
 ## 7. Template directory layout
 
-The template ships as a directory copied into a new project root by `bootstrap-cdd-project.sh` (which lives at the CDD repo root, not inside `template/`). The bootstrapped tree looks like:
+The template ships as a directory copied into a new project root by `tools/bootstrap-cdd-project.sh` (which lives under `tools/`, not inside `template/`). The bootstrapped tree looks like:
 
 ```
 <PROJECT_DIR>/
@@ -417,12 +417,12 @@ The template ships as a directory copied into a new project root by `bootstrap-c
     └── <PROJECT_SLUG>-worktree.sh            # renamed and substituted by bootstrap
 ```
 
-`template/BOOTSTRAP.md` is meta-documentation that lives in the template directory but is **not** copied into the bootstrapped project; the bootstrap script excludes it. Likewise, the bootstrap script itself stays at the CDD repo root and is not part of the bootstrapped tree.
+`template/BOOTSTRAP.md` is meta-documentation that lives in the template directory but is **not** copied into the bootstrapped project; the bootstrap script excludes it. Likewise, the bootstrap script itself stays under `tools/` in the CDD repo and is not part of the bootstrapped tree.
 
 Bootstrap procedure for a new project:
 
 1. From the CDD repo root, run:
-   `./bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug`
+   `./tools/bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug`
    The basename of `--path` becomes the `<PROJECT_DIR>` slug.
 2. Add the worktree-helper source line to `~/.bashrc` (the script prints the exact line on success).
 3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
@@ -437,7 +437,7 @@ Concretely, the CDD repo has two layers:
 - **Its own CDD scaffolding** at the repo root: `./CLAUDE.md`, `./.claude/commands/`, `./doc/{architecture,features,knowledge_base}/`, `./tools/cdd-worktree.sh`. This is how Claude Code works on the CDD repo itself.
 - **The template** under `./template/`: the copy-paste material that gets dropped into new projects. This is content, not scaffolding.
 
-The two layers share a shape but serve different purposes. `./CLAUDE.md` is the CDD project's actual context (it references the process doc, lists open work, points at the template). `./template/CLAUDE.md` is a skeleton with placeholders, intended to be copied and filled in for a different project. `./template/BOOTSTRAP.md` documents the bootstrap recipe (it is template-adjacent meta-doc, not content that ships into the bootstrapped project), and `./bootstrap-cdd-project.sh` at the CDD repo root automates the copy + substitution.
+The two layers share a shape but serve different purposes. `./CLAUDE.md` is the CDD project's actual context (it references the process doc, lists open work, points at the template). `./template/CLAUDE.md` is a skeleton with placeholders, intended to be copied and filled in for a different project. `./template/BOOTSTRAP.md` documents the bootstrap recipe (it is template-adjacent meta-doc, not content that ships into the bootstrapped project), and `./tools/bootstrap-cdd-project.sh` automates the copy + substitution.
 
 The duplication between `./.claude/commands/` and `./template/.claude/commands/` is real but small, and it is the right duplication: the template ships a snapshot, the CDD repo's own copy can drift slightly if a command needs CDD-specific behaviour, and divergence is visible at review time. The CDD repo's own `/pre-pr` includes a command-set drift step that diffs the two trees and presents each hunk to the human, who judges whether it is expected substitution drift or unintended divergence.
 

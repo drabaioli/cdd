@@ -1,6 +1,6 @@
 # Bootstrapping a project from the CDD template
 
-This document lives **inside** the template directory but is **not** copied into the bootstrapped project; the bootstrap script (`bootstrap-cdd-project.sh` at the CDD repo root) excludes it. Its audience is the person about to run the bootstrap script, not the future maintainer of the bootstrapped project.
+This document lives **inside** the template directory but is **not** copied into the bootstrapped project; the bootstrap script (`tools/bootstrap-cdd-project.sh` in the CDD repo) excludes it. Its audience is the person about to run the bootstrap script, not the future maintainer of the bootstrapped project.
 
 The Claude-Driven Development workflow itself is described in `doc/knowledge_base/claude-driven-development.md` in the CDD repo. Read that once before bootstrapping; the slash commands assume you understand the workflow they're part of.
 
@@ -52,7 +52,7 @@ Other angle-bracketed text in the template (e.g. `<one-paragraph project descrip
 From the CDD repo root:
 
 ```bash
-./bootstrap-cdd-project.sh \
+./tools/bootstrap-cdd-project.sh \
   --name "My Project Display Name" \
   --slug myproject \
   --path ../my-project

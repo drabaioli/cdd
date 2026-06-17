@@ -2,7 +2,7 @@
 # Render-then-diff drift check between the CDD repo's own .claude/commands/ and the
 # template/.claude/commands/ it ships.
 #
-# The template is rendered via bootstrap-cdd-project.sh --stage with this repo's own
+# The template is rendered via tools/bootstrap-cdd-project.sh --stage with this repo's own
 # identifiers (slug/dir "cdd"), so expected substitution drift cancels out mechanically
 # and only real divergence survives. Remaining divergence is a defect unless:
 #   - the file is listed in scripts/command-drift-whitelist.txt (one-sided by design), or
@@ -32,7 +32,7 @@ PROCESS_DOC="doc/knowledge_base/claude-driven-development.md"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-./bootstrap-cdd-project.sh --stage --name "CDD" --slug cdd --dir cdd \
+./tools/bootstrap-cdd-project.sh --stage --name "CDD" --slug cdd --dir cdd \
   --path "$TMP/render" >/dev/null
 RENDERED_CMDS="$TMP/render/.claude/commands"
 

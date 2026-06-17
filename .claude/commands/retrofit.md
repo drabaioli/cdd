@@ -77,7 +77,7 @@ Reuse the bootstrap script's substitution — do not reimplement it:
 
 ```bash
 STAGE=$(mktemp -d)
-./bootstrap-cdd-project.sh --stage \
+./tools/bootstrap-cdd-project.sh --stage \
   --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> --dir <PROJECT_DIR> \
   --path "$STAGE/render"
 ```
@@ -133,7 +133,7 @@ Current template:
 
 ```bash
 STAGE=$(mktemp -d)
-./bootstrap-cdd-project.sh --stage \
+./tools/bootstrap-cdd-project.sh --stage \
   --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> --dir <PROJECT_DIR> \
   --path "$STAGE/current"
 ```
@@ -143,7 +143,7 @@ Old (baseline) template, extracted from this repo's history and rendered through
 ```bash
 OLD_TPL=$(mktemp -d)
 git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
-./bootstrap-cdd-project.sh --stage \
+./tools/bootstrap-cdd-project.sh --stage \
   --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> --dir <PROJECT_DIR> \
   --template-dir "$OLD_TPL/template" \
   --path "$STAGE/old"

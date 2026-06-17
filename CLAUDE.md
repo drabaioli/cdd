@@ -16,7 +16,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
 | Guided greenfield bootstrap                          | `.claude/commands/bootstrap.md` (`/bootstrap`)    |
 | Lightweight one-off deliverable                      | `.claude/commands/quick-create.md` (`/quick-create`) |
-| Non-interactive bootstrap script                     | `bootstrap-cdd-project.sh` (repo root)            |
+| Non-interactive bootstrap script                     | `tools/bootstrap-cdd-project.sh`                  |
 | Demo / dogfooding subsystem (seed + automation)      | `demo/` (start with `demo/README.md`)             |
 
 **Read `doc/knowledge_base/claude-driven-development.md` before making any structural change to the workflow or template.** The process doc is the source of truth; the template is its instantiation. Changes flow process-first, template-second.
@@ -38,8 +38,8 @@ This repo is documentation and shell scripts; there is no build step. Verificati
 
 ```bash
 # Shell script sanity (CI also runs shellcheck over the same set).
-bash -n bootstrap-cdd-project.sh scripts/*.sh
-bash -n tools/cdd-worktree.sh template/tools/PROJECT-worktree.sh
+bash -n scripts/*.sh
+bash -n tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh template/tools/PROJECT-worktree.sh
 bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
 # Command-set drift: repo .claude/commands/ vs the rendered template.
@@ -47,7 +47,7 @@ bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
-./bootstrap-cdd-project.sh --name "Demo Project" --slug demo \
+./tools/bootstrap-cdd-project.sh --name "Demo Project" --slug demo \
   --path /tmp/cdd-smoke/demo-project
 ./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
 
@@ -72,7 +72,7 @@ When `/pre-pr` runs in this repo, the "build / format / lint / test" gates colla
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
 | `template/tools/`                  | Worktree helper shipped to new projects                   |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
-| `bootstrap-cdd-project.sh`         | Non-interactive bootstrap script (repo root)              |
+| `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |

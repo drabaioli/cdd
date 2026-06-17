@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Smoke-test the bootstrapped tree at $1.
 #
-# Asserts that bootstrap-cdd-project.sh produced a clean tree:
+# Asserts that tools/bootstrap-cdd-project.sh produced a clean tree:
 #   - no <PROJECT_NAME>, <PROJECT_SLUG>, <PROJECT_DIR>, or bare PROJECT literals remain
 #   - the bootstrapped worktree script passes `bash -n`
 #   - BOOTSTRAP.md was not copied

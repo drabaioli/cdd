@@ -83,7 +83,7 @@ Author the identifiers as placeholders (`<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PR
 Reuse the bootstrap script — do not reimplement copying or substitution:
 
 ```bash
-./bootstrap-cdd-project.sh \
+./tools/bootstrap-cdd-project.sh \
   --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> \
   --path "<target>" \
   --overlay "$OVERLAY"

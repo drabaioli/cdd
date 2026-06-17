@@ -44,7 +44,7 @@ demo/setup.sh mdr             # the kept dogfood instance "Markdown Renderer"
 demo/setup.sh mdr_demo_07     # a specific instance
 ```
 
-`setup.sh` wraps the repo-root `bootstrap-cdd-project.sh` (it does **not** reimplement substitution): bootstrap copies `template/`, overlays `demo/seed/` via `--overlay`, substitutes the identifiers, runs `git init`, and makes the scaffold commit. Then `setup.sh` creates and pushes a GitHub repo with `gh repo create --source . --push` (private by default; pass `--public` to share).
+`setup.sh` wraps `tools/bootstrap-cdd-project.sh` (it does **not** reimplement substitution): bootstrap copies `template/`, overlays `demo/seed/` via `--overlay`, substitutes the identifiers, runs `git init`, and makes the scaffold commit. Then `setup.sh` creates and pushes a GitHub repo with `gh repo create --source . --push` (private by default; pass `--public` to share).
 
 After setup, `setup.sh` appends a marker-guarded block to `~/.bashrc` (default) so the instance's worktree helper is sourced automatically in new shells:
 

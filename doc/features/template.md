@@ -1,6 +1,6 @@
 # The template
 
-A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`bootstrap-cdd-project.sh` at the CDD repo root) that together start a new project on CDD. Template contents:
+A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`tools/bootstrap-cdd-project.sh`) that together start a new project on CDD. Template contents:
 
 - `CLAUDE.md` skeleton with placeholders for project-specific content.
 - `.claude/commands/{next-step,pre-pr,merge-main,process-pr}.md`: the four slash commands.
