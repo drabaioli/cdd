@@ -131,7 +131,7 @@ Done. Instance '$INSTANCE' is ready at $TARGET
 Next steps:
   1. Source the worktree helper in your shell:
        [[ -f "$WORKTREE_HELPER" ]] && source "$WORKTREE_HELPER"
-  2. cd "$TARGET" and run \`claude\`, then /next-step to start Phase 1.
+  2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 
 Tear it down later with: demo/teardown.sh $INSTANCE --local-only
 EOF
@@ -144,7 +144,7 @@ Next steps:
   1. Open a new shell (or run: source "$RC_FILE") so the worktree helper is active.
      Fallback — source it manually in the current shell:
        [[ -f "$WORKTREE_HELPER" ]] && source "$WORKTREE_HELPER"
-  2. cd "$TARGET" and run \`claude\`, then /next-step to start Phase 1.
+  2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 
 Tear it down later with: demo/teardown.sh $INSTANCE
 EOF

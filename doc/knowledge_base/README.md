@@ -5,7 +5,7 @@ Project metadata, history, and foundational documents for the CDD project.
 ## Contents
 
 - **`claude-driven-development.md`**: the process document. Philosophy, lifecycle, artifacts, edit rules, known gaps. The source of truth for what CDD is.
-- **`roadmap.md`**: the central workflow artifact. Phases, tasks, milestones. Edited by implementation sessions (ticking checkboxes; applying pre-approved add/modify/remove edits) and by `/pre-pr` (ticking + proposing edits to the user). Never edited by `/next-step`.
+- **`roadmap.md`**: the central workflow artifact. Phases, tasks, milestones. Edited by implementation sessions (ticking checkboxes; applying pre-approved add/modify/remove edits) and by `/cdd-pre-pr` (ticking + proposing edits to the user). Never edited by `/cdd-next-step`.
 
 ## Conventions
 

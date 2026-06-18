@@ -140,7 +140,7 @@ adopt: <one-line description of what was adopted from main>
 
 ## 7. Verify
 
-Run the project build and tests to confirm the merged state is healthy. Use the same commands as `/pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern.
+Run the project build and tests to confirm the merged state is healthy. Use the same commands as `/cdd-pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern.
 
 If anything fails, report the failure and stop. Do not push.
 
@@ -156,7 +156,7 @@ Present a final summary:
 - [ ] Build passes
 - [ ] Tests pass
 
-Next: re-run /pre-pr before opening or updating the PR.
+Next: re-run /cdd-pre-pr before opening or updating the PR.
 ```
 
-The user should re-run `/pre-pr` in a fresh session after `/merge-main` to ensure the merged state passes all gates.
+The user should re-run `/cdd-pre-pr` in a fresh session after `/cdd-merge-main` to ensure the merged state passes all gates.

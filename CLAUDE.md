@@ -14,8 +14,8 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
 | Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
-| Guided greenfield bootstrap                          | `.claude/commands/bootstrap.md` (`/bootstrap`)    |
-| Lightweight one-off deliverable                      | `.claude/commands/quick-create.md` (`/quick-create`) |
+| Guided greenfield bootstrap                          | `.claude/commands/cdd-bootstrap.md` (`/cdd-bootstrap`)    |
+| Lightweight one-off deliverable                      | `.claude/commands/cdd-quick-create.md` (`/cdd-quick-create`) |
 | Non-interactive bootstrap script                     | `tools/bootstrap-cdd-project.sh`                  |
 | Demo / dogfooding subsystem (seed + automation)      | `demo/` (start with `demo/README.md`)             |
 
@@ -30,7 +30,7 @@ Each doc directory keeps an `index.md` pointer list: read the index, then load o
 - Template files use a three-identifier placeholder model — `<PROJECT_NAME>` (display), `<PROJECT_SLUG>` (shell-command slug), `<PROJECT_DIR>` (directory/repo slug) — plus a bare `PROJECT` token internal to `template/tools/PROJECT-worktree.sh` (substitution artifact, valued the same as `<PROJECT_SLUG>`). Free-form `<...>` text is fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable. See section 2.9 of the process doc for the model, and `template/BOOTSTRAP.md` for the bootstrap recipe.
 - The template is generic. Do not introduce content drawn from a specific downstream project (e.g. firmware-specific conventions, web-specific build commands) into `template/` files. Per-project-type variants are deferred design (see process doc section 6).
 - `demo/` is a third artifact, separate from `template/` and `scripts/`. Its filled-in seed (`demo/seed/`) holds concrete "Markdown Renderer" project content — which is allowed *because* it lives under `demo/`. None of it may leak into `template/`. `demo/setup.sh` must keep wrapping `bootstrap-cdd-project.sh` (via `--overlay`) rather than duplicating the substitution logic.
-- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. `scripts/command-drift-check.sh` (run by CI and `/pre-pr`) verifies this mechanically: it renders the template and diffs — the command set and the worktree helper bodies — so only real divergence surfaces; justified exceptions live in `scripts/command-drift-whitelist.txt` or behind `cdd-only` markers. Justified one-sided cases: `/retrofit` (`.claude/commands/retrofit.md`), `/bootstrap` (`.claude/commands/bootstrap.md`), and `/quick-create` (`.claude/commands/quick-create.md`) live only in the CDD repo — all three operate *on* a target from a CDD session (retrofit adapts an existing project, bootstrap creates a new one, quick-create produces a one-off deliverable), so the template ships no copy.
+- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. `scripts/command-drift-check.sh` (run by CI and `/cdd-pre-pr`) verifies this mechanically: it renders the template and diffs — the command set and the worktree helper bodies — so only real divergence surfaces; justified exceptions live in `scripts/command-drift-whitelist.txt` or behind `cdd-only` markers. Justified one-sided cases: `/cdd-retrofit` (`.claude/commands/cdd-retrofit.md`), `/cdd-bootstrap` (`.claude/commands/cdd-bootstrap.md`), and `/cdd-quick-create` (`.claude/commands/cdd-quick-create.md`) live only in the CDD repo — all three operate *on* a target from a CDD session (retrofit adapts an existing project, bootstrap creates a new one, quick-create produces a one-off deliverable), so the template ships no copy.
 
 ## Build & test
 
@@ -58,7 +58,7 @@ demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
 
 The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the end-to-end smoke, and the demo seed-overlay step.
 
-When `/pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
+When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
 
 ## Module layout
 
@@ -91,8 +91,8 @@ See `doc/knowledge_base/claude-driven-development.md` for the full picture.
 
 This project uses CDD on itself. Every CDD session is a fresh context doing exactly one job (see process doc section 3 for the session taxonomy).
 
-- **To start a new task** (handoff session): run `/next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode). `/next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and `#NN` / a bare integer / the `issue`/`issues` keyword sources the task from a GitHub issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
-- **When main has advanced under a feature branch** (merge session): run `/merge-main` in a fresh context on the feature branch.
-- **Before opening a PR** (pre-PR session): run `/pre-pr` in a fresh context to verify the process doc and template are consistent and the roadmap reflects what landed; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (adding `Closes #NN` when the branch carries the `gh_issue_NN` token).
-- **When a PR review leaves comments** (PR-review session): run `/process-pr` in a fresh context on the feature branch.
+- **To start a new task** (handoff session): run `/cdd-next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode). `/cdd-next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and `#NN` / a bare integer / the `issue`/`issues` keyword sources the task from a GitHub issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
+- **When main has advanced under a feature branch** (merge session): run `/cdd-merge-main` in a fresh context on the feature branch.
+- **Before opening a PR** (pre-PR session): run `/cdd-pre-pr` in a fresh context to verify the process doc and template are consistent and the roadmap reflects what landed; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (adding `Closes #NN` when the branch carries the `gh_issue_NN` token).
+- **When a PR review leaves comments** (PR-review session): run `/cdd-process-pr` in a fresh context on the feature branch.
 - Keep the process doc, template, and roadmap consistent as part of every change. Process-first, then template.

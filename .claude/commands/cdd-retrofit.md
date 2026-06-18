@@ -1,4 +1,4 @@
-Install CDD into an existing project, or upgrade a project already running CDD, at the path given as argument: `/retrofit <target-path>`.
+Install CDD into an existing project, or upgrade a project already running CDD, at the path given as argument: `/cdd-retrofit <target-path>`.
 
 Run this command from a CDD-repo session (it needs the CDD repo's `template/`, `bootstrap-cdd-project.sh`, and git history). The mode — **install** or **upgrade** — is auto-detected from the target. This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* target projects, so downstream projects have no use for it — see the process doc, Section 2.7).
 
@@ -27,7 +27,7 @@ Also note `<target>/.gitignore`: if any path the retrofit will write (`.claude/`
 Probe for CDD scaffolding in the target:
 
 ```bash
-ls <target>/.claude/commands/next-step.md <target>/doc/knowledge_base/roadmap.md 2>/dev/null
+ls <target>/.claude/commands/cdd-next-step.md <target>/doc/knowledge_base/roadmap.md 2>/dev/null
 ```
 
 - Either file present → **upgrade mode** (section 4).
@@ -61,7 +61,7 @@ WT="$(dirname "<target>")/$(basename "<target>")-$BRANCH"
 
 ## 3. Install mode
 
-A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/next-step` picks those up as the next unchecked tasks.
+A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/cdd-next-step` picks those up as the next unchecked tasks.
 
 ### 3.1 Confirm the three identifiers
 
@@ -90,7 +90,7 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
 
 - **Absent in `$WT`** → copy it directly (create parent dirs as needed). This covers the slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, and the marker in the common case.
 - **Present in `$WT`** (collision — typically `CLAUDE.md`, sometimes `doc/` files or `.claude/settings.json`) → propose a merge interactively, one file at a time:
-  - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/next-step`, `/pre-pr`, `/merge-main`). Show the proposed result; apply only on approval.
+  - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/cdd-next-step`, `/cdd-pre-pr`, `/cdd-merge-main`). Show the proposed result; apply only on approval.
   - `.claude/settings.json`: merge the `permissions.allow` arrays (union); show the result before writing.
   - Anything else: show both versions and propose the merge; the user decides per file.
 - Never delete or move existing files.
@@ -106,7 +106,7 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
   ```
 
   Stage with `add -A` — the worktree was fresh, so this captures exactly the retrofit's writes. Gitignored paths won't be staged (see the section 1 gitignore warning). Commit only on this dedicated branch; never commit onto the target's existing branches.
-- Print next steps: the exact `source` line for `$WT/tools/<PROJECT_SLUG>-worktree.sh` (and, after merge, `<target>/tools/...`) to add to `~/.bashrc`; how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting.
+- Print next steps: the exact `source` line for `$WT/tools/<PROJECT_SLUG>-worktree.sh` (and, after merge, `<target>/tools/...`) to add to `~/.bashrc`; how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting.
 
 ## 4. Upgrade mode
 
@@ -199,4 +199,4 @@ Report, in both modes:
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.
-- The next steps for the user: review the retrofit branch and open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/next-step` for fresh installs — noting that for a first-time install without prior doc discipline that first `/next-step` is a doc reconciliation that may be slow and span several early PRs (expected, not a fault).
+- The next steps for the user: review the retrofit branch and open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/cdd-next-step` for fresh installs — noting that for a first-time install without prior doc discipline that first `/cdd-next-step` is a doc reconciliation that may be slow and span several early PRs (expected, not a fault).

@@ -16,12 +16,12 @@ A task flows through up to five sessions, each driven by one slash command:
 ```mermaid
 %%{init: {'theme':'base', 'themeVariables': {'background':'#0a0f1a', 'primaryColor':'#16243a', 'primaryTextColor':'#cfe3f0', 'primaryBorderColor':'#6f9fc4', 'lineColor':'#4a6c8c', 'textColor':'#b9d2e6', 'edgeLabelBackground':'#0a0f1a', 'fontFamily':'Poppins, Verdana, Helvetica, Arial, sans-serif', 'fontSize':'14px'}, 'flowchart': {'curve':'basis', 'padding':14, 'nodeSpacing':55, 'rankSpacing':60}}}%%
 flowchart TD
-    NS("Handoff session<br>/next-step, on the main worktree"):::agent
+    NS("Handoff session<br>/cdd-next-step, on the main worktree"):::agent
     IMPL("Implementation session<br>opens in plan mode — ③ plan approved —<br>implement, update docs + roadmap, commit"):::agent
-    MM("Merge session<br>/merge-main: integrate main, dry-run first"):::opt
-    PP("Pre-PR session<br>/pre-pr: CI gates, code review, doc reconciliation"):::agent
+    MM("Merge session<br>/cdd-merge-main: integrate main, dry-run first"):::opt
+    PP("Pre-PR session<br>/cdd-pre-pr: CI gates, code review, doc reconciliation"):::agent
     REV("Human reviews the PR on GitHub"):::human
-    PPR("PR-review session<br>/process-pr: triage + address review comments"):::opt
+    PPR("PR-review session<br>/cdd-process-pr: triage + address review comments"):::opt
     DONE("Squash-merge, worktree teardown"):::human
 
     NS -->|"  ① task selected  ② handoff approved<br>a fresh worktree is spun up  "| IMPL
@@ -50,9 +50,9 @@ git clone https://github.com/drabaioli/cdd.git ~/Code/cdd && cd ~/Code/cdd
   --path ~/Code/my-project
 ```
 
-The script copies the template, substitutes the placeholders, and makes the initial scaffold commit. Then fill in `CLAUDE.md` and `doc/knowledge_base/roadmap.md`, source `tools/myproj-worktree.sh` from `~/.bashrc`, run `claude`, and start with `/next-step`. Full procedure in [`template/BOOTSTRAP.md`](template/BOOTSTRAP.md).
+The script copies the template, substitutes the placeholders, and makes the initial scaffold commit. Then fill in `CLAUDE.md` and `doc/knowledge_base/roadmap.md`, source `tools/myproj-worktree.sh` from `~/.bashrc`, run `claude`, and start with `/cdd-next-step`. Full procedure in [`template/BOOTSTRAP.md`](template/BOOTSTRAP.md).
 
-For a guided greenfield start instead of the manual recipe, run `/bootstrap` from a Claude Code session in this repo: it walks you through defining the project, drafts a real roadmap and project overview, and scaffolds the new project — overview, `CLAUDE.md`, and roadmap already filled in — in one go. To install CDD into an *existing* project, use `/retrofit` from a Claude Code session in this repo instead. When the task is a one-off — a single self-contained script plus a README, not a project worth a roadmap — run `/quick-create` for a lightweight guided session that writes the deliverable directly, with no project substrate.
+For a guided greenfield start instead of the manual recipe, run `/cdd-bootstrap` from a Claude Code session in this repo: it walks you through defining the project, drafts a real roadmap and project overview, and scaffolds the new project — overview, `CLAUDE.md`, and roadmap already filled in — in one go. To install CDD into an *existing* project, use `/cdd-retrofit` from a Claude Code session in this repo instead. When the task is a one-off — a single self-contained script plus a README, not a project worth a roadmap — run `/cdd-quick-create` for a lightweight guided session that writes the deliverable directly, with no project substrate.
 
 ## What's in this repo
 

@@ -15,4 +15,4 @@ Project documentation map. Each directory keeps an `index.md` pointer list: read
 - `features/` — per feature: what it does, who consumes it, the surface (CLI, API, UI, protocol), inputs and outputs, observable failure modes, behavioural contracts. Not internal structure or implementation history.
 - `knowledge_base/` — the roadmap, decision records (append-only: why a choice was made, alternatives considered), coding standards, investigation notes.
 
-When a change in code alters anything described in these documents, update the relevant doc — and its index, if a doc was added or removed — in the same PR. `/pre-pr` surfaces discrepancies.
+When a change in code alters anything described in these documents, update the relevant doc — and its index, if a doc was added or removed — in the same PR. `/cdd-pre-pr` surfaces discrepancies.

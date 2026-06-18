@@ -47,4 +47,4 @@ The **actions pipeline** is the central structural idea. `ACTIONS` is a single o
 
 ## Maintenance
 
-When a change in code alters anything described here, update the relevant doc in the same PR. `/pre-pr` will surface discrepancies, but the implementation session should keep this in mind during the change itself.
+When a change in code alters anything described here, update the relevant doc in the same PR. `/cdd-pre-pr` will surface discrepancies, but the implementation session should keep this in mind during the change itself.

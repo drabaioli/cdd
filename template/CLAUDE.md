@@ -58,8 +58,8 @@ See `doc/architecture/index.md` for the full picture.
 
 This project uses the Claude-Driven Development workflow. Every CDD session is a fresh context doing exactly one job.
 
-- **To start a new task** (handoff session): run `/next-step` from the main worktree to produce a handoff, then run `<PROJECT_SLUG>-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode). `/next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and `#NN` / a bare integer / the `issue`/`issues` keyword sources the task from a GitHub issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
-- **When main has advanced under a feature branch** (merge session): run `/merge-main` in a fresh context on the feature branch.
-- **Before opening a PR** (pre-PR session): run `/pre-pr` in a fresh context to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (adding `Closes #NN` when the branch carries the `gh_issue_NN` token).
-- **When a PR review leaves comments** (PR-review session): run `/process-pr` in a fresh context on the feature branch.
+- **To start a new task** (handoff session): run `/cdd-next-step` from the main worktree to produce a handoff, then run `<PROJECT_SLUG>-worktree <branch>` to spin up the implementation worktree (implementation session, opens in plan mode). `/cdd-next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and `#NN` / a bare integer / the `issue`/`issues` keyword sources the task from a GitHub issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
+- **When main has advanced under a feature branch** (merge session): run `/cdd-merge-main` in a fresh context on the feature branch.
+- **Before opening a PR** (pre-PR session): run `/cdd-pre-pr` in a fresh context to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (adding `Closes #NN` when the branch carries the `gh_issue_NN` token).
+- **When a PR review leaves comments** (PR-review session): run `/cdd-process-pr` in a fresh context on the feature branch.
 - Keep `doc/architecture/`, `doc/features/`, and this file current as part of every change.

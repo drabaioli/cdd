@@ -3,10 +3,10 @@
 # One file name per line; lines starting with # and blank lines are ignored.
 
 # CDD-repo-only: operates *on* target projects from a CDD session (process doc §2.7).
-retrofit.md
+cdd-retrofit.md
 
 # CDD-repo-only: scaffolds a new greenfield project from a CDD session (process doc §2.7, §6).
-bootstrap.md
+cdd-bootstrap.md
 
 # CDD-repo-only: produces a lightweight one-off deliverable from a CDD session (process doc §2.7, §6).
-quick-create.md
+cdd-quick-create.md

@@ -18,17 +18,17 @@
 # later overlays win over earlier ones and over the template.
 #
 # --stage renders the substituted template only: no git init, no scaffold commit.
-# Used by /retrofit to stage a render that is then merged into an existing project.
+# Used by /cdd-retrofit to stage a render that is then merged into an existing project.
 # Because a staging path's basename is typically a throwaway tmp name, --dir is
 # required with --stage to supply the real <PROJECT_DIR> value.
 #
 # --template-dir DIR substitutes from DIR instead of the repo-root template/.
-# Used by /retrofit upgrade mode to render an old template snapshot
+# Used by /cdd-retrofit upgrade mode to render an old template snapshot
 # (extracted via `git show`) through the same substitution path.
 #
 # In both modes the script writes a one-line baseline marker, .claude/cdd-baseline,
 # holding the CDD repo commit hash the template was rendered from (or "unknown"
-# when this script does not live in a git checkout). /retrofit upgrade mode uses
+# when this script does not live in a git checkout). /cdd-retrofit upgrade mode uses
 # it as the three-way merge base.
 #
 # See template/BOOTSTRAP.md for the full procedure and the three-identifier model.
@@ -47,12 +47,12 @@ usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /
   --overlay       Directory copied over the template before substitution (repeatable). Lets a
                   filled-in seed override template files; overlaid files are substituted too.
   --stage         Render-only mode: substitute into --path but skip git init and the scaffold
-                  commit. Requires --dir. Used by /retrofit to stage a render for merging
+                  commit. Requires --dir. Used by /cdd-retrofit to stage a render for merging
                   into an existing project.
   --dir           Override the directory slug (<PROJECT_DIR>) instead of deriving it from the
                   basename of --path. Required with --stage.
   --template-dir  Substitute from this directory instead of the repo-root template/.
-                  Used by /retrofit upgrade mode to render an old template snapshot.
+                  Used by /cdd-retrofit upgrade mode to render an old template snapshot.
 EOF
   exit 2
 }
@@ -185,7 +185,7 @@ done < <(find "$TARGET" -type f -print0)
 # Word-boundary so we don't accidentally chew through prose containing the substring.
 sed -i -E "s#\\bPROJECT\\b#${SLUG_ESC}#g" "$TARGET/tools/${PROJECT_SLUG}-worktree.sh"
 
-# Write the baseline marker: the CDD repo commit this render came from. /retrofit
+# Write the baseline marker: the CDD repo commit this render came from. /cdd-retrofit
 # upgrade mode uses it as the three-way merge base. "unknown" when the script is
 # run outside a git checkout (e.g. shipped standalone).
 mkdir -p "$TARGET/.claude"
@@ -196,7 +196,7 @@ printf '%s\n' "$CDD_BASELINE" > "$TARGET/.claude/cdd-baseline"
 TARGET_ABS="$(cd "$TARGET" && pwd)"
 
 # Stage mode stops here: no git init, no scaffold commit, terse output for the
-# /retrofit command that drives it.
+# /cdd-retrofit command that drives it.
 if [[ -n "$STAGE" ]]; then
   cat <<EOF
 Staged CDD template render at: $TARGET_ABS
@@ -227,6 +227,6 @@ Next steps:
   2. cd into $TARGET_ABS, fill in CLAUDE.md placeholders, and write the initial roadmap
      in doc/knowledge_base/roadmap.md.
 
-  3. Run \`claude\` and invoke /next-step to start the first task.
+  3. Run \`claude\` and invoke /cdd-next-step to start the first task.
 
 EOF

@@ -12,7 +12,7 @@
 #
 # Also asserts:
 #   - the handoff schema headings match between the process doc (section 2.6) and
-#     .claude/commands/next-step.md; the template copy of next-step.md is already
+#     .claude/commands/cdd-next-step.md; the template copy of cdd-next-step.md is already
 #     covered by the render-diff.
 #   - the worktree helpers (tools/cdd-worktree.sh vs the rendered template helper)
 #     match from the first function definition onward; everything above it is header
@@ -105,12 +105,12 @@ schema_headings() {
 }
 
 doc_schema="$(schema_headings "$PROCESS_DOC")"
-cmd_schema="$(schema_headings "$REPO_CMDS/next-step.md")"
+cmd_schema="$(schema_headings "$REPO_CMDS/cdd-next-step.md")"
 if [[ -z "$doc_schema" ]]; then
   echo "ERROR: could not locate the handoff schema block in $PROCESS_DOC" >&2
   fail=1
 elif [[ "$doc_schema" != "$cmd_schema" ]]; then
-  echo "DRIFT: handoff schema headings differ between $PROCESS_DOC and $REPO_CMDS/next-step.md" >&2
+  echo "DRIFT: handoff schema headings differ between $PROCESS_DOC and $REPO_CMDS/cdd-next-step.md" >&2
   diff <(printf '%s\n' "$doc_schema") <(printf '%s\n' "$cmd_schema") >&2 || true
   fail=1
 fi

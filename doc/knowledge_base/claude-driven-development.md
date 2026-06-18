@@ -32,9 +32,9 @@ Typical sections:
 - A "Key references" table pointing to architecture, feature docs, coding standards, and the roadmap.
 - A short "Critical constraints" section with the rules that bite immediately (language version, banned constructs, naming conventions, units).
 - Build, test, lint, format commands.
-- A short "Workflow" pointer telling the agent to run `/pre-pr` before opening a PR and to keep docs current.
+- A short "Workflow" pointer telling the agent to run `/cdd-pre-pr` before opening a PR and to keep docs current.
 
-CLAUDE.md is updated by the agent during `/pre-pr` when module layout, build commands, or top-level constraints change. It is not the place to dump architecture details; those live in `doc/architecture/`.
+CLAUDE.md is updated by the agent during `/cdd-pre-pr` when module layout, build commands, or top-level constraints change. It is not the place to dump architecture details; those live in `doc/architecture/`.
 
 ### 2.2 The roadmap (`doc/knowledge_base/roadmap.md` or similar)
 
@@ -50,7 +50,7 @@ The roadmap is the central artifact. If it drifts from reality, the workflow los
 
 ### 2.3 Architecture docs (`doc/architecture/`)
 
-"What the system is now," structurally. Module boundaries, data flow, key interfaces, deployment topology, threading model. Updated continuously by the implementation session as it changes the system, and reconciled by `/pre-pr` against the diff.
+"What the system is now," structurally. Module boundaries, data flow, key interfaces, deployment topology, threading model. Updated continuously by the implementation session as it changes the system, and reconciled by `/cdd-pre-pr` against the diff.
 
 The directory is organised as an index plus per-topic documents. `index.md` is a pure pointer list — one link per document with a one-line summary — and the content lives in the per-topic docs (`overview.md`, `message-bus.md`, …). A session reads the index, then loads only the documents relevant to its task; this is the context-economy counterpart of CLAUDE.md staying thin. A top-level `doc/index.md` points at the architecture, features, and knowledge-base directories so a session can navigate the whole doc tree from one file, and CLAUDE.md's key-references table points at the indexes.
 
@@ -62,7 +62,7 @@ Architecture docs are load-bearing for the agent: when a new session opens with 
 
 ### 2.4 Feature docs (`doc/features/`)
 
-"What the system does," from a capability/user perspective. One doc per significant feature. Created or updated by the implementation session whenever a feature is added or changed in a user-visible way. Reconciled by `/pre-pr`.
+"What the system does," from a capability/user perspective. One doc per significant feature. Created or updated by the implementation session whenever a feature is added or changed in a user-visible way. Reconciled by `/cdd-pre-pr`.
 
 Feature docs serve human readers (what does this system do today?) and the agent (what's the contract this feature must preserve when I refactor near it?). On projects with no external "users" yet (greenfield internal tools, firmware), the audience is future-you and future-collaborators.
 
@@ -79,13 +79,13 @@ Project metadata and history. The roadmap lives here. So do:
 
 The knowledge base is mostly append-only. Decisions are not rewritten when they are superseded; new decisions are added that supersede them, with a reference back. This preserves the reasoning trail.
 
-The project overview is the exception to the append-only rule and is distinct from a founding document (below). It is a **living charter**, kept current: a fresh session reads it first to learn what the project is for and where its boundaries sit, before descending into the architecture and feature docs. `/bootstrap` (Section 6) populates it from the discovery conversation at project creation; later sessions keep it true as scope and constraints evolve. A founding document, by contrast, is the historical reasoning trail — *not* kept current. The two can coexist: the overview says what the project is today; the founding document records why it was shaped that way.
+The project overview is the exception to the append-only rule and is distinct from a founding document (below). It is a **living charter**, kept current: a fresh session reads it first to learn what the project is for and where its boundaries sit, before descending into the architecture and feature docs. `/cdd-bootstrap` (Section 6) populates it from the discovery conversation at project creation; later sessions keep it true as scope and constraints evolve. A founding document, by contrast, is the historical reasoning trail — *not* kept current. The two can coexist: the overview says what the project is today; the founding document records why it was shaped that way.
 
 A common member of the knowledge base is the project's **founding document**: the investigation that led to creating and structuring the project, usually written before any code exists, and the main input to the first roadmap. Founding documents follow the decision-record rule: they are not kept current. After bootstrap their purpose shifts from driving the project to preserving the reasoning trail — why the project is shaped the way it is. Living context belongs to the architecture and feature docs and the roadmap; when a founding document contains structural description that proves durable, migrate it into `doc/architecture/` as the structure stabilises rather than maintaining it in place. (This repo's own `claude-driven-development.md` is a special case: here the founding document is also the shipped product, so unlike an ordinary founding document it *is* kept current — edits to it are edits to the deliverable.)
 
 ### 2.6 Handoff files (`~/.claude-handoffs/<repo-name>/<branch>.md`)
 
-The contract between the handoff session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
+The contract between the handoff session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/cdd-next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
 
 Schema:
 
@@ -111,16 +111,16 @@ The implementation prompt is self-contained: it includes only context the implem
 
 Project-level Claude Code slash commands. CDD ships four commands in the per-task lifecycle:
 
-- `/next-step`, exploratory session, run on main, produces a handoff.
-- `/pre-pr`, verification session, run on the feature branch, runs CI and reconciles docs.
-- `/merge-main`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
-- `/process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
+- `/cdd-next-step`, exploratory session, run on main, produces a handoff.
+- `/cdd-pre-pr`, verification session, run on the feature branch, runs CI and reconciles docs.
+- `/cdd-merge-main`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
+- `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/cdd-merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
 
-Three further commands exist in the CDD repo only and are deliberately not shipped in the template, because each operates *on* a target from a CDD-repo session — so downstream projects have no use for a copy. (`/bootstrap` and `/retrofit` additionally need `template/` plus the bootstrap script; `/quick-create` needs neither, as its bullet notes.) This is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/` (recorded in `scripts/command-drift-whitelist.txt`):
+Three further commands exist in the CDD repo only and are deliberately not shipped in the template, because each operates *on* a target from a CDD-repo session — so downstream projects have no use for a copy. (`/cdd-bootstrap` and `/cdd-retrofit` additionally need `template/` plus the bootstrap script; `/cdd-quick-create` needs neither, as its bullet notes.) This is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/` (recorded in `scripts/command-drift-whitelist.txt`):
 
-- `/bootstrap`, used once at project start: a guided session that helps the user produce the project definition and a draft roadmap, then scaffolds a new greenfield project from the template in a single bootstrap invocation (see Section 6).
-- `/retrofit`, which installs CDD into an existing project or upgrades a project already running it (see Section 6).
-- `/quick-create`, which produces a small, self-contained deliverable — a script plus a README, not a full CDD project — without any of the project substrate (no roadmap, doc tree, worktree helper, or per-task lifecycle). It is CDD-repo-only for the same reason as its siblings, with one difference: it operates on a target path but needs *neither* `template/` nor the bootstrap script, because there is no template for a one-off (see Section 6).
+- `/cdd-bootstrap`, used once at project start: a guided session that helps the user produce the project definition and a draft roadmap, then scaffolds a new greenfield project from the template in a single bootstrap invocation (see Section 6).
+- `/cdd-retrofit`, which installs CDD into an existing project or upgrades a project already running it (see Section 6).
+- `/cdd-quick-create`, which produces a small, self-contained deliverable — a script plus a README, not a full CDD project — without any of the project substrate (no roadmap, doc tree, worktree helper, or per-task lifecycle). It is CDD-repo-only for the same reason as its siblings, with one difference: it operates on a target path but needs *neither* `template/` nor the bootstrap script, because there is no template for a one-off (see Section 6).
 
 Slash commands are declarative: they describe what to do, not how to orchestrate it. Orchestration (worktree creation, branch lifecycle) lives in the shell helpers.
 
@@ -154,42 +154,42 @@ Substitution order is significant: `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT
 
 ### 2.10 The template baseline marker (`.claude/cdd-baseline`)
 
-Every bootstrapped or retrofitted project carries a one-line marker file, `.claude/cdd-baseline`, holding the commit hash of the CDD repo the template was rendered from (or the literal `unknown` when the bootstrap script runs outside a git checkout of the CDD repo). The marker is written by `bootstrap-cdd-project.sh` and by `/retrofit`; no template file ships it, because its value only exists at render time.
+Every bootstrapped or retrofitted project carries a one-line marker file, `.claude/cdd-baseline`, holding the commit hash of the CDD repo the template was rendered from (or the literal `unknown` when the bootstrap script runs outside a git checkout of the CDD repo). The marker is written by `bootstrap-cdd-project.sh` and by `/cdd-retrofit`; no template file ships it, because its value only exists at render time.
 
-Its sole purpose is to anchor `/retrofit`'s upgrade mode: with the baseline hash, the old template a project started from can be recovered (`git show <hash>:template/<file>` in the CDD repo) and a three-way comparison can distinguish "the CDD template evolved" from "the project customized this file". Projects bootstrapped before the marker existed fall back to heuristic two-way diffing; the first upgrade writes the marker going forward.
+Its sole purpose is to anchor `/cdd-retrofit`'s upgrade mode: with the baseline hash, the old template a project started from can be recovered (`git show <hash>:template/<file>` in the CDD repo) and a three-way comparison can distinguish "the CDD template evolved" from "the project customized this file". Projects bootstrapped before the marker existed fall back to heuristic two-way diffing; the first upgrade writes the marker going forward.
 
 ### 2.11 Commit conventions
 
 Several sessions auto-commit at their gate so that a session never leaves a dirty tree for the next one to inherit. Five rules keep this non-disruptive:
 
 1. **A gate commits only the changes it produced.** It adds the specific files the session edited — never `git add -A` over a tree it didn't author. If the working tree is already dirty on entry with changes the gate did not create, the gate **stops and surfaces** them and skips the auto-commit, rather than sweeping unrelated work into the commit.
-2. **Auto-commits are local — no push.** The sole exception is `/process-pr` (§3.7), which commits *and* pushes to the open PR branch; it is the one auto-push gate.
+2. **Auto-commits are local — no push.** The sole exception is `/cdd-process-pr` (§3.7), which commits *and* pushes to the open PR branch; it is the one auto-push gate.
 3. **Messages follow the project's own commit conventions from `CLAUDE.md`**, including the `Co-Authored-By` trailer. The convention here is generic; each project defines its own message format.
 4. **Each gate surfaces a short summary of what it committed** in its output (the commit subject and the files included).
 5. **An auto-commit is not a checkpoint.** A local commit with no push is reversible — it adds no gate and removes none. It is not a seventh checkpoint (see §4); the human checkpoints are unchanged by it.
 
-Which sessions auto-commit: the implementation session (§3.3) and `/pre-pr` (§3.5) commit their own changes locally; `/process-pr` (§3.7) commits and pushes; `/merge-main` (§3.4) produces a merge commit and enforces a clean tree before merging. All four follow the rules above.
+Which sessions auto-commit: the implementation session (§3.3) and `/cdd-pre-pr` (§3.5) commit their own changes locally; `/cdd-process-pr` (§3.7) commits and pushes; `/cdd-merge-main` (§3.4) produces a merge commit and enforces a clean tree before merging. All four follow the rules above.
 
 ## 3. Lifecycle
 
-A task flows through CDD in up to five sessions, two of them optional side-loops (`/merge-main` before the PR, `/process-pr` after review). Each session type has a name, one command, and one job:
+A task flows through CDD in up to five sessions, two of them optional side-loops (`/cdd-merge-main` before the PR, `/cdd-process-pr` after review). Each session type has a name, one command, and one job:
 
 | Session            | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
 | ------------------ | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
-| **Handoff**        | `/next-step`                                  | main worktree                        | the handoff file only — repo is read-only  |
+| **Handoff**        | `/cdd-next-step`                                  | main worktree                        | the handoff file only — repo is read-only  |
 | **Implementation** | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
-| **Merge** (opt.)   | `/merge-main`                                 | feature worktree                     | merge resolution, docs if needed           |
-| **Pre-PR**         | `/pre-pr`                                     | feature worktree                     | doc reconciliation, approved roadmap edits |
-| **PR-review** (opt.) | `/process-pr`                               | feature worktree                     | review-driven code and replies             |
+| **Merge** (opt.)   | `/cdd-merge-main`                                 | feature worktree                     | merge resolution, docs if needed           |
+| **Pre-PR**         | `/cdd-pre-pr`                                     | feature worktree                     | doc reconciliation, approved roadmap edits |
+| **PR-review** (opt.) | `/cdd-process-pr`                               | feature worktree                     | review-driven code and replies             |
 
 The blanket invariant: **every CDD session is a fresh context doing exactly one job.** This is a rule, not a per-command judgment call — the merge and PR-review sessions get fresh contexts for the same reason the pre-PR session does, even when the previous session's window is still open and would be convenient to reuse.
 
-The five rows above are the per-task lifecycle. Three further session types sit outside it, each run as a one-shot from a CDD-repo session rather than once per task: the **bootstrap session** (`/bootstrap`, greenfield setup), the **retrofit session** (`/retrofit`, installing or upgrading CDD on an existing project), and the **quick-create session** (`/quick-create`, producing a lightweight one-off deliverable — see Section 6). All three are CDD-repo-only meta sessions that operate on a target path, and all three keep the same fresh-context-one-job discipline. Bootstrap and retrofit need `template/` plus the bootstrap script; quick-create needs neither, because a one-off has no template.
+The five rows above are the per-task lifecycle. Three further session types sit outside it, each run as a one-shot from a CDD-repo session rather than once per task: the **bootstrap session** (`/cdd-bootstrap`, greenfield setup), the **retrofit session** (`/cdd-retrofit`, installing or upgrading CDD on an existing project), and the **quick-create session** (`/cdd-quick-create`, producing a lightweight one-off deliverable — see Section 6). All three are CDD-repo-only meta sessions that operate on a target path, and all three keep the same fresh-context-one-job discipline. Bootstrap and retrofit need `template/` plus the bootstrap script; quick-create needs neither, because a one-off has no template.
 
 ```
                        (on main worktree)
             ┌──────────────────────────────────┐
-            │ Handoff session: /next-step      │
+            │ Handoff session: /cdd-next-step      │
             │                                  │
             │ Read roadmap (or take a task     │
             │ prompt), discuss/scope, clarify  │
@@ -217,7 +217,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │  (optional, if main moved)
                             ▼
             ┌──────────────────────────────────┐
-            │ Merge session: /merge-main       │
+            │ Merge session: /cdd-merge-main       │
             │                                  │
             │ Dry-run conflict assessment.     │
             │ Human approves. Merge main into  │
@@ -226,7 +226,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │
                             ▼
             ┌──────────────────────────────────┐
-            │ Pre-PR session: /pre-pr          │
+            │ Pre-PR session: /cdd-pre-pr          │
             │                                  │
             │ Run build, format, lint, tests,  │
             │ integration tests. Code review.  │
@@ -242,7 +242,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │  (optional, if review left comments)
                             ▼
             ┌──────────────────────────────────┐
-            │ PR-review session: /process-pr   │
+            │ PR-review session: /cdd-process-pr   │
             │                                  │
             │ Read the PR's review comments.   │
             │ Triage; human approves the plan. │
@@ -262,15 +262,15 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                     back on main, clean
 ```
 
-### 3.1 Handoff session: `/next-step` (on main)
+### 3.1 Handoff session: `/cdd-next-step` (on main)
 
 Goal: pick what to do next and produce a clean handoff.
 
 The session has three front-ends, and converges on the same handoff whichever one is used:
 
-- **Roadmap-driven** (`/next-step`, no argument): the session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task.
-- **Intent-driven** (`/next-step <prompt describing a task to start>`): the task is already chosen by the human, so candidate proposal is skipped. This supports the common case where the human wants to start something off-roadmap rather than picking the next checkbox. The session loads context adaptively — the roadmap and the architecture/feature *indexes*, then selectively only the docs the described task actually touches — enough to scope it and detect overlap, not an exhaustive read (the implementation session rebuilds detailed context). It then does two things proposal mode does not: an **overlap check** — if the prompt substantially matches an existing (especially unchecked) roadmap item, surface that and ask whether to proceed as that item rather than silently creating a duplicate — and a **roadmap-belonging decision** — judge whether this new task belongs on the roadmap (substantive, evolving, will be referenced → yes; trivial throwaway → maybe not), asking the human if it's unclear. The verdict is recorded in the handoff's Notes as an instruction to the implementation session, which makes the actual roadmap edit.
-- **Issue-driven** (`/next-step #123` or a bare integer scopes that issue directly; `/next-step issue` / `issues` lists open issues and lets the human pick): a thin front-end onto intent-driven mode where the intent text comes from a GitHub issue rather than being typed. The issue's title, body, and comments seed the *same* intent machinery — adaptive context load, overlap check, roadmap-belonging decision — so issues are an inbox feeding the roadmap, which remains the source of truth, not a parallel backlog. The browse list excludes issues that already have a local branch/worktree or an open PR. The session has **no side-effects on the issue** (it does not assign, comment, or relabel); the issue number is threaded forward solely through the branch name, `gh_issue_NN_<slug>`, and the issue auto-closes when the PR merges (see §3.5/§3.6). This mode needs `gh` and a GitHub `origin`; if either is absent it degrades to a clear message rather than failing. (The other two modes are unaffected — they never touch `gh`.)
+- **Roadmap-driven** (`/cdd-next-step`, no argument): the session reads the roadmap and the stale-handoff list, proposes one or more candidate tasks, discusses dependencies and ambiguity with the human, and converges on a single task.
+- **Intent-driven** (`/cdd-next-step <prompt describing a task to start>`): the task is already chosen by the human, so candidate proposal is skipped. This supports the common case where the human wants to start something off-roadmap rather than picking the next checkbox. The session loads context adaptively — the roadmap and the architecture/feature *indexes*, then selectively only the docs the described task actually touches — enough to scope it and detect overlap, not an exhaustive read (the implementation session rebuilds detailed context). It then does two things proposal mode does not: an **overlap check** — if the prompt substantially matches an existing (especially unchecked) roadmap item, surface that and ask whether to proceed as that item rather than silently creating a duplicate — and a **roadmap-belonging decision** — judge whether this new task belongs on the roadmap (substantive, evolving, will be referenced → yes; trivial throwaway → maybe not), asking the human if it's unclear. The verdict is recorded in the handoff's Notes as an instruction to the implementation session, which makes the actual roadmap edit.
+- **Issue-driven** (`/cdd-next-step #123` or a bare integer scopes that issue directly; `/cdd-next-step issue` / `issues` lists open issues and lets the human pick): a thin front-end onto intent-driven mode where the intent text comes from a GitHub issue rather than being typed. The issue's title, body, and comments seed the *same* intent machinery — adaptive context load, overlap check, roadmap-belonging decision — so issues are an inbox feeding the roadmap, which remains the source of truth, not a parallel backlog. The browse list excludes issues that already have a local branch/worktree or an open PR. The session has **no side-effects on the issue** (it does not assign, comment, or relabel); the issue number is threaded forward solely through the branch name, `gh_issue_NN_<slug>`, and the issue auto-closes when the PR merges (see §3.5/§3.6). This mode needs `gh` and a GitHub `origin`; if either is absent it degrades to a clear message rather than failing. (The other two modes are unaffected — they never touch `gh`.)
 
 Either way, the session then clarifies requirements that are cheap to resolve here, the ones where the right answer can be inferred from the roadmap or briefly discussed, and explicitly defers harder requirements to the implementation session.
 
@@ -290,9 +290,9 @@ The session opens in plan mode, reads the handoff, and rebuilds its context from
 
 Plan mode is the load-bearing checkpoint here: the agent cannot modify files while in plan mode, so the human gets a guaranteed approval gate before any code is written.
 
-Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits its own changes locally (no push) per the commit conventions (§2.11) — stopping and surfacing rather than committing if the tree holds changes it didn't make. Because the implementation session has no command file, this commit is reinforced by a standing instruction in the handoff prompt that `/next-step` generates.
+Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits its own changes locally (no push) per the commit conventions (§2.11) — stopping and surfacing rather than committing if the tree holds changes it didn't make. Because the implementation session has no command file, this commit is reinforced by a standing instruction in the handoff prompt that `/cdd-next-step` generates.
 
-### 3.4 Merge session (optional): `/merge-main`
+### 3.4 Merge session (optional): `/cdd-merge-main`
 
 Run on the feature branch when main has advanced and the feature branch needs to integrate the new state, either because the PR will conflict or because the feature work depends on something that just landed on main.
 
@@ -303,9 +303,9 @@ Two-phase:
 
 This is also where the agent can pull in improvements from main that are useful here without scheduling an explicit roadmap task (small refactors, new utilities, updated conventions).
 
-### 3.5 Pre-PR session: `/pre-pr`
+### 3.5 Pre-PR session: `/cdd-pre-pr`
 
-A fresh session on the feature branch, started after the implementation session has closed. This isolation is deliberate: a fresh context avoids the implementation session grading its own homework, and any "propose to the human" step in `/pre-pr` is a proposal to the human running this session, not to another session. Runs the CI gates, reads the diff, code-reviews changed files, and reconciles documentation.
+A fresh session on the feature branch, started after the implementation session has closed. This isolation is deliberate: a fresh context avoids the implementation session grading its own homework, and any "propose to the human" step in `/cdd-pre-pr` is a proposal to the human running this session, not to another session. Runs the CI gates, reads the diff, code-reviews changed files, and reconciles documentation.
 
 Doc reconciliation has three parts:
 
@@ -313,19 +313,19 @@ Doc reconciliation has three parts:
 - **Feature docs**: same, for feature docs.
 - **Roadmap**: tick newly-completed checkboxes directly; identify roadmap edits (add/modify/remove tasks) implied by what landed and present them to the human in this session for approval before applying.
 
-`/pre-pr` also performs a conditional CI-improvement check: if the change introduces a category of work that the existing CI doesn't cover (new file type, new test category, a tool that should be linted but isn't), propose improvements to the human. On approval, apply them as part of the same PR; alternatively, the human may defer them as a new roadmap task. The default is silence. The agent should not propose CI improvements every run; only when the change genuinely surfaces a gap.
+`/cdd-pre-pr` also performs a conditional CI-improvement check: if the change introduces a category of work that the existing CI doesn't cover (new file type, new test category, a tool that should be linted but isn't), propose improvements to the human. On approval, apply them as part of the same PR; alternatively, the human may defer them as a new roadmap task. The default is silence. The agent should not propose CI improvements every run; only when the change genuinely surfaces a gap.
 
-Output is a pass/fail summary across all the gates. After the summary, `/pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If §6 detected upstream drift, the step restates the `/merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/pre-pr` never opens a PR without explicit confirmation.
+Output is a pass/fail summary across all the gates. After the summary, `/cdd-pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If §6 detected upstream drift, the step restates the `/cdd-merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/cdd-pre-pr` never opens a PR without explicit confirmation.
 
 ### 3.6 PR review and merge
 
-The PR is opened either from the `/pre-pr` session's opt-in step (§3.5) or by the human running `gh pr create` manually. The human then reviews the PR (with full Claude assistance if desired, but in a fresh session, not the implementation session), and merges. Squash-merge is the default; the worktree script handles squash-merged branches as a first-class case.
+The PR is opened either from the `/cdd-pre-pr` session's opt-in step (§3.5) or by the human running `gh pr create` manually. The human then reviews the PR (with full Claude assistance if desired, but in a fresh session, not the implementation session), and merges. Squash-merge is the default; the worktree script handles squash-merged branches as a first-class case.
 
-### 3.7 PR-review session (optional): `/process-pr`
+### 3.7 PR-review session (optional): `/cdd-process-pr`
 
 Run on the feature branch when a review has left comments that need addressing. A fresh session reads the open PR's review comments (inline review threads, review summary bodies, and general conversation comments), processes only the unresolved ones, and triages them: change-request, question, nit, or discussion. It presents the triage plan to the human, then implements the change-requests and nits, answers the questions, and pushes back — disagreeing and explaining in the reply — on any change-request it judges wrong or risky rather than implementing it blindly.
 
-Approving the triage plan is the session's single checkpoint: once the human approves it, the rest of the run — the edits, the in-thread replies, the commit, the push — executes without further confirmation gates. `/process-pr` is the one gate that pushes (the auto-push exception in §2.11): the PR branch is already open and under review, so the commit goes straight to it. The rationale is described in Section 4. Review threads are never resolved by the command; resolving them is the human's call during re-review.
+Approving the triage plan is the session's single checkpoint: once the human approves it, the rest of the run — the edits, the in-thread replies, the commit, the push — executes without further confirmation gates. `/cdd-process-pr` is the one gate that pushes (the auto-push exception in §2.11): the PR branch is already open and under review, so the commit goes straight to it. The rationale is described in Section 4. Review threads are never resolved by the command; resolving them is the human's call during re-review.
 
 This loop can repeat across review rounds.
 
@@ -337,20 +337,20 @@ The human runs `<project>-worktree-done` from the feature worktree. The script r
 
 Six explicit checkpoints. The human is also free to interject at any other point.
 
-1. **Task selection** (end of `/next-step`): the human chooses among proposed candidates.
-2. **Handoff approval** (end of `/next-step`): the human approves the drafted implementation prompt and notes.
+1. **Task selection** (end of `/cdd-next-step`): the human chooses among proposed candidates.
+2. **Handoff approval** (end of `/cdd-next-step`): the human approves the drafted implementation prompt and notes.
 3. **Plan approval** (start of implementation session, plan mode): the human approves the plan before any file is written.
-4. **Merge-main approval** (between dry run and merge in `/merge-main`): the human approves after seeing conflict complexity.
-5. **Roadmap edit approval** (during `/pre-pr`): the human approves proposed add/modify/remove edits before they are applied.
-6. **PR merge** (after `/pre-pr`): standard GitHub PR review and merge.
+4. **Merge-main approval** (between dry run and merge in `/cdd-merge-main`): the human approves after seeing conflict complexity.
+5. **Roadmap edit approval** (during `/cdd-pre-pr`): the human approves proposed add/modify/remove edits before they are applied.
+6. **PR merge** (after `/cdd-pre-pr`): standard GitHub PR review and merge.
 
 These six are the gates. The agent should never proceed past a gate without explicit human confirmation.
 
-The auto-commits some sessions make at their gates (§2.11) do not change this count. A local commit with no push is reversible from git history, so it adds no checkpoint and removes none — it is not a seventh gate. The only gate that pushes is `/process-pr`, and its single up-front checkpoint is described in §4.1.
+The auto-commits some sessions make at their gates (§2.11) do not change this count. A local commit with no push is reversible from git history, so it adds no checkpoint and removes none — it is not a seventh gate. The only gate that pushes is `/cdd-process-pr`, and its single up-front checkpoint is described in §4.1.
 
-### 4.1 The `/process-pr` exception
+### 4.1 The `/cdd-process-pr` exception
 
-In `/process-pr` (Section 3.7) the gate sits up front rather than on each action: the human approves the triage plan (which comments will be addressed, and how) before any file is edited, and that single approval authorizes everything that follows — the edits, the in-thread replies, the commit, and the push. There is no second confirmation before the GitHub-side actions. This is a conscious trade-off, not an oversight: in a single-user, fast review-iteration loop the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Re-confirming each reply or push after the plan was already approved would defeat the purpose of a tight address-and-re-review cycle.
+In `/cdd-process-pr` (Section 3.7) the gate sits up front rather than on each action: the human approves the triage plan (which comments will be addressed, and how) before any file is edited, and that single approval authorizes everything that follows — the edits, the in-thread replies, the commit, and the push. There is no second confirmation before the GitHub-side actions. This is a conscious trade-off, not an oversight: in a single-user, fast review-iteration loop the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Re-confirming each reply or push after the plan was already approved would defeat the purpose of a tight address-and-re-review cycle.
 
 Human-in-the-loop judgment is preserved where it matters: the plan is approved before execution, and the command pushes back on change-requests it judges wrong rather than implementing them blindly. What is dropped is only repeated confirmation of the outbound actions that execute the approved plan. Review threads are also never auto-resolved — the human resolves them during re-review.
 
@@ -375,30 +375,30 @@ The handoff session is read-only on the repo. This keeps its job narrow: read, d
 
 ## 6. Known gaps and deferred design
 
-Several areas were intentionally out of scope for the first version of the template; three of them — adapting an existing project, greenfield bootstrap, and lightweight one-off deliverables — are now addressed by `/retrofit`, `/bootstrap`, and `/quick-create` respectively.
+Several areas were intentionally out of scope for the first version of the template; three of them — adapting an existing project, greenfield bootstrap, and lightweight one-off deliverables — are now addressed by `/cdd-retrofit`, `/cdd-bootstrap`, and `/cdd-quick-create` respectively.
 
-**Greenfield bootstrap.** How a project gets its first roadmap, its first CLAUDE.md, its project overview, and its first architecture skeleton. This is addressed by `/bootstrap`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session. It takes no argument: the project's name, slug, directory, and target location all emerge from the discovery conversation, so there is nothing to pass up front (the target path is proposed — defaulting to `$HOME/Code/<PROJECT_DIR>` — and confirmed once the identifiers are settled). It is a **guided** session, not a brief-to-files converter: the discovery conversation is part of the command. It walks the user through defining the project — what it is, its goals, what it does and explicitly does not do, its constraints, its architecture intentions — and from that produces the project overview (Section 2.5), a filled-in `CLAUDE.md`, and a draft roadmap. Each is confirmed with the user (project definition, then roadmap, then the three identifiers) before anything is rendered.
+**Greenfield bootstrap.** How a project gets its first roadmap, its first CLAUDE.md, its project overview, and its first architecture skeleton. This is addressed by `/cdd-bootstrap`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session. It takes no argument: the project's name, slug, directory, and target location all emerge from the discovery conversation, so there is nothing to pass up front (the target path is proposed — defaulting to `$HOME/Code/<PROJECT_DIR>` — and confirmed once the identifiers are settled). It is a **guided** session, not a brief-to-files converter: the discovery conversation is part of the command. It walks the user through defining the project — what it is, its goals, what it does and explicitly does not do, its constraints, its architecture intentions — and from that produces the project overview (Section 2.5), a filled-in `CLAUDE.md`, and a draft roadmap. Each is confirmed with the user (project definition, then roadmap, then the three identifiers) before anything is rendered.
 
-The mechanism is the `demo/setup.sh` pattern: `/bootstrap` writes the generated artifacts into a staging overlay directory and invokes `bootstrap-cdd-project.sh` once with `--overlay`, so the overlay overrides the template stubs and the filled-in docs land in the initial scaffold commit — no post-hoc copying. Because `/bootstrap` writes the architecture intentions, the overview, and a real roadmap through the conversation, the generated roadmap starts at the project's real first phase and does **not** carry the template's pre-filled "CDD bootstrap" phase (survey the codebase / write the docs / fill the roadmap). That pre-filled phase exists for files-only starts — `/retrofit` install mode and the manual bootstrap-script path below — where the docs have not yet been written.
+The mechanism is the `demo/setup.sh` pattern: `/cdd-bootstrap` writes the generated artifacts into a staging overlay directory and invokes `bootstrap-cdd-project.sh` once with `--overlay`, so the overlay overrides the template stubs and the filled-in docs land in the initial scaffold commit — no post-hoc copying. Because `/cdd-bootstrap` writes the architecture intentions, the overview, and a real roadmap through the conversation, the generated roadmap starts at the project's real first phase and does **not** carry the template's pre-filled "CDD bootstrap" phase (survey the codebase / write the docs / fill the roadmap). That pre-filled phase exists for files-only starts — `/cdd-retrofit` install mode and the manual bootstrap-script path below — where the docs have not yet been written.
 
-The manual fallback is to run `tools/bootstrap-cdd-project.sh` from the CDD repo (see `template/BOOTSTRAP.md` for the procedure): it copies the template into a fresh directory, performs the placeholder substitution non-interactively, and runs the initial `git init` + scaffold commit, leaving the stubs and the pre-filled bootstrap phase to be filled in by hand and by the first few `/next-step` sessions. Use this when guided discovery isn't wanted; otherwise prefer `/bootstrap`.
+The manual fallback is to run `tools/bootstrap-cdd-project.sh` from the CDD repo (see `template/BOOTSTRAP.md` for the procedure): it copies the template into a fresh directory, performs the placeholder substitution non-interactively, and runs the initial `git init` + scaffold commit, leaving the stubs and the pre-filled bootstrap phase to be filled in by hand and by the first few `/cdd-next-step` sessions. Use this when guided discovery isn't wanted; otherwise prefer `/cdd-bootstrap`.
 
-**Lightweight one-off deliverables.** Not every task is a project. Sometimes the right output is a single self-contained artifact — a script plus a README — that future-you can use as-is, with no roadmap, no `doc/` tree, no worktree helper, and no per-task lifecycle to maintain. The motivating example is a ~240-line PEP723 `uv` script with a short README and one local commit. Addressed by `/quick-create`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session. It is **guided but deliberately lighter than `/bootstrap`**: instead of the seven discovery headings it asks only a few natural questions — what it is, its goal, its non-goals — then writes the artifact(s) and a focused README directly into the target. It writes plain files; it does not use `template/`, the bootstrap script, or an overlay, because a one-off has no template. The default target is a sibling of the CDD repo (the parent of the CDD checkout, e.g. `$HOME/Code/<name>`), proposed and confirmed. The flow is **files-first**: the deliverable is written before any version control happens, and only then are two outward-facing actions offered separately and confirmed individually — a local `git init` plus a single commit, and (independently) creating and pushing a GitHub repo. Neither is the default. The engineering floor is a focused README and clean single-purpose code (required); declaring dependencies inline where the language supports it (e.g. PEP723), a quick smoke run, and a license/authorship header are offered, not forced, and not over-prescribed by language. If a deliverable later grows into a project, `/retrofit` can install CDD onto it.
+**Lightweight one-off deliverables.** Not every task is a project. Sometimes the right output is a single self-contained artifact — a script plus a README — that future-you can use as-is, with no roadmap, no `doc/` tree, no worktree helper, and no per-task lifecycle to maintain. The motivating example is a ~240-line PEP723 `uv` script with a short README and one local commit. Addressed by `/cdd-quick-create`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session. It is **guided but deliberately lighter than `/cdd-bootstrap`**: instead of the seven discovery headings it asks only a few natural questions — what it is, its goal, its non-goals — then writes the artifact(s) and a focused README directly into the target. It writes plain files; it does not use `template/`, the bootstrap script, or an overlay, because a one-off has no template. The default target is a sibling of the CDD repo (the parent of the CDD checkout, e.g. `$HOME/Code/<name>`), proposed and confirmed. The flow is **files-first**: the deliverable is written before any version control happens, and only then are two outward-facing actions offered separately and confirmed individually — a local `git init` plus a single commit, and (independently) creating and pushing a GitHub repo. Neither is the default. The engineering floor is a focused README and clean single-purpose code (required); declaring dependencies inline where the language supports it (e.g. PEP723), a quick smoke run, and a license/authorship header are offered, not forced, and not over-prescribed by language. If a deliverable later grows into a project, `/cdd-retrofit` can install CDD onto it.
 
-This raises a recurring question — *is the task a deliverable or a project?* — answered once here, by a **shared scope-triage heuristic** that both `/quick-create` and `/bootstrap` reference. A task is a **project** (use `/bootstrap`) when any of these hold: it is expected to evolve across many sessions and needs a roadmap to track phases; it has more than one cooperating component, or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features over time. A task is a **deliverable** (use `/quick-create`) when none of those hold: a single self-contained artifact, finished in essentially one sitting, used as-is by future-you. The heuristic runs in **both directions** as an off-ramp: `/quick-create` checks it early and, if project-signals trip, surfaces them and offers to switch to `/bootstrap`; `/bootstrap`'s discovery does the inverse, offering to drop to `/quick-create` when the task turns out to be a trivial single artifact. As with every structural choice in CDD, the human decides at the checkpoint — the command surfaces the signals and recommends, it does not switch unilaterally.
+This raises a recurring question — *is the task a deliverable or a project?* — answered once here, by a **shared scope-triage heuristic** that both `/cdd-quick-create` and `/cdd-bootstrap` reference. A task is a **project** (use `/cdd-bootstrap`) when any of these hold: it is expected to evolve across many sessions and needs a roadmap to track phases; it has more than one cooperating component, or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features over time. A task is a **deliverable** (use `/cdd-quick-create`) when none of those hold: a single self-contained artifact, finished in essentially one sitting, used as-is by future-you. The heuristic runs in **both directions** as an off-ramp: `/cdd-quick-create` checks it early and, if project-signals trip, surfaces them and offers to switch to `/cdd-bootstrap`; `/cdd-bootstrap`'s discovery does the inverse, offering to drop to `/cdd-quick-create` when the task turns out to be a trivial single artifact. As with every structural choice in CDD, the human decides at the checkpoint — the command surfaces the signals and recommends, it does not switch unilaterally.
 
-**Parallel-merge structure.** When two worktrees land in sequence, the second needs to integrate the first. Today this is partly automated (`/merge-main` covers it) and partly manual (the human decides when to trigger). A more structured approach, perhaps with a "second worktree must re-run pre-pr after merge-main", may be warranted once parallel work is common. The invariant is clear: a feature branch must integrate main and re-pass pre-pr before it's ready to merge.
+**Parallel-merge structure.** When two worktrees land in sequence, the second needs to integrate the first. Today this is partly automated (`/cdd-merge-main` covers it) and partly manual (the human decides when to trigger). A more structured approach, perhaps with a "second worktree must re-run pre-pr after merge-main", may be warranted once parallel work is common. The invariant is clear: a feature branch must integrate main and re-pass pre-pr before it's ready to merge.
 
 **Template opinionation per project type.** The current template encodes the workflow, but the project-specific bits (build commands, language constraints, module layout) are placeholders. Different project archetypes (firmware, web app, library, data pipeline) probably want different opinionated defaults for those placeholders. Worth deriving from real usage rather than guessing up front.
 
-**Adapting an existing project.** Addressed by `/retrofit`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session with the target project's path as argument. It auto-detects which of two modes applies:
+**Adapting an existing project.** Addressed by `/cdd-retrofit`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session with the target project's path as argument. It auto-detects which of two modes applies:
 
-- *Install mode* — the target has no CDD scaffolding. A files-only install of the template: slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, with placeholder substitution done by `bootstrap-cdd-project.sh` in a render-only staging mode (the command never reimplements substitution). Files missing from the target are copied; collisions with existing files (a project's own `CLAUDE.md`, for instance) are merged interactively, one file at a time, with human approval — never overwritten silently. No codebase survey happens at install time: the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/next-step` picks those up as the next unchecked tasks. This pre-filled phase is for files-only starts — install mode here and the manual bootstrap-script path — where no docs have been written yet; `/bootstrap` writes the docs through guided discovery and so ships a real roadmap without it.
+- *Install mode* — the target has no CDD scaffolding. A files-only install of the template: slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, with placeholder substitution done by `bootstrap-cdd-project.sh` in a render-only staging mode (the command never reimplements substitution). Files missing from the target are copied; collisions with existing files (a project's own `CLAUDE.md`, for instance) are merged interactively, one file at a time, with human approval — never overwritten silently. No codebase survey happens at install time: the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/cdd-next-step` picks those up as the next unchecked tasks. This pre-filled phase is for files-only starts — install mode here and the manual bootstrap-script path — where no docs have been written yet; `/cdd-bootstrap` writes the docs through guided discovery and so ships a real roadmap without it.
 - *Upgrade mode* — the target already runs CDD. Using the baseline marker (Section 2.10) as the merge base, each CDD-managed file is compared three ways: improvements the CDD template has accrued are proposed for application; local customizations are preserved; files changed on both sides get an interactive merge. Local changes that look general rather than project-specific are not silently kept local — they are surfaced as candidates to upstream into the CDD repo. Every change that touches a project file is approved per file; the checkpoints of Section 4 apply in spirit here too.
 
 In both modes the retrofit isolates its writes from the target's current branch. Before rendering anything, it creates a dedicated branch (`cdd-retrofit`) and a sibling worktree off the target's HEAD, directs every write into that worktree, and — once all per-file approvals are done — makes a single commit on the branch so the user reviews and merges the scaffolding through a normal PR rather than finding it strewn across the current branch (usually the default branch). This is the one place CDD runs history-mutating git in a target, and it is deliberately scoped: the command only ever creates the dedicated branch and commits onto *it*, never onto the target's existing branches. On the happy path — a sibling worktree off HEAD — it never touches the current checkout. If the target is not a git repo, the command warns and falls back to writing in place without committing; if it is a git repo with no commits yet (an unborn HEAD, where a worktree can't be created), it falls back to a plain branch in the existing checkout and commits there. Because the worktree branches from HEAD, uncommitted local edits to CDD-managed files are not seen by the upgrade comparison; the command warns when it detects them rather than hard-stopping on any dirty tree.
 
-The doc-reconciliation discipline remains the bigger ask, and it is where retrofitting actually costs. The `/retrofit` session itself is cheap — it installs or upgrades files. The cost lands on the **first few PRs afterward**, as the project's architecture and feature docs are forced to reflect reality for the first time. That reconciliation is deliberately not done during `/retrofit`: that session is context-heavy, and surveying what the docs do and don't say needs its own focused session. So it is deferred to the project's first `/next-step`, which picks up the template roadmap's pre-filled "CDD bootstrap" phase (survey the codebase, draft the architecture and feature docs, fill the roadmap). For a greenfield project those tasks are near-trivial; for an existing project without prior doc discipline they are the opposite, and they may span several heavier-than-usual early PRs before the docs and the code agree.
+The doc-reconciliation discipline remains the bigger ask, and it is where retrofitting actually costs. The `/cdd-retrofit` session itself is cheap — it installs or upgrades files. The cost lands on the **first few PRs afterward**, as the project's architecture and feature docs are forced to reflect reality for the first time. That reconciliation is deliberately not done during `/cdd-retrofit`: that session is context-heavy, and surveying what the docs do and don't say needs its own focused session. So it is deferred to the project's first `/cdd-next-step`, which picks up the template roadmap's pre-filled "CDD bootstrap" phase (survey the codebase, draft the architecture and feature docs, fill the roadmap). For a greenfield project those tasks are near-trivial; for an existing project without prior doc discipline they are the opposite, and they may span several heavier-than-usual early PRs before the docs and the code agree.
 
 Two things temper this. First, the don't-disrupt-existing-docs stance: a retrofitted project often already has *some* documentation, and the first reconciliation should reconcile and adopt it into CDD's structure rather than overwrite it into the template layout. This is guidance, not an algorithm — the point is to preserve what the project already knows about itself, not to follow a fixed merge procedure. Second, the cost is a **first-time** cost. An upgrade retrofit (a project already running CDD) can assume the discipline already holds: its docs already track the code, so the heavy reconciliation does not recur. Only a first-time install faces the full bill. The command does not try to detect prior discipline beyond the install-vs-upgrade mode it already distinguishes; the two paths are described so the human knows which one they are on.
 
@@ -413,10 +413,10 @@ The template ships as a directory copied into a new project root by `tools/boots
 │   ├── cdd-baseline                          # written at render time, not shipped in the template
 │   ├── settings.json                         # auto-allows worktree sessions to read their handoff file
 │   └── commands/
-│       ├── next-step.md
-│       ├── pre-pr.md
-│       ├── merge-main.md
-│       └── process-pr.md
+│       ├── cdd-next-step.md
+│       ├── cdd-pre-pr.md
+│       ├── cdd-merge-main.md
+│       └── cdd-process-pr.md
 ├── doc/
 │   ├── index.md                              # top-level pointer to the doc directories
 │   ├── architecture/
@@ -424,7 +424,7 @@ The template ships as a directory copied into a new project root by `tools/boots
 │   ├── features/
 │   │   └── index.md                          # pointer-list skeleton
 │   └── knowledge_base/
-│       ├── project-overview.md               # project charter skeleton, filled by /bootstrap or by hand
+│       ├── project-overview.md               # project charter skeleton, filled by /cdd-bootstrap or by hand
 │       ├── roadmap.md                        # pre-filled bootstrap phase + placeholder phases
 │       └── README.md                         # explains the knowledge base
 └── tools/
@@ -440,7 +440,7 @@ Bootstrap procedure for a new project:
    The basename of `--path` becomes the `<PROJECT_DIR>` slug.
 2. Add the worktree-helper source line to `~/.bashrc` (the script prints the exact line on success).
 3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
-4. Start the first `/next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand). The roadmap's pre-filled bootstrap phase carries the first tasks: survey the codebase, draft the initial architecture docs, and replace the placeholder phases with the project's real plan — a suggested-infrastructure list (CI, linting, tests, …) helps populate the early phases.
+4. Start the first `/cdd-next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand). The roadmap's pre-filled bootstrap phase carries the first tasks: survey the codebase, draft the initial architecture docs, and replace the placeholder phases with the project's real plan — a suggested-infrastructure list (CI, linting, tests, …) helps populate the early phases.
 
 ### 7.1 The CDD repo as its own project
 
@@ -453,7 +453,7 @@ Concretely, the CDD repo has two layers:
 
 The two layers share a shape but serve different purposes. `./CLAUDE.md` is the CDD project's actual context (it references the process doc, lists open work, points at the template). `./template/CLAUDE.md` is a skeleton with placeholders, intended to be copied and filled in for a different project. `./template/BOOTSTRAP.md` documents the bootstrap recipe (it is template-adjacent meta-doc, not content that ships into the bootstrapped project), and `./tools/bootstrap-cdd-project.sh` automates the copy + substitution.
 
-The duplication between `./.claude/commands/` and `./template/.claude/commands/` is real but small, and it is the right duplication: the template ships a snapshot, the CDD repo's own copy can drift slightly if a command needs CDD-specific behaviour, and divergence is visible at review time. The CDD repo's own `/pre-pr` includes a command-set drift step that diffs the two trees and presents each hunk to the human, who judges whether it is expected substitution drift or unintended divergence.
+The duplication between `./.claude/commands/` and `./template/.claude/commands/` is real but small, and it is the right duplication: the template ships a snapshot, the CDD repo's own copy can drift slightly if a command needs CDD-specific behaviour, and divergence is visible at review time. The CDD repo's own `/cdd-pre-pr` includes a command-set drift step that diffs the two trees and presents each hunk to the human, who judges whether it is expected substitution drift or unintended divergence.
 
 The process doc itself (`claude-driven-development.md`) lives under `doc/knowledge_base/` in the CDD repo, since it is the foundational design document for the project. Other projects using the template do not get a copy of the process doc by default; the template is self-sufficient for users who don't need the philosophy.
 
@@ -464,7 +464,7 @@ This pattern, the meta-project hosting its own template, is the cleanest availab
 The workflow as described assumes a single human in the loop. A few adjustments anticipated for team use, not yet designed:
 
 - Handoff files would need to live somewhere shared (repo-tracked under `.handoffs/`, or a shared filesystem location, or an issue tracker). Branch-keyed naming still works.
-- Task selection in `/next-step` needs visibility into others' in-flight worktrees to avoid stomping. The worktree-list command would need to query a shared source.
+- Task selection in `/cdd-next-step` needs visibility into others' in-flight worktrees to avoid stomping. The worktree-list command would need to query a shared source.
 - PR review remains a human gate, but the team needs a convention on who reviews what; the agent's PR-review pass becomes one input among several.
 - Roadmap edits, especially structural ones, need a team approval mechanism beyond "the human running the session approves." A lightweight rule: structural edits go through a PR against the roadmap itself.
 
