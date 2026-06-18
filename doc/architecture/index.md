@@ -5,6 +5,6 @@ How this repo is structured. This index is a pointer list — the content lives 
 ## Documents
 
 - [Overview](overview.md) — the two-layer model (process doc + template), top-level layout, layer relationships, open structural questions
-- [Bootstrap & retrofit](bootstrap-and-retrofit.md) — the single substitution pipeline: bootstrap script, stage mode, overlay mode, `/bootstrap`, `/retrofit`, the baseline marker
+- [Bootstrap & retrofit](bootstrap-and-retrofit.md) — the single substitution pipeline: bootstrap script, stage mode, overlay mode, `/cdd-bootstrap`, `/cdd-retrofit`, the baseline marker
 - [The demo layer](demo.md) — the third artifact: filled-in seed + create/teardown automation
 - `adr/` — architecture decision records (`adr/0000-template.md` for the format)

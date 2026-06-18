@@ -27,4 +27,4 @@ Audience: humans (users, future-you, future-collaborators) and Claude Code sessi
 
 ## Maintenance
 
-When a change in code alters user-visible behaviour, update or add the relevant feature doc in the same PR. New features get a new file; modifications to existing features get edits to the existing file. `/pre-pr` will surface discrepancies.
+When a change in code alters user-visible behaviour, update or add the relevant feature doc in the same PR. New features get a new file; modifications to existing features get edits to the existing file. `/cdd-pre-pr` will surface discrepancies.

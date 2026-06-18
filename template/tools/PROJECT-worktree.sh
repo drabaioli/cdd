@@ -9,7 +9,7 @@
 #                               first prompt already submitted. Requires a
 #                               handoff file at
 #                               ~/.claude-handoffs/<repo-name>/<branch>.md
-#                               (run /next-step first). Run from the main
+#                               (run /cdd-next-step first). Run from the main
 #                               worktree.
 #
 #   PROJECT-worktree-done       After the feature branch has landed (or you've
@@ -63,7 +63,7 @@ PROJECT-worktree() {
   local handoff="${handoff_dir}/${branch}.md"
   if [[ ! -f "$handoff" ]]; then
     echo "No handoff file at $handoff" >&2
-    echo "Run /next-step in an exploratory session first to produce one." >&2
+    echo "Run /cdd-next-step in an exploratory session first to produce one." >&2
     return 1
   fi
 

@@ -1,18 +1,18 @@
-Produce a small, self-contained deliverable — a script plus a README, not a full CDD project: `/quick-create` (takes an optional one-line description of what to build).
+Produce a small, self-contained deliverable — a script plus a README, not a full CDD project: `/cdd-quick-create` (takes an optional one-line description of what to build).
 
-Run this command from a CDD-repo session. It is the third sibling of `/bootstrap` and `/retrofit`: `/bootstrap` creates a new CDD *project*, `/retrofit` adapts an *existing* one, and `/quick-create` creates a lightweight *deliverable* — a one-off artifact with none of the project substrate (no roadmap, no `doc/` tree, no `.claude/commands/`, no worktree helper, no baseline marker, no `/pre-pr` lifecycle). Like its siblings it exists only in the CDD repo and has no counterpart in `template/.claude/commands/`; unlike them it needs neither `template/` nor the bootstrap script, because a one-off has no template — it writes plain files directly (see the process doc, Section 6).
+Run this command from a CDD-repo session. It is the third sibling of `/cdd-bootstrap` and `/cdd-retrofit`: `/cdd-bootstrap` creates a new CDD *project*, `/cdd-retrofit` adapts an *existing* one, and `/cdd-quick-create` creates a lightweight *deliverable* — a one-off artifact with none of the project substrate (no roadmap, no `doc/` tree, no `.claude/commands/`, no worktree helper, no baseline marker, no `/cdd-pre-pr` lifecycle). Like its siblings it exists only in the CDD repo and has no counterpart in `template/.claude/commands/`; unlike them it needs neither `template/` nor the bootstrap script, because a one-off has no template — it writes plain files directly (see the process doc, Section 6).
 
-This is a **guided** command, but deliberately lighter than `/bootstrap`: a few natural questions, not the seven discovery headings. What it keeps from CDD is the part that pays off even for a one-off — a little guided discovery, clean single-purpose code, and a README so future-you can use it. What it drops is everything a single artifact doesn't need.
+This is a **guided** command, but deliberately lighter than `/cdd-bootstrap`: a few natural questions, not the seven discovery headings. What it keeps from CDD is the part that pays off even for a one-off — a little guided discovery, clean single-purpose code, and a README so future-you can use it. What it drops is everything a single artifact doesn't need.
 
 **Checkpoint discipline:** confirm the scope (step 1), then the captured definition (step 2), then the name and target (step 3) — each before moving on. The deliverable is written **files-first** (step 4), before any version control. The two outward-facing actions — a local commit (step 6) and a GitHub repo (step 7) — are offered separately, confirmed individually, and never done silently or by default.
 
 ## 1. Scope check (the gate)
 
-Before discovery, confirm this is actually a deliverable and not a project. Apply the shared scope-triage heuristic (process doc, Section 6): a task is a **project** (→ `/bootstrap`) when any of these hold — it is expected to evolve across many sessions and needs a roadmap; it has more than one cooperating component or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features. It is a **deliverable** (→ `/quick-create`) when none hold: a single self-contained artifact, finished in essentially one sitting, used as-is by future-you.
+Before discovery, confirm this is actually a deliverable and not a project. Apply the shared scope-triage heuristic (process doc, Section 6): a task is a **project** (→ `/cdd-bootstrap`) when any of these hold — it is expected to evolve across many sessions and needs a roadmap; it has more than one cooperating component or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features. It is a **deliverable** (→ `/cdd-quick-create`) when none hold: a single self-contained artifact, finished in essentially one sitting, used as-is by future-you.
 
-If, from the description (`$ARGUMENTS`) or an opening exchange, project-signals trip, **surface them and offer to switch to `/bootstrap`** rather than proceeding. The human decides.
+If, from the description (`$ARGUMENTS`) or an opening exchange, project-signals trip, **surface them and offer to switch to `/cdd-bootstrap`** rather than proceeding. The human decides.
 
-**Checkpoint:** if any project-signal is present, name it and get an explicit "stay lightweight" or "switch to `/bootstrap`" before continuing.
+**Checkpoint:** if any project-signal is present, name it and get an explicit "stay lightweight" or "switch to `/cdd-bootstrap`" before continuing.
 
 ## 2. Lightweight discovery
 
@@ -89,4 +89,4 @@ Report:
 - What was written: the artifact(s) and the README, plus any optional extras (inline dependency metadata, license header).
 - Whether a smoke test ran and its result.
 - Whether a local commit was made (step 6) and whether a GitHub repo was created (step 7).
-- That this is a **deliverable**, not a project: there is no roadmap, worktree helper, or `/pre-pr` lifecycle. If it later grows into a project, `/retrofit` can install CDD onto it.
+- That this is a **deliverable**, not a project: there is no roadmap, worktree helper, or `/cdd-pre-pr` lifecycle. If it later grows into a project, `/cdd-retrofit` can install CDD onto it.

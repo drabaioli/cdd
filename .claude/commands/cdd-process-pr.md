@@ -1,8 +1,8 @@
 Address the open PR's review feedback: read the review comments for the current branch, triage them, implement the change-requests (pushing back where warranted), then auto-post in-thread replies and auto-commit + push the result.
 
-Run this command on the feature branch (not on main), after a PR has been opened and someone has reviewed it. It is a post-review side-loop, analogous in position to `/merge-main`.
+Run this command on the feature branch (not on main), after a PR has been opened and someone has reviewed it. It is a post-review side-loop, analogous in position to `/cdd-merge-main`.
 
-**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates (see the process doc, "The `/process-pr` exception"). Do not add per-action gates after the plan is approved. Review threads are never resolved by this command; the user resolves them.
+**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates (see the process doc, "The `/cdd-process-pr` exception"). Do not add per-action gates after the plan is approved. Review threads are never resolved by this command; the user resolves them.
 
 ## 1. Discover the open PR
 
@@ -89,7 +89,7 @@ Classify each open item and present a short plan to the user **before editing an
 Present the plan compactly, e.g.:
 
 ```
-## /process-pr triage (PR #NUMBER)
+## /cdd-process-pr triage (PR #NUMBER)
 
 1. [change-request] src/foo.ts:42 — "rename to X" → will rename.
 2. [question]        review summary — "why no retry?" → will answer, no code change.
@@ -147,7 +147,7 @@ Push to the PR branch. Sequencing note: if you want the reply in step 6 to cite 
 Summarize what was processed:
 
 ```
-## /process-pr summary (PR #NUMBER)
+## /cdd-process-pr summary (PR #NUMBER)
 - Threads addressed: <count>
 - Questions answered: <count>
 - Change-requests declined: <count> (replies explain why)

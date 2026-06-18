@@ -28,7 +28,7 @@ Add an `inline_styles(html)` step that rewrites the preview's `<style>`-based fo
 
 **Milestone:** "Copy as rich text (email-safe)" produces HTML that pastes with formatting intact into Gmail.
 
-> **Parallel-build note:** branch off `main` *after* Phase 1 merges, in its own worktree, at the same time as Phase 3. Both phases register a new action in the **same `ACTIONS` region** and add a button in the **same toolbar region** — editing the same lines, so the two branches are guaranteed to conflict on merge. Resolve it with `/merge-main` once one of them lands.
+> **Parallel-build note:** branch off `main` *after* Phase 1 merges, in its own worktree, at the same time as Phase 3. Both phases register a new action in the **same `ACTIONS` region** and add a button in the **same toolbar region** — editing the same lines, so the two branches are guaranteed to conflict on merge. Resolve it with `/cdd-merge-main` once one of them lands.
 
 ## Phase 3: Export to file — *demo branch B, parallel with Phase 2*
 
@@ -40,7 +40,7 @@ Add file exports: a self-contained "Download standalone .html" and an "Download 
 
 **Milestone:** both downloads work; the email-ready file opens with formatting intact when imported into an email.
 
-> **Dependency + parallel-build note:** branch off `main` *after* Phase 1 merges, at the same time as Phase 2 (its own worktree). Because Phase 2 has not merged yet, **`inline_styles()` does not exist on this branch** — ship the standalone export and leave `ExportEmailAction` blocked on that helper. When Phase 2 merges and `main` advances, run `/merge-main` on this branch: it (a) resolves the `ACTIONS`/toolbar conflict with Phase 2 **and** (b) brings `inline_styles()` onto the branch so the email export can be finished. This is the moment `/merge-main` visibly does two jobs at once.
+> **Dependency + parallel-build note:** branch off `main` *after* Phase 1 merges, at the same time as Phase 2 (its own worktree). Because Phase 2 has not merged yet, **`inline_styles()` does not exist on this branch** — ship the standalone export and leave `ExportEmailAction` blocked on that helper. When Phase 2 merges and `main` advances, run `/cdd-merge-main` on this branch: it (a) resolves the `ACTIONS`/toolbar conflict with Phase 2 **and** (b) brings `inline_styles()` onto the branch so the email export can be finished. This is the moment `/cdd-merge-main` visibly does two jobs at once.
 
 ## Phase 4: Syntax-highlighted code blocks
 

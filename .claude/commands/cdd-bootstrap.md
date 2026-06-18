@@ -1,6 +1,6 @@
-Scaffold a new greenfield project on the CDD workflow: `/bootstrap` (takes no argument).
+Scaffold a new greenfield project on the CDD workflow: `/cdd-bootstrap` (takes no argument).
 
-Run this command from a CDD-repo session (it needs the CDD repo's `template/` and `bootstrap-cdd-project.sh`). This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* a new target project, so downstream projects have no use for it — see the process doc, Section 2.7). It is the greenfield sibling of `/retrofit`: `/retrofit` adapts an *existing* project, `/bootstrap` creates a *new* one.
+Run this command from a CDD-repo session (it needs the CDD repo's `template/` and `bootstrap-cdd-project.sh`). This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* a new target project, so downstream projects have no use for it — see the process doc, Section 2.7). It is the greenfield sibling of `/cdd-retrofit`: `/cdd-retrofit` adapts an *existing* project, `/cdd-bootstrap` creates a *new* one.
 
 This is a **guided** command, not a brief-to-files converter. The discovery conversation is part of the job: you walk the user through defining the project, then encode the result into the initial docs and roadmap, then scaffold the project in a single bootstrap invocation. The generated project starts with a real, filled-in overview, `CLAUDE.md`, and roadmap — not the template's pre-filled "survey the codebase" bootstrap phase, which is for files-only installs.
 
@@ -22,7 +22,7 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
-**Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (process doc, Section 6) and **offer to drop to `/quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
+**Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (process doc, Section 6) and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
 
 **Checkpoint:** present a structured summary of the captured definition (the seven headings above). Get explicit confirmation or corrections before writing anything.
 
@@ -56,7 +56,7 @@ The bootstrap script refuses a path that already exists and is non-empty, so che
 [[ -e "<target>" && -n "$(ls -A "<target>" 2>/dev/null)" ]] && echo "exists and non-empty"
 ```
 
-If it exists and is non-empty, stop and ask for a different location — `/bootstrap` is for greenfield. (Suggest `/retrofit` if the user actually meant to install CDD into an existing project.) An absent path or an empty directory is fine.
+If it exists and is non-empty, stop and ask for a different location — `/cdd-bootstrap` is for greenfield. (Suggest `/cdd-retrofit` if the user actually meant to install CDD into an existing project.) An absent path or an empty directory is fine.
 
 **Checkpoint:** confirm the target path before staging the overlay.
 
@@ -118,6 +118,6 @@ Report:
   [[ -f "<target>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "<target>/tools/<PROJECT_SLUG>-worktree.sh"
   ```
 
-- The next command: `cd <target>`, run `claude`, and `/next-step` — it picks up the real first phase of the roadmap. Unlike a files-only install, there is **no** codebase-survey bootstrap phase to clear first; the docs are already populated.
+- The next command: `cd <target>`, run `claude`, and `/cdd-next-step` — it picks up the real first phase of the roadmap. Unlike a files-only install, there is **no** codebase-survey bootstrap phase to clear first; the docs are already populated.
 
-(The bootstrap script prints its own generic "fill in CLAUDE.md / look at the pre-filled roadmap" block; your summary supersedes it for the `/bootstrap` path, where those are already done.)
+(The bootstrap script prints its own generic "fill in CLAUDE.md / look at the pre-filled roadmap" block; your summary supersedes it for the `/cdd-bootstrap` path, where those are already done.)

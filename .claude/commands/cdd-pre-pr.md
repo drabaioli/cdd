@@ -71,8 +71,23 @@ git fetch origin main
 git log --oneline HEAD..origin/main
 ```
 
-If `origin/main` has advanced beyond the branch point, mention it and recommend running `/merge-main` before opening the PR. Do not merge from this session.
+If `origin/main` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-main` before opening the PR. Do not merge from this session.
 
+<!-- cdd-only-begin -->
+## Command-set drift (CDD repo only)
+
+This check is specific to the CDD repo (the meta-project): it surfaces unintended divergence between the repo's own `.claude/commands/` and the `template/.claude/commands/` it ships to downstream projects.
+
+```bash
+./scripts/command-drift-check.sh
+```
+
+The script renders the template through `bootstrap-cdd-project.sh --stage` with this repo's own identifiers, so expected substitution drift cancels out mechanically. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-meta-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. The same script asserts that the handoff schema headings match between the process doc (Section 2.6) and `cdd-next-step.md`, that the worktree helpers (`tools/cdd-worktree.sh` vs the rendered template helper) match from the first function definition onward, and that no `cdd-only` markers leak into the template itself. CI runs it on every PR via `template-smoke.yml`.
+
+If the script exits 0, report "no drift" and continue. If it reports divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence). Apply fixes only on user approval. Do not auto-edit either tree from this step.
+
+When presenting the step 7 checklist, append a `- [ ] Command-set drift clean` line to it.
+<!-- cdd-only-end -->
 ## 7. Summary
 
 Present a checklist summary:
@@ -91,7 +106,7 @@ Present a checklist summary:
 - [ ] README up to date
 - [ ] Roadmap up to date
 - [ ] CI gaps surfaced: none / proposed (list them)
-- [ ] No upstream drift (or: /merge-main recommended)
+- [ ] No upstream drift (or: /cdd-merge-main recommended)
 - [ ] Reconciliation edits committed
 ```
 
@@ -125,7 +140,7 @@ gh auth status && git remote get-url origin   # origin should be a github.com UR
 
 If either is missing, say so in one line and skip this step (the checklist above still stands).
 
-If §6 found upstream drift, restate the recommendation to run `/merge-main` before opening the PR, and let the user decide whether to proceed anyway.
+If §6 found upstream drift, restate the recommendation to run `/cdd-merge-main` before opening the PR, and let the user decide whether to proceed anyway.
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 

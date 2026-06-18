@@ -5,7 +5,7 @@ What this repo provides. This index is a pointer list — the content lives in t
 ## Documents
 
 - [The Claude-Driven Development process](process.md) — the documented human-in-the-loop workflow itself
-- [The template](template.md) — copy-paste directory + bootstrap script, plus the CDD-repo-only `/bootstrap`, `/retrofit`, and `/quick-create` commands
+- [The template](template.md) — copy-paste directory + bootstrap script, plus the CDD-repo-only `/cdd-bootstrap`, `/cdd-retrofit`, and `/cdd-quick-create` commands
 - [The demo](demo.md) — the Markdown Renderer seed: visual demo of the task cycle + dogfooding greenfield
 
 ## Status

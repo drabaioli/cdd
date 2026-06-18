@@ -2,7 +2,7 @@
 
 A `demo/` subsystem that instantiates a concrete project ("Markdown Renderer") from a filled-in seed, for two uses from one source:
 
-- A reproducible, **visual demo** of CDD's task cycle: one reviewable PR, two parallel branches that hit a guaranteed merge conflict, and a `/merge-main` that resolves the conflict *and* delivers a cross-branch dependency.
+- A reproducible, **visual demo** of CDD's task cycle: one reviewable PR, two parallel branches that hit a guaranteed merge conflict, and a `/cdd-merge-main` that resolves the conflict *and* delivers a cross-branch dependency.
 - The **dogfooding greenfield** for roadmap Phase 2.
 
 Contents:

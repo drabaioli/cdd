@@ -112,7 +112,7 @@ When you defer a question, list it explicitly in the handoff's Notes section so 
 
 When the user signals they're ready, draft:
 
-**Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: prefix the name with the fixed `gh_issue_NN_` token so the issue number is durable and groups cleanly — `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). This token is the sole mechanism threading the issue to its PR (`/pre-pr` turns it into `Closes #NN`).
+**Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: prefix the name with the fixed `gh_issue_NN_` token so the issue number is durable and groups cleanly — `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). This token is the sole mechanism threading the issue to its PR (`/cdd-pre-pr` turns it into `Closes #NN`).
 
 **Implementation prompt**: a self-contained prompt for the new session. Critical rule, the new session will read `CLAUDE.md`, the roadmap, and the architecture/feature docs itself. Include only context that is **not** inferable from the repo:
 
