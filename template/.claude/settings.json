@@ -2,8 +2,8 @@
   "permissions": {
     "allow": [
       "Read(~/.claude-handoffs/<PROJECT_DIR>/**)",
-      "Bash(mkdir -p ~/.claude-handoffs/<PROJECT_DIR>)",
-      "Bash(ls ~/.claude-handoffs/<PROJECT_DIR>/)",
+      "Bash(mkdir -p ~/.claude-handoffs/<PROJECT_DIR>*)",
+      "Bash(ls ~/.claude-handoffs/<PROJECT_DIR>/*)",
       "Bash(rm ~/.claude-handoffs/<PROJECT_DIR>/*.md)"
     ]
   }
