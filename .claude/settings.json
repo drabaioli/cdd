@@ -2,8 +2,8 @@
   "permissions": {
     "allow": [
       "Read(~/.claude-handoffs/cdd/**)",
-      "Bash(mkdir -p ~/.claude-handoffs/cdd)",
-      "Bash(ls ~/.claude-handoffs/cdd/)",
+      "Bash(mkdir -p ~/.claude-handoffs/cdd*)",
+      "Bash(ls ~/.claude-handoffs/cdd/*)",
       "Bash(rm ~/.claude-handoffs/cdd/*.md)"
     ]
   }
