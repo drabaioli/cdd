@@ -6,15 +6,17 @@ This document describes the philosophy, the artifacts, the lifecycle, and the ru
 
 ## 1. Philosophy
 
-Four commitments shape every decision in this workflow.
+Five commitments shape every decision in this workflow.
 
 **The human is in the loop at every gate.** The agent never picks the next task, never approves a plan, never merges its own PR, never restructures the roadmap unilaterally. It proposes; the human disposes. The agent's value is throughput inside a clearly-scoped task and consistency in keeping docs current, not autonomous decision-making.
 
 **Automate everything except decisions.** The positive dual of the first commitment: CDD drives toward maximal SDLC automation — implementation, verification, documentation reconciliation, merge mechanics, even the consistency checks that keep the workflow itself honest — while reserving human attention for decisions. The six checkpoints (Section 4) are where automation deliberately stops. Everywhere else, a recurring manual step is a gap: convert it into a mechanism.
 
-**The project documents itself as it grows.** Architecture and feature documentation are first-class deliverables, not afterthoughts. They serve dual duty: human reference and agent context. The same `pre-pr` step that runs CI also reconciles the docs against the code. A change isn't done until the docs match it.
+**The project holds itself to engineering standards as it grows.** Sound architecture, structured documentation, tested behaviour, and a working CI gate are first-class deliverables, not afterthoughts; they serve dual duty as human reference and agent context. Documentation is the part CDD enforces directly today: the same `pre-pr` step that runs CI reconciles the docs against the code, and a change isn't done until the docs match it. The rest — that new behaviour ships with a test, that CI builds and checks the project, that dependencies and style stay honest — CDD instils by *mechanism and floor, not prescription*: it ships a written definition of what "engineering-ready" means (the engineering-practices contract, Section 2.12), asks at the pre-PR gate whether new behaviour is tested, and tracks the practices it does not yet enforce on the roadmap — while leaving the concrete tools, frameworks, and commands to the project. It raises the floor without dictating the house. This is how CDD instils engineering excellence into an adopting project without invading how it works.
 
 **Context is the scarcest resource.** Each Claude Code session has a finite, expensive context window. The workflow is structured to keep each session's context focused on one job: choosing the next task, implementing one task, reviewing one PR, resolving one merge. Sessions hand off via files (handoffs, the roadmap, the docs) rather than by trying to share context.
+
+**The workflow improves itself.** CDD treats its own substrate — `CLAUDE.md`, the commands, the CI and test scaffolding, the docs, the conventions — as a product under continuous revision. When a session discovers a better way to work (a constraint that should have been in `CLAUDE.md`, a check the pre-PR gate should run, a convention worth adopting), the improvement does not evaporate at session end: it is routed into the project's own roadmap or conventions as a tracked change, and an improvement general enough to help any project is surfaced as a candidate to upstream into CDD itself (Section 6, `/cdd-retrofit` upgrade mode). A recurring friction that no artifact captures is a gap, the same way a recurring manual step is.
 
 A non-goal: full autonomy. CDD is not an attempt to take the human out of the loop. It is a way to amplify a single developer (initially) by structuring how the agent participates.
 
@@ -75,6 +77,7 @@ Project metadata and history. The roadmap lives here. So do:
 - The project overview (`project-overview.md`): the project's charter — what it is, why it exists, what it does and explicitly does not do, its constraints, and its architecture intentions. See below.
 - Decision records: why we chose this RTOS, this framework, this hardware target, this protocol. Append-only.
 - Coding standards: language-specific style and convention rules.
+- The engineering-practices contract (`engineering-practices.md`): the project's engineering floor, with each practice marked *enforced* or *expected*. See Section 2.12.
 - Investigation notes: deep dives done in the course of the project that don't fit into architecture or feature docs.
 
 The knowledge base is mostly append-only. Decisions are not rewritten when they are superseded; new decisions are added that supersede them, with a reference back. This preserves the reasoning trail.
@@ -170,6 +173,25 @@ Several sessions auto-commit at their gate so that a session never leaves a dirt
 
 Which sessions auto-commit: the implementation session (§3.3) and `/cdd-pre-pr` (§3.5) commit their own changes locally; `/cdd-process-pr` (§3.7) commits and pushes; `/cdd-merge-main` (§3.4) produces a merge commit and enforces a clean tree before merging. All four follow the rules above.
 
+### 2.12 The engineering-practices contract (`doc/knowledge_base/engineering-practices.md`)
+
+The project's engineering floor, written down. It is the artifact that makes the second commitment of Section 1 — instilling engineering best practices — legible instead of implicit: a reader can see, at a glance, which practices CDD currently *guarantees* for this project and which it still *owes*. Each practice is marked one of two ways:
+
+- **Enforced** — a CDD gate guarantees it on every change. If an enforced practice is failing, `/cdd-pre-pr` reports it and the change is not ready.
+- **Expected** — the project is committed to the practice but has not yet mechanized it here. Each expected practice is tracked as a roadmap task until it becomes enforced. "Expected" is a promise with a due date, not an opt-out.
+
+The canonical set of practices the contract enumerates:
+
+| Practice                                                                          | Typical status                                          | Enforcing gate (once enforced)                         |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
+| Structured documentation (architecture, feature, roadmap docs track the code)     | **enforced**                                            | `/cdd-pre-pr` doc reconciliation (§3.5)                |
+| Tested behaviour (new behaviour ships with a test, or a recorded reason it doesn't) | **enforced** once a test command exists; **expected** until then | `/cdd-pre-pr` test-coverage reconciliation (§3.5)      |
+| Continuous integration (build + checks run on every change)                       | **expected** until a CI entry point exists, then **enforced** | `/cdd-pre-pr` build & QA (§3.5) + the project's own CI |
+| Lint & format                                                                     | **expected**                                            | `/cdd-pre-pr` build & QA, once a lint/format command exists |
+| Dependency & toolchain hygiene (pinned/locked deps, documented toolchain)         | **expected**                                            | project-defined                                        |
+
+A practice moves from **expected** to **enforced** in the same change that lands its mechanism (a test command, a CI job): the mechanism and the status flip ship together. The contract is deliberately generic and language-agnostic — it names *what* the floor is and carries placeholders for the project's own commands, never a shipped CI or lint config (opinionated per-project-type defaults are deferred design, §6). New practices are added as the project matures; the roadmap's suggested-infrastructure tasks and `/cdd-pre-pr`'s CI-improvement check (§3.5) feed it. Drop a row that genuinely does not apply (e.g. integration tests in a pure library), but record *why* in a clause rather than deleting it silently.
+
 ## 3. Lifecycle
 
 A task flows through CDD in up to five sessions, two of them optional side-loops (`/cdd-merge-main` before the PR, `/cdd-process-pr` after review). Each session type has a name, one command, and one job:
@@ -230,9 +252,9 @@ The five rows above are the per-task lifecycle. Three further session types sit 
             │                                  │
             │ Run build, format, lint, tests,  │
             │ integration tests. Code review.  │
-            │ Reconcile architecture and       │
-            │ feature docs. Propose roadmap    │
-            │ edits. Conditionally propose CI  │
+            │ Reconcile docs and test          │
+            │ coverage. Propose roadmap edits. │
+            │ Conditionally propose CI         │
             │ improvements.                    │
             └──────────────────────────────────┘
                             │
@@ -305,7 +327,7 @@ This is also where the agent can pull in improvements from main that are useful 
 
 ### 3.5 Pre-PR session: `/cdd-pre-pr`
 
-A fresh session on the feature branch, started after the implementation session has closed. This isolation is deliberate: a fresh context avoids the implementation session grading its own homework, and any "propose to the human" step in `/cdd-pre-pr` is a proposal to the human running this session, not to another session. Runs the CI gates, reads the diff, code-reviews changed files, and reconciles documentation.
+A fresh session on the feature branch, started after the implementation session has closed. This isolation is deliberate: a fresh context avoids the implementation session grading its own homework, and any "propose to the human" step in `/cdd-pre-pr` is a proposal to the human running this session, not to another session. Runs the CI gates, reads the diff, code-reviews changed files, reconciles documentation, and checks that new behaviour is tested.
 
 Doc reconciliation has three parts:
 
@@ -313,9 +335,11 @@ Doc reconciliation has three parts:
 - **Feature docs**: same, for feature docs.
 - **Roadmap**: tick newly-completed checkboxes directly; identify roadmap edits (add/modify/remove tasks) implied by what landed and present them to the human in this session for approval before applying.
 
+Alongside doc reconciliation, `/cdd-pre-pr` reconciles **test coverage** — the recurring guardrail behind the engineering-practices contract's "tested behaviour" row (§2.12). For each behavioural change in the diff it checks whether a test exercises the new behaviour. If the project has a test command, a behavioural change that landed without a test is flagged; a deliberately-untested change is allowed but must be recorded, not silent. If the project has no test harness yet (the contract still marks tested behaviour *expected*), the step does not invent a framework — it notes that the change shipped untested and confirms that standing up tests is tracked on the roadmap. Like doc reconciliation, this surfaces and records; it does not add a checkpoint (§4).
+
 `/cdd-pre-pr` also performs a conditional CI-improvement check: if the change introduces a category of work that the existing CI doesn't cover (new file type, new test category, a tool that should be linted but isn't), propose improvements to the human. On approval, apply them as part of the same PR; alternatively, the human may defer them as a new roadmap task. The default is silence. The agent should not propose CI improvements every run; only when the change genuinely surfaces a gap.
 
-Output is a pass/fail summary across all the gates. After the summary, `/cdd-pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If §6 detected upstream drift, the step restates the `/cdd-merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/cdd-pre-pr` never opens a PR without explicit confirmation.
+Output is a pass/fail summary across all the gates. After the summary, `/cdd-pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If the upstream-drift check detected drift, the step restates the `/cdd-merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/cdd-pre-pr` never opens a PR without explicit confirmation.
 
 ### 3.6 PR review and merge
 
@@ -390,6 +414,8 @@ This raises a recurring question — *is the task a deliverable or a project?* �
 **Parallel-merge structure.** When two worktrees land in sequence, the second needs to integrate the first. Today this is partly automated (`/cdd-merge-main` covers it) and partly manual (the human decides when to trigger). A more structured approach, perhaps with a "second worktree must re-run pre-pr after merge-main", may be warranted once parallel work is common. The invariant is clear: a feature branch must integrate main and re-pass pre-pr before it's ready to merge.
 
 **Template opinionation per project type.** The current template encodes the workflow, but the project-specific bits (build commands, language constraints, module layout) are placeholders. Different project archetypes (firmware, web app, library, data pipeline) probably want different opinionated defaults for those placeholders. Worth deriving from real usage rather than guessing up front.
+
+**A standing self-improvement channel.** The fifth commitment (§1, "the workflow improves itself") is guarded today only at two moments: `/cdd-retrofit` upgrade mode surfaces a project's general customizations as upstream candidates, and the CDD repo dogfoods itself (§7.1). A project merely *running* CDD day to day has no recurring, lightweight channel to flag "this `CLAUDE.md` constraint, this CI check, this convention looks general — capture it." The retired friction log (a standing separate file) is deliberately not the answer; the mechanism should route a discovered improvement into machinery that already exists — a roadmap item, a conventions/`CLAUDE.md` edit, or an upstream candidate — rather than into a new log. The likely shape is a conditional `/cdd-pre-pr` prompt parallel to the CI-improvement check, or a `/cdd-next-step` intake; deferred until the design is worked out.
 
 **Adapting an existing project.** Addressed by `/cdd-retrofit`, a command that lives in the CDD repo only (see Section 2.7) and is run from a CDD-repo session with the target project's path as argument. It auto-detects which of two modes applies:
 

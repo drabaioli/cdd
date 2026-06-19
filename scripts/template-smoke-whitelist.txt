@@ -13,7 +13,7 @@
 <descriptive_slug>
 <exact checkbox line(s) from the roadmap being addressed>
 <file>
-<files reconciled in steps 3–6>
+<files reconciled in steps 3–7>
 <format check command>
 <integration test cmd>
 <lint command>

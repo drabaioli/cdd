@@ -53,7 +53,17 @@ Check and **update** documentation based on the changes:
 
 Read each relevant doc and compare against the actual code changes. Fix discrepancies directly when they are reconciliation (the doc is out of date relative to what landed). Ask before applying structural changes (adding new doc files, restructuring an existing doc).
 
-## 5. CI improvement check (conditional)
+## 5. Test coverage reconciliation
+
+For each behavioural change in the diff (a new function, a new branch, changed output, a fixed bug), check whether it is covered by a test. This is the recurring guardrail behind the "tested behaviour" row of `doc/knowledge_base/engineering-practices.md`.
+
+- **If the project has a test command** ("tested behaviour" marked *enforced*): confirm a test exercises the new behaviour. If a behavioural change landed with no accompanying test, flag it — the default expectation is that new behaviour ships with a test.
+- **If a change is deliberately untested** (a throwaway script, generated code, a spike): that is allowed, but it must be *intentional and recorded*, not silent. State the reason in the PR summary.
+- **If the project has no test command yet** ("tested behaviour" still *expected*): do not invent a framework. Note that the change shipped untested because there is no test harness, and confirm that standing one up is tracked as a roadmap task. If this change is exactly the kind of behaviour that motivates a first test, say so and let the user decide whether to pull that task forward.
+
+This step asks a question and records the answer; it does not mandate a specific framework, a coverage threshold, or that every change be tested. "Not tested, and here is why" is a valid, recorded outcome. Surface it — do not block on it.
+
+## 6. CI improvement check (conditional)
 
 If, and only if, the change introduces a category of work that the existing CI does not cover, propose specific improvements to the user. Examples that should trigger a proposal:
 
@@ -64,7 +74,7 @@ If, and only if, the change introduces a category of work that the existing CI d
 
 Do **not** propose generic CI improvements every run. The default is silence. If you do propose, the user has two options: apply now in this PR, or defer as a new roadmap task. Apply only on approval.
 
-## 6. Upstream drift check
+## 7. Upstream drift check
 
 ```bash
 git fetch origin main
@@ -73,7 +83,7 @@ git log --oneline HEAD..origin/main
 
 If `origin/main` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-main` before opening the PR. Do not merge from this session.
 
-## 7. Summary
+## 8. Summary
 
 Present a checklist summary:
 
@@ -90,6 +100,7 @@ Present a checklist summary:
 - [ ] CLAUDE.md up to date
 - [ ] README up to date
 - [ ] Roadmap up to date
+- [ ] New behaviour tested (or untested-with-reason recorded)
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] No upstream drift (or: /cdd-merge-main recommended)
 - [ ] Reconciliation edits committed
@@ -97,9 +108,9 @@ Present a checklist summary:
 
 Mark each item as pass ✓ or needs attention ✗ with details.
 
-## 8. Commit reconciliation edits
+## 9. Commit reconciliation edits
 
-Commit the documentation reconciliation edits this session made in steps 3–6 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). This is a local commit only — **no push**. Pushing happens, if at all, in step 9.
+Commit the documentation reconciliation edits this session made in steps 3–7 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). This is a local commit only — **no push**. Pushing happens, if at all, in step 10.
 
 First check the entry snapshot from step 1:
 
@@ -107,13 +118,13 @@ First check the entry snapshot from step 1:
 - **Otherwise**, commit only the files this session edited. Add them by path — do not `git add -A`:
 
 ```bash
-git add <files reconciled in steps 3–6>
+git add <files reconciled in steps 3–7>
 git commit -m '<message>'
 ```
 
 Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
 
-## 9. Open PR (optional)
+## 10. Open PR (optional)
 
 After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
 
@@ -125,7 +136,7 @@ gh auth status && git remote get-url origin   # origin should be a github.com UR
 
 If either is missing, say so in one line and skip this step (the checklist above still stands).
 
-If §6 found upstream drift, restate the recommendation to run `/cdd-merge-main` before opening the PR, and let the user decide whether to proceed anyway.
+If §7 found upstream drift, restate the recommendation to run `/cdd-merge-main` before opening the PR, and let the user decide whether to proceed anyway.
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
