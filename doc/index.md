@@ -10,4 +10,3 @@ Documentation map for the CDD repository. Each directory keeps an `index.md` poi
   - [`claude-driven-development.md`](knowledge_base/claude-driven-development.md) — the process document: philosophy, artifacts, lifecycle, edit rules (the shipped product)
   - [`roadmap.md`](knowledge_base/roadmap.md) — implementation roadmap for this repo
   - [`engineering-practices.md`](knowledge_base/engineering-practices.md) — this repo's engineering floor: which practices are enforced vs expected
-  - [`founding-objectives-audit.md`](knowledge_base/founding-objectives-audit.md) — investigation note: audit of CDD's three founding objectives and the Phase 11 gap inventory

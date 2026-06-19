@@ -136,9 +136,9 @@ Defects and gaps surfaced by retrofitting CDD onto real existing projects. Each 
 
 ## Phase 11: Founding-objective guardrails
 
-Elevate the two under-guarded founding objectives — instilling engineering best practices, and workflow self-improvement — from implicit to named-and-tracked. Audit and reasoning in `doc/knowledge_base/founding-objectives-audit.md`.
+Elevate the two under-guarded founding objectives — instilling engineering best practices, and workflow self-improvement — from implicit to named-and-tracked. Decision and reasoning in `doc/architecture/adr/0001-name-and-guard-founding-objectives.md`.
 
-- [x] Audit the three founding objectives against the workflow and record the gap inventory. — `founding-objectives-audit.md`
+- [x] Audit the three founding objectives against the workflow and record the gap inventory. — ADR `0001-name-and-guard-founding-objectives.md`
 - [x] Name the under-guarded objectives in §1: broaden "documents itself" into "holds itself to engineering standards", add "the workflow improves itself" (4 → 5 commitments).
 - [x] Ship the engineering-practices contract (enforced vs expected): process doc §2.12 + template `doc/knowledge_base/engineering-practices.md`, instantiated in the CDD repo and the demo seed.
 - [x] Add the `/cdd-pre-pr` test-coverage reconciliation step (both command copies) as the recurring objective-2 guardrail.
