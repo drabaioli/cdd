@@ -133,3 +133,17 @@ Defects and gaps surfaced by retrofitting CDD onto real existing projects. Each 
 - [ ] **Retrofit doc-reconciliation playbook for common pre-existing layouts.** PyGroundControl needed manual reconciliation that recurs across projects: a split architecture-doc layout (`doc/backend/`, `doc/frontend/`, a top-level `system-architecture.md`) folding into `doc/architecture/`; a `future-work.md`/TODO/backlog doc folding into `roadmap.md`; an oversized CLAUDE.md duplicating command/troubleshooting content that should be slimmed to pointers (per-session context cost). Capture these as explicit guidance/checklist in `/cdd-retrofit` (and the process doc's existing-project section) so they aren't rediscovered each time.
 
 **Milestone:** CDD retrofits cleanly onto a project regardless of default-branch name, repo directory name/location, or pre-existing doc layout, without per-project manual fixes to the scaffolding.
+
+## Phase 11: Founding-objective guardrails
+
+Elevate the two under-guarded founding objectives — instilling engineering best practices, and workflow self-improvement — from implicit to named-and-tracked. Decision and reasoning in `doc/architecture/adr/0001-name-and-guard-founding-objectives.md`.
+
+- [x] Audit the three founding objectives against the workflow and record the gap inventory. — ADR `0001-name-and-guard-founding-objectives.md`
+- [x] Name the under-guarded objectives in §1: broaden "documents itself" into "holds itself to engineering standards", add "the workflow improves itself" (4 → 5 commitments).
+- [x] Ship the engineering-practices contract (enforced vs expected): process doc §2.12 + template `doc/knowledge_base/engineering-practices.md`, instantiated in the CDD repo and the demo seed.
+- [x] Add the `/cdd-pre-pr` test-coverage reconciliation step (both command copies) as the recurring objective-2 guardrail.
+- [ ] Objective-3 standing channel: a recurring mechanism that routes a discovered improvement into the roadmap/conventions (not a reintroduced standing log). — §6 known gap; design deferred.
+- [ ] Reinforce objective 2 at bootstrap: a required bootstrap-phase task and/or checklist, once the `/cdd-pre-pr` mechanism is proven.
+- [ ] Objective-1 mechanizations: codify when `/cdd-merge-main` is recommended/auto-triggered; consider a mechanical gate-honored check.
+
+**Milestone:** all three founding objectives are named commitments in §1, each with at least one recurring guardrail or a tracked plan to add one.

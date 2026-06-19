@@ -9,6 +9,7 @@ Markdown Renderer is a small local web app: paste Markdown into a box, see it re
 | System architecture & design     | `doc/architecture/` (start with `index.md`)       |
 | Feature documentation            | `doc/features/` (start with `index.md`)           |
 | Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
+| Engineering practices            | `doc/knowledge_base/engineering-practices.md`     |
 | Design decisions                 | `doc/knowledge_base/` (decision records)          |
 
 **Read `doc/architecture/` before planning any feature or structural change.**

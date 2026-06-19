@@ -12,6 +12,7 @@
 | Architecture decision records    | `doc/architecture/adr/` (Nygard style)            |
 | Feature documentation            | `doc/features/index.md`                           |
 | Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
+| Engineering practices            | `doc/knowledge_base/engineering-practices.md`     |
 | Design decisions                 | `doc/knowledge_base/` (decision records)          |
 
 Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need. **`index.md` files are pointer lists only — content belongs in named subdocuments, not in the index itself.**

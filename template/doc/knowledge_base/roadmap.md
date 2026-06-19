@@ -11,6 +11,7 @@ Get the CDD substrate to reflect reality: survey what exists, write the initial 
 - [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted. For a greenfield project, write architecture guidelines and intentions instead. Where architecture notes already exist (a README, design docs), fold them in rather than starting from scratch.
 - [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability. Likely empty for a greenfield project. Where features are already documented elsewhere, adopt and reconcile that content here.
 - [ ] Fill in the project charter at `doc/knowledge_base/project-overview.md` (what it is, goals, non-goals, constraints, architecture intentions) and the `CLAUDE.md` stubs (project description, critical constraints, build/test commands, module layout).
+- [ ] Fill in the engineering-practices contract (`doc/knowledge_base/engineering-practices.md`): mark each practice *enforced* or *expected* for this project, and fill the command placeholders for the ones that already exist.
 - [ ] Fill in this roadmap: replace the placeholder phases below with the project's real plan, slotting in items from "Suggested infrastructure tasks" where they fit.
 
 **Milestone: the docs describe the project as it actually is, and the roadmap below is a real plan.**
@@ -39,7 +40,7 @@ Get the CDD substrate to reflect reality: survey what exists, write the initial 
 
 ## Suggested infrastructure tasks
 
-Slot these into the phases above where they fit — usually spread across the early phases, not bundled into one. Drop the ones that don't apply; delete this section once it has been folded in.
+Slot these into the phases above where they fit — usually spread across the early phases, not bundled into one. Drop the ones that don't apply; delete this section once it has been folded in. Each one the project commits to but hasn't mechanized yet is an *expected* practice in `doc/knowledge_base/engineering-practices.md`; closing it flips that row to *enforced*.
 
 - Set up CI: build + tests on every PR.
 - Add linting and a format check (and a pre-commit hook if wanted).

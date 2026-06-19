@@ -8,6 +8,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | ---------------------------------------------------- | ------------------------------------------------- |
 | Process document (philosophy, lifecycle, edit rules) | `doc/knowledge_base/claude-driven-development.md` |
 | Implementation roadmap                               | `doc/knowledge_base/roadmap.md`                   |
+| Engineering practices (enforced vs expected)         | `doc/knowledge_base/engineering-practices.md`     |
 | Documentation map                                    | `doc/index.md`                                    |
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
 | Architecture decision records                        | `doc/architecture/adr/` (Nygard style)            |
@@ -64,7 +65,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 
 | Directory                          | Purpose                                                   |
 | ---------------------------------- | --------------------------------------------------------- |
-| `doc/knowledge_base/`              | Process doc, roadmap, decision records                    |
+| `doc/knowledge_base/`              | Process doc, roadmap, engineering practices, decision records |
 | `doc/architecture/`                | How this repo is structured                               |
 | `doc/features/`                    | What this repo provides (process + template)              |
 | `template/`                        | Copy-paste material for new projects                      |

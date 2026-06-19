@@ -6,6 +6,7 @@ Project metadata and history. Mostly append-only.
 
 - `project-overview.md`: the project charter — what it is, why it exists, what it does and explicitly does not do, its constraints and architecture intentions. Kept current (see Conventions).
 - `roadmap.md`: implementation roadmap (the central workflow artifact).
+- `engineering-practices.md`: the project's engineering floor — each practice marked *enforced* (a CDD gate guarantees it) or *expected* (committed, tracked on the roadmap until mechanized).
 - `<coding-standard>.md`: language-specific style and convention rules.
 - `<decision-record>.md`: design and tooling decisions (why we chose X over Y).
 - `<investigation-notes>.md`: deep dives done in the course of the project that don't fit into architecture or feature docs.
