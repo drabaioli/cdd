@@ -65,7 +65,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 
 | Directory                          | Purpose                                                   |
 | ---------------------------------- | --------------------------------------------------------- |
-| `doc/knowledge_base/`              | Process doc, roadmap, decision records                    |
+| `doc/knowledge_base/`              | Process doc, roadmap, engineering practices, decision records |
 | `doc/architecture/`                | How this repo is structured                               |
 | `doc/features/`                    | What this repo provides (process + template)              |
 | `template/`                        | Copy-paste material for new projects                      |

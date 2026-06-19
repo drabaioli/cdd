@@ -27,7 +27,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 │   ├── index.md                              # documentation map
 │   ├── architecture/                         # how this repo is structured
 │   ├── features/                             # what this repo provides
-│   └── knowledge_base/                       # process doc, roadmap, decisions
+│   └── knowledge_base/                       # process doc, roadmap, engineering practices, decisions
 ├── scripts/                                  # template smoke assertions + command-set drift check (with whitelists)
 ├── template/                                 # copy-paste material for new projects
 └── tools/
