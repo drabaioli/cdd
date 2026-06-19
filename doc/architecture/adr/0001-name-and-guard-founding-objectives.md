@@ -10,11 +10,7 @@ CDD has three founding objectives as stated by the project owner:
 2. **Instil engineering best practices into any adopting project without invading how it works** — so juniors and non-engineers inherit architecture excellence, structured documentation, thorough unit/integration tests, and strong CI.
 3. **Self-improvement** — whenever CDD or a CDD project finds a workflow improvement (a better `CLAUDE.md`, a command/CI/test/doc improvement), it incorporates it.
 
-An audit of whether the workflow still *guards* these objectives found:
-
-- **Objective 1 — well guarded.** Named by two §1 commitments, backed by the six §4 checkpoints, and every relaxation of automation (local auto-commits, the `/cdd-process-pr` up-front gate, the human-gated PR-open step) is documented and reasoned. No gate leaks; the only opening is on the positive side — recurring manual steps not yet mechanized.
-- **Objective 2 — half guarded (the largest gap).** Documentation was enforced (architecture/feature/ADR docs, index-as-pointers, doc reconciliation as a `/cdd-pre-pr` gate). Testing, CI, lint, and dependency hygiene were only *suggested*: no shipped CI workflow, no test scaffolding, no lint config — just a deletable "suggested infrastructure" roadmap bullet and `<build/test command>` placeholders. Nothing recurring confirmed a project ever grew tests or CI, and no canonical best-practices artifact existed in either layer.
-- **Objective 3 — weak in steady state.** Upstreaming existed only via `/cdd-retrofit` upgrade mode (a non-persisted in-session report) and CDD-on-CDD dogfooding. A project merely *running* CDD had no standing channel to flag "this looks general — capture or upstream it," and the friction log had been deliberately retired.
+Two of these were under-guarded. Objective 2's testing/CI/lint half was only *suggested* — no shipped CI workflow, no test scaffolding, no lint config, and no canonical best-practices artifact in either layer — while its documentation half was already enforced. Objective 3 had no standing channel in steady state: upstreaming existed only via `/cdd-retrofit` upgrade mode and CDD-on-CDD dogfooding, with the friction log deliberately retired.
 
 **Structural root cause:** §1 named exactly four commitments. Objective 2's testing/CI half was unnamed (only its documentation half was elevated), and objective 3 was entirely unnamed. The philosophy can only guard what it names.
 
