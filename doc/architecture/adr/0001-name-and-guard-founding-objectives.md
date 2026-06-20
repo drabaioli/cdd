@@ -31,5 +31,5 @@ Objective 3 is named this session but its mechanism is deferred (see below); the
 - The `/cdd-pre-pr` reconciliation step adds work to every pre-PR run, but deliberately *records* rather than *blocks* — it does not become a seventh checkpoint.
 - **Deferred (roadmap Phase 11):**
   - *Objective-3 standing channel* — a recurring mechanism routing a discovered improvement into the roadmap/conventions (not a reintroduced log). Recorded as a §6 known gap.
-  - *Objective-1 mechanizations* — codifying when `/cdd-merge-main` should be recommended or auto-triggered, and any mechanical gate-honored check.
+  - *Objective-1 mechanizations* — codifying when `/cdd-merge-base` should be recommended or auto-triggered, and any mechanical gate-honored check.
   - *Objective-2 reinforcement at bootstrap* — a required bootstrap-phase task and/or checklist, once the recurring `/cdd-pre-pr` mechanism is proven.

@@ -98,11 +98,11 @@ if ! [[ "$PROJECT_SLUG" =~ ^[a-z][a-z0-9_-]*$ ]]; then
   echo "error: --slug must match ^[a-z][a-z0-9_-]*\$ (got: $PROJECT_SLUG)" >&2
   exit 2
 fi
-if ! [[ "$PROJECT_DIR" =~ ^[a-z][a-z0-9_-]*$ ]]; then
+if ! [[ "$PROJECT_DIR" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]]; then
   if [[ -n "$DIR_OVERRIDE" ]]; then
-    echo "error: --dir must match ^[a-z][a-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
+    echo "error: --dir must match ^[A-Za-z][A-Za-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
   else
-    echo "error: basename of --path must match ^[a-z][a-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
+    echo "error: basename of --path must match ^[A-Za-z][A-Za-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
   fi
   exit 2
 fi

@@ -1,13 +1,23 @@
-Integrate the current state of `main` into the feature branch. Two phases: a **dry-run conflict assessment** first, then on user approval the actual merge with conflict resolution.
+Integrate the current state of the base branch into the feature branch. Two phases: a **dry-run conflict assessment** first, then on user approval the actual merge with conflict resolution.
 
-Run this command on the feature branch (not on main). Use it when:
+Run this command on the feature branch (not on the base branch). Use it when:
 
-- `main` has advanced under your feature branch and you want to integrate before opening or merging the PR.
-- Something useful has landed on main (a new utility, a refactor, an updated convention) that this branch should pick up without a separate roadmap task.
+- The base branch has advanced under your feature branch and you want to integrate before opening or merging the PR.
+- Something useful has landed on the base branch (a new utility, a refactor, an updated convention) that this branch should pick up without a separate roadmap task.
+
+## 0. Resolve the default branch
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)
+```
+
+Use `$DEFAULT_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
+
+> **Scope note:** this detects the hosting platform's default branch. If the project uses a gitflow model where the platform default is a release branch and daily work targets a different integration branch (e.g. platform default is `main` but features branch off `devel`), this command targets the wrong branch. That case requires an explicit `BASE_BRANCH` config and is tracked as a separate roadmap item.
 
 ## 1. Sanity check
 
-Confirm the current branch is not `main`:
+Confirm the current branch is not the base branch:
 
 ```bash
 git rev-parse --abbrev-ref HEAD
@@ -21,32 +31,32 @@ git status --porcelain
 
 If there are uncommitted changes, stop and ask the user whether to stash or commit before continuing. Do not merge over uncommitted work.
 
-## 2. Update local main reference
+## 2. Update local base branch reference
 
 ```bash
-git fetch origin main
+git fetch origin "$DEFAULT_BRANCH"
 ```
 
-Determine how far the branch has diverged from `origin/main`:
+Determine how far the branch has diverged from `origin/$DEFAULT_BRANCH`:
 
 ```bash
-git log --oneline HEAD..origin/main | head -50
-git log --oneline origin/main..HEAD | head -50
+git log --oneline "HEAD..origin/$DEFAULT_BRANCH" | head -50
+git log --oneline "origin/$DEFAULT_BRANCH..HEAD" | head -50
 ```
 
 Report:
 
-- Number of commits on `origin/main` not in this branch.
-- Number of commits on this branch not in `origin/main`.
+- Number of commits on `origin/$DEFAULT_BRANCH` not in this branch.
+- Number of commits on this branch not in `origin/$DEFAULT_BRANCH`.
 
-If there is nothing on `origin/main` not in this branch, there is nothing to merge. Stop and report.
+If there is nothing on `origin/$DEFAULT_BRANCH` not in this branch, there is nothing to merge. Stop and report.
 
 ## 3. Dry-run conflict assessment
 
 Perform a non-committing test merge to surface conflicts without mutating the working tree:
 
 ```bash
-git merge-tree --write-tree --name-only origin/main HEAD
+git merge-tree --write-tree --name-only "origin/$DEFAULT_BRANCH" HEAD
 ```
 
 Capture the list of conflicting files.
@@ -60,18 +70,18 @@ If there are conflicts, for each conflicting file:
 
 - Read both versions and the merge base. Use:
   ```bash
-  git show origin/main:<file>
+  git show "origin/$DEFAULT_BRANCH:<file>"
   git show HEAD:<file>
-  git show $(git merge-base origin/main HEAD):<file>
+  git show "$(git merge-base "origin/$DEFAULT_BRANCH" HEAD):<file>"
   ```
 - Classify the conflict:
   - **Mechanical**: textual collision in a region where the intent is obvious (e.g. both sides added an import, both sides added an entry to the same list, formatting drift).
   - **Logical**: the two sides changed the same logical concern in incompatible ways (e.g. one renamed a function the other modified the body of).
   - **Structural**: file moved/renamed/deleted on one side and modified on the other.
 
-Also scan the non-conflicting changes on `origin/main` for items relevant to this branch:
+Also scan the non-conflicting changes on `origin/$DEFAULT_BRANCH` for items relevant to this branch:
 
-- New conventions established on main that this branch's code should adopt.
+- New conventions established on the base branch that this branch's code should adopt.
 - New utilities or helpers that obviate code on this branch.
 - Refactored interfaces that this branch consumes.
 
@@ -80,10 +90,10 @@ Also scan the non-conflicting changes on `origin/main` for items relevant to thi
 Present to the user:
 
 ```
-## Merge-main assessment
+## Merge-base assessment
 
-Commits to integrate from origin/main: <N>
-Commits unique to this branch:         <M>
+Commits to integrate from origin/<DEFAULT_BRANCH>: <N>
+Commits unique to this branch:                     <M>
 
 ### Conflicts
 - <file>: <mechanical | logical | structural>, <one-line description>
@@ -107,7 +117,7 @@ If conflicts are non-trivial, **stop and wait for explicit user approval**. Do n
 On user approval:
 
 ```bash
-git merge origin/main
+git merge "origin/$DEFAULT_BRANCH"
 ```
 
 Resolve conflicts file by file:
@@ -135,7 +145,7 @@ For each non-conflict item flagged in step 3 (new conventions, helpers, refactor
 If applied, commit separately from the merge commit with a message like:
 
 ```
-adopt: <one-line description of what was adopted from main>
+adopt: <one-line description of what was adopted from the base branch>
 ```
 
 ## 7. Verify
@@ -149,7 +159,7 @@ If anything fails, report the failure and stop. Do not push.
 Present a final summary:
 
 ```
-## Merge-main summary
+## Merge-base summary
 - [ ] Merge completed
 - [ ] Conflicts resolved: <count> (mechanical: M, logical: L, structural: S)
 - [ ] Improvements adopted: <count or "none">
@@ -159,4 +169,4 @@ Present a final summary:
 Next: re-run /cdd-pre-pr before opening or updating the PR.
 ```
 
-The user should re-run `/cdd-pre-pr` in a fresh session after `/cdd-merge-main` to ensure the merged state passes all gates.
+The user should re-run `/cdd-pre-pr` in a fresh session after `/cdd-merge-base` to ensure the merged state passes all gates.

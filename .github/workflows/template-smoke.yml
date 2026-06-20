@@ -46,6 +46,14 @@ jobs:
       - name: Show the scaffold commit
         run: git -C /tmp/smoke/demo-project log --oneline
 
+      - name: Bootstrap a CamelCase-dir project (Fix 2 coverage)
+        run: |
+          ./tools/bootstrap-cdd-project.sh \
+            --name "My CamelCase Project" \
+            --slug myproj \
+            --path /tmp/smoke/MyProject
+          ./scripts/template-smoke-assert.sh /tmp/smoke/MyProject
+
       - name: Stage a render-only tree and assert it is clean
         run: |
           ./tools/bootstrap-cdd-project.sh --stage \

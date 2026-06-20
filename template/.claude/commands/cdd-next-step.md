@@ -165,14 +165,20 @@ mkdir -p ~/.claude-handoffs/<PROJECT_DIR>
 
 ## 8. Print the next command
 
-After writing, print exactly:
+After writing, resolve the repo root:
+
+```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
+```
+
+Then print exactly (substituting the actual `$REPO_ROOT` path, not a placeholder):
 
 ```
 Handoff written: ~/.claude-handoffs/<PROJECT_DIR>/<branch>.md
 Next: <PROJECT_SLUG>-worktree <branch>
 
 If `<PROJECT_SLUG>-worktree` reports "command not found", the worktree helper isn't sourced. Add this to ~/.bashrc (or ~/.zshrc) and open a new shell:
-  [[ -f "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh"
+  [[ -f "<REPO_ROOT>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "<REPO_ROOT>/tools/<PROJECT_SLUG>-worktree.sh"
 ```
 
 The user will close this session, run `<PROJECT_SLUG>-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.
