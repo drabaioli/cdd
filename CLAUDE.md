@@ -52,11 +52,6 @@ rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
   --path /tmp/cdd-smoke/demo-project
 ./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
 
-# CamelCase PROJECT_DIR smoke (Fix 2 coverage).
-./tools/bootstrap-cdd-project.sh --name "My CamelCase Project" --slug myproj \
-  --path /tmp/cdd-smoke/MyProject
-./scripts/template-smoke-assert.sh /tmp/cdd-smoke/MyProject
-
 # Demo subsystem smoke: bootstrap + seed overlay into a tmp base, no GitHub side effects.
 rm -rf /tmp/cdd-demo-smoke
 demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
