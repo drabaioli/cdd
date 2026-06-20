@@ -182,13 +182,13 @@ The project's engineering floor, written down. It is the artifact that makes the
 
 The canonical set of practices the contract enumerates:
 
-| Practice                                                                          | Typical status                                          | Enforcing gate (once enforced)                         |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
-| Structured documentation (architecture, feature, roadmap docs track the code)     | **enforced**                                            | `/cdd-pre-pr` doc reconciliation (§3.5)                |
-| Tested behaviour (new behaviour ships with a test, or a recorded reason it doesn't) | **enforced** once a test command exists; **expected** until then | `/cdd-pre-pr` test-coverage reconciliation (§3.5)      |
-| Continuous integration (build + checks run on every change)                       | **expected** until a CI entry point exists, then **enforced** | `/cdd-pre-pr` build & QA (§3.5) + the project's own CI |
-| Lint & format                                                                     | **expected**                                            | `/cdd-pre-pr` build & QA, once a lint/format command exists |
-| Dependency & toolchain hygiene (pinned/locked deps, documented toolchain)         | **expected**                                            | project-defined                                        |
+| Practice                                                                            | Typical status                                                   | Enforcing gate (once enforced)                              |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------      |
+| Structured documentation (architecture, feature, roadmap docs track the code)       | **enforced**                                                     | `/cdd-pre-pr` doc reconciliation (§3.5)                     |
+| Tested behaviour (new behaviour ships with a test, or a recorded reason it doesn't) | **enforced** once a test command exists; **expected** until then | `/cdd-pre-pr` test-coverage reconciliation (§3.5)           |
+| Continuous integration (build + checks run on every change)                         | **expected** until a CI entry point exists, then **enforced**    | `/cdd-pre-pr` build & QA (§3.5) + the project's own CI      |
+| Lint & format                                                                       | **expected**                                                     | `/cdd-pre-pr` build & QA, once a lint/format command exists |
+| Dependency & toolchain hygiene (pinned/locked deps, documented toolchain)           | **expected**                                                     | project-defined                                             |
 
 A practice moves from **expected** to **enforced** in the same change that lands its mechanism (a test command, a CI job): the mechanism and the status flip ship together. The contract is deliberately generic and language-agnostic — it names *what* the floor is and carries placeholders for the project's own commands, never a shipped CI or lint config (opinionated per-project-type defaults are deferred design, §6). New practices are added as the project matures; the roadmap's suggested-infrastructure tasks and `/cdd-pre-pr`'s CI-improvement check (§3.5) feed it. Drop a row that genuinely does not apply (e.g. integration tests in a pure library), but record *why* in a clause rather than deleting it silently.
 
@@ -196,13 +196,13 @@ A practice moves from **expected** to **enforced** in the same change that lands
 
 A task flows through CDD in up to five sessions, two of them optional side-loops (`/cdd-merge-base` before the PR, `/cdd-process-pr` after review). Each session type has a name, one command, and one job:
 
-| Session            | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
-| ------------------ | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
-| **Handoff**        | `/cdd-next-step`                                  | main worktree                        | the handoff file only — repo is read-only  |
-| **Implementation** | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
-| **Merge** (opt.)   | `/cdd-merge-base`                                 | feature worktree                     | merge resolution, docs if needed           |
-| **Pre-PR**         | `/cdd-pre-pr`                                     | feature worktree                     | doc reconciliation, approved roadmap edits |
-| **PR-review** (opt.) | `/cdd-process-pr`                               | feature worktree                     | review-driven code and replies             |
+| Session              | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
+| -------------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| **Handoff**          | `/cdd-next-step`                              | main worktree                        | the handoff file only — repo is read-only  |
+| **Implementation**   | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
+| **Merge** (opt.)     | `/cdd-merge-base`                             | feature worktree                     | merge resolution, docs if needed           |
+| **Pre-PR**           | `/cdd-pre-pr`                                 | feature worktree                     | doc reconciliation, approved roadmap edits |
+| **PR-review** (opt.) | `/cdd-process-pr`                             | feature worktree                     | review-driven code and replies             |
 
 The blanket invariant: **every CDD session is a fresh context doing exactly one job.** This is a rule, not a per-command judgment call — the merge and PR-review sessions get fresh contexts for the same reason the pre-PR session does, even when the previous session's window is still open and would be convenient to reuse.
 
@@ -211,7 +211,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
 ```
                        (on main worktree)
             ┌──────────────────────────────────┐
-            │ Handoff session: /cdd-next-step      │
+            │ Handoff session: /cdd-next-step  │
             │                                  │
             │ Read roadmap (or take a task     │
             │ prompt), discuss/scope, clarify  │
@@ -239,7 +239,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │  (optional, if main moved)
                             ▼
             ┌──────────────────────────────────┐
-            │ Merge session: /cdd-merge-base       │
+            │ Merge session: /cdd-merge-base   │
             │                                  │
             │ Dry-run conflict assessment.     │
             │ Human approves. Merge main into  │
@@ -248,7 +248,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │
                             ▼
             ┌──────────────────────────────────┐
-            │ Pre-PR session: /cdd-pre-pr          │
+            │ Pre-PR session: /cdd-pre-pr      │
             │                                  │
             │ Run build, format, lint, tests,  │
             │ integration tests. Code review.  │
@@ -263,16 +263,16 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │
                             │  (optional, if review left comments)
                             ▼
-            ┌──────────────────────────────────┐
-            │ PR-review session: /cdd-process-pr   │
-            │                                  │
-            │ Read the PR's review comments.   │
-            │ Triage; human approves the plan. │
-            │ Address them, pushing back       │
-            │ where warranted. Auto-post       │
-            │ replies, commit + push.          │
-            │ Back to PR review.               │
-            └──────────────────────────────────┘
+            ┌────────────────────────────────────┐
+            │ PR-review session: /cdd-process-pr │
+            │                                    │
+            │ Read the PR's review comments.     │
+            │ Triage; human approves the plan.   │
+            │ Address them, pushing back         │
+            │ where warranted. Auto-post         │
+            │ replies, commit + push.            │
+            │ Back to PR review.                 │
+            └────────────────────────────────────┘
                             │
                             ▼
                        gh pr merge (squash)
