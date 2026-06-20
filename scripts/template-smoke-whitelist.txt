@@ -9,6 +9,7 @@
 <build command>
 <count>
 <count or "none">
+<DEFAULT_BRANCH>
 <deferred open questions for the implementation session, proposed roadmap edits, caveats — or "None" if clean>
 <descriptive_slug>
 <exact checkbox line(s) from the roadmap being addressed>
@@ -25,9 +26,11 @@
 <new convention / new utility / refactored interface>
 <one-line description>
 <one-line description of what was adopted from main>
+<one-line description of what was adopted from the base branch>
 <one-line implication>
 <one of:>
 <repo-name>
+<REPO_ROOT>
 <sha>
 <short title>
 <slug>

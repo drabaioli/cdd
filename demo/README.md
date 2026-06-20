@@ -4,7 +4,7 @@ This directory is a **third artifact** of the CDD repo, alongside `template/` an
 
 The `demo/` subsystem serves two purposes from one shared seed:
 
-- **Demo** — a reproducible, visual walkthrough of CDD's task cycle: one reviewable PR, two parallel branches that conflict, and a `/cdd-merge-main` that resolves the conflict *and* delivers a dependency.
+- **Demo** — a reproducible, visual walkthrough of CDD's task cycle: one reviewable PR, two parallel branches that conflict, and a `/cdd-merge-base` that resolves the conflict *and* delivers a dependency.
 - **Dogfooding** — a real greenfield project (CDD roadmap Phase 2) so working past the demo is genuine work.
 
 The seed project is **Markdown Renderer**: a small local Flask app where you paste Markdown, see it rendered live, and copy the result as **rich text** so it pastes formatted into Gmail, Google Docs, or Word — not as raw `# Heading` source. The key technical spine: pasting into email clients needs `text/html` on the clipboard, and email strips `<style>` blocks, so formatting only survives if CSS is **inlined** (`<p style="...">`). That inline-styling step is the heart of Phases 2–3.
@@ -89,7 +89,7 @@ The roadmap (`demo/seed/doc/knowledge_base/roadmap.md`) is designed so a fresh i
    - **Branch A (Phase 2):** add `inline_styles(html)` and a `CopyEmailSafeAction`, registered in the `ACTIONS` list and a button in the toolbar.
    - **Branch B (Phase 3):** add `ExportStandaloneAction` / `ExportEmailAction`, registered in the **same** `ACTIONS` region and the **same** toolbar region — a guaranteed merge conflict. Branch B's email export depends on Phase 2's `inline_styles()`, which doesn't exist on the branch yet, so it ships the standalone export and leaves the email export blocked.
 
-3. **Merge — `/cdd-merge-main` does two jobs.** Land PR2 (Phase 2) first; `main` advances. On branch B, run `/cdd-merge-main`: it (a) resolves the `ACTIONS`/toolbar conflict with Phase 2 **and** (b) brings `inline_styles()` onto the branch, unblocking the email export. This shows `/cdd-merge-main` resolving a conflict *and* delivering a dependency — not a trivial fast-forward.
+3. **Merge — `/cdd-merge-base` does two jobs.** Land PR2 (Phase 2) first; `main` advances. On branch B, run `/cdd-merge-base`: it (a) resolves the `ACTIONS`/toolbar conflict with Phase 2 **and** (b) brings `inline_styles()` onto the branch, unblocking the email export. This shows `/cdd-merge-base` resolving a conflict *and* delivering a dependency — not a trivial fast-forward.
 
 ## Verifying the subsystem
 

@@ -18,7 +18,7 @@ A task flows through up to five sessions, each driven by one slash command:
 flowchart TD
     NS("Handoff session<br>/cdd-next-step, on the main worktree"):::agent
     IMPL("Implementation session<br>opens in plan mode — ③ plan approved —<br>implement, update docs + roadmap, commit"):::agent
-    MM("Merge session<br>/cdd-merge-main: integrate main, dry-run first"):::opt
+    MM("Merge session<br>/cdd-merge-base: integrate main, dry-run first"):::opt
     PP("Pre-PR session<br>/cdd-pre-pr: CI gates, code review, doc reconciliation"):::agent
     REV("Human reviews the PR on GitHub"):::human
     PPR("PR-review session<br>/cdd-process-pr: triage + address review comments"):::opt

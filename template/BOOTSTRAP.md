@@ -17,7 +17,7 @@ After bootstrap, the new project directory contains:
 │   └── commands/
 │       ├── cdd-next-step.md                      # handoff session
 │       ├── cdd-pre-pr.md                         # pre-PR session
-│       ├── cdd-merge-main.md                     # merge session (merge from main, with dry-run)
+│       ├── cdd-merge-base.md                     # merge session (merge from main, with dry-run)
 │       └── cdd-process-pr.md                     # PR-review session (address PR review feedback)
 ├── doc/
 │   ├── index.md                              # documentation map (pointer to the directories below)
@@ -41,7 +41,7 @@ A CDD project carries three distinct identifiers. The template encodes them as s
 | ----------------- | ------------------------------------------ | ------------------------------------ |
 | `<PROJECT_NAME>`  | Display name; may contain spaces.          | `Sprint Planning Automation POC`     |
 | `<PROJECT_SLUG>`  | Shell-command slug; valid shell identifier prefix (lowercase, hyphens OK). Used wherever `<slug>-worktree` is referenced. | `spa-poc`                            |
-| `<PROJECT_DIR>`   | Directory / repo slug. Used in `$HOME/Code/<PROJECT_DIR>/...` and as the working tree's directory name. Often equal to the slug, allowed to differ. | `sprint-planning-automation-poc`     |
+| `<PROJECT_DIR>`   | Directory / repo slug; the working tree's directory name. Not constrained to lowercase (unlike `<PROJECT_SLUG>`), so it can be CamelCase to match the repo folder. Often equal to the slug. | `sprint-planning-automation-poc` or `PyGroundControl` |
 
 A fourth, internal-only token — bare `PROJECT` — appears inside `template/tools/PROJECT-worktree.sh` where shell function names are defined. Angle-bracketed placeholders aren't valid shell identifiers, so the template uses `PROJECT-worktree()` and the bootstrap script substitutes the bare token with the same value as `<PROJECT_SLUG>`. You shouldn't need to think about this — `bootstrap-cdd-project.sh` handles it.
 

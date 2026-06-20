@@ -1,11 +1,19 @@
-Run a pre-PR checklist for the current branch. Compare against `main` to identify all changes. This is a verification session: it runs CI gates, code-reviews the diff, and reconciles documentation against the changes.
+Run a pre-PR checklist for the current branch. Compare against the base branch to identify all changes. This is a verification session: it runs CI gates, code-reviews the diff, and reconciles documentation against the changes.
 
 This session is **fresh and separate** from the implementation session by design, so that the verification work is not biased by the context that produced the change. Any "propose to the user" step in this command is a proposal to the user running this session.
+
+## 0. Resolve the default branch
+
+```bash
+DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)
+```
+
+Use `$DEFAULT_BRANCH` wherever `main`/`origin/main` appears in git commands below.
 
 ## 1. Identify changes
 
 ```bash
-git diff main...HEAD --name-only
+git diff "$DEFAULT_BRANCH"...HEAD --name-only
 git status --porcelain
 ```
 
@@ -77,11 +85,11 @@ Do **not** propose generic CI improvements every run. The default is silence. If
 ## 7. Upstream drift check
 
 ```bash
-git fetch origin main
-git log --oneline HEAD..origin/main
+git fetch origin "$DEFAULT_BRANCH"
+git log --oneline "HEAD..origin/$DEFAULT_BRANCH"
 ```
 
-If `origin/main` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-main` before opening the PR. Do not merge from this session.
+If `origin/$DEFAULT_BRANCH` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-base` before opening the PR. Do not merge from this session.
 
 ## 8. Summary
 
@@ -102,7 +110,7 @@ Present a checklist summary:
 - [ ] Roadmap up to date
 - [ ] New behaviour tested (or untested-with-reason recorded)
 - [ ] CI gaps surfaced: none / proposed (list them)
-- [ ] No upstream drift (or: /cdd-merge-main recommended)
+- [ ] No upstream drift (or: /cdd-merge-base recommended)
 - [ ] Reconciliation edits committed
 ```
 
@@ -136,7 +144,7 @@ gh auth status && git remote get-url origin   # origin should be a github.com UR
 
 If either is missing, say so in one line and skip this step (the checklist above still stands).
 
-If §7 found upstream drift, restate the recommendation to run `/cdd-merge-main` before opening the PR, and let the user decide whether to proceed anyway.
+If §7 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 

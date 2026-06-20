@@ -90,7 +90,7 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
 
 - **Absent in `$WT`** → copy it directly (create parent dirs as needed). This covers the slash commands, doc skeletons, the worktree helper, `.claude/settings.json`, and the marker in the common case.
 - **Present in `$WT`** (collision — typically `CLAUDE.md`, sometimes `doc/` files or `.claude/settings.json`) → propose a merge interactively, one file at a time:
-  - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/cdd-next-step`, `/cdd-pre-pr`, `/cdd-merge-main`). Show the proposed result; apply only on approval.
+  - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/cdd-next-step`, `/cdd-pre-pr`, `/cdd-merge-base`). Show the proposed result; apply only on approval.
   - `.claude/settings.json`: merge the `permissions.allow` arrays (union); show the result before writing.
   - Anything else: show both versions and propose the merge; the user decides per file.
 - Never delete or move existing files.

@@ -116,8 +116,8 @@ Project-level Claude Code slash commands. CDD ships four commands in the per-tas
 
 - `/cdd-next-step`, exploratory session, run on main, produces a handoff.
 - `/cdd-pre-pr`, verification session, run on the feature branch, runs CI and reconciles docs.
-- `/cdd-merge-main`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
-- `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/cdd-merge-main`. (See Section 4 for the deliberate checkpoint exception it carries.)
+- `/cdd-merge-base`, side-loop, run on a feature branch when main has advanced, does conflict assessment then merge.
+- `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed; reads the PR's review comments, addresses them in-session, posts replies, and commits + pushes. Analogous in lifecycle position to `/cdd-merge-base`. (See Section 4 for the deliberate checkpoint exception it carries.)
 
 Three further commands exist in the CDD repo only and are deliberately not shipped in the template, because each operates *on* a target from a CDD-repo session — so downstream projects have no use for a copy. (`/cdd-bootstrap` and `/cdd-retrofit` additionally need `template/` plus the bootstrap script; `/cdd-quick-create` needs neither, as its bullet notes.) This is justified one-sided drift between `.claude/commands/` and `template/.claude/commands/` (recorded in `scripts/command-drift-whitelist.txt`):
 
@@ -149,7 +149,7 @@ Every CDD project carries three distinct identifiers, and the template encodes t
 
 - **`<PROJECT_NAME>`** — the display name. Human-readable, may contain spaces and mixed case. Example: `Sprint Planning Automation POC`. Used in document titles and prose references to the project.
 - **`<PROJECT_SLUG>`** — the shell-command slug. A valid shell identifier prefix (lowercase, no spaces, hyphen-safe). Example: `spa-poc`. Used wherever a worktree command is referenced (`<PROJECT_SLUG>-worktree <branch>`, `<PROJECT_SLUG>-worktree-list`, etc.).
-- **`<PROJECT_DIR>`** — the directory and repo slug. Used in `$HOME/Code/<PROJECT_DIR>/...` paths and as the working tree's directory name. Example: `sprint-planning-automation-poc`. Often the same as the slug but allowed to differ for projects whose directory name is more verbose than the typed command.
+- **`<PROJECT_DIR>`** — the directory and repo slug. Used as the working tree's directory name and in the worktree-helper source path. May be CamelCase (e.g. `PyGroundControl`) to match the actual repository folder. Example: `sprint-planning-automation-poc` or `PyGroundControl`. Often the same as the slug but allowed to differ; unlike `<PROJECT_SLUG>`, it is not constrained to lowercase.
 
 Internally, `template/tools/PROJECT-worktree.sh` also uses a bare `PROJECT` token where shell function names are defined; angle-bracketed placeholders aren't valid shell identifiers, so this token is a substitution artifact local to that file. It receives the same value as `<PROJECT_SLUG>` during bootstrap.
 
@@ -171,7 +171,7 @@ Several sessions auto-commit at their gate so that a session never leaves a dirt
 4. **Each gate surfaces a short summary of what it committed** in its output (the commit subject and the files included).
 5. **An auto-commit is not a checkpoint.** A local commit with no push is reversible — it adds no gate and removes none. It is not a seventh checkpoint (see §4); the human checkpoints are unchanged by it.
 
-Which sessions auto-commit: the implementation session (§3.3) and `/cdd-pre-pr` (§3.5) commit their own changes locally; `/cdd-process-pr` (§3.7) commits and pushes; `/cdd-merge-main` (§3.4) produces a merge commit and enforces a clean tree before merging. All four follow the rules above.
+Which sessions auto-commit: the implementation session (§3.3) and `/cdd-pre-pr` (§3.5) commit their own changes locally; `/cdd-process-pr` (§3.7) commits and pushes; `/cdd-merge-base` (§3.4) produces a merge commit and enforces a clean tree before merging. All four follow the rules above.
 
 ### 2.12 The engineering-practices contract (`doc/knowledge_base/engineering-practices.md`)
 
@@ -182,27 +182,27 @@ The project's engineering floor, written down. It is the artifact that makes the
 
 The canonical set of practices the contract enumerates:
 
-| Practice                                                                          | Typical status                                          | Enforcing gate (once enforced)                         |
-| --------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------ |
-| Structured documentation (architecture, feature, roadmap docs track the code)     | **enforced**                                            | `/cdd-pre-pr` doc reconciliation (§3.5)                |
-| Tested behaviour (new behaviour ships with a test, or a recorded reason it doesn't) | **enforced** once a test command exists; **expected** until then | `/cdd-pre-pr` test-coverage reconciliation (§3.5)      |
-| Continuous integration (build + checks run on every change)                       | **expected** until a CI entry point exists, then **enforced** | `/cdd-pre-pr` build & QA (§3.5) + the project's own CI |
-| Lint & format                                                                     | **expected**                                            | `/cdd-pre-pr` build & QA, once a lint/format command exists |
-| Dependency & toolchain hygiene (pinned/locked deps, documented toolchain)         | **expected**                                            | project-defined                                        |
+| Practice                                                                            | Typical status                                                   | Enforcing gate (once enforced)                              |
+| ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------      |
+| Structured documentation (architecture, feature, roadmap docs track the code)       | **enforced**                                                     | `/cdd-pre-pr` doc reconciliation (§3.5)                     |
+| Tested behaviour (new behaviour ships with a test, or a recorded reason it doesn't) | **enforced** once a test command exists; **expected** until then | `/cdd-pre-pr` test-coverage reconciliation (§3.5)           |
+| Continuous integration (build + checks run on every change)                         | **expected** until a CI entry point exists, then **enforced**    | `/cdd-pre-pr` build & QA (§3.5) + the project's own CI      |
+| Lint & format                                                                       | **expected**                                                     | `/cdd-pre-pr` build & QA, once a lint/format command exists |
+| Dependency & toolchain hygiene (pinned/locked deps, documented toolchain)           | **expected**                                                     | project-defined                                             |
 
 A practice moves from **expected** to **enforced** in the same change that lands its mechanism (a test command, a CI job): the mechanism and the status flip ship together. The contract is deliberately generic and language-agnostic — it names *what* the floor is and carries placeholders for the project's own commands, never a shipped CI or lint config (opinionated per-project-type defaults are deferred design, §6). New practices are added as the project matures; the roadmap's suggested-infrastructure tasks and `/cdd-pre-pr`'s CI-improvement check (§3.5) feed it. Drop a row that genuinely does not apply (e.g. integration tests in a pure library), but record *why* in a clause rather than deleting it silently.
 
 ## 3. Lifecycle
 
-A task flows through CDD in up to five sessions, two of them optional side-loops (`/cdd-merge-main` before the PR, `/cdd-process-pr` after review). Each session type has a name, one command, and one job:
+A task flows through CDD in up to five sessions, two of them optional side-loops (`/cdd-merge-base` before the PR, `/cdd-process-pr` after review). Each session type has a name, one command, and one job:
 
-| Session            | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
-| ------------------ | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
-| **Handoff**        | `/cdd-next-step`                                  | main worktree                        | the handoff file only — repo is read-only  |
-| **Implementation** | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
-| **Merge** (opt.)   | `/cdd-merge-main`                                 | feature worktree                     | merge resolution, docs if needed           |
-| **Pre-PR**         | `/cdd-pre-pr`                                     | feature worktree                     | doc reconciliation, approved roadmap edits |
-| **PR-review** (opt.) | `/cdd-process-pr`                               | feature worktree                     | review-driven code and replies             |
+| Session              | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
+| -------------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
+| **Handoff**          | `/cdd-next-step`                              | main worktree                        | the handoff file only — repo is read-only  |
+| **Implementation**   | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
+| **Merge** (opt.)     | `/cdd-merge-base`                             | feature worktree                     | merge resolution, docs if needed           |
+| **Pre-PR**           | `/cdd-pre-pr`                                 | feature worktree                     | doc reconciliation, approved roadmap edits |
+| **PR-review** (opt.) | `/cdd-process-pr`                             | feature worktree                     | review-driven code and replies             |
 
 The blanket invariant: **every CDD session is a fresh context doing exactly one job.** This is a rule, not a per-command judgment call — the merge and PR-review sessions get fresh contexts for the same reason the pre-PR session does, even when the previous session's window is still open and would be convenient to reuse.
 
@@ -211,7 +211,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
 ```
                        (on main worktree)
             ┌──────────────────────────────────┐
-            │ Handoff session: /cdd-next-step      │
+            │ Handoff session: /cdd-next-step  │
             │                                  │
             │ Read roadmap (or take a task     │
             │ prompt), discuss/scope, clarify  │
@@ -239,7 +239,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │  (optional, if main moved)
                             ▼
             ┌──────────────────────────────────┐
-            │ Merge session: /cdd-merge-main       │
+            │ Merge session: /cdd-merge-base   │
             │                                  │
             │ Dry-run conflict assessment.     │
             │ Human approves. Merge main into  │
@@ -248,7 +248,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │
                             ▼
             ┌──────────────────────────────────┐
-            │ Pre-PR session: /cdd-pre-pr          │
+            │ Pre-PR session: /cdd-pre-pr      │
             │                                  │
             │ Run build, format, lint, tests,  │
             │ integration tests. Code review.  │
@@ -263,16 +263,16 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │
                             │  (optional, if review left comments)
                             ▼
-            ┌──────────────────────────────────┐
-            │ PR-review session: /cdd-process-pr   │
-            │                                  │
-            │ Read the PR's review comments.   │
-            │ Triage; human approves the plan. │
-            │ Address them, pushing back       │
-            │ where warranted. Auto-post       │
-            │ replies, commit + push.          │
-            │ Back to PR review.               │
-            └──────────────────────────────────┘
+            ┌────────────────────────────────────┐
+            │ PR-review session: /cdd-process-pr │
+            │                                    │
+            │ Read the PR's review comments.     │
+            │ Triage; human approves the plan.   │
+            │ Address them, pushing back         │
+            │ where warranted. Auto-post         │
+            │ replies, commit + push.            │
+            │ Back to PR review.                 │
+            └────────────────────────────────────┘
                             │
                             ▼
                        gh pr merge (squash)
@@ -314,7 +314,7 @@ Plan mode is the load-bearing checkpoint here: the agent cannot modify files whi
 
 Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits its own changes locally (no push) per the commit conventions (§2.11) — stopping and surfacing rather than committing if the tree holds changes it didn't make. Because the implementation session has no command file, this commit is reinforced by a standing instruction in the handoff prompt that `/cdd-next-step` generates.
 
-### 3.4 Merge session (optional): `/cdd-merge-main`
+### 3.4 Merge session (optional): `/cdd-merge-base`
 
 Run on the feature branch when main has advanced and the feature branch needs to integrate the new state, either because the PR will conflict or because the feature work depends on something that just landed on main.
 
@@ -339,7 +339,7 @@ Alongside doc reconciliation, `/cdd-pre-pr` reconciles **test coverage** — the
 
 `/cdd-pre-pr` also performs a conditional CI-improvement check: if the change introduces a category of work that the existing CI doesn't cover (new file type, new test category, a tool that should be linted but isn't), propose improvements to the human. On approval, apply them as part of the same PR; alternatively, the human may defer them as a new roadmap task. The default is silence. The agent should not propose CI improvements every run; only when the change genuinely surfaces a gap.
 
-Output is a pass/fail summary across all the gates. After the summary, `/cdd-pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If the upstream-drift check detected drift, the step restates the `/cdd-merge-main` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/cdd-pre-pr` never opens a PR without explicit confirmation.
+Output is a pass/fail summary across all the gates. After the summary, `/cdd-pre-pr` auto-commits the reconciliation edits it just made — the doc, CLAUDE.md, README, and roadmap changes from this session — locally and with no push, per the commit conventions (§2.11); if it entered an already-dirty tree it stops and surfaces that instead of committing. Pushing stays out of this commit: it happens only in the opt-in PR-open step below. That step is an optional, human-gated step to open the PR — a general capability available to every task, not just issue-sourced ones. It asks a single yes/no question — no pre-shown title/body, no manual `gh` instructions. On approval it derives the title and body and runs `gh pr create`; if the branch name carries the `gh_issue_NN` token, the PR body gets a `Closes #NN` line so the issue auto-closes on merge. If the upstream-drift check detected drift, the step restates the `/cdd-merge-base` recommendation before offering. If the human declines, the step simply stops; the checklist stands on its own. The gate preserves the checkpoint model: `/cdd-pre-pr` never opens a PR without explicit confirmation.
 
 ### 3.6 PR review and merge
 
@@ -364,7 +364,7 @@ Six explicit checkpoints. The human is also free to interject at any other point
 1. **Task selection** (end of `/cdd-next-step`): the human chooses among proposed candidates.
 2. **Handoff approval** (end of `/cdd-next-step`): the human approves the drafted implementation prompt and notes.
 3. **Plan approval** (start of implementation session, plan mode): the human approves the plan before any file is written.
-4. **Merge-main approval** (between dry run and merge in `/cdd-merge-main`): the human approves after seeing conflict complexity.
+4. **Merge-base approval** (between dry run and merge in `/cdd-merge-base`): the human approves after seeing conflict complexity.
 5. **Roadmap edit approval** (during `/cdd-pre-pr`): the human approves proposed add/modify/remove edits before they are applied.
 6. **PR merge** (after `/cdd-pre-pr`): standard GitHub PR review and merge.
 
@@ -411,7 +411,7 @@ The manual fallback is to run `tools/bootstrap-cdd-project.sh` from the CDD repo
 
 This raises a recurring question — *is the task a deliverable or a project?* — answered once here, by a **shared scope-triage heuristic** that both `/cdd-quick-create` and `/cdd-bootstrap` reference. A task is a **project** (use `/cdd-bootstrap`) when any of these hold: it is expected to evolve across many sessions and needs a roadmap to track phases; it has more than one cooperating component, or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features over time. A task is a **deliverable** (use `/cdd-quick-create`) when none of those hold: a single self-contained artifact, finished in essentially one sitting, used as-is by future-you. The heuristic runs in **both directions** as an off-ramp: `/cdd-quick-create` checks it early and, if project-signals trip, surfaces them and offers to switch to `/cdd-bootstrap`; `/cdd-bootstrap`'s discovery does the inverse, offering to drop to `/cdd-quick-create` when the task turns out to be a trivial single artifact. As with every structural choice in CDD, the human decides at the checkpoint — the command surfaces the signals and recommends, it does not switch unilaterally.
 
-**Parallel-merge structure.** When two worktrees land in sequence, the second needs to integrate the first. Today this is partly automated (`/cdd-merge-main` covers it) and partly manual (the human decides when to trigger). A more structured approach, perhaps with a "second worktree must re-run pre-pr after merge-main", may be warranted once parallel work is common. The invariant is clear: a feature branch must integrate main and re-pass pre-pr before it's ready to merge.
+**Parallel-merge structure.** When two worktrees land in sequence, the second needs to integrate the first. Today this is partly automated (`/cdd-merge-base` covers it) and partly manual (the human decides when to trigger). A more structured approach, perhaps with a "second worktree must re-run pre-pr after merge-base", may be warranted once parallel work is common. The invariant is clear: a feature branch must integrate main and re-pass pre-pr before it's ready to merge.
 
 **Template opinionation per project type.** The current template encodes the workflow, but the project-specific bits (build commands, language constraints, module layout) are placeholders. Different project archetypes (firmware, web app, library, data pipeline) probably want different opinionated defaults for those placeholders. Worth deriving from real usage rather than guessing up front.
 
@@ -441,7 +441,7 @@ The template ships as a directory copied into a new project root by `tools/boots
 │   └── commands/
 │       ├── cdd-next-step.md
 │       ├── cdd-pre-pr.md
-│       ├── cdd-merge-main.md
+│       ├── cdd-merge-base.md
 │       └── cdd-process-pr.md
 ├── doc/
 │   ├── index.md                              # top-level pointer to the doc directories
