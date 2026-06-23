@@ -53,18 +53,18 @@ CDD ships seven slash commands, all prefixed `cdd-` so they autocomplete as a gr
 
 | Command | What it does |
 | --- | --- |
-| `/cdd-next-step` | Scope the next task and write a handoff for a fresh implementation session. Three front-ends: the next roadmap item, a typed task prompt (off-roadmap), or a GitHub issue (`#NN` / a bare integer / the `issue` keyword). |
-| `/cdd-merge-base` | Integrate the base branch into a feature branch when the base has advanced under you (dry-run first, then apply). |
-| `/cdd-pre-pr` | Pre-PR checklist: CI gates, code review, and doc/roadmap reconciliation; ends with an opt-in step to open the PR. |
-| `/cdd-process-pr` | Triage and address the open PR's review feedback, reply in-thread, and commit and push. |
+| `/cdd‑next‑step` | Scope the next task and write a handoff for a fresh implementation session. Three front-ends: the next roadmap item, a typed task prompt (off-roadmap), or a GitHub issue (`#NN` / a bare integer / the `issue` keyword). |
+| `/cdd‑merge‑base` | Integrate the base branch into a feature branch when the base has advanced under you (dry-run first, then apply). |
+| `/cdd‑pre‑pr` | Pre-PR checklist: CI gates, code review, and doc/roadmap reconciliation; ends with an opt-in step to open the PR. |
+| `/cdd‑process‑pr` | Triage and address the open PR's review feedback, reply in-thread, and commit and push. |
 
 **CDD-repo-only** — run from a session inside this repo; they operate *on* a target, so the template ships no copy:
 
 | Command | What it does |
 | --- | --- |
-| `/cdd-bootstrap` | Guided greenfield: define the project + draft a roadmap through conversation, then scaffold it. |
-| `/cdd-retrofit` | Install or upgrade CDD in an existing project. |
-| `/cdd-quick-create` | Produce a one-off self-contained deliverable (script + README), no project substrate. |
+| `/cdd‑bootstrap` | Guided greenfield: define the project + draft a roadmap through conversation, then scaffold it. |
+| `/cdd‑retrofit` | Install or upgrade CDD in an existing project. |
+| `/cdd‑quick‑create` | Produce a one-off self-contained deliverable (script + README), no project substrate. |
 
 `<project>-worktree` (and its companion `<project>-worktree-done`) is a **shell helper** sourced from your `~/.bashrc`, not a slash command — it spins up and tears down the per-task git worktree that an implementation session runs in.
 
