@@ -13,6 +13,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ```
 .
 ├── CLAUDE.md                                 # this repo's Claude Code context
+├── LICENSE                                   # MIT (repo-root only; not shipped in template/)
 ├── README.md                                 # repo entry point
 ├── .claude/
 │   ├── commands/                             # this repo's slash commands

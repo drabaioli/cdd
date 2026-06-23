@@ -148,3 +148,18 @@ Elevate the two under-guarded founding objectives — instilling engineering bes
 - [ ] Objective-1 mechanizations: codify when `/cdd-merge-base` is recommended/auto-triggered; consider a mechanical gate-honored check.
 
 **Milestone:** all three founding objectives are named commitments in §1, each with at least one recurring guardrail or a tracked plan to add one.
+
+## Phase 12: Open-source readiness
+
+Prepare CDD to be open-sourced publicly: license it, rewrite the README to explain and demonstrate the workflow, and track the remaining open-source essentials. Contribution policy at launch is issues-only (no PRs yet).
+
+- [x] Add a standard MIT `LICENSE` at the repo root (holder: Diego Andres Rabaioli; year 2026). Repo-root only — not added to `template/` or wired into `bootstrap-cdd-project.sh`, since the template is copied verbatim into downstream projects without dragging a license along.
+- [x] Rewrite the README from scratch: what CDD is and how to use it; guided entry points (`/cdd-bootstrap`, `/cdd-retrofit`, `/cdd-quick-create`) lead the quick start with the manual `bootstrap-cdd-project.sh` recipe below; a complete reference of all 7 slash commands; the task-cycle image (`doc/assets/task-cycle.png`); a short issues-only Contributing section. Kept the two-big-ideas framing, the six-checkpoint concept, the `template-smoke` badge, and the Status section.
+- [ ] `CONTRIBUTING.md` (full version, once PRs are accepted).
+- [ ] `CODE_OF_CONDUCT.md`.
+- [ ] `.github/` issue templates (and a PR template, when PRs open).
+- [ ] `SECURITY.md`.
+- [ ] GitHub repo metadata: description, topics, and a social-preview / OG image (1280×640).
+- [ ] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`).
+
+**Milestone:** CDD is presentable and safe to open-source publicly — licensed, with a README that explains and demonstrates the workflow — with the remaining open-source essentials tracked.
