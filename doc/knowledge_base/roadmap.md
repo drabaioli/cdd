@@ -156,10 +156,10 @@ Prepare CDD to be open-sourced publicly: license it, rewrite the README to expla
 - [x] Add a standard MIT `LICENSE` at the repo root (holder: Diego Andres Rabaioli; year 2026). Repo-root only — not added to `template/` or wired into `bootstrap-cdd-project.sh`, since the template is copied verbatim into downstream projects without dragging a license along.
 - [x] Rewrite the README from scratch: what CDD is and how to use it; guided entry points (`/cdd-bootstrap`, `/cdd-retrofit`, `/cdd-quick-create`) lead the quick start with the manual `bootstrap-cdd-project.sh` recipe below; a complete reference of all 7 slash commands; the task-cycle image (`doc/assets/task-cycle.png`); a short issues-only Contributing section. Kept the two-big-ideas framing, the six-checkpoint concept, the `template-smoke` badge, and the Status section.
 - [ ] `CONTRIBUTING.md` (full version, once PRs are accepted).
-- [ ] `CODE_OF_CONDUCT.md`.
-- [ ] `.github/` issue templates (and a PR template, when PRs open).
-- [ ] `SECURITY.md`.
-- [ ] GitHub repo metadata: description, topics, and a social-preview / OG image (1280×640).
-- [ ] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`).
+- [x] `CODE_OF_CONDUCT.md`. — Contributor Covenant 2.1 at the repo root; enforcement contact `drabaioli@gmail.com`. Repo-root only, not added to `template/`.
+- [x] `.github/` issue templates (and a PR template, when PRs open). — Light YAML issue forms: `bug_report.yml` (workflow/template/script breakage) and `idea.yml` (workflow/template improvement, feeds the self-improvement objective), plus `config.yml` with `blank_issues_enabled: true` and a contact link to the process doc. PR template still deferred (PRs not yet open).
+- [x] `SECURITY.md`. — Repo-root file directing reporters to GitHub private vulnerability reporting (not email); wording assumes the repo setting is enabled (manual one-time toggle).
+- [ ] GitHub repo metadata: description, topics, and a social-preview / OG image (1280×640). — Description + topics applied via `gh repo edit` (topics: coding-harness, claude-code, human-in-the-loop, sdlc, ai-coding, developer-workflow). OG image generated at `doc/assets/cdd-social-preview.png`; **upload still pending** — Settings → General → Social preview is web-UI only.
+- [x] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`). — Public home stays `github.com/drabaioli/cdd` (no org move); README badge, clone URL, and issues URL verified correct — no rewrite needed.
 
 **Milestone:** CDD is presentable and safe to open-source publicly — licensed, with a README that explains and demonstrates the workflow — with the remaining open-source essentials tracked.

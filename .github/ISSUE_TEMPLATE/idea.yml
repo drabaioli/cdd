@@ -1,0 +1,28 @@
+name: Idea
+description: Suggest a workflow or template improvement.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have a way to make CDD sharper? CDD is meant to be turned on itself, so
+        friction you hit and ideas you have feed directly into the process and
+        the template. Thanks for taking the time.
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea, and the friction it addresses
+      description: >
+        What would you change or add, and what problem or rough edge does it
+        solve? Concrete examples of where you hit the friction help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context (optional)
+      description: >
+        Anything else — alternatives you considered, where in the workflow or
+        template this lands, links to related issues.
+    validations:
+      required: false
