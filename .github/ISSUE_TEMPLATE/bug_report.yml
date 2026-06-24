@@ -1,0 +1,29 @@
+name: Bug report
+description: Something in the CDD workflow, template, scripts, or slash commands is broken.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. This form is for breakage — a command, script,
+        template file, or part of the workflow not behaving as documented.
+        For a suggestion or improvement idea, use the **Idea** form instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened, and what you expected
+      description: Describe the problem and what you expected to happen instead.
+      placeholder: |
+        I ran ... and got ...
+        I expected ...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: What you ran / environment (optional)
+      description: >
+        The exact command(s), the CDD command or script involved, and anything
+        about your setup that might matter (OS, shell, Claude Code version).
+    validations:
+      required: false

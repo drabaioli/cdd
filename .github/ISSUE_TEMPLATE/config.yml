@@ -1,0 +1,7 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Understand how CDD works
+    url: https://github.com/drabaioli/cdd/blob/main/doc/knowledge_base/claude-driven-development.md
+    about: >
+      The fastest way to understand CDD is to open a clone with `claude` and ask
+      Claude Code about it. Start with the process document linked here.

@@ -156,10 +156,10 @@ Prepare CDD to be open-sourced publicly: license it, rewrite the README to expla
 - [x] Add a standard MIT `LICENSE` at the repo root (holder: Diego Andres Rabaioli; year 2026). Repo-root only — not added to `template/` or wired into `bootstrap-cdd-project.sh`, since the template is copied verbatim into downstream projects without dragging a license along.
 - [x] Rewrite the README from scratch: what CDD is and how to use it; guided entry points (`/cdd-bootstrap`, `/cdd-retrofit`, `/cdd-quick-create`) lead the quick start with the manual `bootstrap-cdd-project.sh` recipe below; a complete reference of all 7 slash commands; the task-cycle image (`doc/assets/task-cycle.png`); a short issues-only Contributing section. Kept the two-big-ideas framing, the six-checkpoint concept, the `template-smoke` badge, and the Status section.
 - [ ] `CONTRIBUTING.md` (full version, once PRs are accepted).
-- [ ] `CODE_OF_CONDUCT.md`.
-- [ ] `.github/` issue templates (and a PR template, when PRs open).
-- [ ] `SECURITY.md`.
-- [ ] GitHub repo metadata: description, topics, and a social-preview / OG image (1280×640).
-- [ ] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`).
+- [x] `CODE_OF_CONDUCT.md`. — Contributor Covenant 2.1 at the repo root; enforcement contact `drabaioli@gmail.com`. Repo-root only, not added to `template/`.
+- [x] `.github/` issue templates: `bug_report.yml` and `idea.yml` forms plus `config.yml` (blank issues enabled). PR template deferred until PRs open.
+- [x] `SECURITY.md`. — Repo-root file directing reporters to GitHub private vulnerability reporting (not email); wording assumes the repo setting is enabled (manual one-time toggle).
+- [x] GitHub repo metadata: description, topics (via `gh repo edit`), and a 1280×640 social-preview image.
+- [x] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`). — Public home stays `github.com/drabaioli/cdd` (no org move); README badge, clone URL, and issues URL verified correct — no rewrite needed.
 
 **Milestone:** CDD is presentable and safe to open-source publicly — licensed, with a README that explains and demonstrates the workflow — with the remaining open-source essentials tracked.
