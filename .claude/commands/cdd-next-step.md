@@ -1,6 +1,6 @@
 Scope the next roadmap task and produce a handoff file for a fresh implementation session.
 
-This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.claude-handoffs/cdd/`.
+This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.cdd/handoffs/cdd/`.
 
 ## 0. Mode: roadmap-driven, intent-driven, or issue-driven
 
@@ -60,7 +60,7 @@ Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.
 List existing handoff files:
 
 ```bash
-ls ~/.claude-handoffs/cdd/ 2>/dev/null
+ls ~/.cdd/handoffs/cdd/ 2>/dev/null
 ```
 
 For each file `<branch>.md`, check whether the branch still exists locally:
@@ -69,7 +69,7 @@ For each file `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/cdd/<branch>.md`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.cdd/handoffs/cdd/<branch>.md`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
@@ -139,7 +139,7 @@ If the discussion surfaced changes the roadmap should reflect (new tasks to add,
 
 ## 7. Write the handoff file
 
-On approval, write `~/.claude-handoffs/cdd/<branch>.md` with this structure:
+On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
 
 ```markdown
 # Task: <short title>
@@ -160,7 +160,7 @@ On approval, write `~/.claude-handoffs/cdd/<branch>.md` with this structure:
 Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
-mkdir -p ~/.claude-handoffs/cdd
+mkdir -p ~/.cdd/handoffs/cdd
 ```
 
 ## 8. Print the next command
@@ -174,11 +174,11 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 Then print exactly (substituting the actual `$REPO_ROOT` path, not a placeholder):
 
 ```
-Handoff written: ~/.claude-handoffs/cdd/<branch>.md
+Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
 
-If `cdd-worktree` reports "command not found", the worktree helper isn't sourced. Add this to ~/.bashrc (or ~/.zshrc) and open a new shell:
-  [[ -f "<REPO_ROOT>/tools/cdd-worktree.sh" ]] && source "<REPO_ROOT>/tools/cdd-worktree.sh"
+If `cdd-worktree` reports "command not found", the shared helper isn't installed yet. Install it once, then open a new shell:
+  <REPO_ROOT>/tools/cdd-worktree.sh install
 ```
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

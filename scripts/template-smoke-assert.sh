@@ -2,8 +2,7 @@
 # Smoke-test the bootstrapped tree at $1.
 #
 # Asserts that tools/bootstrap-cdd-project.sh produced a clean tree:
-#   - no <PROJECT_NAME>, <PROJECT_SLUG>, <PROJECT_DIR>, or bare PROJECT literals remain
-#   - the bootstrapped worktree script passes `bash -n`
+#   - no <PROJECT_NAME> or <PROJECT_DIR> literals remain
 #   - BOOTSTRAP.md was not copied
 #   - relative markdown links in CLAUDE.md and the roadmap resolve
 #   - .claude/commands/ contains no <...> tokens outside the whitelist
@@ -23,32 +22,27 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
 # 1. No raw placeholders left anywhere.
-for token in '<PROJECT_NAME>' '<PROJECT_SLUG>' '<PROJECT_DIR>'; do
+for token in '<PROJECT_NAME>' '<PROJECT_DIR>'; do
   if grep -rn -- "$token" . ; then
     fail "found leftover $token"
   fi
   pass "no $token"
 done
 
-# Bare PROJECT, word-boundary, must not appear anywhere either.
-if grep -rnE '\bPROJECT\b' . ; then
-  fail "found leftover bare PROJECT"
-fi
-pass "no bare PROJECT"
-
-# 2. Bootstrapped worktree script: parse-clean.
-shopt -s nullglob
-worktree_scripts=(tools/*-worktree.sh)
-shopt -u nullglob
-[[ ${#worktree_scripts[@]} -eq 1 ]] || fail "expected exactly one tools/*-worktree.sh, found ${#worktree_scripts[@]}"
-bash -n "${worktree_scripts[0]}"
-pass "bash -n ${worktree_scripts[0]}"
-
-# 3. BOOTSTRAP.md must not have been copied.
+# 2. BOOTSTRAP.md must not have been copied.
 [[ ! -e BOOTSTRAP.md ]] || fail "BOOTSTRAP.md was copied into the bootstrapped tree"
 pass "BOOTSTRAP.md not present"
 
-# 4. Relative markdown links in CLAUDE.md, the overview, and the roadmap must resolve.
+# 2a. No per-project worktree helper: it is a single shared, self-installing
+# script (cdd-worktree.sh install), never rendered into a project. Guards against
+# accidentally reintroducing a per-project helper to the template.
+shopt -s nullglob
+worktree_helpers=(tools/*-worktree.sh)
+shopt -u nullglob
+[[ ${#worktree_helpers[@]} -eq 0 ]] || fail "rendered a per-project worktree helper (${worktree_helpers[*]}); the helper is shared, installed once via 'cdd-worktree.sh install'"
+pass "no per-project worktree helper rendered"
+
+# 3. Relative markdown links in CLAUDE.md, the overview, and the roadmap must resolve.
 check_links() {
   local file="$1"
   local missing=0
@@ -76,7 +70,7 @@ check_links doc/index.md
 check_links doc/knowledge_base/project-overview.md
 check_links doc/knowledge_base/roadmap.md
 
-# 5. .claude/commands/*.md: no <...> tokens outside the whitelist.
+# 4. .claude/commands/*.md: no <...> tokens outside the whitelist.
 [[ -f "$WHITELIST" ]] || fail "whitelist not found at $WHITELIST"
 
 # Build a sorted-unique list of tokens appearing in slash commands.
@@ -99,7 +93,7 @@ done
 [[ $unexpected -eq 0 ]] || fail "$unexpected unexpected <...> token(s) in .claude/commands/ — update scripts/template-smoke-whitelist.txt if intentional"
 pass ".claude/commands/ tokens all whitelisted"
 
-# 6. Baseline marker: present, single line, a commit hash or "unknown".
+# 5. Baseline marker: present, single line, a commit hash or "unknown".
 [[ -f .claude/cdd-baseline ]] || fail ".claude/cdd-baseline marker missing"
 if ! grep -qxE '[0-9a-f]{7,40}|unknown' .claude/cdd-baseline; then
   fail ".claude/cdd-baseline is not a commit hash or 'unknown': $(cat .claude/cdd-baseline)"

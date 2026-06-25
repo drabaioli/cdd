@@ -27,23 +27,20 @@ After bootstrap, the new project directory contains:
 │       ├── project-overview.md               # project charter skeleton (what it is, goals, non-goals)
 │       ├── roadmap.md                        # central workflow artifact, Phase 1 pre-filled
 │       └── README.md                         # explains the knowledge base
-└── tools/
-    └── <PROJECT_SLUG>-worktree.sh            # worktree helper, already renamed
 ```
+
+(No `tools/` directory: the worktree helper is a single project-independent script you install once — see below — not a per-project file.)
 
 The bootstrap script also runs `git init -b main` and creates a single "Initial CDD scaffold" commit.
 
-## The three-identifier model
+## The two-identifier model
 
-A CDD project carries three distinct identifiers. The template encodes them as separate placeholders so substitution can't conflate them:
+A CDD project carries two distinct identifiers. The template encodes them as separate placeholders so substitution can't conflate them:
 
 | Placeholder       | Role                                       | Example                              |
 | ----------------- | ------------------------------------------ | ------------------------------------ |
 | `<PROJECT_NAME>`  | Display name; may contain spaces.          | `Sprint Planning Automation POC`     |
-| `<PROJECT_SLUG>`  | Shell-command slug; valid shell identifier prefix (lowercase, hyphens OK). Used wherever `<slug>-worktree` is referenced. | `spa-poc`                            |
-| `<PROJECT_DIR>`   | Directory / repo slug; the working tree's directory name. Not constrained to lowercase (unlike `<PROJECT_SLUG>`), so it can be CamelCase to match the repo folder. Often equal to the slug. | `sprint-planning-automation-poc` or `PyGroundControl` |
-
-A fourth, internal-only token — bare `PROJECT` — appears inside `template/tools/PROJECT-worktree.sh` where shell function names are defined. Angle-bracketed placeholders aren't valid shell identifiers, so the template uses `PROJECT-worktree()` and the bootstrap script substitutes the bare token with the same value as `<PROJECT_SLUG>`. You shouldn't need to think about this — `bootstrap-cdd-project.sh` handles it.
+| `<PROJECT_DIR>`   | Directory / repo slug; the working tree's directory name. May be CamelCase to match the repo folder. | `sprint-planning-automation-poc` or `PyGroundControl` |
 
 Other angle-bracketed text in the template (e.g. `<one-paragraph project description>`, `<build command>`) is free-form fill-in: the bootstrap script leaves it alone, and you fill it in by hand after bootstrap.
 
@@ -54,7 +51,6 @@ From the CDD repo root:
 ```bash
 ./tools/bootstrap-cdd-project.sh \
   --name "My Project Display Name" \
-  --slug myproject \
   --path ../my-project
 ```
 
@@ -64,27 +60,26 @@ The script will:
 
 1. Refuse to proceed if the target directory exists and is non-empty.
 2. Copy `template/` into the target, excluding this `BOOTSTRAP.md`.
-3. Rename `tools/PROJECT-worktree.sh` → `tools/<slug>-worktree.sh`.
-4. Substitute `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>`, and the in-script bare `PROJECT` token, in that order.
-5. Write the baseline marker `.claude/cdd-baseline` (the CDD repo commit hash the template was rendered from; used later by `/cdd-retrofit`'s upgrade mode).
-6. Run `git init -b main` and create an initial scaffold commit.
-7. Print a "next steps" block including the exact `source` line to add to your `~/.bashrc`.
+3. Substitute `<PROJECT_NAME>` and `<PROJECT_DIR>`.
+4. Write the baseline marker `.claude/cdd-baseline` (the CDD repo commit hash the template was rendered from; used later by `/cdd-retrofit`'s upgrade mode).
+5. Run `git init -b main` and create an initial scaffold commit.
+6. Print a "next steps" block pointing at the one-time worktree-helper install.
 
 ## After bootstrap
 
-1. **Add the worktree-helper source line to `~/.bashrc`.** The script prints the exact line; copy it as-is. The line looks like:
+1. **Install the shared worktree helper (one-time, project-independent).** If you haven't installed it for an earlier CDD project, run it once from the CDD repo:
 
    ```bash
-   [[ -f "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "$HOME/Code/<PROJECT_DIR>/tools/<PROJECT_SLUG>-worktree.sh"
+   ./tools/cdd-worktree.sh install
    ```
 
-   Open a new shell or `source ~/.bashrc`. The slash commands rely on `<PROJECT_SLUG>-worktree` being on `PATH`; `/cdd-next-step` prints a reminder of this line after the `Next:` instruction so a missing source line is a one-paste fix rather than a hunt.
+   This copies the helper to `~/.cdd/tools/cdd-worktree.sh` and wires `~/.bashrc` and `~/.zshrc` to source it (idempotent). Open a new shell. After this, `cdd-worktree` works in every CDD project — there is nothing per-project to add. `/cdd-next-step` prints the install command if `cdd-worktree` isn't found, so a missing install is a one-paste fix rather than a hunt.
 
 2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 
 3. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
 
-4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.claude-handoffs/<PROJECT_DIR>/` is created on demand.
+4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand.
 
 ## Per-project customisation
 
@@ -94,10 +89,10 @@ A few things you'll want to add or change as the project takes shape:
 - **Decision records** under `doc/knowledge_base/` as you make significant tooling or design choices. Append-only.
 - **Build commands** in `CLAUDE.md` and in `cdd-pre-pr.md` step 2. Replace the `<build command>`-style placeholders with the actual commands.
 - **Test categories** in `cdd-pre-pr.md` step 2. Add or remove jobs as appropriate.
-- **Remote name**: the worktree helper assumes the remote is named `origin`. It derives the default branch from `origin`'s HEAD (falling back to `main`), so repos whose default branch is `master` work unchanged; a differently-named remote requires editing `tools/<PROJECT_SLUG>-worktree.sh`.
+- **Remote name**: the worktree helper assumes the remote is named `origin`. It derives the default branch from `origin`'s HEAD (falling back to `main`), so repos whose default branch is `master` work unchanged; a differently-named remote requires editing the shared helper at `~/.cdd/tools/cdd-worktree.sh`.
 
 ## Required CLI tools
 
 - `git` (with worktree support, any modern version).
-- `gh` (GitHub CLI), used by `<PROJECT_SLUG>-worktree-done` and `<PROJECT_SLUG>-worktree-list` to query PR state. Optional but recommended.
+- `gh` (GitHub CLI), used by `cdd-worktree-done` and `cdd-worktree-list` to query PR state. Optional but recommended.
 - `claude` (Claude Code CLI).

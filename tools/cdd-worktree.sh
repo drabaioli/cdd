@@ -1,22 +1,26 @@
-# CDD worktree helpers, used by the CDD repo itself.
+#!/usr/bin/env bash
+# CDD worktree helpers — one shared, project-independent helper for every CDD project.
 #
-# This is CDD's own copy of the worktree helper. The generic version, with
-# placeholders, lives at template/tools/PROJECT-worktree.sh and is what new
-# projects copy. If you change behaviour here, propagate to the template (and
-# vice versa); unintended drift between the two is a defect.
+# This single script is canonical: there is no per-project copy. The functions
+# are fully repo-agnostic (repo name, default branch, and handoff dir are derived
+# at runtime), so the same `cdd-worktree*` commands work in any CDD project.
 #
-# Source this file from ~/.bashrc:
-#   [[ -f "$HOME/Code/cdd/tools/cdd-worktree.sh" ]] && \
-#     source "$HOME/Code/cdd/tools/cdd-worktree.sh"
+# Install once (issue #18) — copies this script to a stable home that does NOT
+# depend on a live CDD checkout, and wires your shell to source it:
 #
-# (Adjust the path to wherever you've cloned the CDD repo.)
+#   tools/cdd-worktree.sh install
 #
-# Provides:
+# That copies the helper to ~/.cdd/tools/cdd-worktree.sh, appends a
+# marker-guarded source line to ~/.bashrc and ~/.zshrc (idempotent), and migrates
+# any handoffs from the old ~/.claude-handoffs/ location. After installing, open a
+# new shell; the CDD clone can then disappear and the commands still work.
+#
+# Provides (when sourced):
 #   cdd-worktree <branch>   Create a new worktree for <branch> and launch
 #                               `claude` in plan mode in it with the suggested
 #                               first prompt already submitted. Requires a
 #                               handoff file at
-#                               ~/.claude-handoffs/cdd/<branch>.md (run
+#                               ~/.cdd/handoffs/<repo-name>/<branch>.md (run
 #                               /cdd-next-step first). Run from the main worktree.
 #
 #   cdd-worktree-done       After the feature branch has landed (or you've
@@ -29,7 +33,7 @@
 #                               GitHub, otherwise prompt), and delete the
 #                               handoff file iff the branch was deleted.
 #
-#   cdd-worktree-list       List all active handoffs in ~/.claude-handoffs/cdd/
+#   cdd-worktree-list       List all active handoffs in ~/.cdd/handoffs/<repo-name>/
 #                               with worktree / branch / PR status. Highlights
 #                               stale entries (handoff with no branch and no
 #                               worktree) so they're obvious to clean up.
@@ -65,7 +69,7 @@ cdd-worktree() {
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
-  local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
+  local handoff_dir="$HOME/.cdd/handoffs/${repo_name}"
   local handoff="${handoff_dir}/${branch}.md"
   if [[ ! -f "$handoff" ]]; then
     echo "No handoff file at $handoff" >&2
@@ -113,7 +117,7 @@ cdd-worktree-done() {
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
-  local handoff="$HOME/.claude-handoffs/${repo_name}/${branch}.md"
+  local handoff="$HOME/.cdd/handoffs/${repo_name}/${branch}.md"
 
   cd "$main_path" || return 1
   if ! git pull --ff-only origin "$default_branch"; then
@@ -188,7 +192,7 @@ cdd-worktree-list() {
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
-  local handoff_dir="$HOME/.claude-handoffs/${repo_name}"
+  local handoff_dir="$HOME/.cdd/handoffs/${repo_name}"
   if [[ ! -d "$handoff_dir" ]]; then
     echo "No handoff directory at $handoff_dir."
     return 0
@@ -258,3 +262,77 @@ cdd-worktree-list() {
            "$branch" "$wt" "$br" "$pr" "$status"
   done
 }
+
+# Install this helper to its stable home and wire it into the user's shells.
+# Run directly (`tools/cdd-worktree.sh install`), never sourced. Idempotent.
+cdd-worktree-install() {
+  if [[ $# -gt 0 && "$1" != "install" ]]; then
+    echo "usage: cdd-worktree.sh [install]" >&2
+    return 2
+  fi
+
+  local dest_dir="$HOME/.cdd/tools"
+  local dest="$dest_dir/cdd-worktree.sh"
+  mkdir -p "$dest_dir" "$HOME/.cdd/handoffs"
+
+  # Copy this running script to the stable home, unless we're already it.
+  local src
+  src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  if [[ "$src" != "$dest" ]]; then
+    cp "$src" "$dest"
+    chmod +x "$dest"
+    echo "Installed helper: $dest"
+  else
+    echo "Helper already at $dest (running from the installed copy)."
+  fi
+
+  # Wire each shell rc that exists; create ~/.bashrc if neither exists so there
+  # is always at least one entry point.
+  local marker_begin="# --- CDD worktree helper (managed by cdd-worktree.sh install) BEGIN ---"
+  local marker_end="# --- CDD worktree helper END ---"
+  local rc rcs=()
+  [[ -f "$HOME/.bashrc" ]] && rcs+=("$HOME/.bashrc")
+  [[ -f "$HOME/.zshrc"  ]] && rcs+=("$HOME/.zshrc")
+  if (( ${#rcs[@]} == 0 )); then
+    touch "$HOME/.bashrc"
+    rcs+=("$HOME/.bashrc")
+  fi
+  for rc in "${rcs[@]}"; do
+    if grep -qF "$marker_begin" "$rc" 2>/dev/null; then
+      echo "Already wired: $rc (skipped)"
+    else
+      cat >> "$rc" <<RCBLOCK
+
+${marker_begin}
+[[ -f "\$HOME/.cdd/tools/cdd-worktree.sh" ]] && source "\$HOME/.cdd/tools/cdd-worktree.sh"
+${marker_end}
+RCBLOCK
+      echo "Wired: $rc"
+    fi
+  done
+
+  # Migrate handoffs from the old location: copy each project subtree that isn't
+  # already present, leaving the originals in place.
+  local old="$HOME/.claude-handoffs"
+  if [[ -d "$old" ]]; then
+    local migrated=0 proj name
+    shopt -s nullglob
+    for proj in "$old"/*/; do
+      name="$(basename "$proj")"
+      [[ -e "$HOME/.cdd/handoffs/$name" ]] && continue
+      cp -r "$proj" "$HOME/.cdd/handoffs/$name" && migrated=1
+    done
+    shopt -u nullglob
+    if (( migrated )); then
+      echo "Migrated handoffs from $old/ to ~/.cdd/handoffs/ (originals left in place)."
+    fi
+  fi
+
+  echo "Done. Open a new shell (or 'source' your rc) so cdd-worktree* are available."
+}
+
+# Dual-mode: when executed directly, run the installer; when sourced, only the
+# functions above are defined.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  cdd-worktree-install "$@"
+fi

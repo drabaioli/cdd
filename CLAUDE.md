@@ -28,10 +28,10 @@ Each doc directory keeps an `index.md` pointer list: read the index, then load o
 
 - Two layers, kept consistent: process doc (`doc/knowledge_base/claude-driven-development.md`) and template (`template/`). A PR that touches the process doc but not the template (or vice versa) is suspicious and should be justified explicitly.
 - Human-in-the-loop checkpoints are load-bearing. Do not propose removing or weakening any of the six checkpoints in section 4 of the process doc without explicit discussion.
-- Template files use a three-identifier placeholder model — `<PROJECT_NAME>` (display), `<PROJECT_SLUG>` (shell-command slug), `<PROJECT_DIR>` (directory/repo slug) — plus a bare `PROJECT` token internal to `template/tools/PROJECT-worktree.sh` (substitution artifact, valued the same as `<PROJECT_SLUG>`). Free-form `<...>` text is fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable. See section 2.9 of the process doc for the model, and `template/BOOTSTRAP.md` for the bootstrap recipe.
+- Template files use a two-identifier placeholder model — `<PROJECT_NAME>` (display) and `<PROJECT_DIR>` (directory/repo slug). Free-form `<...>` text is fill-in content. Do not introduce a templating engine; placeholders must remain plain text so the template stays human-readable and Claude-readable. See section 2.9 of the process doc for the model, and `template/BOOTSTRAP.md` for the bootstrap recipe.
 - The template is generic. Do not introduce content drawn from a specific downstream project (e.g. firmware-specific conventions, web-specific build commands) into `template/` files. Per-project-type variants are deferred design (see process doc section 6).
 - `demo/` is a third artifact, separate from `template/` and `scripts/`. Its filled-in seed (`demo/seed/`) holds concrete "Markdown Renderer" project content — which is allowed *because* it lives under `demo/`. None of it may leak into `template/`. `demo/setup.sh` must keep wrapping `bootstrap-cdd-project.sh` (via `--overlay`) rather than duplicating the substitution logic.
-- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. `scripts/command-drift-check.sh` (run by CI and `/cdd-pre-pr`) verifies this mechanically: it renders the template and diffs — the command set and the worktree helper bodies — so only real divergence surfaces; justified exceptions live in `scripts/command-drift-whitelist.txt` or behind `cdd-only` markers. Justified one-sided cases: `/cdd-retrofit` (`.claude/commands/cdd-retrofit.md`), `/cdd-bootstrap` (`.claude/commands/cdd-bootstrap.md`), and `/cdd-quick-create` (`.claude/commands/cdd-quick-create.md`) live only in the CDD repo — all three operate *on* a target from a CDD session (retrofit adapts an existing project, bootstrap creates a new one, quick-create produces a one-off deliverable), so the template ships no copy.
+- The CDD repo's own `.claude/commands/` and the template's `.claude/commands/` may drift slightly if needed, but unintended drift is a defect. `scripts/command-drift-check.sh` (run by CI and `/cdd-pre-pr`) verifies this mechanically: it renders the template and diffs the command set, so only real divergence surfaces; justified exceptions live in `scripts/command-drift-whitelist.txt` or behind `cdd-only` markers. Justified one-sided cases: `/cdd-retrofit` (`.claude/commands/cdd-retrofit.md`), `/cdd-bootstrap` (`.claude/commands/cdd-bootstrap.md`), and `/cdd-quick-create` (`.claude/commands/cdd-quick-create.md`) live only in the CDD repo — all three operate *on* a target from a CDD session (retrofit adapts an existing project, bootstrap creates a new one, quick-create produces a one-off deliverable), so the template ships no copy.
 
 ## Build & test
 
@@ -40,7 +40,7 @@ This repo is documentation and shell scripts; there is no build step. Verificati
 ```bash
 # Shell script sanity (CI also runs shellcheck over the same set).
 bash -n scripts/*.sh
-bash -n tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh template/tools/PROJECT-worktree.sh
+bash -n tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh
 bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
 # Command-set drift: repo .claude/commands/ vs the rendered template.
@@ -48,7 +48,7 @@ bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
-./tools/bootstrap-cdd-project.sh --name "Demo Project" --slug demo \
+./tools/bootstrap-cdd-project.sh --name "Demo Project" \
   --path /tmp/cdd-smoke/demo-project
 ./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
 
@@ -80,7 +80,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `scripts/`                         | Template smoke assertions + command-set drift check (with whitelists) |
 | `.github/workflows/`               | CI: `template-smoke.yml` runs the bootstrap end-to-end    |
 | `.claude/commands/`                | This repo's own slash commands                            |
-| `tools/`                           | This repo's own worktree helper (`cdd-worktree.sh`)       |
+| `tools/`                           | Bootstrap script + the canonical shared worktree helper (`cdd-worktree.sh`, self-installing) |
 
 ## Architecture
 

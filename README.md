@@ -14,14 +14,14 @@ One full turn around the cycle:
 
 1. **Pick the next task.** Start a session with `claude`, then run `/cdd-next-step`. It proposes what to work on: the next roadmap item, an off-roadmap prompt you type, or a GitHub issue (`#NN`).
 2. **Confirm the intent.** You confirm the task is what you actually want and settle any roadmap-related decisions it raises. Once that's clear, it writes a handoff file for the implementation session.
-3. **Spin up an isolated worktree.** Run `<project>-worktree <branch>` to create a dedicated git worktree and branch. It automatically launches the implementation session, which opens in plan mode.
+3. **Spin up an isolated worktree.** Run `cdd-worktree <branch>` to create a dedicated git worktree and branch. It automatically launches the implementation session, which opens in plan mode.
 4. **Review and approve the plan.** The session rebuilds its context from the handoff and the docs, then presents a plan. You approve it (this is the key gate), and it implements the task, updates the architecture/feature docs and the roadmap, and commits the work locally (no push yet).
 5. **Integrate the base branch if it moved.** If the base branch advanced while you were working, run `/cdd-merge-base`. It does more than resolve textual conflicts: it performs a *logical* merge, adopting newer base-branch features where the task should now use them.
 6. **Self-review and open the PR.** In a fresh session, run `/cdd-pre-pr`. It runs the CI gates, code-reviews the diff, reconciles the docs and roadmap, and ends by offering to open the PR, the point at which the branch is first pushed.
 7. **Review on GitHub.** You read the diff on GitHub and leave review comments, exactly as you would on any PR.
 8. **Address the feedback.** Run `/cdd-process-pr` on the branch. It triages the review comments, makes the requested changes, replies in each thread, and commits and pushes back to the PR.
 9. **Merge.** You squash-merge the branch on GitHub.
-10. **Clean up and repeat.** Back in your terminal, run `<project>-worktree-done` to remove the feature worktree and fast-forward your base branch to the freshly merged state. Then go again.
+10. **Clean up and repeat.** Back in your terminal, run `cdd-worktree-done` to remove the feature worktree and fast-forward your base branch to the freshly merged state. Then go again.
 
 The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, the edit rules, and the reasoning behind every gate. Read it first if you want to understand what CDD is and why.
 
@@ -64,7 +64,7 @@ CDD ships seven slash commands, all prefixed `cdd-` so they autocomplete as a gr
 | `/cdd‑retrofit` | Install or upgrade CDD in an existing project. |
 | `/cdd‑quick‑create` | Produce a one-off self-contained deliverable (script + README), no project substrate. |
 
-`<project>-worktree` (and its companion `<project>-worktree-done`) is a **shell helper** sourced from your `~/.bashrc`, not a slash command. It spins up and tears down the per-task git worktree that an implementation session runs in.
+`cdd-worktree` (and its companion `cdd-worktree-done`) is a **shell helper**, not a slash command. It's a single project-independent script you install once (`tools/cdd-worktree.sh install`, which wires `~/.bashrc` and `~/.zshrc` and works in every CDD project thereafter). It spins up and tears down the per-task git worktree that an implementation session runs in.
 
 ## Questions?
 

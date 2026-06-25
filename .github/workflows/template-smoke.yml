@@ -16,14 +16,11 @@ jobs:
           bash -n tools/bootstrap-cdd-project.sh
           bash -n scripts/*.sh
           bash -n tools/cdd-worktree.sh
-          bash -n template/tools/PROJECT-worktree.sh
           bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
       - name: Shellcheck the shell scripts
         run: |
-          shellcheck tools/bootstrap-cdd-project.sh scripts/*.sh demo/*.sh
-          # The worktree helpers are sourced (no shebang), so the dialect is explicit.
-          shellcheck -s bash tools/cdd-worktree.sh template/tools/PROJECT-worktree.sh
+          shellcheck tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh scripts/*.sh demo/*.sh
 
       - name: Command-set drift check (repo commands vs rendered template)
         run: ./scripts/command-drift-check.sh
@@ -37,7 +34,6 @@ jobs:
         run: |
           ./tools/bootstrap-cdd-project.sh \
             --name "Demo Project" \
-            --slug demo \
             --path /tmp/smoke/demo-project
 
       - name: Assert the bootstrapped tree is clean
@@ -50,7 +46,6 @@ jobs:
         run: |
           ./tools/bootstrap-cdd-project.sh \
             --name "My CamelCase Project" \
-            --slug myproj \
             --path /tmp/smoke/MyProject
           ./scripts/template-smoke-assert.sh /tmp/smoke/MyProject
 
@@ -58,7 +53,6 @@ jobs:
         run: |
           ./tools/bootstrap-cdd-project.sh --stage \
             --name "Stage Test" \
-            --slug stagetest \
             --dir stage-test \
             --path /tmp/smoke/stage-render
           test ! -d /tmp/smoke/stage-render/.git
@@ -70,7 +64,6 @@ jobs:
           git archive HEAD template | tar -x -C /tmp/smoke/snapshot
           ./tools/bootstrap-cdd-project.sh --stage \
             --name "Snapshot Test" \
-            --slug snaptest \
             --dir snap-test \
             --template-dir /tmp/smoke/snapshot/template \
             --path /tmp/smoke/snapshot-render
@@ -82,11 +75,10 @@ jobs:
       - name: Assert the seeded instance is clean and carries the conflict seam
         run: |
           T=/tmp/smoke/mdr_demo_99
-          if grep -rnE '<PROJECT_(NAME|SLUG|DIR)>|\bPROJECT\b' "$T"; then
+          if grep -rnE '<PROJECT_(NAME|DIR)>' "$T"; then
             echo "found leftover placeholder tokens in the seeded instance" >&2
             exit 1
           fi
           grep -q 'ACTIONS' "$T/doc/knowledge_base/roadmap.md"
           grep -q 'inline_styles' "$T/doc/knowledge_base/roadmap.md"
-          test -f "$T/tools/mdr_demo_99-worktree.sh"
           echo "demo seed overlay is clean"

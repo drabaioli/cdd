@@ -11,11 +11,11 @@
 #   --name "Display Name"   Override the display name (<PROJECT_NAME>).
 #   --base DIR              Base directory for the instance (default: $CDD_DEMO_BASE or ~/Code).
 #   --public               Create the GitHub repo public (default: private).
-#   --local-only           Skip all GitHub steps and rc-file update. For tests/CI.
-#   --rc FILE              RC file to update (default: ~/.bashrc). Ignored under --local-only.
+#   --local-only           Skip all GitHub steps and the worktree-helper install. For tests/CI.
 #
-# The instance name becomes both the slug and the directory, so each instance is
-# fully self-contained (its own <slug>-worktree command and its own handoff dir).
+# The instance name becomes the directory, so each instance gets its own handoff dir
+# (~/.cdd/handoffs/<instance>/). The worktree helper is the shared, project-independent
+# `cdd-worktree`, installed once — not a per-instance script.
 #
 # Requires: git, the CDD bootstrap script, and (unless --local-only) an authenticated gh.
 
@@ -30,7 +30,6 @@ NAME=""
 BASE_ARG=""
 LOCAL_ONLY=0
 VISIBILITY="--private"
-RC_FILE="${HOME}/.bashrc"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,7 +38,6 @@ while [[ $# -gt 0 ]]; do
     --public)     VISIBILITY="--public"; shift ;;
     --private)    VISIBILITY="--private"; shift ;;
     --local-only) LOCAL_ONLY=1; shift ;;
-    --rc)         RC_FILE="${2:-}"; shift 2 ;;
     -h|--help)    grep '^#' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
     -*)           demo_die "unknown option: $1" ;;
     *)            [[ -z "$INSTANCE" ]] || demo_die "unexpected argument: $1"; INSTANCE="$1"; shift ;;
@@ -65,7 +63,6 @@ fi
 
 [[ "$INSTANCE" =~ ^[a-z][a-z0-9_-]*$ ]] || demo_die "instance must match ^[a-z][a-z0-9_-]*\$ (got: $INSTANCE)"
 
-SLUG="$INSTANCE"
 DIR="$INSTANCE"
 if [[ -z "$NAME" ]]; then
   if [[ "$INSTANCE" == "mdr" ]]; then
@@ -95,7 +92,7 @@ echo "  github        : $( (( LOCAL_ONLY )) && echo 'skipped (--local-only)' || 
 echo
 
 # Bootstrap the template, overlay the seed, substitute identifiers, git init + scaffold commit.
-"$BOOTSTRAP" --name "$NAME" --slug "$SLUG" --path "$TARGET" --overlay "$SEED_DIR"
+"$BOOTSTRAP" --name "$NAME" --path "$TARGET" --overlay "$SEED_DIR"
 
 if (( ! LOCAL_ONLY )); then
   ( cd "$TARGET" && gh repo create "$DIR" --source . --push "$VISIBILITY" )
@@ -103,24 +100,14 @@ if (( ! LOCAL_ONLY )); then
   echo "GitHub repo created and pushed: $DIR"
 fi
 
-WORKTREE_HELPER="$TARGET/tools/${SLUG}-worktree.sh"
+CDD_WORKTREE="$REPO_ROOT/tools/cdd-worktree.sh"
 
-# Append a marker-guarded sourcing block to the rc file so the worktree helper
-# is available in new shells automatically. Skipped under --local-only (CI path).
+# Install the shared, project-independent worktree helper once (idempotent). This
+# wires ~/.bashrc and ~/.zshrc to source ~/.cdd/tools/cdd-worktree.sh, so the
+# `cdd-worktree` command is available for every CDD project — including this
+# instance. Skipped under --local-only (CI path: no environment side effects).
 if (( ! LOCAL_ONLY )); then
-  RC_MARKER_BEGIN="# --- CDD demo: ${INSTANCE} BEGIN ---"
-  RC_MARKER_END="# --- CDD demo: ${INSTANCE} END ---"
-  if grep -qF "$RC_MARKER_BEGIN" "$RC_FILE" 2>/dev/null; then
-    echo "RC file already contains block for '${INSTANCE}': $RC_FILE (skipped)"
-  else
-    cat >> "$RC_FILE" <<RCBLOCK
-
-${RC_MARKER_BEGIN}
-[[ -f "${WORKTREE_HELPER}" ]] && source "${WORKTREE_HELPER}"
-${RC_MARKER_END}
-RCBLOCK
-    echo "Updated $RC_FILE — worktree helper will be sourced in new shells."
-  fi
+  "$CDD_WORKTREE" install
 fi
 
 if (( LOCAL_ONLY )); then
@@ -129,8 +116,8 @@ if (( LOCAL_ONLY )); then
 Done. Instance '$INSTANCE' is ready at $TARGET
 
 Next steps:
-  1. Source the worktree helper in your shell:
-       [[ -f "$WORKTREE_HELPER" ]] && source "$WORKTREE_HELPER"
+  1. Install the shared worktree helper once (if you haven't already):
+       $CDD_WORKTREE install
   2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 
 Tear it down later with: demo/teardown.sh $INSTANCE --local-only
@@ -141,9 +128,8 @@ else
 Done. Instance '$INSTANCE' is ready at $TARGET
 
 Next steps:
-  1. Open a new shell (or run: source "$RC_FILE") so the worktree helper is active.
-     Fallback — source it manually in the current shell:
-       [[ -f "$WORKTREE_HELPER" ]] && source "$WORKTREE_HELPER"
+  1. Open a new shell so the \`cdd-worktree\` command is active (the install above
+     wired your ~/.bashrc and ~/.zshrc).
   2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 
 Tear it down later with: demo/teardown.sh $INSTANCE

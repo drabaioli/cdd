@@ -2,7 +2,7 @@
 
 A human-in-the-loop workflow for building and evolving a software project together with Claude Code. The project's own files (CLAUDE.md, a roadmap, architecture/feature docs, and a small set of slash commands) act as the substrate that drives the agentic process. The substrate evolves as the project evolves, so it stays useful instead of going stale.
 
-This document describes the philosophy, the artifacts, the lifecycle, and the rules. The template files (`CLAUDE.md` skeleton, slash commands, worktree script, doc skeletons) are derived from this document and ship alongside it.
+This document describes the philosophy, the artifacts, the lifecycle, and the rules. The template files (`CLAUDE.md` skeleton, slash commands, doc skeletons) are derived from this document and ship alongside it. The worktree helper is a single project-independent script (`tools/cdd-worktree.sh`, installed once) rather than a per-project template file.
 
 ## 1. Philosophy
 
@@ -86,7 +86,7 @@ The project overview is the exception to the append-only rule and is distinct fr
 
 A common member of the knowledge base is the project's **founding document**: the investigation that led to creating and structuring the project, usually written before any code exists, and the main input to the first roadmap. Founding documents follow the decision-record rule: they are not kept current. After bootstrap their purpose shifts from driving the project to preserving the reasoning trail — why the project is shaped the way it is. Living context belongs to the architecture and feature docs and the roadmap; when a founding document contains structural description that proves durable, migrate it into `doc/architecture/` as the structure stabilises rather than maintaining it in place. (This repo's own `claude-driven-development.md` is a special case: here the founding document is also the shipped product, so unlike an ordinary founding document it *is* kept current — edits to it are edits to the deliverable.)
 
-### 2.6 Handoff files (`~/.claude-handoffs/<repo-name>/<branch>.md`)
+### 2.6 Handoff files (`~/.cdd/handoffs/<repo-name>/<branch>.md`)
 
 The contract between the handoff session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/cdd-next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
 
@@ -127,15 +127,17 @@ Three further commands exist in the CDD repo only and are deliberately not shipp
 
 Slash commands are declarative: they describe what to do, not how to orchestrate it. Orchestration (worktree creation, branch lifecycle) lives in the shell helpers.
 
-### 2.8 Worktree shell helpers (`tools/<slug>-worktree.sh`)
+### 2.8 The worktree shell helper (`cdd-worktree`)
 
-A bash script providing three commands, sourced from `~/.bashrc`:
+A single, project-independent bash helper provides three commands. It is the same script for every CDD project: the functions derive the repository name, default branch, and handoff directory at runtime, so there is no per-project copy.
 
-- `<slug>-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
-- `<slug>-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to the default branch, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
-- `<slug>-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
+- `cdd-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
+- `cdd-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to the default branch, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
+- `cdd-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
 
-The helpers derive the repository's default branch from `origin`'s HEAD (falling back to `main`) and assume the remote is named `origin`; the remote-name assumption is documented in `template/BOOTSTRAP.md`.
+The helper installs itself to a stable home that does not depend on a live CDD checkout. Run `tools/cdd-worktree.sh install` once (the script is dual-mode: sourced it defines the functions; run directly with `install` it sets itself up): this copies the script to `~/.cdd/tools/cdd-worktree.sh`, appends a marker-guarded source line to `~/.bashrc` and `~/.zshrc` (idempotent), and migrates any handoffs from the legacy `~/.claude-handoffs/` location. After installing, the commands work in every CDD project — including ones bootstrapped later — without any further per-project setup.
+
+The helper derives the repository's default branch from `origin`'s HEAD (falling back to `main`) and assumes the remote is named `origin`; the remote-name assumption is documented in `template/BOOTSTRAP.md`.
 
 These helpers encode an invariant worth stating explicitly:
 
@@ -143,17 +145,16 @@ These helpers encode an invariant worth stating explicitly:
 
 This invariant prevents losing in-flight work and prevents stale handoffs from accumulating.
 
-### 2.9 The three-identifier model
+### 2.9 The two-identifier model
 
-Every CDD project carries three distinct identifiers, and the template encodes them as separate placeholders so substitution can't conflate them:
+Every CDD project carries two distinct identifiers, and the template encodes them as separate placeholders so substitution can't conflate them:
 
 - **`<PROJECT_NAME>`** — the display name. Human-readable, may contain spaces and mixed case. Example: `Sprint Planning Automation POC`. Used in document titles and prose references to the project.
-- **`<PROJECT_SLUG>`** — the shell-command slug. A valid shell identifier prefix (lowercase, no spaces, hyphen-safe). Example: `spa-poc`. Used wherever a worktree command is referenced (`<PROJECT_SLUG>-worktree <branch>`, `<PROJECT_SLUG>-worktree-list`, etc.).
-- **`<PROJECT_DIR>`** — the directory and repo slug. Used as the working tree's directory name and in the worktree-helper source path. May be CamelCase (e.g. `PyGroundControl`) to match the actual repository folder. Example: `sprint-planning-automation-poc` or `PyGroundControl`. Often the same as the slug but allowed to differ; unlike `<PROJECT_SLUG>`, it is not constrained to lowercase.
+- **`<PROJECT_DIR>`** — the directory and repo slug. Used as the working tree's directory name and, at runtime, as the handoff-directory namespace (`~/.cdd/handoffs/<PROJECT_DIR>/`). May be CamelCase (e.g. `PyGroundControl`) to match the actual repository folder. Example: `sprint-planning-automation-poc` or `PyGroundControl`.
 
-Internally, `template/tools/PROJECT-worktree.sh` also uses a bare `PROJECT` token where shell function names are defined; angle-bracketed placeholders aren't valid shell identifiers, so this token is a substitution artifact local to that file. It receives the same value as `<PROJECT_SLUG>` during bootstrap.
+(A third, lowercase shell-command slug was previously needed to name a per-project `<slug>-worktree` helper. With the helper unified into a single project-independent `cdd-worktree` — §2.8 — that slug no longer has a purpose and was removed.)
 
-Substitution order is significant: `<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>` are substituted first (the angle brackets keep them unambiguous), and bare `PROJECT` only inside the renamed worktree script. The bootstrap script (see Section 6) enforces this.
+Substitution is straightforward: the angle brackets keep `<PROJECT_NAME>` and `<PROJECT_DIR>` unambiguous, and the bootstrap script (see Section 6) replaces both wherever they appear.
 
 ### 2.10 The template baseline marker (`.claude/cdd-baseline`)
 
@@ -199,7 +200,7 @@ A task flows through CDD in up to five sessions, two of them optional side-loops
 | Session              | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
 | -------------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
 | **Handoff**          | `/cdd-next-step`                              | main worktree                        | the handoff file only — repo is read-only  |
-| **Implementation**   | auto-started by `<slug>-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
+| **Implementation**   | auto-started by `cdd-worktree <branch>`    | feature worktree, opens in plan mode | code, docs, roadmap                        |
 | **Merge** (opt.)     | `/cdd-merge-base`                             | feature worktree                     | merge resolution, docs if needed           |
 | **Pre-PR**           | `/cdd-pre-pr`                                 | feature worktree                     | doc reconciliation, approved roadmap edits |
 | **PR-review** (opt.) | `/cdd-process-pr`                             | feature worktree                     | review-driven code and replies             |
@@ -221,7 +222,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                             │
                             │  handoff file
                             ▼
-                  <project>-worktree <branch>
+                       cdd-worktree <branch>
                             │
                             ▼
                        (on new worktree)
@@ -278,7 +279,7 @@ The five rows above are the per-task lifecycle. Three further session types sit 
                        gh pr merge (squash)
                             │
                             ▼
-                 <project>-worktree-done
+                      cdd-worktree-done
                             │
                             ▼
                     back on main, clean
@@ -298,13 +299,13 @@ Either way, the session then clarifies requirements that are cheap to resolve he
 
 Two reinforcing rationales drive this split. The first is context economy: the handoff session's context is necessarily polluted by reading the whole roadmap and reasoning across phases, while the implementation session's context is clean and dedicated to one task — the right environment for the harder, more focused clarification. The second is structural: the handoff session runs on main, which is protected from direct edits and pushes, so it cannot edit the roadmap even by accident; all roadmap edits happen in worktree sessions.
 
-The session ends by writing the handoff file and printing the `<project>-worktree <branch>` command.
+The session ends by writing the handoff file and printing the `cdd-worktree <branch>` command.
 
 The handoff session does not edit the roadmap file. If roadmap edits are needed, it notes them in the handoff and instructs the implementation session to make them.
 
 ### 3.2 Worktree creation
 
-The human closes the handoff session and runs `<project>-worktree <branch>` from the main worktree. The shell helper creates the new worktree and launches Claude Code in plan mode in it, passing the one-line first prompt (`Read <handoff path> and follow the Implementation prompt.`) as the initial user message so the implementation session opens already processing it.
+The human closes the handoff session and runs `cdd-worktree <branch>` from the main worktree. The shell helper creates the new worktree and launches Claude Code in plan mode in it, passing the one-line first prompt (`Read <handoff path> and follow the Implementation prompt.`) as the initial user message so the implementation session opens already processing it.
 
 ### 3.3 Implementation session (on the new worktree)
 
@@ -355,7 +356,7 @@ This loop can repeat across review rounds.
 
 ### 3.8 Worktree teardown
 
-The human runs `<project>-worktree-done` from the feature worktree. The script returns to main, pulls, removes the worktree (handling root-owned Docker artifacts via `sudo` with confirmation), resolves the branch, and deletes the handoff iff the branch was deleted.
+The human runs `cdd-worktree-done` from the feature worktree. The script returns to main, pulls, removes the worktree (handling root-owned Docker artifacts via `sudo` with confirmation), resolves the branch, and deletes the handoff iff the branch was deleted.
 
 ## 4. Human checkpoints
 
@@ -443,30 +444,30 @@ The template ships as a directory copied into a new project root by `tools/boots
 │       ├── cdd-pre-pr.md
 │       ├── cdd-merge-base.md
 │       └── cdd-process-pr.md
-├── doc/
-│   ├── index.md                              # top-level pointer to the doc directories
-│   ├── architecture/
-│   │   └── index.md                          # pointer-list skeleton
-│   ├── features/
-│   │   └── index.md                          # pointer-list skeleton
-│   └── knowledge_base/
-│       ├── project-overview.md               # project charter skeleton, filled by /cdd-bootstrap or by hand
-│       ├── roadmap.md                        # pre-filled bootstrap phase + placeholder phases
-│       └── README.md                         # explains the knowledge base
-└── tools/
-    └── <PROJECT_SLUG>-worktree.sh            # renamed and substituted by bootstrap
+└── doc/
+    ├── index.md                              # top-level pointer to the doc directories
+    ├── architecture/
+    │   └── index.md                          # pointer-list skeleton
+    ├── features/
+    │   └── index.md                          # pointer-list skeleton
+    └── knowledge_base/
+        ├── project-overview.md               # project charter skeleton, filled by /cdd-bootstrap or by hand
+        ├── roadmap.md                        # pre-filled bootstrap phase + placeholder phases
+        └── README.md                         # explains the knowledge base
 ```
+
+The bootstrapped tree ships no `tools/` directory: the worktree helper is a single, project-independent script installed once (`tools/cdd-worktree.sh install` in the CDD repo), not copied per project.
 
 `template/BOOTSTRAP.md` is meta-documentation that lives in the template directory but is **not** copied into the bootstrapped project; the bootstrap script excludes it. Likewise, the bootstrap script itself stays under `tools/` in the CDD repo and is not part of the bootstrapped tree.
 
 Bootstrap procedure for a new project:
 
 1. From the CDD repo root, run:
-   `./tools/bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug`
+   `./tools/bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug`
    The basename of `--path` becomes the `<PROJECT_DIR>` slug.
-2. Add the worktree-helper source line to `~/.bashrc` (the script prints the exact line on success).
+2. If you haven't already, install the shared worktree helper once: `./tools/cdd-worktree.sh install` (the script prints this on success). This is a one-time, project-independent step.
 3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
-4. Start the first `/cdd-next-step` session (it creates the per-repo handoff directory `~/.claude-handoffs/<repo-name>/` on demand). The roadmap's pre-filled bootstrap phase carries the first tasks: survey the codebase, draft the initial architecture docs, and replace the placeholder phases with the project's real plan — a suggested-infrastructure list (CI, linting, tests, …) helps populate the early phases.
+4. Start the first `/cdd-next-step` session (it creates the per-repo handoff directory `~/.cdd/handoffs/<repo-name>/` on demand). The roadmap's pre-filled bootstrap phase carries the first tasks: survey the codebase, draft the initial architecture docs, and replace the placeholder phases with the project's real plan — a suggested-infrastructure list (CI, linting, tests, …) helps populate the early phases.
 
 ### 7.1 The CDD repo as its own project
 
