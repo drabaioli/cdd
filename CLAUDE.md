@@ -71,7 +71,6 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `template/`                        | Copy-paste material for new projects                      |
 | `template/.claude/commands/`       | Slash commands shipped to new projects                    |
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
-| `template/tools/`                  | Worktree helper shipped to new projects                   |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
 | `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
