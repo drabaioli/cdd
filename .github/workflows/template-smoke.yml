@@ -25,6 +25,9 @@ jobs:
       - name: Command-set drift check (repo commands vs rendered template)
         run: ./scripts/command-drift-check.sh
 
+      - name: Worktree-helper install smoke (against a throwaway HOME)
+        run: ./scripts/install-smoke-assert.sh
+
       - name: Configure git identity for the scaffold commit
         run: |
           git config --global user.email "ci@example.com"
