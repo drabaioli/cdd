@@ -137,6 +137,27 @@ A single, project-independent bash helper provides three commands. It is the sam
 
 The helper installs itself to a stable home that does not depend on a live CDD checkout. Run `tools/cdd-worktree.sh install` once (the script is dual-mode: sourced it defines the functions; run directly with `install` it sets itself up): this copies the script to `~/.cdd/tools/cdd-worktree.sh`, appends a marker-guarded source line to `~/.bashrc` and `~/.zshrc` (idempotent), and migrates any handoffs from the legacy `~/.claude-handoffs/` location. After installing, the commands work in every CDD project — including ones bootstrapped later — without any further per-project setup.
 
+On a machine that does **not** have the CDD repo checked out — a fresh machine cloning only a downstream CDD project — the same one-time install is a single command that fetches the canonical script to its stable home and runs it (note: `curl … | bash` does **not** work here, because the installer copies itself from its own file path, which a piped stdin does not provide — so it must land on disk first):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
+  --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
+  && bash ~/.cdd/tools/cdd-worktree.sh install
+```
+
+#### The helper is a toolchain dependency, not a project file
+
+Because the helper is machine-global, it is treated like `git` or `gh`: one installed copy serves every CDD project on the machine, newest wins, and the install is idempotent so re-running it upgrades in place. Installing from the latest `main` (rather than pinning each project to its `.claude/cdd-baseline` commit) is deliberate — pinning per project would reintroduce exactly the conflict a single shared helper exists to avoid.
+
+This rests on a deliberately small, **frozen compatibility contract** between the helper and the projects it serves:
+
+1. the three command names — `cdd-worktree`, `cdd-worktree-done`, `cdd-worktree-list`; and
+2. the handoff layout — `~/.cdd/handoffs/<repo>/<branch>.md`.
+
+Nothing project-specific lives in the helper (repo name, default branch, and handoff dir are derived at runtime), so a single current copy stays compatible with every project version. Because the helper version is global, there is by construction no "project A's helper vs project B's helper" to conflict — there is exactly one, and it is the union of all behaviours.
+
+The contract is not changed casually. When machine-global state genuinely must evolve, the change ships as a **one-shot migration inside `install`** rather than a silent break — the `~/.claude-handoffs/` → `~/.cdd/handoffs/` move is the worked example: `install` migrates existing handoffs instead of stranding them, and a future helper would read both the old and new location across a deprecation window. And because the state is global, one `install` run re-homes every project on the machine at once — so migrations are *easier* under this model than they would be with a per-project copy, where each project would need migrating separately.
+
 The helper derives the repository's default branch from `origin`'s HEAD (falling back to `main`) and assumes the remote is named `origin`; the remote-name assumption is documented in `template/BOOTSTRAP.md`.
 
 These helpers encode an invariant worth stating explicitly:
@@ -465,7 +486,7 @@ Bootstrap procedure for a new project:
 1. From the CDD repo root, run:
    `./tools/bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug`
    The basename of `--path` becomes the `<PROJECT_DIR>` slug.
-2. If you haven't already, install the shared worktree helper once: `./tools/cdd-worktree.sh install` (the script prints this on success). This is a one-time, project-independent step.
+2. If you haven't already, install the shared worktree helper once: `./tools/cdd-worktree.sh install` (the script prints this on success). This is a one-time, project-independent step. On a machine without the CDD repo checked out, use the `curl … -o ~/.cdd/tools/cdd-worktree.sh && bash … install` one-liner from §2.8 instead.
 3. Fill in CLAUDE.md placeholders: project description, key references, critical constraints, build/test commands.
 4. Start the first `/cdd-next-step` session (it creates the per-repo handoff directory `~/.cdd/handoffs/<repo-name>/` on demand). The roadmap's pre-filled bootstrap phase carries the first tasks: survey the codebase, draft the initial architecture docs, and replace the placeholder phases with the project's real plan — a suggested-infrastructure list (CI, linting, tests, …) helps populate the early phases.
 

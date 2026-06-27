@@ -67,13 +67,21 @@ The script will:
 
 ## After bootstrap
 
-1. **Install the shared worktree helper (one-time, project-independent).** If you haven't installed it for an earlier CDD project, run it once from the CDD repo:
+1. **Install the shared worktree helper (one-time, project-independent).** If you haven't installed it for an earlier CDD project, install it once. If you have the CDD repo checked out:
 
    ```bash
    ./tools/cdd-worktree.sh install
    ```
 
-   This copies the helper to `~/.cdd/tools/cdd-worktree.sh` and wires `~/.bashrc` and `~/.zshrc` to source it (idempotent). Open a new shell. After this, `cdd-worktree` works in every CDD project — there is nothing per-project to add. `/cdd-next-step` prints the install command if `cdd-worktree` isn't found, so a missing install is a one-paste fix rather than a hunt.
+   On a fresh machine that only has *this* project (no CDD repo checkout), fetch the canonical helper and install it in one step:
+
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
+     --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
+     && bash ~/.cdd/tools/cdd-worktree.sh install
+   ```
+
+   (It must land on disk first — `curl … | bash` won't work, because the installer copies itself from its own file path.) Either form copies the helper to `~/.cdd/tools/cdd-worktree.sh` and wires `~/.bashrc` and `~/.zshrc` to source it (idempotent). Open a new shell. After this, `cdd-worktree` works in every CDD project — there is nothing per-project to add. The helper is a machine-global toolchain dependency, like `git` or `gh`: one install per machine, newest wins. `/cdd-next-step` offers to run the install if `cdd-worktree` isn't found, so a missing install is a one-keystroke fix rather than a hunt.
 
 2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 

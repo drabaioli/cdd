@@ -64,7 +64,15 @@ CDD ships seven slash commands, all prefixed `cdd-` so they autocomplete as a gr
 | `/cdd‑retrofit` | Install or upgrade CDD in an existing project. |
 | `/cdd‑quick‑create` | Produce a one-off self-contained deliverable (script + README), no project substrate. |
 
-`cdd-worktree` (and its companion `cdd-worktree-done`) is a **shell helper**, not a slash command. It's a single project-independent script you install once (`tools/cdd-worktree.sh install`, which wires `~/.bashrc` and `~/.zshrc` and works in every CDD project thereafter). It spins up and tears down the per-task git worktree that an implementation session runs in.
+`cdd-worktree` (and its companion `cdd-worktree-done`) is a **shell helper**, not a slash command. It's a single project-independent script — a machine-global toolchain dependency, like `git` or `gh` — that you install once and that then works in every CDD project. From a CDD repo checkout: `tools/cdd-worktree.sh install`. On a fresh machine with only a downstream project (no CDD repo), one command fetches and installs it:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
+  --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
+  && bash ~/.cdd/tools/cdd-worktree.sh install
+```
+
+Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. It spins up and tears down the per-task git worktree that an implementation session runs in.
 
 ## Questions?
 

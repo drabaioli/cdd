@@ -163,22 +163,30 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>
 ```
 
-## 8. Print the next command
+## 8. Print the next command, and offer to install the helper if missing
 
-After writing, resolve the repo root:
-
-```bash
-REPO_ROOT=$(git rev-parse --show-toplevel)
-```
-
-Then print exactly (substituting the actual `$REPO_ROOT` path, not a placeholder):
+After writing, print exactly:
 
 ```
 Handoff written: ~/.cdd/handoffs/<PROJECT_DIR>/<branch>.md
 Next: cdd-worktree <branch>
-
-If `cdd-worktree` reports "command not found", the shared helper isn't installed yet. Install it once, then open a new shell:
-  <REPO_ROOT>/tools/cdd-worktree.sh install
 ```
+
+Then check whether the shared worktree helper is installed on this machine (a plain file test — `cdd-worktree` itself is a shell function, not visible to a non-interactive shell):
+
+```bash
+test -f ~/.cdd/tools/cdd-worktree.sh && echo present || echo missing
+```
+
+- **present** — nothing more to do.
+- **missing** — the helper isn't installed yet. It's a one-time, machine-global install (like `git` or `gh`; it then works in every CDD project). **Offer to run it now**, and on the user's go-ahead, run:
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
+    --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
+    && bash ~/.cdd/tools/cdd-worktree.sh install
+  ```
+
+  (It must land on disk first — `curl … | bash` won't work, because the installer copies itself from its own file path. If the user has the CDD repo checked out, `./tools/cdd-worktree.sh install` from it does the same with no download.) Tell the user to open a new shell afterwards so `cdd-worktree` is available.
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

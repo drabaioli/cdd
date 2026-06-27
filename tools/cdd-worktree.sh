@@ -10,10 +10,26 @@
 #
 #   tools/cdd-worktree.sh install
 #
-# That copies the helper to ~/.cdd/tools/cdd-worktree.sh, appends a
+# On a machine without a CDD checkout (a fresh machine with only a downstream CDD
+# project), fetch the canonical script to its home and run it in one step:
+#
+#   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
+#     --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
+#     && bash ~/.cdd/tools/cdd-worktree.sh install
+#
+# (It must land on disk first; `curl ... | bash` won't work because install copies
+# itself from its own file path, which a piped stdin does not provide.)
+#
+# Either form copies the helper to ~/.cdd/tools/cdd-worktree.sh, appends a
 # marker-guarded source line to ~/.bashrc and ~/.zshrc (idempotent), and migrates
 # any handoffs from the old ~/.claude-handoffs/ location. After installing, open a
 # new shell; the CDD clone can then disappear and the commands still work.
+#
+# The helper is a machine-global toolchain dependency, like git or gh: one install
+# per machine, newest wins, install is idempotent (re-run to upgrade). Its contract
+# with projects is frozen and deliberately tiny -- the three command names below
+# plus the ~/.cdd/handoffs/<repo>/<branch>.md layout -- so a single current copy
+# stays compatible with every project version. See the process doc section 2.8.
 #
 # Provides (when sourced):
 #   cdd-worktree <branch>   Create a new worktree for <branch> and launch
