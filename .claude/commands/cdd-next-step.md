@@ -163,30 +163,17 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/cdd
 ```
 
-## 8. Print the next command, and offer to install the helper if missing
+## 8. Print the next command
 
-After writing, print exactly:
+After writing, print exactly (the install line is a static reminder — do **not** probe for the helper on every run; it's a once-per-machine setup the user ignores once done):
 
 ```
 Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
+
+If `cdd-worktree` is "command not found", install the shared helper once (machine-global, like git/gh), then open a new shell:
+  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
+  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install)
 ```
-
-Then check whether the shared worktree helper is installed on this machine (a plain file test — `cdd-worktree` itself is a shell function, not visible to a non-interactive shell):
-
-```bash
-test -f ~/.cdd/tools/cdd-worktree.sh && echo present || echo missing
-```
-
-- **present** — nothing more to do.
-- **missing** — the helper isn't installed yet. It's a one-time, machine-global install (like `git` or `gh`; it then works in every CDD project). **Offer to run it now**, and on the user's go-ahead, run:
-
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
-    --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
-    && bash ~/.cdd/tools/cdd-worktree.sh install
-  ```
-
-  (It must land on disk first — `curl … | bash` won't work, because the installer copies itself from its own file path. If the user has the CDD repo checked out, `./tools/cdd-worktree.sh install` from it does the same with no download.) Tell the user to open a new shell afterwards so `cdd-worktree` is available.
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

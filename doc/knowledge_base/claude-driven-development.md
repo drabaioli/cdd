@@ -137,7 +137,7 @@ A single, project-independent bash helper provides three commands. It is the sam
 
 The helper installs itself to a stable home that does not depend on a live CDD checkout. Run `tools/cdd-worktree.sh install` once (the script is dual-mode: sourced it defines the functions; run directly with `install` it sets itself up): this copies the script to `~/.cdd/tools/cdd-worktree.sh`, appends a marker-guarded source line to `~/.bashrc` and `~/.zshrc` (idempotent), and migrates any handoffs from the legacy `~/.claude-handoffs/` location. After installing, the commands work in every CDD project — including ones bootstrapped later — without any further per-project setup.
 
-On a machine that does **not** have the CDD repo checked out — a fresh machine cloning only a downstream CDD project — the same one-time install is a single command that fetches the canonical script to its stable home and runs it (note: `curl … | bash` does **not** work here, because the installer copies itself from its own file path, which a piped stdin does not provide — so it must land on disk first):
+On a machine without the CDD repo checked out (a fresh clone of only a downstream project), the same one-time install is a single command — fetched to disk first, since `curl … | bash` can't work (the installer copies itself from its own file path):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
@@ -145,18 +145,7 @@ curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktr
   && bash ~/.cdd/tools/cdd-worktree.sh install
 ```
 
-#### The helper is a toolchain dependency, not a project file
-
-Because the helper is machine-global, it is treated like `git` or `gh`: one installed copy serves every CDD project on the machine, newest wins, and the install is idempotent so re-running it upgrades in place. Installing from the latest `main` (rather than pinning each project to its `.claude/cdd-baseline` commit) is deliberate — pinning per project would reintroduce exactly the conflict a single shared helper exists to avoid.
-
-This rests on a deliberately small, **frozen compatibility contract** between the helper and the projects it serves:
-
-1. the three command names — `cdd-worktree`, `cdd-worktree-done`, `cdd-worktree-list`; and
-2. the handoff layout — `~/.cdd/handoffs/<repo>/<branch>.md`.
-
-Nothing project-specific lives in the helper (repo name, default branch, and handoff dir are derived at runtime), so a single current copy stays compatible with every project version. Because the helper version is global, there is by construction no "project A's helper vs project B's helper" to conflict — there is exactly one, and it is the union of all behaviours.
-
-The contract is not changed casually. When machine-global state genuinely must evolve, the change ships as a **one-shot migration inside `install`** rather than a silent break — the `~/.claude-handoffs/` → `~/.cdd/handoffs/` move is the worked example: `install` migrates existing handoffs instead of stranding them, and a future helper would read both the old and new location across a deprecation window. And because the state is global, one `install` run re-homes every project on the machine at once — so migrations are *easier* under this model than they would be with a per-project copy, where each project would need migrating separately.
+The helper is a machine-global toolchain dependency, like `git` or `gh`: installed once per machine, newest wins, install idempotent. Install from latest `main`, never pinned per project — pinning would reintroduce the very conflict a single shared helper avoids. Its contract with projects is deliberately tiny and frozen: the three command names above plus the `~/.cdd/handoffs/<repo>/<branch>.md` layout; everything project-specific is derived at runtime, so one copy stays compatible with every project and there is by construction no per-project helper to conflict. When that state must evolve, the change ships as a one-shot migration inside `install` (the `~/.claude-handoffs/` → `~/.cdd/handoffs/` move is the example), re-homing every project at once.
 
 The helper derives the repository's default branch from `origin`'s HEAD (falling back to `main`) and assumes the remote is named `origin`; the remote-name assumption is documented in `template/BOOTSTRAP.md`.
 
