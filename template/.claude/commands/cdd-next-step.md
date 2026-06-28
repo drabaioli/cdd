@@ -1,6 +1,6 @@
 Scope the next roadmap task and produce a handoff file for a fresh implementation session.
 
-This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.claude-handoffs/<PROJECT_DIR>/`.
+This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.cdd/handoffs/<PROJECT_DIR>/`.
 
 ## 0. Mode: roadmap-driven, intent-driven, or issue-driven
 
@@ -60,7 +60,7 @@ Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.
 List existing handoff files:
 
 ```bash
-ls ~/.claude-handoffs/<PROJECT_DIR>/ 2>/dev/null
+ls ~/.cdd/handoffs/<PROJECT_DIR>/ 2>/dev/null
 ```
 
 For each file `<branch>.md`, check whether the branch still exists locally:
@@ -69,9 +69,9 @@ For each file `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.claude-handoffs/<PROJECT_DIR>/<branch>.md`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.cdd/handoffs/<PROJECT_DIR>/<branch>.md`). Never delete without explicit confirmation.
 
-For a richer view that also reports worktree / PR status, suggest `<PROJECT_SLUG>-worktree-list`.
+For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
 ## 3. Propose the next task (roadmap-driven mode)
 
@@ -139,7 +139,7 @@ If the discussion surfaced changes the roadmap should reflect (new tasks to add,
 
 ## 7. Write the handoff file
 
-On approval, write `~/.claude-handoffs/<PROJECT_DIR>/<branch>.md` with this structure:
+On approval, write `~/.cdd/handoffs/<PROJECT_DIR>/<branch>.md` with this structure:
 
 ```markdown
 # Task: <short title>
@@ -160,25 +160,20 @@ On approval, write `~/.claude-handoffs/<PROJECT_DIR>/<branch>.md` with this stru
 Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
-mkdir -p ~/.claude-handoffs/<PROJECT_DIR>
+mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>
 ```
 
 ## 8. Print the next command
 
-After writing, resolve the repo root:
-
-```bash
-REPO_ROOT=$(git rev-parse --show-toplevel)
-```
-
-Then print exactly (substituting the actual `$REPO_ROOT` path, not a placeholder):
+After writing, print exactly (the install line is a static reminder — do **not** probe for the helper on every run; it's a once-per-machine setup the user ignores once done):
 
 ```
-Handoff written: ~/.claude-handoffs/<PROJECT_DIR>/<branch>.md
-Next: <PROJECT_SLUG>-worktree <branch>
+Handoff written: ~/.cdd/handoffs/<PROJECT_DIR>/<branch>.md
+Next: cdd-worktree <branch>
 
-If `<PROJECT_SLUG>-worktree` reports "command not found", the worktree helper isn't sourced. Add this to ~/.bashrc (or ~/.zshrc) and open a new shell:
-  [[ -f "<REPO_ROOT>/tools/<PROJECT_SLUG>-worktree.sh" ]] && source "<REPO_ROOT>/tools/<PROJECT_SLUG>-worktree.sh"
+If `cdd-worktree` is "command not found", install the shared helper once (machine-global, like git/gh), then open a new shell:
+  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
+  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install)
 ```
 
-The user will close this session, run `<PROJECT_SLUG>-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.
+The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

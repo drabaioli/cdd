@@ -27,12 +27,12 @@ demo/seed/
 
 The seed ships only the CDD scaffolding for the project — **no app code**. The Flask app is built by running CDD cycles (`/cdd-next-step` → implement → `/cdd-pre-pr` → PR) on a created instance; that is the demo/dogfooding itself.
 
-The seed files carry the same three placeholders the template uses (`<PROJECT_NAME>`, `<PROJECT_SLUG>`, `<PROJECT_DIR>`); `setup.sh` substitutes them per instance via the bootstrap script's `--overlay` flag.
+The seed files carry the same two placeholders the template uses (`<PROJECT_NAME>`, `<PROJECT_DIR>`); `setup.sh` substitutes them per instance via the bootstrap script's `--overlay` flag.
 
 ## Instances
 
-- **Dogfood instance (kept):** display name "Markdown Renderer", slug & dir `mdr`. Not auto-numbered.
-- **Demo instances (numbered, disposable):** `mdr_demo_01`, `mdr_demo_02`, … — slug and dir both equal the numbered name, so each instance is fully self-contained (its own `<name>-worktree` command and its own `~/.claude-handoffs/<name>/` directory). Numbering (rather than one reusable `mdr_demo`) lets you park one demo with interesting state while spinning up the next.
+- **Dogfood instance (kept):** display name "Markdown Renderer", dir `mdr`. Not auto-numbered.
+- **Demo instances (numbered, disposable):** `mdr_demo_01`, `mdr_demo_02`, … — the dir equals the numbered name, so each instance gets its own `~/.cdd/handoffs/<name>/` handoff directory (the `cdd-worktree` command itself is shared across all instances). Numbering (rather than one reusable `mdr_demo`) lets you park one demo with interesting state while spinning up the next.
 
 By default instances are created under `~/Code/<name>`; override with `--base DIR` or the `CDD_DEMO_BASE` environment variable.
 
@@ -46,19 +46,11 @@ demo/setup.sh mdr_demo_07     # a specific instance
 
 `setup.sh` wraps `tools/bootstrap-cdd-project.sh` (it does **not** reimplement substitution): bootstrap copies `template/`, overlays `demo/seed/` via `--overlay`, substitutes the identifiers, runs `git init`, and makes the scaffold commit. Then `setup.sh` creates and pushes a GitHub repo with `gh repo create --source . --push` (private by default; pass `--public` to share).
 
-After setup, `setup.sh` appends a marker-guarded block to `~/.bashrc` (default) so the instance's worktree helper is sourced automatically in new shells:
-
-```bash
-# --- CDD demo: mdr_demo_01 BEGIN ---
-[[ -f "$HOME/Code/mdr_demo_01/tools/mdr_demo_01-worktree.sh" ]] && source "$HOME/Code/mdr_demo_01/tools/mdr_demo_01-worktree.sh"
-# --- CDD demo: mdr_demo_01 END ---
-```
-
-The marker embeds the instance name so multiple parked demos coexist in the same rc file, and teardown removes exactly its own block. Use `--rc FILE` to target a different rc file. Under `--local-only` the rc file is not touched.
+After setup, `setup.sh` runs the shared worktree helper's one-time `install` (`tools/cdd-worktree.sh install`, idempotent) so `cdd-worktree` is available in new shells. Because the helper is a single project-independent script, there is no per-instance rc block: the install wires `~/.bashrc` and `~/.zshrc` once and every instance uses the same `cdd-worktree` command. Under `--local-only` the install is skipped (no environment side effects).
 
 Auto-numbering checks **both** local directories under the base **and** existing GitHub repos, so a parked demo (local or remote) never gets a colliding number.
 
-Options: `--name "Display Name"`, `--base DIR`, `--public`, `--rc FILE`, `--local-only` (skip GitHub steps and rc update — used by the smoke test).
+Options: `--name "Display Name"`, `--base DIR`, `--public`, `--local-only` (skip GitHub steps and the helper install — used by the smoke test).
 
 ## Teardown
 
@@ -67,9 +59,9 @@ demo/teardown.sh mdr_demo_03         # remove the local dir and delete the GitHu
 demo/teardown.sh mdr_demo_03 --local-only   # remove only the local directory
 ```
 
-Teardown removes the instance's marker-guarded block from `~/.bashrc` (default) before removing the local directory. Use `--rc FILE` to target the same file you passed to `setup.sh`. Under `--local-only`, the rc file is not touched.
+Teardown removes the local directory (and, unless `--local-only`, the GitHub repo). It does **not** touch the shared `cdd-worktree` install block in your rc files: that block is global and shared across all instances, so removing one instance leaves it in place.
 
-Teardown refuses to delete a directory that does not look like a bootstrapped CDD project (it checks for `CLAUDE.md` + `tools/*-worktree.sh`), and prompts for confirmation unless you pass `--yes`.
+Teardown refuses to delete a directory that does not look like a bootstrapped CDD project (it checks for `CLAUDE.md` + `.claude/cdd-baseline`), and prompts for confirmation unless you pass `--yes`.
 
 > **`gh` scope caveat:** deleting the GitHub repo needs the `delete_repo` scope on your `gh` token. If teardown fails on the delete step, run:
 >

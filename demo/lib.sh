@@ -75,6 +75,5 @@ demo_next_demo_instance() {
 # True if DIR looks like a bootstrapped CDD project (sentinel for destructive ops).
 demo_is_cdd_project() {
   local dir="$1"
-  [[ -f "$dir/CLAUDE.md" ]] || return 1
-  compgen -G "$dir/tools/*-worktree.sh" >/dev/null 2>&1
+  [[ -f "$dir/CLAUDE.md" && -f "$dir/.claude/cdd-baseline" ]]
 }

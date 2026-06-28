@@ -63,12 +63,11 @@ WT="$(dirname "<target>")/$(basename "<target>")-$BRANCH"
 
 A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/cdd-next-step` picks those up as the next unchecked tasks.
 
-### 3.1 Confirm the three identifiers
+### 3.1 Confirm the two identifiers
 
 Propose, then confirm with the user before rendering (never pick silently):
 
-- `<PROJECT_DIR>` — basename of the target path. Must match `^[a-z][a-z0-9_-]*$`; if it doesn't, ask the user for a conforming value (this only affects rendered paths like the handoff dir, not the actual directory name).
-- `<PROJECT_SLUG>` — propose the dir slug, sanitized to `^[a-z][a-z0-9_-]*$`. This becomes the `<slug>-worktree` command the user will type; let them shorten it.
+- `<PROJECT_DIR>` — basename of the target path. Must match `^[A-Za-z][A-Za-z0-9_-]*$`; if it doesn't, ask the user for a conforming value (this only affects rendered paths like the handoff dir, not the actual directory name).
 - `<PROJECT_NAME>` — propose a title-cased form of the directory name; free text.
 
 ### 3.2 Render the template into a staging directory
@@ -78,7 +77,7 @@ Reuse the bootstrap script's substitution — do not reimplement it:
 ```bash
 STAGE=$(mktemp -d)
 ./tools/bootstrap-cdd-project.sh --stage \
-  --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> --dir <PROJECT_DIR> \
+  --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
   --path "$STAGE/render"
 ```
 
@@ -106,7 +105,7 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
   ```
 
   Stage with `add -A` — the worktree was fresh, so this captures exactly the retrofit's writes. Gitignored paths won't be staged (see the section 1 gitignore warning). Commit only on this dedicated branch; never commit onto the target's existing branches.
-- Print next steps: the exact `source` line for `$WT/tools/<PROJECT_SLUG>-worktree.sh` (and, after merge, `<target>/tools/...`) to add to `~/.bashrc`; how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting.
+- Print next steps: the one-time worktree-helper install (`./tools/cdd-worktree.sh install` in the CDD repo — project-independent, only needed if the user hasn't installed it before; nothing is added per project); how to review and merge the branch (`git -C "$WT" show`, then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting.
 
 ## 4. Upgrade mode
 
@@ -123,7 +122,6 @@ Read `$WT/.claude/cdd-baseline` (the section 2.5 worktree, which mirrors HEAD).
 
 The marker stores only the hash, so re-infer and confirm with the user:
 
-- `<PROJECT_SLUG>`: from the worktree helper filename `$WT/tools/*-worktree.sh` (most reliable); fall back to asking.
 - `<PROJECT_DIR>`: basename of the target path.
 - `<PROJECT_NAME>`: from the title of `$WT/CLAUDE.md` if recognizable; otherwise ask.
 
@@ -134,7 +132,7 @@ Current template:
 ```bash
 STAGE=$(mktemp -d)
 ./tools/bootstrap-cdd-project.sh --stage \
-  --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> --dir <PROJECT_DIR> \
+  --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
   --path "$STAGE/current"
 ```
 
@@ -144,7 +142,7 @@ Old (baseline) template, extracted from this repo's history and rendered through
 OLD_TPL=$(mktemp -d)
 git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 ./tools/bootstrap-cdd-project.sh --stage \
-  --name "<PROJECT_NAME>" --slug <PROJECT_SLUG> --dir <PROJECT_DIR> \
+  --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
   --template-dir "$OLD_TPL/template" \
   --path "$STAGE/old"
 ```
@@ -153,7 +151,7 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 
 ### 4.4 Three-way comparison, per CDD-managed file
 
-The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/README.md`, `tools/<slug>-worktree.sh`. (`CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
+The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/README.md`. (The worktree helper is no longer part of this set — it is a single project-independent script installed once, not a per-project template file. `CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
 
 For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file **read from `$WT`** (the section 2.5 worktree, which mirrors HEAD; this is why section 1 warns when CDD-managed files have uncommitted edits — those won't be reflected here):
 

@@ -4,7 +4,6 @@
 # Usage:
 #   bootstrap-cdd-project.sh \
 #     --name "Display Name" \
-#     --slug shell-slug \
 #     --path /path/to/dir-slug \
 #     [--overlay /path/to/seed ...] \
 #     [--stage --dir dir-slug] [--template-dir DIR]
@@ -31,16 +30,15 @@
 # when this script does not live in a git checkout). /cdd-retrofit upgrade mode uses
 # it as the three-way merge base.
 #
-# See template/BOOTSTRAP.md for the full procedure and the three-identifier model.
+# See template/BOOTSTRAP.md for the full procedure and the two-identifier model.
 
 set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-usage: bootstrap-cdd-project.sh --name "Display Name" --slug shell-slug --path /path/to/dir-slug [--overlay DIR ...] [--stage --dir dir-slug] [--template-dir DIR]
+usage: bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug [--overlay DIR ...] [--stage --dir dir-slug] [--template-dir DIR]
 
   --name          Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
-  --slug          Shell-command slug; lowercase, hyphens OK. Used in <slug>-worktree commands.
   --path          Path where the project will be created (absolute or relative). The basename
                   becomes the directory slug. The path must not exist, or must be an empty
                   directory.
@@ -58,7 +56,6 @@ EOF
 }
 
 PROJECT_NAME=""
-PROJECT_SLUG=""
 TARGET=""
 OVERLAYS=()
 STAGE=""
@@ -68,7 +65,6 @@ TEMPLATE_DIR_OVERRIDE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --name)         PROJECT_NAME="${2:-}";          shift 2 ;;
-    --slug)         PROJECT_SLUG="${2:-}";          shift 2 ;;
     --path)         TARGET="${2:-}";                shift 2 ;;
     --overlay)      OVERLAYS+=("${2:-}");           shift 2 ;;
     --stage)        STAGE=1;                        shift ;;
@@ -80,7 +76,6 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$PROJECT_NAME" ]] || { echo "error: --name is required" >&2; usage; }
-[[ -n "$PROJECT_SLUG" ]] || { echo "error: --slug is required" >&2; usage; }
 [[ -n "$TARGET"       ]] || { echo "error: --path is required" >&2; usage; }
 if [[ -n "$STAGE" && -z "$DIR_OVERRIDE" ]]; then
   echo "error: --stage requires --dir (a staging path's basename is not the real <PROJECT_DIR>)" >&2
@@ -93,11 +88,7 @@ fi
 TARGET="${TARGET%/}"
 PROJECT_DIR="${DIR_OVERRIDE:-$(basename "$TARGET")}"
 
-# Slug and dir must be safe for shell identifiers and filesystem paths.
-if ! [[ "$PROJECT_SLUG" =~ ^[a-z][a-z0-9_-]*$ ]]; then
-  echo "error: --slug must match ^[a-z][a-z0-9_-]*\$ (got: $PROJECT_SLUG)" >&2
-  exit 2
-fi
+# Dir must be safe for shell identifiers and filesystem paths.
 if ! [[ "$PROJECT_DIR" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]]; then
   if [[ -n "$DIR_OVERRIDE" ]]; then
     echo "error: --dir must match ^[A-Za-z][A-Za-z0-9_-]*\$ (got: $PROJECT_DIR)" >&2
@@ -153,20 +144,15 @@ for overlay in "${OVERLAYS[@]}"; do
   fi
 done
 
-# Rename the worktree script before substitution.
-mv "$TARGET/tools/PROJECT-worktree.sh" "$TARGET/tools/${PROJECT_SLUG}-worktree.sh"
-
-# Substitute placeholders. Order matters:
-#   1. <PROJECT_NAME>, <PROJECT_SLUG>, <PROJECT_DIR> first — angle brackets keep them unambiguous.
-#   2. Bare PROJECT only inside the renamed worktree script, last.
-# Use a sed delimiter unlikely to appear in any value (#); display names should be plain text.
+# Substitute placeholders. The angle brackets keep <PROJECT_NAME> and <PROJECT_DIR>
+# unambiguous. Use a sed delimiter unlikely to appear in any value (#); display
+# names should be plain text.
 escape_sed_repl() {
   # Escape characters special to sed's replacement side: \, &, and the delimiter (#).
   printf '%s' "$1" | sed -e 's/[\\&#]/\\&/g'
 }
 
 NAME_ESC=$(escape_sed_repl "$PROJECT_NAME")
-SLUG_ESC=$(escape_sed_repl "$PROJECT_SLUG")
 DIR_ESC=$(escape_sed_repl "$PROJECT_DIR")
 
 # Walk every regular file in the target and substitute the angle-bracketed placeholders.
@@ -176,14 +162,9 @@ while IFS= read -r -d '' f; do
   grep -Iq . "$f" || continue
   sed -i \
     -e "s#<PROJECT_NAME>#${NAME_ESC}#g" \
-    -e "s#<PROJECT_SLUG>#${SLUG_ESC}#g" \
     -e "s#<PROJECT_DIR>#${DIR_ESC}#g" \
     "$f"
 done < <(find "$TARGET" -type f -print0)
-
-# Bare PROJECT substitution: only inside the renamed worktree script.
-# Word-boundary so we don't accidentally chew through prose containing the substring.
-sed -i -E "s#\\bPROJECT\\b#${SLUG_ESC}#g" "$TARGET/tools/${PROJECT_SLUG}-worktree.sh"
 
 # Write the baseline marker: the CDD repo commit this render came from. /cdd-retrofit
 # upgrade mode uses it as the three-way merge base. "unknown" when the script is
@@ -220,9 +201,10 @@ Location: $TARGET_ABS
 
 Next steps:
 
-  1. Add this line to your ~/.bashrc (or ~/.zshrc) and open a new shell:
+  1. One-time, if you haven't already: install the shared CDD worktree helper, then
+     open a new shell. After that, \`cdd-worktree <branch>\` works in every CDD project.
 
-       [[ -f "${TARGET_ABS}/tools/${PROJECT_SLUG}-worktree.sh" ]] && source "${TARGET_ABS}/tools/${PROJECT_SLUG}-worktree.sh"
+       ${SCRIPT_DIR}/cdd-worktree.sh install
 
   2. cd into $TARGET_ABS, fill in CLAUDE.md placeholders, and write the initial roadmap
      in doc/knowledge_base/roadmap.md.
