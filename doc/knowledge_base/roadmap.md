@@ -164,3 +164,13 @@ Prepare CDD to be open-sourced publicly: license it, rewrite the README to expla
 - [x] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`). — Public home stays `github.com/drabaioli/cdd` (no org move); README badge, clone URL, and issues URL verified correct — no rewrite needed.
 
 **Milestone:** CDD is presentable and safe to open-source publicly — licensed, with a README that explains and demonstrates the workflow — with the remaining open-source essentials tracked.
+
+## Phase 13: Task state & observability
+
+Give each task a machine-readable record of where it sits in its lifecycle and which Claude Code sessions have worked it, so tooling can show task state instead of inferring it from handoffs, branches, and `gh`.
+
+- [x] Per-task state record: a `<branch>.state.json` sibling of the handoff, seeded by `/cdd-next-step` and advanced by the implementation session and the `/cdd-merge-base` / `/cdd-pre-pr` / `/cdd-process-pr` commands; deleted alongside the handoff by `cdd-worktree-done`. Advisory, local-only, append-only `sessions` chain with resume links. — process doc §2.13 (new) + §2.6/§2.8/§3.3 + all four command copies (repo + template) + both `settings.json` (Write/`hostname`/`date`/`rm *.state.json` allows) + `tools/cdd-worktree.sh` + architecture/feature docs + BOOTSTRAP.md.
+- [ ] Consume the record: teach `cdd-worktree-list` (and the `cdd-dash` dashboard) to read `stage`/`status`/`sessions` instead of inferring task state.
+- [ ] Multi-machine resume: regenerate this state from a remote branch so a task can be picked up on another machine (issue #22). Needs a sync mechanism (git notes/refs) — explicitly out of scope for the local cache above.
+
+**Milestone:** a task's lifecycle stage and its working sessions are recorded as data and surfaced by CDD tooling, not reconstructed by inference.
