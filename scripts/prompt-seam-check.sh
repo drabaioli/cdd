@@ -61,6 +61,9 @@ grep -qF 'Closes #NN' "$PRE" \
 # Backticked tokens that look like a repo-relative path (contain '/', end in a known
 # extension, no placeholders/globs/home/vars/brace-expansion) must resolve to a real file.
 for f in "$REPO_CMDS"/cdd-*.md CLAUDE.md README.md; do
+  # SC2016: the single quotes below are deliberate — the grep/sed patterns match
+  # literal backtick characters in the markdown; no shell expansion is wanted.
+  # shellcheck disable=SC2016
   while IFS= read -r p; do
     [[ -e "$p" ]] && continue
     whitelisted "$p" && continue
