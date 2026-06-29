@@ -46,6 +46,10 @@ bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 # Command-set drift: repo .claude/commands/ vs the rendered template.
 ./scripts/command-drift-check.sh
 
+# Prompt-seam contracts: /cdd-* refs resolve, gh_issue_NN token agrees across
+# producer/consumer, backticked paths resolve, commands keep load-bearing headings.
+./scripts/prompt-seam-check.sh
+
 # Worktree-helper install: run `cdd-worktree.sh install` against a throwaway HOME.
 ./scripts/install-smoke-assert.sh
 
@@ -60,7 +64,7 @@ rm -rf /tmp/cdd-demo-smoke
 demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
 ```
 
-The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the worktree-helper install smoke, the end-to-end smoke, and the demo seed-overlay step.
+The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the prompt-seam check, the worktree-helper install smoke, the end-to-end smoke, and the demo seed-overlay step.
 
 When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
 
@@ -79,7 +83,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | Template smoke assertions + install smoke + command-set drift check (with whitelists) |
+| `scripts/`                         | Template smoke assertions + install smoke + command-set drift check + prompt-seam check (with whitelists) |
 | `.github/workflows/`               | CI: `template-smoke.yml` runs the bootstrap end-to-end    |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `tools/`                           | Bootstrap script + the canonical shared worktree helper (`cdd-worktree.sh`, self-installing) |
