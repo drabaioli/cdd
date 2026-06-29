@@ -4,7 +4,7 @@ A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`t
 
 - `CLAUDE.md` skeleton with placeholders for project-specific content.
 - `.claude/commands/{next-step,pre-pr,merge-main,process-pr}.md`: the four slash commands.
-- `.claude/settings.json`: auto-allows worktree sessions to read their handoff file (`~/.cdd/handoffs/<PROJECT_DIR>/**`), substituted at bootstrap.
+- `.claude/settings.json`: auto-allows worktree sessions to read their handoff file and write the colocated per-task state record (`~/.cdd/handoffs/<PROJECT_DIR>/**`), substituted at bootstrap.
 - `doc/index.md` plus `doc/{architecture,features,knowledge_base}/`: the documentation map and doc directory skeletons; the architecture and features skeletons follow the index-plus-per-topic-docs convention.
 - `doc/knowledge_base/project-overview.md`: the project-charter skeleton (what it is, goals, what it does and does not do, constraints, architecture intentions) — a living document, kept current. Filled by `/cdd-bootstrap` from discovery, or by hand otherwise.
 - `doc/knowledge_base/roadmap.md`: roadmap skeleton with a pre-filled Phase 1 of CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md and overview stubs, engineering-practices fill, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to distribute across the project's real phases. The pre-filled phase serves files-only starts (`/cdd-retrofit` install + the manual script); `/cdd-bootstrap` writes those docs through discovery and ships a real roadmap without it.

@@ -69,7 +69,7 @@ For each file `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.cdd/handoffs/cdd/<branch>.md`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it together with its state sibling (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
@@ -130,6 +130,8 @@ End the implementation prompt with these standing instructions (verbatim):
 > Before writing a plan, surface any remaining open questions and confirm scope with the user.
 >
 > When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
+>
+> Twice, update the task **state record** — the JSON file `/cdd-next-step` seeded beside this handoff, at `~/.cdd/handoffs/$REPO/$BRANCH.state.json` (with `REPO=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")` and `BRANCH=$(git rev-parse --abbrev-ref HEAD)`). Read it, edit the fields, write it back: **when the plan is approved** (before writing any code) set `stage` to `implementation` and `status` to `plan_approved`; **after your local commit** set `status` to `implementation_done`. Each time, refresh `updated_at` to the current UTC time (`date -u +%Y-%m-%dT%H:%M:%SZ`) and, unless `$CLAUDE_CODE_SESSION_ID` is empty or already the `id` of the last entry in `sessions`, append to `sessions` an object with `id` set to `$CLAUDE_CODE_SESSION_ID`, `resume` set to `claude --resume` followed by that id, `url` null, `stage` `implementation`, and `recorded_at` the same UTC time. The record is advisory — if it is missing or anything is unclear, skip it rather than guessing. (See the process doc §2.13 for the full schema.)
 
 Show the draft to the user for approval. Iterate if needed.
 
@@ -161,6 +163,22 @@ Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
 mkdir -p ~/.cdd/handoffs/cdd
+```
+
+Then seed the task **state record** beside the handoff — the slash commands update this file as the task moves through its stages, and external tools (e.g. cdd-dash) read it (see the process doc §2.13). Resolve the `$(...)` values first (`hostname`, and `date -u +%Y-%m-%dT%H:%M:%SZ` for both timestamps), then write `~/.cdd/handoffs/cdd/<branch>.state.json`:
+
+```json
+{
+  "schema_version": 1,
+  "branch": "<branch>",
+  "stage": "scoped",
+  "status": "handoff_ready",
+  "pr": null,
+  "sessions": [],
+  "machine": "$(hostname)",
+  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}
 ```
 
 ## 8. Print the next command

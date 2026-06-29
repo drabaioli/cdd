@@ -13,7 +13,7 @@ After bootstrap, the new project directory contains:
 ├── CLAUDE.md                                 # entry point Claude Code reads
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
-│   ├── settings.json                         # auto-allows worktree sessions to read their handoff file
+│   ├── settings.json                         # auto-allows sessions to read the handoff + write the task state record
 │   └── commands/
 │       ├── cdd-next-step.md                      # handoff session
 │       ├── cdd-pre-pr.md                         # pre-PR session

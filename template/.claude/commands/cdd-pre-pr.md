@@ -132,6 +132,8 @@ git commit -m '<message>'
 
 Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
 
+Then record the task **state** (advisory; see the process doc §2.13). In `~/.cdd/handoffs/$REPO/$BRANCH.state.json` (with `REPO=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")` and `BRANCH=$(git rev-parse --abbrev-ref HEAD)`), read the record (skip this if it is absent — don't fabricate one), set `stage` to `pre_pr` and `status` to `checks_passed`, refresh `updated_at` (`date -u +%Y-%m-%dT%H:%M:%SZ`), and — unless `$CLAUDE_CODE_SESSION_ID` is empty or already the `id` of the last `sessions` entry — append to `sessions` an object with `id` set to `$CLAUDE_CODE_SESSION_ID`, `resume` set to `claude --resume` followed by that id, `url` null, `stage` `pre_pr`, and `recorded_at` the same UTC time. Write it back.
+
 ## 10. Open PR (optional)
 
 After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
@@ -148,5 +150,5 @@ If §7 found upstream drift, restate the recommendation to run `/cdd-merge-base`
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary, then run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge.
+- **On yes**: derive a title from the branch/commits and a body from the change summary, then run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then update the task **state record** (the same file as step 9): set `stage` to `pr_open`, `status` to `open`, and `pr` to the new PR's number; refresh `updated_at` (`date -u +%Y-%m-%dT%H:%M:%SZ`); and append a `sessions` entry for `$CLAUDE_CODE_SESSION_ID` (`id`, `resume` = `claude --resume` followed by that id, `url` null, `stage` `pr_open`, `recorded_at` the same UTC time) unless that variable is empty or already the `id` of the last entry. Write it back.
 - **On no**: stop. The checklist above already stands on its own.

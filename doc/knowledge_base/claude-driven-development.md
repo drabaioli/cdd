@@ -88,7 +88,7 @@ A common member of the knowledge base is the project's **founding document**: th
 
 ### 2.6 Handoff files (`~/.cdd/handoffs/<repo-name>/<branch>.md`)
 
-The contract between the handoff session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/cdd-next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted.
+The contract between the handoff session and the implementation session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide (branch-scoped, ephemeral). Created by `/cdd-next-step`. Consumed by the first prompt of the implementation session. Deleted when the branch is deleted. A sibling **state record** (`<branch>.state.json`) is seeded beside it and shares its lifecycle — see §2.13.
 
 Schema:
 
@@ -132,7 +132,7 @@ Slash commands are declarative: they describe what to do, not how to orchestrate
 A single, project-independent bash helper provides three commands. It is the same script for every CDD project: the functions derive the repository name, default branch, and handoff directory at runtime, so there is no per-project copy.
 
 - `cdd-worktree <branch>`, creates a worktree for `<branch>` and launches Claude Code in plan mode in it with the suggested first prompt already submitted. Requires a handoff file to exist.
-- `cdd-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to the default branch, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff iff the branch was deleted.
+- `cdd-worktree-done`, run from a feature worktree once the PR has landed or the branch is being abandoned. Returns to the default branch, pulls, removes the worktree, resolves the branch (safe-delete if merged, force-delete if squash-merged, prompt otherwise), and deletes the handoff — and its sibling state record (§2.13) — iff the branch was deleted.
 - `cdd-worktree-list`, lists active handoffs with worktree/branch/PR status. Highlights stale entries.
 
 The helper installs itself to a stable home that does not depend on a live CDD checkout. Run `tools/cdd-worktree.sh install` once (the script is dual-mode: sourced it defines the functions; run directly with `install` it sets itself up): this copies the script to `~/.cdd/tools/cdd-worktree.sh`, appends a marker-guarded source line to `~/.bashrc` and `~/.zshrc` (idempotent), and migrates any handoffs from the legacy `~/.claude-handoffs/` location. After installing, the commands work in every CDD project — including ones bootstrapped later — without any further per-project setup.
@@ -202,6 +202,47 @@ The canonical set of practices the contract enumerates:
 | Dependency & toolchain hygiene (pinned/locked deps, documented toolchain)           | **expected**                                                     | project-defined                                             |
 
 A practice moves from **expected** to **enforced** in the same change that lands its mechanism (a test command, a CI job): the mechanism and the status flip ship together. The contract is deliberately generic and language-agnostic — it names *what* the floor is and carries placeholders for the project's own commands, never a shipped CI or lint config (opinionated per-project-type defaults are deferred design, §6). New practices are added as the project matures; the roadmap's suggested-infrastructure tasks and `/cdd-pre-pr`'s CI-improvement check (§3.5) feed it. Drop a row that genuinely does not apply (e.g. integration tests in a pure library), but record *why* in a clause rather than deleting it silently.
+
+### 2.13 Per-task state record (`~/.cdd/handoffs/<repo>/<branch>.state.json`)
+
+A small JSON file that records where a task sits in its lifecycle and which Claude Code sessions have worked it. It is an **additive sibling of the handoff** (§2.6): same per-repo directory, same `<branch>` basename, same branch-scoped/ephemeral lifecycle. The slash commands write it at their stage transitions; external tools read it (the dashboard `cdd-dash` is the motivating consumer). It fits the frozen worktree-helper contract (§2.8) without enlarging it: the helper neither writes nor reads the record — it only deletes it, alongside the handoff, in `cdd-worktree-done`.
+
+The record is **advisory and reconstructible**. It is written by the command steps, so it is only as reliable as those steps — but it is strictly better than inferring a task's stage by regex over handoffs, branches, and `gh` output. It is a **local cache** describing work on *this* machine; it is explicitly **not** a cross-machine transfer mechanism, carries no git-notes/refs sync, and holds a snapshot plus timestamps, **not** an event history. Multi-machine resume (regenerating this state from a remote branch) is separate future work (issue #22). A consumer that finds the file missing or stale falls back to inference; a writer that finds it missing does not fabricate one (only `/cdd-next-step` creates it).
+
+Schema (`schema_version` lets consumers version their parser):
+
+```json
+{
+  "schema_version": 1,
+  "branch": "task_state_tracking",
+  "stage": "implementation",
+  "status": "plan_approved",
+  "pr": null,
+  "sessions": [
+    { "id": "<uuid>", "resume": "claude --resume <uuid>", "url": null,
+      "stage": "implementation", "recorded_at": "<iso8601>" }
+  ],
+  "machine": "<hostname>",
+  "created_at": "<iso8601>",
+  "updated_at": "<iso8601>"
+}
+```
+
+`pr` is the integer PR number once a PR exists, else `null`. `sessions` is **append-only**: each in-worktree session that advances the task appends its own link, so the full chain is preserved and the last element is the most recent session. A writer derives its session id from the `CLAUDE_CODE_SESSION_ID` environment variable (which equals the resumable session, recoverable with `claude --resume <id>`); it appends an entry only when that variable is non-empty and differs from the last entry's `id` (this dedups repeated writes within one session while keeping the cross-session chain). If the variable is unset — older Claude Code — the writer omits the session entry rather than guessing. `url` is reserved for a future web-session link and is `null` for CLI sessions, which have none.
+
+The enumerated `stage`/`status` vocabulary and which session writes each transition:
+
+| stage            | status                | written by                                          |
+| ---------------- | --------------------- | --------------------------------------------------- |
+| `scoped`         | `handoff_ready`       | `/cdd-next-step` — seeds the record beside the handoff (`sessions: []`; it runs on a different session, on the default branch) |
+| `implementation` | `plan_approved`       | implementation session — on plan approval, before any code |
+| `implementation` | `implementation_done` | implementation session — after its local commit    |
+| `merge`          | `merged`              | `/cdd-merge-base` — after a successful merge         |
+| `pre_pr`         | `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
+| `pr_open`        | `open`                | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
+| `pr_review`      | `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
+
+The implementation session has no command file, so its two writes are driven by a standing instruction in the handoff that `/cdd-next-step` generates (the same mechanism that reinforces its self-commit, §3.3). Every writer refreshes `updated_at`. Consuming this record (e.g. teaching `cdd-worktree-list` to surface stage/status, or `cdd-dash` to read it instead of inferring) is downstream work and intentionally out of scope here.
 
 ## 3. Lifecycle
 
@@ -323,7 +364,7 @@ The session opens in plan mode, reads the handoff, and rebuilds its context from
 
 Plan mode is the load-bearing checkpoint here: the agent cannot modify files while in plan mode, so the human gets a guaranteed approval gate before any code is written.
 
-Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits its own changes locally (no push) per the commit conventions (§2.11) — stopping and surfacing rather than committing if the tree holds changes it didn't make. Because the implementation session has no command file, this commit is reinforced by a standing instruction in the handoff prompt that `/cdd-next-step` generates.
+Once the plan is approved, the session implements the task, updates architecture and feature docs to reflect the change, updates the roadmap (ticking the completed checkbox; applying any add/modify/remove edits previously discussed and approved), and commits its own changes locally (no push) per the commit conventions (§2.11) — stopping and surfacing rather than committing if the tree holds changes it didn't make. Because the implementation session has no command file, this commit — and the two state-record updates it makes (`plan_approved` on approval, `implementation_done` after the commit; §2.13) — are reinforced by a standing instruction in the handoff prompt that `/cdd-next-step` generates.
 
 ### 3.4 Merge session (optional): `/cdd-merge-base`
 

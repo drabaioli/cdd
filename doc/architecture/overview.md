@@ -17,7 +17,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── README.md                                 # repo entry point
 ├── .claude/
 │   ├── commands/                             # this repo's slash commands
-│   └── settings.json                         # auto-allows worktree sessions to read their handoff file
+│   └── settings.json                         # auto-allows sessions to read the handoff + write the task state record
 ├── .github/
 │   └── workflows/                            # CI (template-smoke runs the bootstrap end-to-end)
 ├── demo/                                     # filled-in seed + create/teardown automation (third artifact)

@@ -134,6 +134,9 @@ cdd-worktree-done() {
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   local handoff="$HOME/.cdd/handoffs/${repo_name}/${branch}.md"
+  # The per-task state record (written by the slash commands) is an additive
+  # sibling of the handoff; it shares the handoff's deletion lifecycle.
+  local state_file="${handoff%.md}.state.json"
 
   cd "$main_path" || return 1
   if ! git pull --ff-only origin "$default_branch"; then
@@ -194,11 +197,13 @@ cdd-worktree-done() {
     fi
   fi
 
-  # 3. Handoff deletion (only if branch was actually deleted).
-  if (( branch_deleted )) && [[ -f "$handoff" ]]; then
-    rm "$handoff" && echo "Removed handoff: $handoff"
-  elif [[ -f "$handoff" ]]; then
-    echo "Kept handoff: $handoff"
+  # 3. Handoff + state-record deletion (only if branch was actually deleted).
+  if (( branch_deleted )); then
+    [[ -f "$handoff" ]] && rm "$handoff" && echo "Removed handoff: $handoff"
+    [[ -f "$state_file" ]] && rm "$state_file" && echo "Removed state: $state_file"
+  else
+    [[ -f "$handoff" ]] && echo "Kept handoff: $handoff"
+    [[ -f "$state_file" ]] && echo "Kept state: $state_file"
   fi
 
   echo "Done. In $main_path on $default_branch at $(git rev-parse --short HEAD)."
