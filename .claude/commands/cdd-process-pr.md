@@ -154,4 +154,4 @@ Summarize what was processed:
 - Commits pushed: <count>
 ```
 
-Then record the task **state** (advisory; see the process doc §2.13). In `~/.cdd/handoffs/$REPO/$BRANCH.state.json` (with `REPO=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")` and `BRANCH=$(git rev-parse --abbrev-ref HEAD)`), read the record (skip this if it is absent — don't fabricate one), set `stage` to `pr_review`, `status` to `addressed`, and `pr` to NUMBER; refresh `updated_at` (`date -u +%Y-%m-%dT%H:%M:%SZ`); and — unless `$CLAUDE_CODE_SESSION_ID` is empty or already the `id` of the last `sessions` entry — append to `sessions` an object with `id` set to `$CLAUDE_CODE_SESSION_ID`, `resume` set to `claude --resume` followed by that id, `url` null, `stage` `pr_review`, and `recorded_at` the same UTC time. Write it back.
+Then advance the task **state record** (advisory; see the process doc §2.13), passing the PR number: run `cdd-state set addressed --pr NUMBER`. It skips silently if the record is absent.

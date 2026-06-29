@@ -169,6 +169,6 @@ Present a final summary:
 Next: re-run /cdd-pre-pr before opening or updating the PR.
 ```
 
-Then record the task **state** (advisory; see the process doc §2.13). In `~/.cdd/handoffs/$REPO/$BRANCH.state.json` (with `REPO=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")` and `BRANCH=$(git rev-parse --abbrev-ref HEAD)`), read the record (skip this if it is absent — don't fabricate one), set `stage` to `merge` and `status` to `merged`, refresh `updated_at` (`date -u +%Y-%m-%dT%H:%M:%SZ`), and — unless `$CLAUDE_CODE_SESSION_ID` is empty or already the `id` of the last `sessions` entry — append to `sessions` an object with `id` set to `$CLAUDE_CODE_SESSION_ID`, `resume` set to `claude --resume` followed by that id, `url` null, `stage` `merge`, and `recorded_at` the same UTC time. Write it back.
+Then advance the task **state record** (advisory; see the process doc §2.13): run `cdd-state set merged`. It skips silently if the record is absent.
 
 The user should re-run `/cdd-pre-pr` in a fresh session after `/cdd-merge-base` to ensure the merged state passes all gates.

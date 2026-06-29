@@ -131,7 +131,7 @@ End the implementation prompt with these standing instructions (verbatim):
 >
 > When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
 >
-> Twice, update the task **state record** — the JSON file `/cdd-next-step` seeded beside this handoff, at `~/.cdd/handoffs/$REPO/$BRANCH.state.json` (with `REPO=$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")` and `BRANCH=$(git rev-parse --abbrev-ref HEAD)`). Read it, edit the fields, write it back: **when the plan is approved** (before writing any code) set `stage` to `implementation` and `status` to `plan_approved`; **after your local commit** set `status` to `implementation_done`. Each time, refresh `updated_at` to the current UTC time (`date -u +%Y-%m-%dT%H:%M:%SZ`) and, unless `$CLAUDE_CODE_SESSION_ID` is empty or already the `id` of the last entry in `sessions`, append to `sessions` an object with `id` set to `$CLAUDE_CODE_SESSION_ID`, `resume` set to `claude --resume` followed by that id, `url` null, `stage` `implementation`, and `recorded_at` the same UTC time. The record is advisory — if it is missing or anything is unclear, skip it rather than guessing. (See the process doc §2.13 for the full schema.)
+> Twice, advance the task **state record** with the `cdd-state` helper (advisory; it skips silently if the record is absent): **when the plan is approved**, before writing any code, run `cdd-state set plan_approved`; **after your local commit**, run `cdd-state set implementation_done`.
 
 Show the draft to the user for approval. Iterate if needed.
 
@@ -165,20 +165,10 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/cdd
 ```
 
-Then seed the task **state record** beside the handoff — the slash commands update this file as the task moves through its stages, and external tools (e.g. cdd-dash) read it (see the process doc §2.13). Resolve the `$(...)` values first (`hostname`, and `date -u +%Y-%m-%dT%H:%M:%SZ` for both timestamps), then write `~/.cdd/handoffs/cdd/<branch>.state.json`:
+Then seed the task **state record** beside the handoff — the slash commands advance this file as the task moves through its stages, and external tools read it (see the process doc §2.13). One command does it:
 
-```json
-{
-  "schema_version": 1,
-  "branch": "<branch>",
-  "stage": "scoped",
-  "status": "handoff_ready",
-  "pr": null,
-  "sessions": [],
-  "machine": "$(hostname)",
-  "created_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "updated_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
+```bash
+cdd-state seed <branch>
 ```
 
 ## 8. Print the next command
@@ -189,9 +179,10 @@ After writing, print exactly (the install line is a static reminder — do **not
 Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
 
-If `cdd-worktree` is "command not found", install the shared helper once (machine-global, like git/gh), then open a new shell:
+If `cdd-worktree` or `cdd-state` is "command not found", install the shared helpers once (machine-global, like git/gh), then open a new shell:
   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
-  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install)
+  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-state.sh --create-dirs -o ~/.cdd/tools/cdd-state.sh && bash ~/.cdd/tools/cdd-state.sh install
+  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install)
 ```
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.
