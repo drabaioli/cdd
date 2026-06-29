@@ -17,6 +17,7 @@ There is no unit-test suite; behaviour is exercised by integration-style smoke a
 
 - `bash -n` over all shell scripts (syntax).
 - `./scripts/command-drift-check.sh` — repo `.claude/commands/` vs the rendered template, plus the handoff-schema and worktree-helper assertions.
+- `./scripts/prompt-seam-check.sh` — deterministic seam contracts between the repo's own prompts: `/cdd-*` references resolve to a command file, the `gh_issue_NN` branch token is produced and consumed in agreement, backticked file paths resolve, and each command keeps its load-bearing headings.
 - End-to-end bootstrap smoke: `tools/bootstrap-cdd-project.sh` into a tmpdir + `scripts/template-smoke-assert.sh` (clean, link-valid tree).
 - Demo seed-overlay smoke: `demo/setup.sh … --local-only`.
 
@@ -24,7 +25,7 @@ New behaviour in a script or the bootstrap path ships with the relevant smoke or
 
 ## Continuous integration — Enforced
 
-`.github/workflows/template-smoke.yml` runs shellcheck, the command-drift check, the end-to-end bootstrap smoke, and the demo seed-overlay step on every PR.
+`.github/workflows/template-smoke.yml` runs shellcheck, the command-drift check, the prompt-seam check, the end-to-end bootstrap smoke, and the demo seed-overlay step on every PR.
 
 ## Lint & format — Enforced (lint); Expected (format)
 
