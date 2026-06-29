@@ -155,6 +155,8 @@ These helpers encode an invariant worth stating explicitly:
 
 This invariant prevents losing in-flight work and prevents stale handoffs from accumulating.
 
+A second, equally project-independent helper — `cdd-state` (`tools/cdd-state.sh`) — manages the per-task state record (§2.13). It installs the same way (dual-mode, self-installing, machine-global, newest-wins) and has its own tiny contract: `seed` / `set` plus the `<branch>.state.json` layout. It is independent of the worktree helper, which only *deletes* the record, so the frozen three-command worktree contract above is unchanged.
+
 ### 2.9 The two-identifier model
 
 Every CDD project carries two distinct identifiers, and the template encodes them as separate placeholders so substitution can't conflate them:
@@ -205,9 +207,11 @@ A practice moves from **expected** to **enforced** in the same change that lands
 
 ### 2.13 Per-task state record (`~/.cdd/handoffs/<repo>/<branch>.state.json`)
 
-A small JSON file that records where a task sits in its lifecycle and which Claude Code sessions have worked it. It is an **additive sibling of the handoff** (§2.6): same per-repo directory, same `<branch>` basename, same branch-scoped/ephemeral lifecycle. The slash commands write it at their stage transitions; external tools read it (the dashboard `cdd-dash` is the motivating consumer). It fits the frozen worktree-helper contract (§2.8) without enlarging it: the helper neither writes nor reads the record — it only deletes it, alongside the handoff, in `cdd-worktree-done`.
+A small JSON file recording where a task sits in its lifecycle and which Claude Code sessions have worked it. It is an **additive sibling of the handoff** (§2.6): same per-repo directory, same `<branch>` basename, same branch-scoped/ephemeral lifecycle. The primary payoff is the **session chain** — given a branch, you can find and resume the session(s) that worked it (`claude --resume <id>`) without grepping shell history. A dashboard (`cdd-dash`) is one downstream consumer, not the justification.
 
-The record is **advisory and reconstructible**. It is written by the command steps, so it is only as reliable as those steps — but it is strictly better than inferring a task's stage by regex over handoffs, branches, and `gh` output. It is a **local cache** describing work on *this* machine; it is explicitly **not** a cross-machine transfer mechanism, carries no git-notes/refs sync, and holds a snapshot plus timestamps, **not** an event history. Multi-machine resume (regenerating this state from a remote branch) is separate future work (issue #22). A consumer that finds the file missing or stale falls back to inference; a writer that finds it missing does not fabricate one (only `/cdd-next-step` creates it).
+The record is **advisory**: a consumer that finds it missing or stale falls back to inferring state from handoffs, branches, and `gh`; a writer that finds it missing does not fabricate one (only `/cdd-next-step` creates it). It is a **local cache** of work on *this* machine — not a cross-machine transfer mechanism and not an event history; multi-machine resume is separate future work (issue #22). It fits the frozen worktree-helper contract (§2.8) without enlarging it: `cdd-worktree-done` only deletes the record, alongside the handoff.
+
+Writes go through a small **`cdd-state` helper** (`tools/cdd-state.sh`), dual-mode and self-installing like the worktree helper: `cdd-state seed <branch>` creates the record, `cdd-state set <stage> [--pr N]` advances it. Routing every write through one helper makes them atomic (temp-file + rename) and well-formed, so the malformed-JSON / wrong-field failure mode of hand-editing is gone; the model still decides *when* to call it. The helper is advisory end-to-end — absent `jq` or an absent record, it no-ops rather than failing the workflow.
 
 Schema (`schema_version` lets consumers version their parser):
 
@@ -215,34 +219,27 @@ Schema (`schema_version` lets consumers version their parser):
 {
   "schema_version": 1,
   "branch": "task_state_tracking",
-  "stage": "implementation",
-  "status": "plan_approved",
+  "stage": "plan_approved",
   "pr": null,
-  "sessions": [
-    { "id": "<uuid>", "resume": "claude --resume <uuid>", "url": null,
-      "stage": "implementation", "recorded_at": "<iso8601>" }
-  ],
-  "machine": "<hostname>",
-  "created_at": "<iso8601>",
-  "updated_at": "<iso8601>"
+  "sessions": [ { "id": "<uuid>", "stage": "plan_approved" } ]
 }
 ```
 
-`pr` is the integer PR number once a PR exists, else `null`. `sessions` is **append-only**: each in-worktree session that advances the task appends its own link, so the full chain is preserved and the last element is the most recent session. A writer derives its session id from the `CLAUDE_CODE_SESSION_ID` environment variable (which equals the resumable session, recoverable with `claude --resume <id>`); it appends an entry only when that variable is non-empty and differs from the last entry's `id` (this dedups repeated writes within one session while keeping the cross-session chain). If the variable is unset — older Claude Code — the writer omits the session entry rather than guessing. `url` is reserved for a future web-session link and is `null` for CLI sessions, which have none.
+`pr` is the integer PR number once a PR exists, else `null`. `sessions` is **append-only**: each in-worktree session that advances the task appends a `{id, stage}` entry, so the chain is preserved and the last element is the most recent session. The helper takes the id from `CLAUDE_CODE_SESSION_ID` and appends only when it is non-empty and differs from the last entry's `id` (dedups repeated writes within one session); if the variable is unset — older Claude Code — it omits the entry rather than guessing. A consumer derives the resume command as `claude --resume <id>`.
 
-The enumerated `stage`/`status` vocabulary and which session writes each transition:
+`stage` is a single enum (no separate status); each transition and its writer:
 
-| stage            | status                | written by                                          |
-| ---------------- | --------------------- | --------------------------------------------------- |
-| `scoped`         | `handoff_ready`       | `/cdd-next-step` — seeds the record beside the handoff (`sessions: []`; it runs on a different session, on the default branch) |
-| `implementation` | `plan_approved`       | implementation session — on plan approval, before any code |
-| `implementation` | `implementation_done` | implementation session — after its local commit    |
-| `merge`          | `merged`              | `/cdd-merge-base` — after a successful merge         |
-| `pre_pr`         | `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
-| `pr_open`        | `open`                | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
-| `pr_review`      | `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
+| `stage`               | written by                                          |
+| --------------------- | --------------------------------------------------- |
+| `scoped`              | `/cdd-next-step` — seeds the record (`sessions: []`; it runs on a different session, on the default branch) |
+| `plan_approved`       | implementation session — on plan approval, before any code |
+| `implementation_done` | implementation session — after its local commit     |
+| `merged`              | `/cdd-merge-base` — after a successful merge         |
+| `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
+| `pr_open`             | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
+| `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
 
-The implementation session has no command file, so its two writes are driven by a standing instruction in the handoff that `/cdd-next-step` generates (the same mechanism that reinforces its self-commit, §3.3). Every writer refreshes `updated_at`. Consuming this record (e.g. teaching `cdd-worktree-list` to surface stage/status, or `cdd-dash` to read it instead of inferring) is downstream work and intentionally out of scope here.
+The implementation session has no command file, so its two `cdd-state set` calls are driven by a standing instruction in the handoff that `/cdd-next-step` generates (the same mechanism that reinforces its self-commit, §3.3). Consuming the record (e.g. `cdd-dash` reading it instead of inferring) is downstream work, out of scope here.
 
 ## 3. Lifecycle
 

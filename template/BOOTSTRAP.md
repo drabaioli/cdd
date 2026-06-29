@@ -13,7 +13,7 @@ After bootstrap, the new project directory contains:
 ├── CLAUDE.md                                 # entry point Claude Code reads
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
-│   ├── settings.json                         # auto-allows sessions to read the handoff + write the task state record
+│   ├── settings.json                         # auto-allows sessions to read the handoff + run the cdd-state helper
 │   └── commands/
 │       ├── cdd-next-step.md                      # handoff session
 │       ├── cdd-pre-pr.md                         # pre-PR session
@@ -67,21 +67,24 @@ The script will:
 
 ## After bootstrap
 
-1. **Install the shared worktree helper (one-time, project-independent).** If you haven't installed it for an earlier CDD project, install it once. If you have the CDD repo checked out:
+1. **Install the shared helpers (one-time, project-independent).** Two self-installing scripts — the worktree helper and the task-state helper. If you haven't installed them for an earlier CDD project, install them once. If you have the CDD repo checked out:
 
    ```bash
-   ./tools/cdd-worktree.sh install
+   ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install
    ```
 
-   On a fresh machine that only has *this* project (no CDD repo checkout), fetch the canonical helper and install it in one step:
+   On a fresh machine that only has *this* project (no CDD repo checkout), fetch each canonical helper and install it in one step:
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
      --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
      && bash ~/.cdd/tools/cdd-worktree.sh install
+   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-state.sh \
+     --create-dirs -o ~/.cdd/tools/cdd-state.sh \
+     && bash ~/.cdd/tools/cdd-state.sh install
    ```
 
-   (It must land on disk first — `curl … | bash` won't work, because the installer copies itself from its own file path.) Either form copies the helper to `~/.cdd/tools/cdd-worktree.sh` and wires `~/.bashrc` and `~/.zshrc` to source it (idempotent). Open a new shell. After this, `cdd-worktree` works in every CDD project — there is nothing per-project to add. The helper is a machine-global toolchain dependency, like `git` or `gh`: one install per machine, newest wins. `/cdd-next-step` prints this install line as a reminder, so a missing install is a one-paste fix rather than a hunt.
+   (Each must land on disk first — `curl … | bash` won't work, because each installer copies itself from its own file path.) Either form copies the helper to `~/.cdd/tools/` and wires `~/.bashrc` and `~/.zshrc` to source it (idempotent). Open a new shell. After this, `cdd-worktree` and `cdd-state` work in every CDD project — there is nothing per-project to add. They are machine-global toolchain dependencies, like `git` or `gh`: one install per machine, newest wins. `/cdd-next-step` prints these install lines as a reminder, so a missing install is a one-paste fix rather than a hunt.
 
 2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 

@@ -4,14 +4,14 @@ A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`t
 
 - `CLAUDE.md` skeleton with placeholders for project-specific content.
 - `.claude/commands/{next-step,pre-pr,merge-main,process-pr}.md`: the four slash commands.
-- `.claude/settings.json`: auto-allows worktree sessions to read their handoff file and write the colocated per-task state record (`~/.cdd/handoffs/<PROJECT_DIR>/**`), substituted at bootstrap.
+- `.claude/settings.json`: auto-allows worktree sessions to read their handoff file (`~/.cdd/handoffs/<PROJECT_DIR>/**`, substituted at bootstrap) and to run the `cdd-state` helper that maintains the colocated per-task state record.
 - `doc/index.md` plus `doc/{architecture,features,knowledge_base}/`: the documentation map and doc directory skeletons; the architecture and features skeletons follow the index-plus-per-topic-docs convention.
 - `doc/knowledge_base/project-overview.md`: the project-charter skeleton (what it is, goals, what it does and does not do, constraints, architecture intentions) — a living document, kept current. Filled by `/cdd-bootstrap` from discovery, or by hand otherwise.
 - `doc/knowledge_base/roadmap.md`: roadmap skeleton with a pre-filled Phase 1 of CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md and overview stubs, engineering-practices fill, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to distribute across the project's real phases. The pre-filled phase serves files-only starts (`/cdd-retrofit` install + the manual script); `/cdd-bootstrap` writes those docs through discovery and ships a real roadmap without it.
 - `doc/knowledge_base/engineering-practices.md`: the engineering-practices contract skeleton — each practice marked *enforced* (a CDD gate guarantees it) or *expected* (committed, tracked on the roadmap until mechanized), with placeholders for the project's own test/CI/lint commands. Filled in during the bootstrap phase.
 - `BOOTSTRAP.md`: meta-documentation for the bootstrap recipe. Not copied into the bootstrapped tree.
 
-The template ships no worktree helper: it is a single project-independent script (`tools/cdd-worktree.sh` in the CDD repo) that the user installs once, not a per-project copy.
+The template ships no shell helpers: the worktree helper (`tools/cdd-worktree.sh`) and the task-state helper (`tools/cdd-state.sh`) are project-independent scripts in the CDD repo that the user installs once, not per-project copies.
 
 The bootstrap script substitutes the two identifiers (`<PROJECT_NAME>`, `<PROJECT_DIR>`), writes the baseline marker `.claude/cdd-baseline` (the CDD repo commit the template was rendered from), runs `git init`, and creates the scaffold commit. It also offers a render-only mode (`--stage`, with `--dir` and `--template-dir` overrides) that skips the git steps; `/cdd-retrofit` drives it. A GitHub Actions workflow (`template-smoke`) exercises the script on every PR — including a staged render — and asserts that the bootstrapped tree has no stale placeholders, no dangling internal links, and a well-formed marker.
 
