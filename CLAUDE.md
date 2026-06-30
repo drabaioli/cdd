@@ -40,7 +40,7 @@ This repo is documentation and shell scripts; there is no build step. Verificati
 ```bash
 # Shell script sanity (CI also runs shellcheck over the same set).
 bash -n scripts/*.sh
-bash -n tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh
+bash -n tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh tools/cdd-state.sh
 bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
 # Command-set drift: repo .claude/commands/ vs the rendered template.
@@ -86,7 +86,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `scripts/`                         | Template smoke assertions + install smoke + command-set drift check + prompt-seam check (with whitelists) |
 | `.github/workflows/`               | CI: `template-smoke.yml` runs the bootstrap end-to-end    |
 | `.claude/commands/`                | This repo's own slash commands                            |
-| `tools/`                           | Bootstrap script + the canonical shared worktree helper (`cdd-worktree.sh`, self-installing) |
+| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) |
 
 ## Architecture
 
