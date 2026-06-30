@@ -330,13 +330,17 @@ cdd-worktree-resume() {
       have_gh=1
     fi
 
+    # Iterate full refnames and strip the full prefix: the short form of the
+    # origin/HEAD symref is "origin/HEAD" on older git but just "origin" on
+    # newer git, which would slip past a "$rb" == HEAD check and become a bogus
+    # candidate. The full refname (refs/remotes/origin/HEAD) is stable.
     local candidates=() rb
     while IFS= read -r rb; do
-      rb="${rb#origin/}"
+      rb="${rb#refs/remotes/origin/}"
       [[ "$rb" == "HEAD" || "$rb" == "$default_branch" ]] && continue
       grep -qx "$rb" <<<"$worktree_branches" && continue
       candidates+=("$rb")
-    done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin 2>/dev/null)
+    done < <(git for-each-ref --format='%(refname)' refs/remotes/origin 2>/dev/null)
 
     if (( ${#candidates[@]} == 0 )); then
       echo "No remote feature branches to resume (all are local worktrees or none exist)." >&2
