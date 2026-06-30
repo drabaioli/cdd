@@ -153,3 +153,5 @@ Summarize what was processed:
 - Change-requests declined: <count> (replies explain why)
 - Commits pushed: <count>
 ```
+
+Then advance the task **state record** (advisory; see the process doc §2.13), passing the PR number: run `cdd-state set addressed --pr NUMBER`. It skips silently if the record is absent.

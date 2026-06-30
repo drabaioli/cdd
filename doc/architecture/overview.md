@@ -17,7 +17,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── README.md                                 # repo entry point
 ├── .claude/
 │   ├── commands/                             # this repo's slash commands
-│   └── settings.json                         # auto-allows worktree sessions to read their handoff file
+│   └── settings.json                         # auto-allows sessions to read the handoff + run the cdd-state helper
 ├── .github/
 │   └── workflows/                            # CI (template-smoke runs the bootstrap end-to-end)
 ├── demo/                                     # filled-in seed + create/teardown automation (third artifact)
@@ -33,7 +33,8 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── template/                                 # copy-paste material for new projects
 └── tools/
     ├── bootstrap-cdd-project.sh              # non-interactive bootstrap for new projects
-    └── cdd-worktree.sh                       # this repo's worktree helper
+    ├── cdd-worktree.sh                       # shared worktree helper (self-installing)
+    └── cdd-state.sh                          # shared task-state helper (self-installing)
 ```
 
 ## Layer relationships

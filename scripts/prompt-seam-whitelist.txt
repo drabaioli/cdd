@@ -3,9 +3,10 @@
 # Exact-line match; lines starting with # and blank lines are ignored.
 
 # --- Not slash commands (check 1: command-name resolution) ---
-# The sourced shell helper (tools/cdd-worktree.sh), written without a leading
-# slash precisely because it is not a slash command.
+# The sourced shell helpers (tools/cdd-worktree.sh, tools/cdd-state.sh),
+# written without a leading slash precisely because they are not slash commands.
 /cdd-worktree
+/cdd-state
 # Baseline marker file path (.claude/cdd-baseline), not a command.
 /cdd-baseline
 # Smoke-test temp dirs (/tmp/cdd-smoke, /tmp/cdd-demo-smoke), not commands.

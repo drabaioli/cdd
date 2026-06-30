@@ -69,7 +69,7 @@ For each file `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it (`rm ~/.cdd/handoffs/cdd/<branch>.md`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it together with its state sibling (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
@@ -130,6 +130,8 @@ End the implementation prompt with these standing instructions (verbatim):
 > Before writing a plan, surface any remaining open questions and confirm scope with the user.
 >
 > When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
+>
+> Twice, advance the task **state record** with the `cdd-state` helper (advisory; it skips silently if the record is absent): **when the plan is approved**, before writing any code, run `cdd-state set plan_approved`; **after your local commit**, run `cdd-state set implementation_done`.
 
 Show the draft to the user for approval. Iterate if needed.
 
@@ -163,6 +165,12 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/cdd
 ```
 
+Then seed the task **state record** beside the handoff — the slash commands advance this file as the task moves through its stages, and external tools read it (see the process doc §2.13). One command does it:
+
+```bash
+cdd-state seed <branch>
+```
+
 ## 8. Print the next command
 
 After writing, print exactly (the install line is a static reminder — do **not** probe for the helper on every run; it's a once-per-machine setup the user ignores once done):
@@ -171,9 +179,10 @@ After writing, print exactly (the install line is a static reminder — do **not
 Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>
 
-If `cdd-worktree` is "command not found", install the shared helper once (machine-global, like git/gh), then open a new shell:
+If `cdd-worktree` or `cdd-state` is "command not found", install the shared helpers once (machine-global, like git/gh), then open a new shell:
   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
-  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install)
+  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-state.sh --create-dirs -o ~/.cdd/tools/cdd-state.sh && bash ~/.cdd/tools/cdd-state.sh install
+  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install)
 ```
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.

@@ -4,7 +4,9 @@
       "Read(~/.cdd/handoffs/<PROJECT_DIR>/**)",
       "Bash(mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>*)",
       "Bash(ls ~/.cdd/handoffs/<PROJECT_DIR>/*)",
-      "Bash(rm ~/.cdd/handoffs/<PROJECT_DIR>/*.md)"
+      "Bash(rm ~/.cdd/handoffs/<PROJECT_DIR>/*.md)",
+      "Bash(rm ~/.cdd/handoffs/<PROJECT_DIR>/*.state.json)",
+      "Bash(cdd-state*)"
     ]
   }
 }

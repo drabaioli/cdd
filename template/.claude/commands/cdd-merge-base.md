@@ -169,4 +169,6 @@ Present a final summary:
 Next: re-run /cdd-pre-pr before opening or updating the PR.
 ```
 
+Then advance the task **state record** (advisory; see the process doc §2.13): run `cdd-state set merged`. It skips silently if the record is absent.
+
 The user should re-run `/cdd-pre-pr` in a fresh session after `/cdd-merge-base` to ensure the merged state passes all gates.

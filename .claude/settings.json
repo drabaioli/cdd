@@ -4,7 +4,9 @@
       "Read(~/.cdd/handoffs/cdd/**)",
       "Bash(mkdir -p ~/.cdd/handoffs/cdd*)",
       "Bash(ls ~/.cdd/handoffs/cdd/*)",
-      "Bash(rm ~/.cdd/handoffs/cdd/*.md)"
+      "Bash(rm ~/.cdd/handoffs/cdd/*.md)",
+      "Bash(rm ~/.cdd/handoffs/cdd/*.state.json)",
+      "Bash(cdd-state*)"
     ]
   }
 }

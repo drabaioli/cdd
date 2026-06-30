@@ -148,6 +148,7 @@ Elevate the two under-guarded founding objectives — instilling engineering bes
 - [ ] Reinforce objective 2 at bootstrap: a required bootstrap-phase task and/or checklist, once the `/cdd-pre-pr` mechanism is proven.
 - [ ] Objective-1 mechanizations: codify when `/cdd-merge-base` is recommended/auto-triggered; consider a mechanical gate-honored check.
 - [x] Deterministic prompt seam-contract checks (Tier 1; issue #23). `scripts/prompt-seam-check.sh` (+ whitelist) pins four grep-only seams between the workflow's own prompts — the four are enumerated in the script header and `engineering-practices.md`. CDD-repo-only; wired into CI, `/cdd-pre-pr`, and the engineering-practices enforced list. A recurring objective-1 reliability guardrail. Scope decision — deterministic checks only, no generalized "prompt lint" framework and no LLM-as-judge evals — in ADR [`0002-scope-prompt-seam-checks-deterministic-only.md`](../architecture/adr/0002-scope-prompt-seam-checks-deterministic-only.md).
+- [ ] Trim process-doc references in the commands: ~14 "read the process doc §N" pointers across the 7 commands pull a large file into context on each run; embed the needed snippet or a tighter pointer instead. Efficiency, not correctness. — surfaced in PR #38 review.
 
 **Milestone:** all three founding objectives are named commitments in §1, each with at least one recurring guardrail or a tracked plan to add one.
 
@@ -165,3 +166,14 @@ Prepare CDD to be open-sourced publicly: license it, rewrite the README to expla
 - [x] Confirm the public repo home / org and update the README badge + clone URLs accordingly (currently point at `github.com/drabaioli/cdd`). — Public home stays `github.com/drabaioli/cdd` (no org move); README badge, clone URL, and issues URL verified correct — no rewrite needed.
 
 **Milestone:** CDD is presentable and safe to open-source publicly — licensed, with a README that explains and demonstrates the workflow — with the remaining open-source essentials tracked.
+
+## Phase 13: Task state & observability
+
+Give each task a machine-readable record of where it sits in its lifecycle and which Claude Code sessions have worked it, so tooling can show task state instead of inferring it from handoffs, branches, and `gh`.
+
+- [x] Per-task state record + `cdd-state` helper: a `<branch>.state.json` sibling of the handoff, advanced through the lifecycle by the slash commands via `tools/cdd-state.sh` (atomic `seed`/`set`, self-installing). Advisory, local-only, append-only `{id, stage}` session chain. Full design and schema in process doc §2.13. — §2.13 + §2.6/§2.8/§3.3, all four command copies (repo + template), both `settings.json`, `tools/cdd-state.sh` (new) and `tools/cdd-worktree.sh` (deletion), architecture/feature docs, BOOTSTRAP.md.
+- [ ] Harden the one outcome transition a tool call owns: a `PostToolUse` hook on `gh pr create` that parses the PR number and writes `pr_open`/`pr=NN` mechanically (`cdd-state` as the hook target), removing the model-remembering dependency. (A `UserPromptSubmit` hook fires deterministically on every `/cdd-*` call, but only at invocation — it can stamp "stage started", not outcomes like `checks_passed` or the PR number, which stay model-driven via `cdd-state set`.)
+- [ ] Consume the record: teach the `cdd-dash` dashboard to read `stage`/`sessions` instead of inferring task state. (`cdd-worktree-list` already infers worktree/branch/PR status fine and does not need the record — fold in only if a concrete need appears.)
+- [ ] Multi-machine resume: regenerate this state from a remote branch so a task can be picked up on another machine (issue #22). Needs a sync mechanism (git notes/refs) — explicitly out of scope for the local cache above.
+
+**Milestone:** a task's lifecycle stage and its working sessions are recorded as data and surfaced by CDD tooling, not reconstructed by inference.
