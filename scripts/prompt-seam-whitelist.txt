@@ -1,0 +1,21 @@
+# Tokens that look like a /cdd-* slash command or a repo file path but are
+# intentionally NOT one. Consulted by scripts/prompt-seam-check.sh.
+# Exact-line match; lines starting with # and blank lines are ignored.
+
+# --- Not slash commands (check 1: command-name resolution) ---
+# The sourced shell helper (tools/cdd-worktree.sh), written without a leading
+# slash precisely because it is not a slash command.
+/cdd-worktree
+# Baseline marker file path (.claude/cdd-baseline), not a command.
+/cdd-baseline
+# Smoke-test temp dirs (/tmp/cdd-smoke, /tmp/cdd-demo-smoke), not commands.
+/cdd-smoke
+/cdd-demo-smoke
+# Retired command name, kept only in roadmap completion annotations that
+# document the /cdd-merge-main -> /cdd-merge-base rename (#31). Historical.
+/cdd-merge-main
+
+# --- Downstream paths absent from the CDD repo (check 3: path existence) ---
+# Produced by /cdd-bootstrap in a downstream project; the CDD repo's own
+# overview lives at doc/architecture/overview.md instead.
+doc/knowledge_base/project-overview.md

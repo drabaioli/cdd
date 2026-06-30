@@ -25,6 +25,9 @@ jobs:
       - name: Command-set drift check (repo commands vs rendered template)
         run: ./scripts/command-drift-check.sh
 
+      - name: Prompt-seam check (command refs, branch token, paths, sections)
+        run: ./scripts/prompt-seam-check.sh
+
       - name: Worktree-helper install smoke (against a throwaway HOME)
         run: ./scripts/install-smoke-assert.sh
 

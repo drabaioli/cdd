@@ -105,6 +105,20 @@ The script renders the template through `bootstrap-cdd-project.sh --stage` with 
 If the script exits 0, report "no drift" and continue. If it reports divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence). Apply fixes only on user approval. Do not auto-edit either tree from this step.
 
 When presenting the step 8 checklist, append a `- [ ] Command-set drift clean` line to it.
+
+## Prompt-seam checks (CDD repo only)
+
+Also specific to the CDD repo: deterministic seam-contract checks over the repo's own prompts (the slash-commands and the docs around them), guarding against a one-sided edit silently stranding a downstream prompt-driven step.
+
+```bash
+./scripts/prompt-seam-check.sh
+```
+
+It verifies four seams with grep only (no LLM, no API key): every `/cdd-*` reference across the repo's markdown resolves to an existing command file (known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`); the `gh_issue_NN` branch token produced in `cdd-next-step.md` is still consumed (turned into a `Closes #NN` line) in `cdd-pre-pr.md`; backticked file paths in the command files, `CLAUDE.md`, and `README.md` resolve to real files; and each `cdd-*.md` still carries its load-bearing headings. CI runs it on every PR via `template-smoke.yml`.
+
+If the script exits 0, report "prompt seams clean" and continue. If it reports a broken seam, present each one to the user; for each, the user decides whether to fix the reference/heading/path or record a justified exception (a whitelist entry). Apply fixes only on user approval.
+
+When presenting the step 8 checklist, append a `- [ ] Prompt seams clean` line to it.
 <!-- cdd-only-end -->
 ## 8. Summary
 

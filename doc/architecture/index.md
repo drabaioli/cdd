@@ -9,3 +9,4 @@ How this repo is structured. This index is a pointer list — the content lives 
 - [The demo layer](demo.md) — the third artifact: filled-in seed + create/teardown automation
 - `adr/` — architecture decision records (`adr/0000-template.md` for the format)
   - [`0001-name-and-guard-founding-objectives.md`](adr/0001-name-and-guard-founding-objectives.md) — naming and guarding CDD's two under-guarded founding objectives (engineering practices, self-improvement)
+  - [`0002-scope-prompt-seam-checks-deterministic-only.md`](adr/0002-scope-prompt-seam-checks-deterministic-only.md) — scoping prompt "CI" to deterministic seam checks; why LLM-as-judge evals (and a generalized prompt-lint framework) are not planned work
