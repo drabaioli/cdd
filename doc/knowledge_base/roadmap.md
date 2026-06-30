@@ -148,6 +148,7 @@ Elevate the two under-guarded founding objectives — instilling engineering bes
 - [ ] Reinforce objective 2 at bootstrap: a required bootstrap-phase task and/or checklist, once the `/cdd-pre-pr` mechanism is proven.
 - [ ] Objective-1 mechanizations: codify when `/cdd-merge-base` is recommended/auto-triggered; consider a mechanical gate-honored check.
 - [x] Deterministic prompt seam-contract checks (Tier 1; issue #23). `scripts/prompt-seam-check.sh` (+ whitelist) pins four grep-only seams between the workflow's own prompts — the four are enumerated in the script header and `engineering-practices.md`. CDD-repo-only; wired into CI, `/cdd-pre-pr`, and the engineering-practices enforced list. A recurring objective-1 reliability guardrail. Scope decision — deterministic checks only, no generalized "prompt lint" framework and no LLM-as-judge evals — in ADR [`0002-scope-prompt-seam-checks-deterministic-only.md`](../architecture/adr/0002-scope-prompt-seam-checks-deterministic-only.md).
+- [ ] Trim process-doc references in the commands: ~14 "read the process doc §N" pointers across the 7 commands pull a large file into context on each run; embed the needed snippet or a tighter pointer instead. Efficiency, not correctness. — surfaced in PR #38 review.
 
 **Milestone:** all three founding objectives are named commitments in §1, each with at least one recurring guardrail or a tracked plan to add one.
 
