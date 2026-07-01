@@ -57,12 +57,11 @@
 #   cdd-worktree-resume [<branch>]
 #                           Pick up a task started on another machine: recreate
 #                               a worktree tracking an EXISTING remote branch
-#                               (no handoff required) and cd into it, leaving you
-#                               ready to run /cdd-process-pr, /cdd-merge-base, or
-#                               /cdd-pre-pr. Does not launch Claude Code. With no
-#                               argument, lists remote feature branches not
-#                               already checked out and prompts for one. Run from
-#                               the main worktree.
+#                               (no handoff required) and cd into it, ready for
+#                               you to run /cdd-process-pr, /cdd-merge-base, or
+#                               /cdd-pre-pr. With no argument, lists remote
+#                               feature branches not already checked out and
+#                               prompts for one. Run from the main worktree.
 
 # Resolve the repo's default branch from origin's HEAD, falling back to "main".
 # The remote is assumed to be named "origin" (see template/BOOTSTRAP.md).
