@@ -53,6 +53,15 @@
 #                               with worktree / branch / PR status. Highlights
 #                               stale entries (handoff with no branch and no
 #                               worktree) so they're obvious to clean up.
+#
+#   cdd-worktree-resume [<branch>]
+#                           Pick up a task started on another machine: recreate
+#                               a worktree tracking an EXISTING remote branch
+#                               (no handoff required) and cd into it, ready for
+#                               you to run /cdd-process-pr, /cdd-merge-base, or
+#                               /cdd-pre-pr. With no argument, lists remote
+#                               feature branches not already checked out and
+#                               prompts for one. Run from the main worktree.
 
 # Resolve the repo's default branch from origin's HEAD, falling back to "main".
 # The remote is assumed to be named "origin" (see template/BOOTSTRAP.md).
@@ -282,6 +291,118 @@ cdd-worktree-list() {
     printf '%-40s  %-8s  %-8s  %-12s  %s\n' \
            "$branch" "$wt" "$br" "$pr" "$status"
   done
+}
+
+# Recreate a worktree on an EXISTING remote branch so a task started on another
+# machine can be picked up here. Unlike cdd-worktree, this requires no handoff and
+# tracks the remote branch rather than creating a new one. The handoff and state
+# record are local-only and are NOT synced across machines (see process doc §2.8);
+# the resume-side commands (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read
+# PR/branch state from git and gh, not the handoff, so their absence is fine.
+cdd-worktree-resume() {
+  local branch="${1:-}"
+
+  # Same guard as cdd-worktree: the sibling worktree name is derived from $PWD, so
+  # insist on the main worktree to avoid nesting names.
+  local default_branch current_branch
+  default_branch="$(cdd-worktree-default-branch)"
+  current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
+  if [[ "$current_branch" != "$default_branch" ]]; then
+    echo "Run this from the main worktree on '$default_branch' (current: '$current_branch')." >&2
+    return 1
+  fi
+
+  if ! git fetch origin; then
+    echo "git fetch origin failed, aborting." >&2
+    return 1
+  fi
+
+  # Snapshot worktree branches once (reused for discovery and already-exists).
+  local worktree_branches
+  worktree_branches="$(git worktree list --porcelain 2>/dev/null \
+                        | awk '$1 == "branch" { sub("refs/heads/", "", $2); print $2 }')"
+
+  if [[ -z "$branch" ]]; then
+    # Discovery: remote feature branches (exclude default + HEAD) not already
+    # checked out as a local worktree.
+    local have_gh=0
+    if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+      have_gh=1
+    fi
+
+    # Iterate full refnames and strip the full prefix: the short form of the
+    # origin/HEAD symref is "origin/HEAD" on older git but just "origin" on
+    # newer git, which would slip past a "$rb" == HEAD check and become a bogus
+    # candidate. The full refname (refs/remotes/origin/HEAD) is stable.
+    local candidates=() rb
+    while IFS= read -r rb; do
+      rb="${rb#refs/remotes/origin/}"
+      [[ "$rb" == "HEAD" || "$rb" == "$default_branch" ]] && continue
+      grep -qx "$rb" <<<"$worktree_branches" && continue
+      candidates+=("$rb")
+    done < <(git for-each-ref --format='%(refname)' refs/remotes/origin 2>/dev/null)
+
+    if (( ${#candidates[@]} == 0 )); then
+      echo "No remote feature branches to resume (all are local worktrees or none exist)." >&2
+      return 1
+    fi
+
+    echo "Remote branches available to resume:"
+    local i pr_line
+    for i in "${!candidates[@]}"; do
+      pr_line=""
+      if (( have_gh )); then
+        pr_line="$(gh pr list --head "${candidates[$i]}" --state all \
+                     --json number,state \
+                     --jq '.[0] | select(.) | " (PR #\(.number) \(.state))"' 2>/dev/null)"
+      fi
+      printf '  %2d) %s%s\n' "$(( i + 1 ))" "${candidates[$i]}" "$pr_line"
+    done
+
+    local choice
+    read -r -p "Select a branch [1-${#candidates[@]}]: " choice
+    if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#candidates[@]} )); then
+      echo "Invalid selection: '$choice'." >&2
+      return 1
+    fi
+    branch="${candidates[$(( choice - 1 ))]}"
+  else
+    if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
+      echo "No remote branch origin/$branch (after fetch)." >&2
+      echo "Use 'cdd-worktree-resume' with no argument to list resumable branches." >&2
+      return 1
+    fi
+  fi
+
+  # Already checked out as a worktree? Point the user at it and stop.
+  if grep -qx "$branch" <<<"$worktree_branches"; then
+    local existing
+    existing="$(git worktree list --porcelain 2>/dev/null | awk -v ref="refs/heads/$branch" '
+      $1 == "worktree" { path = $2 }
+      $1 == "branch"   && $2 == ref { print path; exit }
+    ')"
+    echo "Branch '$branch' is already checked out at: ${existing:-<unknown>}" >&2
+    return 0
+  fi
+
+  local repo_dir
+  repo_dir="$(basename "$PWD")"
+  local worktree_path="../${repo_dir}-${branch}"
+
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    # Local branch already exists (no worktree yet): attach it.
+    git worktree add "$worktree_path" "$branch" || return 1
+  else
+    # Create a local branch tracking the existing remote branch.
+    git worktree add --track -b "$branch" "$worktree_path" "origin/$branch" || return 1
+  fi
+  cd "$worktree_path" || return 1
+
+  echo
+  echo "Resumed worktree for '$branch' on origin/$branch (now in $worktree_path)."
+  echo "Handoff/state were NOT transferred (they're local to the originating machine)."
+  echo "Resume-side commands read PR/branch state from git and gh, so this is fine."
+  echo "Next: start Claude Code here and run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
 }
 
 # Install this helper to its stable home and wire it into the user's shells.

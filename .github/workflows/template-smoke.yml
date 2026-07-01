@@ -31,6 +31,9 @@ jobs:
       - name: Worktree-helper install smoke (against a throwaway HOME)
         run: ./scripts/install-smoke-assert.sh
 
+      - name: Worktree-resume smoke (local bare repo as origin)
+        run: ./scripts/worktree-resume-assert.sh
+
       - name: Configure git identity for the scaffold commit
         run: |
           git config --global user.email "ci@example.com"
