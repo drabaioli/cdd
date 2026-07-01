@@ -166,6 +166,13 @@ For each file, with `old` = staged old render, `current` = staged current render
 
 Every application is per-file interactive: show the diff, get approval, write into `$WT`.
 
+**Added files — reconcile fill-in skeletons, don't ship them raw.** A file absent from the old render is newer than the project's baseline, and it may be a fill-in skeleton whose placeholder defaults would make false claims about a mature project (the motivating case: `engineering-practices.md` arriving with `<test command>` / `<lint command>` / `<ci workflow / command>` placeholders and provisional `<Enforced once …; Expected until then>` markers, claiming no gate exists in a project that already runs pytest, ruff, and CI). For every file you propose adding:
+
+- **Scan the staged render for residual `<...>` tokens.** The render already substituted the two identifiers (`<PROJECT_NAME>`/`<PROJECT_DIR>`), so any remaining `<...>` is genuine fill-in content — a placeholder field or a provisional status marker.
+- **If it carries residual placeholders, reconcile before writing.** Make a best-effort pass to fill the fields you can confidently detect from the target's actual state, and propose the filled result under the same per-file approval as any other write. Keep this lightweight: fill what you can confidently detect and leave the rest — do **not** build a general reconciliation engine (`/cdd-pre-pr` is the systematic backstop). Never fabricate a value to clear a placeholder; if you can't confidently determine it, leave the placeholder and let the summary flag it.
+- **Worked example — `engineering-practices.md`.** Fill `<test command>` / `<integration test command>` / `<lint command>` / `<format check command>` / `<ci workflow / command>` from the commands you can detect (a `Makefile`/`pyproject.toml`/`package.json` test or lint target, a test-runner or linter config), and flip each provisional status marker to **Enforced** or **Expected** according to whether that gate actually exists — CI judged by a `.github/workflows/*.yml`, tests/lint by the presence of the corresponding runner or linter config. Apply the same shape to any other added fill-in doc.
+- Anything left unreconciled after the approved edit still counts as residual and is carried into the section 5 summary flag.
+
 ### 4.5 Upstream candidates
 
 For each preserved local customization, judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Do not silently keep general improvements local: collect them into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. Do not auto-apply anything to the CDD repo in this session.
@@ -194,6 +201,7 @@ Report, in both modes:
 - Mode detected, identifiers used.
 - The isolation: the worktree path (`$WT`), the branch name, and the commit hash made on it — or, if section 2.5 fell back, that writes landed in place with no commit and why.
 - Files copied / upgraded / merged / preserved (and any the user declined).
+- **Added — needs reconciliation** (upgrade mode): any added file that still contains residual `<...>` placeholders or provisional status markers after all approved edits, listed by path. Keep this as a distinct category from clean adds so it reads as an action item, not a silent success — the user must finish these, and the recommended `/cdd-pre-pr` pass below will also catch them.
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.
