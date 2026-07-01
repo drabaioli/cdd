@@ -178,6 +178,31 @@ RCBLOCK
     fi
   done
 
+  # Also expose `cdd-state` as an executable on PATH. The rc `source` line above
+  # only reaches INTERACTIVE shells (a stock ~/.bashrc returns early for
+  # non-interactive shells via its `case $- in *i*` guard). Slash commands run
+  # `cdd-state set …` from Claude Code's Bash tool, which is non-interactive — so
+  # without a PATH entry the function is undefined there and every state update
+  # silently no-ops. This thin shim sources the helper and dispatches, so the
+  # command resolves in any shell; interactive shells still prefer the sourced
+  # function (functions shadow PATH), so behaviour is identical.
+  local bin_dir="$HOME/.local/bin"
+  local shim="$bin_dir/cdd-state"
+  mkdir -p "$bin_dir"
+  cat > "$shim" <<'SHIM'
+#!/usr/bin/env bash
+# Managed by cdd-state.sh install — thin PATH entry point so `cdd-state` resolves
+# in non-interactive shells too. Regenerated on each install; do not hand-edit.
+source "$HOME/.cdd/tools/cdd-state.sh"
+cdd-state "$@"
+SHIM
+  chmod +x "$shim"
+  echo "Installed PATH shim: $shim"
+  case ":$PATH:" in
+    *":$bin_dir:"*) ;;
+    *) echo "Note: $bin_dir is not on your PATH; add it so cdd-state resolves everywhere." >&2 ;;
+  esac
+
   echo "Done. Open a new shell (or 'source' your rc) so cdd-state is available."
 }
 

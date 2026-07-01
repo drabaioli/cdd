@@ -453,6 +453,33 @@ RCBLOCK
     fi
   done
 
+  # Also expose the cdd-worktree* commands as executables on PATH. The rc
+  # `source` line above only reaches INTERACTIVE shells (a stock ~/.bashrc
+  # returns early for non-interactive shells via its `case $- in *i*` guard), so
+  # without these shims the commands are "command not found" in a non-interactive
+  # shell (e.g. Claude Code's Bash tool). Each shim sources the helper and
+  # dispatches. Interactive shells still prefer the sourced function (functions
+  # shadow PATH) — which matters for `cdd-worktree`/`-resume`, whose `cd` into the
+  # new worktree only takes effect in the caller's shell when run as a function;
+  # the shim keeps the command resolvable, the function keeps the cwd change.
+  local bin_dir="$HOME/.local/bin" cmd
+  mkdir -p "$bin_dir"
+  for cmd in cdd-worktree cdd-worktree-resume cdd-worktree-list cdd-worktree-done; do
+    cat > "$bin_dir/$cmd" <<SHIM
+#!/usr/bin/env bash
+# Managed by cdd-worktree.sh install — PATH entry point so this command resolves
+# in non-interactive shells too. Regenerated on each install; do not hand-edit.
+source "\$HOME/.cdd/tools/cdd-worktree.sh"
+$cmd "\$@"
+SHIM
+    chmod +x "$bin_dir/$cmd"
+  done
+  echo "Installed PATH shims in $bin_dir: cdd-worktree, cdd-worktree-resume, cdd-worktree-list, cdd-worktree-done"
+  case ":$PATH:" in
+    *":$bin_dir:"*) ;;
+    *) echo "Note: $bin_dir is not on your PATH; add it so the cdd-worktree* commands resolve everywhere." >&2 ;;
+  esac
+
   # Migrate handoffs from the old location: copy each project subtree that isn't
   # already present, leaving the originals in place.
   local old="$HOME/.claude-handoffs"
