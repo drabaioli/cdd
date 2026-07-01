@@ -106,6 +106,9 @@ cdd-state() {
         echo "cdd-state: no record at $file; skipping (advisory)." >&2
         return 0
       fi
+      # $stage/$pr/$sid below are jq variables (passed via --arg), not shell
+      # expansions, so the single-quoted filter is intentional.
+      # shellcheck disable=SC2016
       local filter='.stage = $stage'
       [[ -n "$pr" ]] && filter="$filter | .pr = (\$pr | tonumber)"
       # Append this session unless CLAUDE_CODE_SESSION_ID is empty or already the

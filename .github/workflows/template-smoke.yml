@@ -15,12 +15,12 @@ jobs:
         run: |
           bash -n tools/bootstrap-cdd-project.sh
           bash -n scripts/*.sh
-          bash -n tools/cdd-worktree.sh
+          bash -n tools/cdd-worktree.sh tools/cdd-state.sh
           bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 
       - name: Shellcheck the shell scripts
         run: |
-          shellcheck tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh scripts/*.sh demo/*.sh
+          shellcheck tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh tools/cdd-state.sh scripts/*.sh demo/*.sh
 
       - name: Command-set drift check (repo commands vs rendered template)
         run: ./scripts/command-drift-check.sh
