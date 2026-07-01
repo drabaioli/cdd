@@ -57,11 +57,12 @@
 #   cdd-worktree-resume [<branch>]
 #                           Pick up a task started on another machine: recreate
 #                               a worktree tracking an EXISTING remote branch
-#                               (no handoff required), then launch plain `claude`
-#                               so you can run /cdd-process-pr, /cdd-merge-base,
-#                               or /cdd-pre-pr. With no argument, lists remote
-#                               feature branches not already checked out and
-#                               prompts for one. Run from the main worktree.
+#                               (no handoff required) and cd into it, leaving you
+#                               ready to run /cdd-process-pr, /cdd-merge-base, or
+#                               /cdd-pre-pr. Does not launch Claude Code. With no
+#                               argument, lists remote feature branches not
+#                               already checked out and prompts for one. Run from
+#                               the main worktree.
 
 # Resolve the repo's default branch from origin's HEAD, falling back to "main".
 # The remote is assumed to be named "origin" (see template/BOOTSTRAP.md).
@@ -399,12 +400,10 @@ cdd-worktree-resume() {
   cd "$worktree_path" || return 1
 
   echo
-  echo "Resumed worktree for '$branch' on origin/$branch."
+  echo "Resumed worktree for '$branch' on origin/$branch (now in $worktree_path)."
   echo "Handoff/state were NOT transferred (they're local to the originating machine)."
   echo "Resume-side commands read PR/branch state from git and gh, so this is fine."
-  echo "Next: run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
-  echo
-  claude
+  echo "Next: start Claude Code here and run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
 }
 
 # Install this helper to its stable home and wire it into the user's shells.

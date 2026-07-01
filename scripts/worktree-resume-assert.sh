@@ -6,15 +6,16 @@
 # branches, clones a fresh "machine B" working copy that has NO local feature
 # branch / worktree, then sources the helper and asserts:
 #   - `cdd-worktree-resume <branch>` creates a sibling worktree tracking
-#     origin/<branch>, and launches `claude` (stubbed on PATH)
-#   - a second `cdd-worktree-resume <branch>` detects the existing worktree,
-#     returns 0, and does NOT relaunch claude
+#     origin/<branch>, and does NOT launch `claude`
+#   - a second `cdd-worktree-resume <branch>` detects the existing worktree and
+#     returns 0
 #   - `cdd-worktree-resume` with no argument lists resumable remote branches and
 #     creates the selected one (fed a numbered choice on stdin)
 #
 # Usage: scripts/worktree-resume-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. A stubbed
-# `claude` keeps the helper from launching a real session.
+# `claude` on PATH guards the "never launched" assertion: the helper must leave
+# the log empty.
 
 set -euo pipefail
 
@@ -46,7 +47,8 @@ DEFAULT_BRANCH="main"
 FEATURE_A="gh_issue_99_demo"
 FEATURE_B="gh_issue_100_other"
 
-# Stub `claude` on PATH so the helper runs to completion without a real session.
+# Stub `claude` on PATH as a negative guard: the helper must never invoke it, so
+# any output here (a non-empty log) is a regression.
 mkdir -p "$WORK/bin"
 export CLAUDE_STUB_LOG="$WORK/claude.log"
 cat > "$WORK/bin/claude" <<'EOF'
@@ -105,18 +107,18 @@ head="$(git -C "$WT_A" rev-parse --abbrev-ref HEAD)"
 upstream="$(git -C "$WT_A" rev-parse --abbrev-ref "$FEATURE_A@{upstream}" 2>/dev/null || true)"
 [[ "$upstream" == "origin/$FEATURE_A" ]] \
   || fail "branch upstream is '$upstream', expected 'origin/$FEATURE_A'"
-[[ -s "$CLAUDE_STUB_LOG" ]] || fail "claude was not launched after resume"
-pass "explicit resume created a tracking worktree and launched claude"
+[[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "resume must not launch claude"
+pass "explicit resume created a tracking worktree without launching claude"
 
-# 3. Re-running on the same branch detects the existing worktree (no relaunch).
+# 3. Re-running on the same branch detects the existing worktree.
 : > "$CLAUDE_STUB_LOG"
 set +e
 run_resume "$WORK/repoA" "$FEATURE_A" "" >/dev/null 2>&1
 rc=$?
 set -e
 [[ "$rc" -eq 0 ]] || fail "second cdd-worktree-resume $FEATURE_A exited $rc (expected 0)"
-[[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "already-exists path should not relaunch claude"
-pass "already-exists resume returns 0 without relaunching claude"
+[[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "already-exists path must not launch claude"
+pass "already-exists resume returns 0 without launching claude"
 
 # 4. Discovery mode (no argument): pick the first listed branch via stdin.
 #    for-each-ref sorts refnames, so candidate 1 is the lexicographically first
