@@ -2,7 +2,7 @@
 # End-to-end smoke for `cdd-worktree-resume` (issue #22) against a local bare repo.
 #
 # The real cross-machine flow is hard to exercise in CI, so this stands in a local
-# `git init --bare` for `origin`: it pushes a default branch plus two feature
+# `git init --bare` for `origin`: it pushes a default branch plus three feature
 # branches, clones a fresh "machine B" working copy that has NO local feature
 # branch / worktree, then sources the helper and asserts:
 #   - `cdd-worktree-resume <branch>` creates a sibling worktree tracking
@@ -11,6 +11,10 @@
 #     returns 0
 #   - `cdd-worktree-resume` with no argument lists resumable remote branches and
 #     creates the selected one (fed a numbered choice on stdin)
+#   - discovery's `git fetch --prune` drops a branch deleted on the remote (as
+#     GitHub does on merge), so it does not appear in the list
+#   - explicit `cdd-worktree-resume <branch>` for a remote-deleted branch is
+#     refused and creates no worktree
 #
 # Usage: scripts/worktree-resume-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. A stubbed
@@ -46,6 +50,10 @@ EOF
 DEFAULT_BRANCH="main"
 FEATURE_A="gh_issue_99_demo"
 FEATURE_B="gh_issue_100_other"
+# A branch that gets deleted on the remote (as GitHub does when a PR merges).
+# Discovery's `git fetch --prune` must drop it, and explicit resume must refuse
+# it. Sorts before A/B so it would be candidate 1 if pruning were missing.
+FEATURE_C="gh_issue_50_gone"
 
 # Stub `claude` on PATH as a negative guard: the helper must never invoke it, so
 # any output here (a non-empty log) is a regression.
@@ -73,6 +81,9 @@ git clone -q "$WORK/origin.git" "$WORK/seed" 2>/dev/null  # empty-repo warning i
   git switch -q -c "$FEATURE_B" "$DEFAULT_BRANCH"
   echo "b" > b.txt; git add b.txt; git commit -q -m "feature b"
   git push -q -u origin "$FEATURE_B"
+  git switch -q -c "$FEATURE_C" "$DEFAULT_BRANCH"
+  echo "c" > c.txt; git add c.txt; git commit -q -m "feature c"
+  git push -q -u origin "$FEATURE_C"
 )
 
 # Run the helper in a subshell so its `cd` and `set` don't leak into the test.
@@ -122,7 +133,8 @@ pass "already-exists resume returns 0 without launching claude"
 
 # 4. Discovery mode (no argument): pick the first listed branch via stdin.
 #    for-each-ref sorts refnames, so candidate 1 is the lexicographically first
-#    feature branch ($FEATURE_B = gh_issue_100_other sorts before $FEATURE_A).
+#    feature branch ($FEATURE_B = gh_issue_100_other sorts before $FEATURE_A;
+#    $FEATURE_C = gh_issue_50_gone sorts first but is not selected here).
 git clone -q "$WORK/origin.git" "$WORK/repoB"
 : > "$CLAUDE_STUB_LOG"
 set +e
@@ -135,5 +147,35 @@ WT_B="$WORK/repoB-$FEATURE_B"
 head="$(git -C "$WT_B" rev-parse --abbrev-ref HEAD)"
 [[ "$head" == "$FEATURE_B" ]] || fail "discovery worktree HEAD is '$head', expected '$FEATURE_B'"
 pass "discovery mode resumed the selected remote branch"
+
+# 5. Discovery prunes branches deleted on the remote. Clone first (so the stale
+#    origin/$FEATURE_C ref exists locally), then delete the branch on origin, as
+#    GitHub does when a PR merges. Feed an invalid choice (0) so the helper prints
+#    the candidate list then bails without creating a worktree; inspect it.
+git clone -q "$WORK/origin.git" "$WORK/repoC"
+git -C "$WORK/seed" push -q origin --delete "$FEATURE_C"
+set +e
+list_out="$(run_resume "$WORK/repoC" "" "0" 2>/dev/null)"
+set -e
+grep -q "$FEATURE_A" <<<"$list_out" || fail "discovery should list live $FEATURE_A"
+grep -q "$FEATURE_B" <<<"$list_out" || fail "discovery should list live $FEATURE_B"
+if grep -q "$FEATURE_C" <<<"$list_out"; then
+  fail "discovery must prune $FEATURE_C after it was deleted on the remote"
+fi
+pass "discovery prunes branches deleted on the remote"
+
+# 6. Explicit resume of a remote-deleted branch is refused, and no worktree is
+#    created for it. repoC still carries the stale ref; the fetch --prune inside
+#    resume drops it, so show-ref then fails.
+: > "$CLAUDE_STUB_LOG"
+set +e
+run_resume "$WORK/repoC" "$FEATURE_C" "" >/dev/null 2>&1
+rc=$?
+set -e
+[[ "$rc" -ne 0 ]] || fail "explicit resume of remote-deleted $FEATURE_C should exit non-zero"
+[[ ! -d "$WORK/repoC-$FEATURE_C" ]] \
+  || fail "explicit resume of remote-deleted $FEATURE_C must not create a worktree"
+[[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "refused resume must not launch claude"
+pass "explicit resume of a remote-deleted branch is refused without a worktree"
 
 echo "all worktree-resume smoke checks passed"
