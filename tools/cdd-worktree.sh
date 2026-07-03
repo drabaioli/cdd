@@ -312,8 +312,11 @@ cdd-worktree-resume() {
     return 1
   fi
 
-  if ! git fetch origin; then
-    echo "git fetch origin failed, aborting." >&2
+  # --prune drops stale remote-tracking refs for branches deleted on the remote
+  # (GitHub deletes the head branch when a PR merges), so discovery lists exactly
+  # what still exists on origin — the default branch plus live feature branches.
+  if ! git fetch --prune origin; then
+    echo "git fetch --prune origin failed, aborting." >&2
     return 1
   fi
 
@@ -324,7 +327,8 @@ cdd-worktree-resume() {
 
   if [[ -z "$branch" ]]; then
     # Discovery: remote feature branches (exclude default + HEAD) not already
-    # checked out as a local worktree.
+    # checked out as a local worktree. The fetch above pruned merged-and-deleted
+    # branches, so what remains is the set of live branches shown on GitHub.
     local have_gh=0
     if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       have_gh=1
@@ -368,7 +372,8 @@ cdd-worktree-resume() {
     branch="${candidates[$(( choice - 1 ))]}"
   else
     if ! git show-ref --verify --quiet "refs/remotes/origin/$branch"; then
-      echo "No remote branch origin/$branch (after fetch)." >&2
+      echo "No remote branch origin/$branch (after fetch --prune)." >&2
+      echo "It may have been merged and deleted on the remote, or never pushed." >&2
       echo "Use 'cdd-worktree-resume' with no argument to list resumable branches." >&2
       return 1
     fi
