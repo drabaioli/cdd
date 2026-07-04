@@ -160,6 +160,13 @@ cdd-state-install() {
 
   local marker_begin="# --- CDD state helper (managed by cdd-state.sh install) BEGIN ---"
   local marker_end="# --- CDD state helper END ---"
+  # An ACTIVE block is one whose source line is executable (not commented out).
+  # Match it anchored to line start allowing only leading whitespace: a commented
+  # line begins with '#', so it can never match. This lets `install` self-repair a
+  # block a user (or tool) disabled by commenting, which a bare marker grep can't
+  # tell apart from an active one.
+  # shellcheck disable=SC2016
+  local active_re='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-state\.sh" \]\] && source'
   local rc rcs=()
   [[ -f "$HOME/.bashrc" ]] && rcs+=("$HOME/.bashrc")
   [[ -f "$HOME/.zshrc"  ]] && rcs+=("$HOME/.zshrc")
@@ -168,17 +175,30 @@ cdd-state-install() {
     rcs+=("$HOME/.bashrc")
   fi
   for rc in "${rcs[@]}"; do
-    if grep -qF "$marker_begin" "$rc" 2>/dev/null; then
+    if grep -qE "$active_re" "$rc" 2>/dev/null; then
       echo "Already wired: $rc (skipped)"
-    else
-      cat >> "$rc" <<RCBLOCK
+      continue
+    fi
+    if grep -qF "$marker_begin" "$rc" 2>/dev/null; then
+      # Present but inactive (commented/mangled): strip it, then re-append below.
+      # index() matches the marker substring even when the line is commented.
+      local tmp
+      tmp="$(mktemp "${rc}.XXXXXX")" || return 1
+      awk -v b="$marker_begin" -v e="$marker_end" '
+        index($0, b) { skip = 1 }
+        skip && index($0, e) { skip = 0; next }
+        skip { next }
+        { print }
+      ' "$rc" > "$tmp" && mv -f "$tmp" "$rc"
+      echo "Repaired disabled CDD block in $rc"
+    fi
+    cat >> "$rc" <<RCBLOCK
 
 ${marker_begin}
 [[ -f "\$HOME/.cdd/tools/cdd-state.sh" ]] && source "\$HOME/.cdd/tools/cdd-state.sh"
 ${marker_end}
 RCBLOCK
-      echo "Wired: $rc"
-    fi
+    echo "Wired: $rc"
   done
 
   # Also expose `cdd-state` as an executable on PATH. The rc `source` line above

@@ -437,6 +437,13 @@ cdd-worktree-install() {
   # is always at least one entry point.
   local marker_begin="# --- CDD worktree helper (managed by cdd-worktree.sh install) BEGIN ---"
   local marker_end="# --- CDD worktree helper END ---"
+  # An ACTIVE block is one whose source line is executable (not commented out).
+  # Match it anchored to line start allowing only leading whitespace: a
+  # commented line begins with '#', so it can never match. This distinguishes a
+  # live block from one a user (or tool) disabled by commenting — the case the
+  # old bare marker grep could not see, which left `install` unable to self-repair.
+  # shellcheck disable=SC2016
+  local active_re='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-worktree\.sh" \]\] && source'
   local rc rcs=()
   [[ -f "$HOME/.bashrc" ]] && rcs+=("$HOME/.bashrc")
   [[ -f "$HOME/.zshrc"  ]] && rcs+=("$HOME/.zshrc")
@@ -445,41 +452,76 @@ cdd-worktree-install() {
     rcs+=("$HOME/.bashrc")
   fi
   for rc in "${rcs[@]}"; do
-    if grep -qF "$marker_begin" "$rc" 2>/dev/null; then
+    if grep -qE "$active_re" "$rc" 2>/dev/null; then
       echo "Already wired: $rc (skipped)"
-    else
-      cat >> "$rc" <<RCBLOCK
+      continue
+    fi
+    if grep -qF "$marker_begin" "$rc" 2>/dev/null; then
+      # A managed block is present but inactive (commented out or otherwise
+      # mangled). Strip it entirely, then re-append a fresh active block below.
+      # index() matches the marker substring even when the line is commented
+      # (e.g. "## # --- … BEGIN ---" still contains "# --- … BEGIN ---").
+      local tmp
+      tmp="$(mktemp "${rc}.XXXXXX")" || return 1
+      awk -v b="$marker_begin" -v e="$marker_end" '
+        index($0, b) { skip = 1 }
+        skip && index($0, e) { skip = 0; next }
+        skip { next }
+        { print }
+      ' "$rc" > "$tmp" && mv -f "$tmp" "$rc"
+      echo "Repaired disabled CDD block in $rc"
+    fi
+    cat >> "$rc" <<RCBLOCK
 
 ${marker_begin}
 [[ -f "\$HOME/.cdd/tools/cdd-worktree.sh" ]] && source "\$HOME/.cdd/tools/cdd-worktree.sh"
 ${marker_end}
 RCBLOCK
-      echo "Wired: $rc"
-    fi
+    echo "Wired: $rc"
   done
 
   # Also expose the cdd-worktree* commands as executables on PATH. The rc
   # `source` line above only reaches INTERACTIVE shells (a stock ~/.bashrc
   # returns early for non-interactive shells via its `case $- in *i*` guard), so
-  # without these shims the commands are "command not found" in a non-interactive
-  # shell (e.g. Claude Code's Bash tool). Each shim sources the helper and
-  # dispatches. Interactive shells still prefer the sourced function (functions
-  # shadow PATH) — which matters for `cdd-worktree`/`-resume`, whose `cd` into the
-  # new worktree only takes effect in the caller's shell when run as a function;
-  # the shim keeps the command resolvable, the function keeps the cwd change.
+  # without a PATH entry a command is "command not found" in a non-interactive
+  # shell (e.g. Claude Code's Bash tool). Interactive shells always prefer the
+  # sourced function (functions shadow PATH), so a shim is only ever reached when
+  # the function is NOT loaded in the caller's shell.
+  #
+  # Three of the commands — cdd-worktree, cdd-worktree-resume, cdd-worktree-done —
+  # `cd` the CALLER's shell (into the new worktree, or back to main). A shim runs
+  # in a subshell, which cannot change its parent's cwd, so dispatching from the
+  # shim would silently strand the caller in the wrong (or, for -done, the just-
+  # removed) directory while printing success. These three therefore ship a shim
+  # that FAILS LOUDLY instead of dispatching: reaching it means the function is
+  # unloaded, so the only correct action is to tell the user to load it. Only
+  # cdd-worktree-list changes no cwd, so it keeps a real source+dispatch shim.
   local bin_dir="$HOME/.local/bin" cmd
   mkdir -p "$bin_dir"
-  for cmd in cdd-worktree cdd-worktree-resume cdd-worktree-list cdd-worktree-done; do
+  for cmd in cdd-worktree cdd-worktree-resume cdd-worktree-done; do
     cat > "$bin_dir/$cmd" <<SHIM
 #!/usr/bin/env bash
-# Managed by cdd-worktree.sh install — PATH entry point so this command resolves
-# in non-interactive shells too. Regenerated on each install; do not hand-edit.
-source "\$HOME/.cdd/tools/cdd-worktree.sh"
-$cmd "\$@"
+# Managed by cdd-worktree.sh install — cwd-changing command; do not hand-edit.
+# Reaching this shim means the '$cmd' shell function is not loaded in your shell,
+# so its 'cd' cannot take effect (a subshell cannot change its parent's cwd).
+# Refuse loudly rather than silently leave you in the wrong directory.
+echo "$cmd must run as a sourced shell function, not via the PATH shim." >&2
+echo "It changes your shell's working directory, which a subshell cannot do." >&2
+echo "Fix: open a new shell, or 'source ~/.cdd/tools/cdd-worktree.sh', then re-run." >&2
+echo "If your shell rc CDD block was disabled: bash ~/.cdd/tools/cdd-worktree.sh install" >&2
+exit 1
 SHIM
     chmod +x "$bin_dir/$cmd"
   done
-  echo "Installed PATH shims in $bin_dir: cdd-worktree, cdd-worktree-resume, cdd-worktree-list, cdd-worktree-done"
+  cat > "$bin_dir/cdd-worktree-list" <<'SHIM'
+#!/usr/bin/env bash
+# Managed by cdd-worktree.sh install — PATH entry point so this command resolves
+# in non-interactive shells too. Regenerated on each install; do not hand-edit.
+source "$HOME/.cdd/tools/cdd-worktree.sh"
+cdd-worktree-list "$@"
+SHIM
+  chmod +x "$bin_dir/cdd-worktree-list"
+  echo "Installed PATH shims in $bin_dir: cdd-worktree-list (dispatch); cdd-worktree, cdd-worktree-resume, cdd-worktree-done (refuse-if-unsourced)"
   case ":$PATH:" in
     *":$bin_dir:"*) ;;
     *) echo "Note: $bin_dir is not on your PATH; add it so the cdd-worktree* commands resolve everywhere." >&2 ;;
