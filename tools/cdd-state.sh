@@ -160,11 +160,9 @@ cdd-state-install() {
 
   local marker_begin="# --- CDD state helper (managed by cdd-state.sh install) BEGIN ---"
   local marker_end="# --- CDD state helper END ---"
-  # An ACTIVE block is one whose source line is executable (not commented out).
-  # Match it anchored to line start allowing only leading whitespace: a commented
-  # line begins with '#', so it can never match. This lets `install` self-repair a
-  # block a user (or tool) disabled by commenting, which a bare marker grep can't
-  # tell apart from an active one.
+  # Match the ACTIVE source line (anchored to line start, so a commented-out
+  # copy can't match) rather than the bare marker, so `install` can self-repair
+  # a block disabled by commenting.
   # shellcheck disable=SC2016
   local active_re='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-state\.sh" \]\] && source'
   local rc rcs=()

@@ -437,11 +437,9 @@ cdd-worktree-install() {
   # is always at least one entry point.
   local marker_begin="# --- CDD worktree helper (managed by cdd-worktree.sh install) BEGIN ---"
   local marker_end="# --- CDD worktree helper END ---"
-  # An ACTIVE block is one whose source line is executable (not commented out).
-  # Match it anchored to line start allowing only leading whitespace: a
-  # commented line begins with '#', so it can never match. This distinguishes a
-  # live block from one a user (or tool) disabled by commenting — the case the
-  # old bare marker grep could not see, which left `install` unable to self-repair.
+  # Match the ACTIVE source line (anchored to line start, so a commented-out
+  # copy can't match) rather than the bare marker, so `install` can tell a live
+  # block from one disabled by commenting and re-enable the latter.
   # shellcheck disable=SC2016
   local active_re='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-worktree\.sh" \]\] && source'
   local rc rcs=()
@@ -457,10 +455,9 @@ cdd-worktree-install() {
       continue
     fi
     if grep -qF "$marker_begin" "$rc" 2>/dev/null; then
-      # A managed block is present but inactive (commented out or otherwise
-      # mangled). Strip it entirely, then re-append a fresh active block below.
-      # index() matches the marker substring even when the line is commented
-      # (e.g. "## # --- … BEGIN ---" still contains "# --- … BEGIN ---").
+      # A managed block is present but inactive: strip it, then re-append a
+      # fresh active block below. index() matches the marker even when the
+      # line is commented ("## # --- … BEGIN ---" still contains the marker).
       local tmp
       tmp="$(mktemp "${rc}.XXXXXX")" || return 1
       awk -v b="$marker_begin" -v e="$marker_end" '
@@ -480,31 +477,21 @@ RCBLOCK
     echo "Wired: $rc"
   done
 
-  # Also expose the cdd-worktree* commands as executables on PATH. The rc
-  # `source` line above only reaches INTERACTIVE shells (a stock ~/.bashrc
-  # returns early for non-interactive shells via its `case $- in *i*` guard), so
-  # without a PATH entry a command is "command not found" in a non-interactive
-  # shell (e.g. Claude Code's Bash tool). Interactive shells always prefer the
-  # sourced function (functions shadow PATH), so a shim is only ever reached when
-  # the function is NOT loaded in the caller's shell.
-  #
-  # Three of the commands — cdd-worktree, cdd-worktree-resume, cdd-worktree-done —
-  # `cd` the CALLER's shell (into the new worktree, or back to main). A shim runs
-  # in a subshell, which cannot change its parent's cwd, so dispatching from the
-  # shim would silently strand the caller in the wrong (or, for -done, the just-
-  # removed) directory while printing success. These three therefore ship a shim
-  # that FAILS LOUDLY instead of dispatching: reaching it means the function is
-  # unloaded, so the only correct action is to tell the user to load it. Only
-  # cdd-worktree-list changes no cwd, so it keeps a real source+dispatch shim.
+  # Expose the commands on PATH too: the rc `source` line only reaches
+  # interactive shells, so a non-interactive shell (e.g. Claude Code's Bash
+  # tool) would otherwise get "command not found". The three cwd-changing
+  # commands ship a shim that FAILS LOUDLY instead of dispatching — a shim runs
+  # in a subshell and can't change the caller's cwd, so dispatching would
+  # silently strand the caller. cdd-worktree-list changes no cwd, so it keeps a
+  # real source+dispatch shim.
   local bin_dir="$HOME/.local/bin" cmd
   mkdir -p "$bin_dir"
   for cmd in cdd-worktree cdd-worktree-resume cdd-worktree-done; do
     cat > "$bin_dir/$cmd" <<SHIM
 #!/usr/bin/env bash
 # Managed by cdd-worktree.sh install — cwd-changing command; do not hand-edit.
-# Reaching this shim means the '$cmd' shell function is not loaded in your shell,
-# so its 'cd' cannot take effect (a subshell cannot change its parent's cwd).
-# Refuse loudly rather than silently leave you in the wrong directory.
+# Reaching this shim means '$cmd' is not loaded as a function, so its 'cd' can't
+# take effect (a subshell can't change its parent's cwd). Refuse loudly.
 echo "$cmd must run as a sourced shell function, not via the PATH shim." >&2
 echo "It changes your shell's working directory, which a subshell cannot do." >&2
 echo "Fix: open a new shell, or 'source ~/.cdd/tools/cdd-worktree.sh', then re-run." >&2
