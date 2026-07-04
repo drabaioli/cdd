@@ -28,6 +28,19 @@ STATE_HELPER="$REPO_ROOT/tools/cdd-state.sh"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
+# Disable a managed rc block by prefixing every line from BEGIN to END with "# ",
+# simulating a user (or tool) commenting it out — the state `install` must detect
+# and self-repair. Matches markers by substring so it works on active blocks.
+comment_block() {
+  local file="$1" begin="$2" end="$3" tmp
+  tmp="$(mktemp "${file}.XXXXXX")"
+  awk -v b="$begin" -v e="$end" '
+    index($0, b) { skip = 1 }
+    skip { print "# " $0; if (index($0, e)) skip = 0; next }
+    { print }
+  ' "$file" > "$tmp" && mv -f "$tmp" "$file"
+}
+
 [[ -x "$HELPER" ]] || fail "helper not found/executable: $HELPER"
 [[ -x "$STATE_HELPER" ]] || fail "state helper not found/executable: $STATE_HELPER"
 
@@ -68,11 +81,24 @@ pass "cdd-worktree* PATH shims written to ~/.local/bin and executable"
 
 # The shim must actually resolve and dispatch from a non-interactive shell with
 # only ~/.local/bin on PATH and no rc sourced — the exact case it exists for.
-# `cdd-worktree-list` is side-effect-free, so use it as the probe.
+# `cdd-worktree-list` is side-effect-free AND changes no cwd, so it keeps a real
+# source+dispatch shim; use it as the probe.
 env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
   bash -c 'command -v cdd-worktree-list >/dev/null && cdd-worktree-list >/dev/null 2>&1' \
   || fail "cdd-worktree-list shim did not resolve/dispatch in a non-interactive shell"
-pass "cdd-worktree shim resolves and dispatches non-interactively"
+pass "cdd-worktree-list shim resolves and dispatches non-interactively"
+
+# The cwd-changing commands (cdd-worktree, cdd-worktree-resume, cdd-worktree-done)
+# must FAIL LOUDLY via the shim rather than dispatch into a subshell whose `cd`
+# can't reach the caller — the regression that stranded the user in the removed
+# worktree. Probe cdd-worktree-done (the regression subject): the shim exits
+# before sourcing anything, so no git state is needed.
+done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+  bash -c 'cdd-worktree-done' 2>&1)" && \
+  fail "cdd-worktree-done shim succeeded silently (should refuse when unsourced)"
+grep -qF "must run as a sourced shell function" <<<"$done_out" \
+  || fail "cdd-worktree-done shim did not print the sourced-function guidance; got: $done_out"
+pass "cwd-changing shim (cdd-worktree-done) fails loudly instead of silently no-op'ing the cd"
 
 [[ -f "$FAKE_HOME/.cdd/handoffs/someproj/feature_x.md" ]] \
   || fail "legacy handoff not migrated to ~/.cdd/handoffs/"
@@ -86,6 +112,23 @@ markers=$(grep -cF "CDD worktree helper (managed by cdd-worktree.sh install) BEG
 [[ "$markers" -eq 1 ]] || fail "second install duplicated the marker block (found $markers)"
 pass "second install is idempotent (no duplicate marker block)"
 
+# Self-repair: a managed block that is present but DISABLED (commented out) must be
+# rewritten as an active source line on re-install — the case a bare marker grep
+# could not see, which left a user whose block got commented unable to re-enable it.
+WT_BEGIN="# --- CDD worktree helper (managed by cdd-worktree.sh install) BEGIN ---"
+WT_END="# --- CDD worktree helper END ---"
+# shellcheck disable=SC2016
+WT_ACTIVE='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-worktree\.sh" \]\] && source'
+comment_block "$FAKE_HOME/.bashrc" "$WT_BEGIN" "$WT_END"
+grep -qE "$WT_ACTIVE" "$FAKE_HOME/.bashrc" \
+  && fail "precondition: block still active after comment_block"
+HOME="$FAKE_HOME" "$HELPER" install >/dev/null
+grep -qE "$WT_ACTIVE" "$FAKE_HOME/.bashrc" \
+  || fail "install did not self-repair a disabled worktree block to an active source line"
+markers=$(grep -cF "CDD worktree helper (managed by cdd-worktree.sh install) BEGIN" "$FAKE_HOME/.bashrc")
+[[ "$markers" -eq 1 ]] || fail "self-repair left more than one worktree marker block (found $markers)"
+pass "install self-repairs a disabled worktree block (active again, still single)"
+
 # The task-state helper self-installs identically; assert its shim contract too.
 HOME="$FAKE_HOME" "$STATE_HELPER" install >/dev/null
 STATE_SHIM="$FAKE_HOME/.local/bin/cdd-state"
@@ -97,5 +140,20 @@ resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
   || fail "cdd-state shim did not resolve in a non-interactive shell"
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
 pass "cdd-state PATH shim written and resolves non-interactively"
+
+# The cdd-state installer shares the self-repair guard; assert it too.
+ST_BEGIN="# --- CDD state helper (managed by cdd-state.sh install) BEGIN ---"
+ST_END="# --- CDD state helper END ---"
+# shellcheck disable=SC2016
+ST_ACTIVE='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-state\.sh" \]\] && source'
+comment_block "$FAKE_HOME/.bashrc" "$ST_BEGIN" "$ST_END"
+grep -qE "$ST_ACTIVE" "$FAKE_HOME/.bashrc" \
+  && fail "precondition: state block still active after comment_block"
+HOME="$FAKE_HOME" "$STATE_HELPER" install >/dev/null
+grep -qE "$ST_ACTIVE" "$FAKE_HOME/.bashrc" \
+  || fail "install did not self-repair a disabled state block to an active source line"
+markers=$(grep -cF "CDD state helper (managed by cdd-state.sh install) BEGIN" "$FAKE_HOME/.bashrc")
+[[ "$markers" -eq 1 ]] || fail "self-repair left more than one state marker block (found $markers)"
+pass "install self-repairs a disabled state block (active again, still single)"
 
 echo "all install smoke checks passed"
