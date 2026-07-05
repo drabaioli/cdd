@@ -8,15 +8,17 @@
 [![Issues welcome](https://img.shields.io/badge/Issues-welcome-brightgreen.svg)](https://github.com/drabaioli/cdd/issues)
 [![Status: active development](https://img.shields.io/badge/status-active%20development-blue.svg)](doc/knowledge_base/roadmap.md)
 
-CDD (Claude-Driven Development) is a human-in-the-loop workflow for building software with Claude Code. AI agents do as much of the coding as possible and automate every step that can be — but a developer stays in the loop at the decisions that matter.
+CDD (Claude-Driven Development) is a human-in-the-loop workflow for building software with Claude Code. The idea is simple: let AI agents do as much of the work as possible, and automate everything you can, but keep a developer around for the decisions that matter. You're not watching an agent free-run. You're steering it through a disciplined lifecycle where you get to approve things before anything consequential happens.
 
-Rather than one long conversation that rots as its context fills with stale detail, each step is a fresh session with one job and exactly the context it needs, loaded at the right time.
+A big part of what makes it work is being careful with context. When a single conversation tries to cover planning, implementation, review, and everything in between, all that mixed-together detail becomes a distraction and the quality of the results starts to suffer. So instead, every step gets its own fresh session with a single job and just the context it needs. The session doing the implementation isn't carrying the baggage of the planning discussion, and the one opening a PR isn't cluttered with half-finished exploration. It turns out that a handful of small, focused sessions tend to go a lot further than one giant one.
 
-The workflow also holds itself and your code to real engineering standards: it applies best practices to itself — reviewing its own code, writing specs — and enforces tests, documentation hygiene, linting, and formatting on every change. Keeping the docs and the roadmap current is part of that discipline, and it's what lets each fresh session load only the context it needs.
+The other half is checking in often. One-shotting a whole task is a bit utopian: today's models don't handle it all that gracefully yet, and no agent can read your mind and know exactly what you want. Frequent, low-stakes check-ins fix that. Each time you approve a plan or review a change, you get a chance to nudge things back on course before they drift too far, so the end result lands much closer to what you actually wanted.
 
-## ⚙️ How it works
+It also tries to bake in good engineering habits rather than hoping you'll remember them. The workflow reviews its own code and writes specs before it builds, and it looks after the hygiene that usually slips first when you're moving at AI speed: running tests, keeping documentation in sync, linting, formatting. The discipline is built into the lifecycle instead of taped on at the end.
 
-Every task moves through the same cycle. Each step is a fresh Claude Code session doing exactly one job, handing off to the next through files (a handoff file, the roadmap, the docs) rather than a shared chat window — so context stays lean and never bloats with material the current job doesn't use. The locks down the left of the diagram are the human gates: the agent never crosses one without your explicit approval, and approving the plan is the load-bearing one.
+Documentation gets the same care, and not just for your benefit. A structured knowledge base keeps the project's memory durable across all these throwaway sessions, and it's exactly what a coding agent needs to understand how things work and what to do next. It all comes back to the same goal: giving each session exactly the context it needs, and keeping you in control at every gate.
+
+## How it works
 
 ![CDD task cycle: start a session and run /cdd-next-step to queue a task, spin up an isolated worktree, build in plan mode, optionally /cdd-merge-base, run /cdd-pre-pr to self-review and open the PR, review on GitHub, optionally /cdd-process-pr for review feedback, merge, then clean up and repeat, with locked human gates down the left.](doc/assets/task-cycle.png)
 
@@ -32,7 +34,7 @@ One full turn around the cycle:
 
 The [process document](doc/knowledge_base/claude-driven-development.md) describes the full lifecycle, the artifacts, the edit rules, and the reasoning behind every gate. Read it first if you want to understand what CDD is and why.
 
-## 🚀 Quick start
+## Quick start
 
 CDD's front door is its guided commands. Here's the shortest path from zero to your first task:
 
@@ -55,15 +57,17 @@ Other entry points, run the same way from a session inside this repo:
 
 Prefer to script it? The non-interactive `tools/bootstrap-cdd-project.sh` does the same scaffolding without the guided conversation.
 
-## 🎯 Three objectives
+## Three objectives
 
-CDD is built around three goals, in tension and balanced on purpose:
+CDD is built around three goals, in tension and balanced on purpose.
 
-- **Automate everything except the decisions that matter.** Everything between the human gates is automated; the gates — picking the task, approving the plan, approving any base-branch merge, merging the PR — never are.
-- **Bake in engineering best practices.** Tests, linting, formatting, CI, and living documentation aren't bolted on at the end. The workflow expects them at every step, so quality and context don't erode as the project grows.
-- **Improve the workflow as you use it.** CDD is meant to be turned on itself. Friction surfaced in a session folds back into the process and the template, so the workflow gets sharper over time.
+**Automate everything except the decisions that matter.** Everything between the human gates is automated; the gates, picking the task, approving the plan, approving any base-branch merge, merging the PR, never are.
 
-## 📖 Command reference
+**Bake in engineering best practices.** Tests, linting, formatting, CI, and living documentation aren't bolted on at the end. The workflow expects them at every step, so quality and context don't erode as the project grows.
+
+**Improve the workflow as you use it.** CDD is meant to be turned on itself. Friction surfaced in a session folds back into the process and the template, so the workflow gets sharper over time.
+
+## Command reference
 
 CDD ships seven slash commands, all prefixed `cdd-` so they autocomplete as a group.
 
@@ -94,7 +98,7 @@ curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktr
 
 Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. It spins up and tears down the per-task git worktree that an implementation session runs in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch, no handoff needed — so a task started elsewhere can be picked up to run `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`.
 
-## 💬 Questions?
+## Questions?
 
 The fastest way to understand CDD is to ask it directly: launch `claude` on your local clone of this repo and ask away. The process doc, the template, and these docs are all right there for it to read.
 
@@ -102,7 +106,7 @@ The fastest way to understand CDD is to ask it directly: launch `claude` on your
 
 At this stage CDD accepts **GitHub issues only; pull requests aren't open yet**. Bug reports, suggestions, and questions about the workflow are very welcome: please [open an issue](https://github.com/drabaioli/cdd/issues). Have a change in mind? Raise it as an issue first and we can discuss it there. Direct PRs aren't being accepted for now. That will change as the project opens up.
 
-## 📍 Status
+## Status
 
 Currently in active development and working quite well. See [`doc/knowledge_base/roadmap.md`](doc/knowledge_base/roadmap.md) for what's done and what's next.
 
