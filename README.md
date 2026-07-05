@@ -1,6 +1,6 @@
 # Claude-Driven Development (CDD)
 
-![Claude-Driven Development — a dark charcoal banner with a faint grid: the large "Claude-Driven Development." wordmark in green with an orange period, above the tagline "A human-in-the-loop workflow for building software with Claude Code."](doc/assets/cdd-social-preview.png)
+![Claude-Driven Development — a dark charcoal banner with a faint grid: the large "Claude-Driven Development." wordmark in green with an orange period, above the tagline "A human-in-the-loop workflow for building software with Claude Code."](doc/assets/social-preview.png)
 
 [![template-smoke](https://github.com/drabaioli/cdd/actions/workflows/template-smoke.yml/badge.svg)](https://github.com/drabaioli/cdd/actions/workflows/template-smoke.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
@@ -16,9 +16,9 @@ The workflow also holds itself and your code to real engineering standards: it a
 
 ## ⚙️ How it works
 
-Every task moves through the same cycle. Each step is a fresh Claude Code session doing exactly one job, handing off to the next through files (a handoff file, the roadmap, the docs) rather than a shared chat window — so context stays lean and never bloats with material the current job doesn't use. The locks across the top of the diagram are the human gates: the agent never crosses one without your explicit approval, and approving the plan is the load-bearing one.
+Every task moves through the same cycle. Each step is a fresh Claude Code session doing exactly one job, handing off to the next through files (a handoff file, the roadmap, the docs) rather than a shared chat window — so context stays lean and never bloats with material the current job doesn't use. The locks down the left of the diagram are the human gates: the agent never crosses one without your explicit approval, and approving the plan is the load-bearing one.
 
-![CDD task cycle: start a session and run /cdd-next-step to queue a task, spin up an isolated worktree, build in plan mode, optionally /cdd-merge-base, run /cdd-pre-pr to self-review and open the PR, review on GitHub, optionally /cdd-process-pr for review feedback, merge, then clean up and repeat, with locked human gates across the top.](doc/assets/task-cycle.png)
+![CDD task cycle: start a session and run /cdd-next-step to queue a task, spin up an isolated worktree, build in plan mode, optionally /cdd-merge-base, run /cdd-pre-pr to self-review and open the PR, review on GitHub, optionally /cdd-process-pr for review feedback, merge, then clean up and repeat, with locked human gates down the left.](doc/assets/task-cycle.png)
 
 One full turn around the cycle:
 
