@@ -1,6 +1,6 @@
 # Claude-Driven Development (CDD)
 
-![Claude-Driven Development — a dark charcoal banner with orange corner gradients and a faint grid: a small "CDD" eyebrow, the large "Claude-Driven Development." wordmark with an orange period, and the tagline "A human-in-the-loop workflow for building software with Claude Code."](doc/assets/banner.png)
+![Claude-Driven Development — a dark charcoal banner with a faint grid: the large "Claude-Driven Development." wordmark in green with an orange period, above the tagline "A human-in-the-loop workflow for building software with Claude Code."](doc/assets/cdd-social-preview.png)
 
 [![template-smoke](https://github.com/drabaioli/cdd/actions/workflows/template-smoke.yml/badge.svg)](https://github.com/drabaioli/cdd/actions/workflows/template-smoke.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-orange.svg)](LICENSE)
