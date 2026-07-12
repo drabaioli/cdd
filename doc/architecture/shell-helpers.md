@@ -33,6 +33,38 @@ Nothing project-specific is configured or copied per project: the repo name (the
 
 Every write is atomic — rendered to a temp file in the destination directory, then `mv`'d into place — so a crashed or concurrent write cannot leave a truncated record. The session chain's ids come from `CLAUDE_CODE_SESSION_ID`: an entry is appended only when the variable is non-empty and differs from the last entry's id (deduping repeated writes within one session); when it is unset (older Claude Code), the entry is omitted rather than guessed. The helper is advisory end-to-end: absent `jq`, or an absent record, it no-ops rather than failing the workflow (writers never fabricate a record; only `/cdd-next-step` seeds one).
 
+### Schema
+
+`schema_version` lets consumers version their parser:
+
+```json
+{
+  "schema_version": 1,
+  "branch": "task_state_tracking",
+  "stage": "plan_approved",
+  "pr": null,
+  "sessions": [ { "id": "<uuid>", "stage": "plan_approved" } ]
+}
+```
+
+`pr` is the integer PR number once a PR exists, else `null`. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`.
+
+### Stages and writers
+
+`stage` is a single enum (the record carries no separate status); each transition and its writer:
+
+| `stage`               | written by                                          |
+| --------------------- | --------------------------------------------------- |
+| `scoped`              | `/cdd-next-step` — seeds the record (`sessions: []`; it runs on a different session, on the default branch) |
+| `plan_approved`       | implementation session — on plan approval, before any code |
+| `implementation_done` | implementation session — after its local commit     |
+| `merged`              | `/cdd-merge-base` — after a successful merge         |
+| `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
+| `pr_open`             | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
+| `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
+
+The implementation session has no command file, so its two `cdd-state set` calls are driven by a standing instruction in the handoff that `/cdd-next-step` generates.
+
 ## Resume discovery (`cdd-worktree-resume`)
 
 The no-argument discovery mode fetches with `--prune`, so remote-tracking refs for branches deleted on the remote (as GitHub does when a PR merges) drop out before the listing. What remains — the default branch plus the feature branches still live on the remote, minus those already checked out locally — is exactly the resumable set, whether or not a branch has a PR yet.
