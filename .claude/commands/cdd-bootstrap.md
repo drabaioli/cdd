@@ -22,7 +22,7 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
-**Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (process doc, Section 6) and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
+**Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (`doc/features/template.md`, "Deliverable or project?") and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
 
 **Checkpoint:** present a structured summary of the captured definition (the seven headings above). Get explicit confirmation or corrections before writing anything.
 
