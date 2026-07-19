@@ -31,7 +31,7 @@ Nothing project-specific is configured or copied per project: the repo name (the
 
 ## State-record writes (`cdd-state`)
 
-Every write is atomic — rendered to a temp file in the destination directory, then `mv`'d into place — so a crashed or concurrent write cannot leave a truncated record. The session chain's ids come from `CLAUDE_CODE_SESSION_ID`: an entry is appended only when the variable is non-empty and differs from the last entry's id (deduping repeated writes within one session); when it is unset (older Claude Code), the entry is omitted rather than guessed. The helper is advisory end-to-end: absent `jq`, or an absent record, it no-ops rather than failing the workflow (writers never fabricate a record; only `/cdd-next-step` seeds one).
+Every write is atomic — rendered to a temp file in the destination directory, then `mv`'d into place — so a crashed or concurrent write cannot leave a truncated record. The session chain's ids come from `CLAUDE_CODE_SESSION_ID`: an entry is appended only when the variable is non-empty and differs from the last entry's id (deduping repeated writes within one session); when it is unset (older Claude Code), the entry is omitted rather than guessed. Each entry also carries `dir`, the worktree root the session ran in (`git rev-parse --show-toplevel`) — the natural `cd` target before `claude --resume`. Seeding records the handoff session (`/cdd-next-step`, on the main worktree) as the first entry so it is resumable too, then `set` appends each in-worktree session thereafter. The helper is advisory end-to-end: absent `jq`, or an absent record, it no-ops rather than failing the workflow (writers never fabricate a record; only `/cdd-next-step` seeds one).
 
 ### Schema
 
@@ -43,11 +43,11 @@ Every write is atomic — rendered to a temp file in the destination directory, 
   "branch": "task_state_tracking",
   "stage": "plan_approved",
   "pr": null,
-  "sessions": [ { "id": "<uuid>", "stage": "plan_approved" } ]
+  "sessions": [ { "id": "<uuid>", "stage": "plan_approved", "dir": "<worktree-root>" } ]
 }
 ```
 
-`pr` is the integer PR number once a PR exists, else `null`. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`.
+`pr` is the integer PR number once a PR exists, else `null`. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`, run from `dir`. `dir` is additive and optional — not versioned by `schema_version`, so old and new records interoperate; a consumer that finds it absent falls back to the branch's known worktree path.
 
 ### Stages and writers
 
@@ -55,7 +55,7 @@ Every write is atomic — rendered to a temp file in the destination directory, 
 
 | `stage`               | written by                                          |
 | --------------------- | --------------------------------------------------- |
-| `scoped`              | `/cdd-next-step` — seeds the record (`sessions: []`; it runs on a different session, on the default branch) |
+| `scoped`              | `/cdd-next-step` — seeds the record and records itself as the first session `{id, stage: scoped, dir}` (empty `sessions` only when no session id is available); it runs on a different session, on the default branch |
 | `plan_approved`       | implementation session — on plan approval, before any code |
 | `implementation_done` | implementation session — after its local commit     |
 | `merged`              | `/cdd-merge-base` — after a successful merge         |
