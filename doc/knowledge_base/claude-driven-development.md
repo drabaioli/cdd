@@ -222,17 +222,17 @@ Schema (`schema_version` lets consumers version their parser):
   "branch": "task_state_tracking",
   "stage": "plan_approved",
   "pr": null,
-  "sessions": [ { "id": "<uuid>", "stage": "plan_approved" } ]
+  "sessions": [ { "id": "<uuid>", "stage": "plan_approved", "dir": "<worktree-root>" } ]
 }
 ```
 
-`pr` is the integer PR number once a PR exists, else `null`. `sessions` is **append-only**: each in-worktree session that advances the task appends a `{id, stage}` entry, so the chain is preserved and the last element is the most recent session. The helper takes the id from `CLAUDE_CODE_SESSION_ID` and appends only when it is non-empty and differs from the last entry's `id` (dedups repeated writes within one session); if the variable is unset — older Claude Code — it omits the entry rather than guessing. A consumer derives the resume command as `claude --resume <id>`.
+`pr` is the integer PR number once a PR exists, else `null`. `sessions` is **append-only**: each session that works the task appends a `{id, stage, dir}` entry, so the chain is preserved and the last element is the most recent session. `dir` is the worktree root the session ran in (`git rev-parse --show-toplevel`) — the natural `cd` target before `claude --resume`; it is the handoff session's main worktree for the seeded entry and each in-worktree session's own worktree thereafter. `dir` is additive and optional: it is not versioned by `schema_version`, and a consumer that finds it absent falls back to the branch's known worktree path. Seeding records the **handoff session** as the first entry — so the `/cdd-next-step` session that scoped the task is resumable too — rather than starting from an empty list; the append that follows begins with the implementation session. The helper takes the id from `CLAUDE_CODE_SESSION_ID` and records/appends only when it is non-empty and differs from the last entry's `id` (dedups repeated writes within one session); if the variable is unset — older Claude Code — it omits the entry rather than guessing (seed then leaves `sessions: []`). A consumer derives the resume command as `claude --resume <id>`.
 
 `stage` is a single enum (no separate status); each transition and its writer:
 
 | `stage`               | written by                                          |
 | --------------------- | --------------------------------------------------- |
-| `scoped`              | `/cdd-next-step` — seeds the record (`sessions: []`; it runs on a different session, on the default branch) |
+| `scoped`              | `/cdd-next-step` — seeds the record and records itself as the first session `{id, stage: scoped, dir}` (empty `sessions` only when no session id is available); it runs on a different session, on the default branch |
 | `plan_approved`       | implementation session — on plan approval, before any code |
 | `implementation_done` | implementation session — after its local commit     |
 | `merged`              | `/cdd-merge-base` — after a successful merge         |

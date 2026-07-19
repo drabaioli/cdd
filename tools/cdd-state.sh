@@ -25,15 +25,22 @@
 #
 # Provides (when sourced):
 #   cdd-state seed <branch>        Create the record beside the handoff, at stage
-#                                      `scoped` with an empty `sessions`. Used by
-#                                      /cdd-next-step on the default branch.
+#                                      `scoped`. Used by /cdd-next-step on the
+#                                      default branch. Records the current (handoff)
+#                                      session as a {id, stage, dir} entry when
+#                                      $CLAUDE_CODE_SESSION_ID is set, so the handoff
+#                                      session is resumable too; otherwise seeds an
+#                                      empty `sessions` (older Claude Code — no id).
 #   cdd-state set <stage> [--pr N] Advance an existing record to <stage> (and set
 #                                      the PR number with --pr). Derives repo/branch
 #                                      from the current worktree. Skips silently if
 #                                      the record is absent (writers never fabricate
-#                                      one). Appends a {id, stage} entry for
+#                                      one). Appends a {id, stage, dir} entry for
 #                                      $CLAUDE_CODE_SESSION_ID unless it is empty or
 #                                      already the last entry's id.
+#
+# `dir` on a session entry is the worktree root the session ran in (from
+# `git rev-parse --show-toplevel`): the natural `cd` target for `claude --resume`.
 #
 # Stages (a single enum; the record carries no separate status):
 #   scoped  plan_approved  implementation_done  merged  checks_passed  pr_open  addressed
@@ -78,11 +85,22 @@ cdd-state() {
       repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")")" || return 1
       dir="$HOME/.cdd/handoffs/${repo_name}"
       mkdir -p "$dir"
+      # Record the handoff session (this /cdd-next-step session, on the main
+      # worktree) so it is resumable too — guarded exactly like `set`'s append:
+      # only when CLAUDE_CODE_SESSION_ID is set (older Claude Code → empty list,
+      # don't guess). `dir` is the worktree root, the `cd` target for --resume.
+      local sid="${CLAUDE_CODE_SESSION_ID:-}" toplevel sessions='[]'
+      toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"
+      if [[ -n "$sid" ]]; then
+        sessions="$(jq -n --arg id "$sid" --arg dir "$toplevel" \
+          '[{id: $id, stage: "scoped", dir: $dir}]')" || return 1
+      fi
       local content
       content="$(jq -n \
         --argjson v "$CDD_STATE_SCHEMA_VERSION" \
         --arg branch "$branch" \
-        '{schema_version: $v, branch: $branch, stage: "scoped", pr: null, sessions: []}')" || return 1
+        --argjson sessions "$sessions" \
+        '{schema_version: $v, branch: $branch, stage: "scoped", pr: null, sessions: $sessions}')" || return 1
       cdd-state-write "${dir}/${branch}.state.json" "$content" \
         && echo "Seeded state: ${dir}/${branch}.state.json"
       ;;
@@ -112,16 +130,19 @@ cdd-state() {
       local filter='.stage = $stage'
       [[ -n "$pr" ]] && filter="$filter | .pr = (\$pr | tonumber)"
       # Append this session unless CLAUDE_CODE_SESSION_ID is empty or already the
-      # last entry's id (dedups repeated writes within one session).
-      local sid="${CLAUDE_CODE_SESSION_ID:-}"
+      # last entry's id (dedups repeated writes within one session). `dir` is the
+      # worktree root this session ran in — the `cd` target for `claude --resume`.
+      local sid="${CLAUDE_CODE_SESSION_ID:-}" toplevel
+      toplevel="$(git rev-parse --show-toplevel 2>/dev/null)"
       if [[ -n "$sid" ]]; then
-        filter="$filter | if (.sessions[-1].id // \"\") == \$sid then . else .sessions += [{id: \$sid, stage: \$stage}] end"
+        filter="$filter | if (.sessions[-1].id // \"\") == \$sid then . else .sessions += [{id: \$sid, stage: \$stage, dir: \$dir}] end"
       fi
       local content
       content="$(jq \
         --arg stage "$stage" \
         --arg pr "$pr" \
         --arg sid "$sid" \
+        --arg dir "$toplevel" \
         "$filter" "$file")" || { echo "cdd-state: failed to update $file" >&2; return 1; }
       cdd-state-write "$file" "$content" \
         && echo "State: $(basename "$file") -> $stage${pr:+ (pr #$pr)}"
