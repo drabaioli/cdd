@@ -96,7 +96,7 @@ curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktr
   && bash ~/.cdd/tools/cdd-worktree.sh install
 ```
 
-Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. It spins up and tears down the per-task git worktree that an implementation session runs in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch, no handoff needed — so a task started elsewhere can be picked up to run `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`.
+Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. It spins up and tears down the per-task git worktree that an implementation session runs in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch — so a task started elsewhere can be picked up to run `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`. The task's handoff and state record ride along too, synced through a per-task git ref (advisory — resume still works without them).
 
 ## Questions?
 

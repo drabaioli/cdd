@@ -58,6 +58,11 @@ bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 # local bare repo as `origin`; a stubbed `claude` guards that it is never launched.
 ./scripts/worktree-resume-assert.sh
 
+# Task-ref sync: seed/set on "machine A" push refs/cdd/<branch> to a local bare
+# `origin`; resume on "machine B" materializes the handoff + state (most-advanced
+# wins); the no-ref path still resumes cleanly.
+./scripts/ref-sync-assert.sh
+
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
 ./tools/bootstrap-cdd-project.sh --name "Demo Project" \

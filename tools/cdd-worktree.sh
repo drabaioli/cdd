@@ -210,6 +210,11 @@ cdd-worktree-done() {
   if (( branch_deleted )); then
     [[ -f "$handoff" ]] && rm "$handoff" && echo "Removed handoff: $handoff"
     [[ -f "$state_file" ]] && rm "$state_file" && echo "Removed state: $state_file"
+    # Best-effort: drop the per-task sync ref on origin so refs/cdd/* doesn't
+    # accumulate. Advisory — a failed delete (no such ref, offline) never blocks.
+    if git push origin --delete "refs/cdd/$branch" 2>/dev/null; then
+      echo "Removed remote task ref: refs/cdd/$branch"
+    fi
   else
     [[ -f "$handoff" ]] && echo "Kept handoff: $handoff"
     [[ -f "$state_file" ]] && echo "Kept state: $state_file"
@@ -293,12 +298,91 @@ cdd-worktree-list() {
   done
 }
 
+# Ordered CDD lifecycle stages, least → most advanced. Source of truth is
+# cdd-state.sh's `cdd-state-stages`; mirrored here by hand (the two helpers are
+# separate self-installing files). Prints the index of $1, or -1 when unknown.
+cdd-worktree-stage-index() {
+  local stage="$1" i=0 s
+  for s in scoped plan_approved implementation_done merged checks_passed pr_open addressed; do
+    [[ "$s" == "$stage" ]] && { printf '%s\n' "$i"; return 0; }
+    i=$(( i + 1 ))
+  done
+  printf '%s\n' -1
+}
+
+# Atomically materialize FETCH_HEAD:<intree> to <dest>, preserving exact bytes
+# (streams git show to a temp file in the same dir, then mv -f — no command
+# substitution, so no trailing-newline mangling). Returns non-zero if the path is
+# absent from the tree or the write fails.
+cdd-worktree-extract() {
+  local intree="$1" dest="$2" tmp
+  tmp="$(mktemp "${dest}.XXXXXX")" || return 1
+  if git show "FETCH_HEAD:${intree}" >"$tmp" 2>/dev/null; then
+    mv -f "$tmp" "$dest"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+# Fetch the per-task ref refs/cdd/<branch> from origin and materialize the handoff +
+# state record into ~/.cdd/handoffs/<repo>/. Advisory and best-effort: returns 0 when
+# a ref was found (having printed what it did), 1 when there is no ref (offline, no
+# origin, or none pushed) so the caller keeps the honest no-transfer messaging.
+# Heuristics: the handoff .md is immutable after seed, so it is written only when
+# absent locally; the state .json follows most-advanced-stage-wins (compare .stage
+# indices, keep the further-along side), falling back to write-only-if-absent when jq
+# is unavailable. Never clobbers a more-advanced local record. See shell-helpers.md.
+cdd-worktree-materialize-ref() {
+  local branch="$1"
+  git fetch origin "refs/cdd/$branch" 2>/dev/null || return 1
+  git rev-parse --quiet --verify FETCH_HEAD >/dev/null 2>&1 || return 1
+
+  local repo_name dir
+  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")" || return 1
+  dir="$HOME/.cdd/handoffs/${repo_name}"
+  mkdir -p "$dir"
+  local handoff_dest="${dir}/${branch}.md"
+  local state_dest="${dir}/${branch}.state.json"
+
+  # Handoff: immutable after seed → materialize only when absent locally.
+  if [[ ! -f "$handoff_dest" ]] && git cat-file -e FETCH_HEAD:handoff.md 2>/dev/null; then
+    cdd-worktree-extract handoff.md "$handoff_dest" \
+      && echo "Materialized handoff: $handoff_dest"
+  fi
+
+  # State record: most-advanced-stage wins.
+  if git cat-file -e FETCH_HEAD:state.json 2>/dev/null; then
+    if [[ ! -f "$state_dest" ]]; then
+      cdd-worktree-extract state.json "$state_dest" \
+        && echo "Materialized state record: $state_dest"
+    elif command -v jq >/dev/null 2>&1; then
+      local ref_stage local_stage ref_idx local_idx
+      ref_stage="$(git show FETCH_HEAD:state.json 2>/dev/null | jq -r '.stage // empty' 2>/dev/null)"
+      local_stage="$(jq -r '.stage // empty' "$state_dest" 2>/dev/null)"
+      ref_idx="$(cdd-worktree-stage-index "$ref_stage")"
+      local_idx="$(cdd-worktree-stage-index "$local_stage")"
+      if (( ref_idx > local_idx )); then
+        cdd-worktree-extract state.json "$state_dest" \
+          && echo "Updated state record from ref (stage ${local_stage:-?} -> ${ref_stage:-?})."
+      else
+        echo "Kept local state record (stage ${local_stage:-?} >= synced ${ref_stage:-?})."
+      fi
+    else
+      echo "Kept local state record (jq unavailable to compare stages)."
+    fi
+  fi
+  return 0
+}
+
 # Recreate a worktree on an EXISTING remote branch so a task started on another
 # machine can be picked up here. Unlike cdd-worktree, this requires no handoff and
-# tracks the remote branch rather than creating a new one. The handoff and state
-# record are local-only and are NOT synced across machines (see process doc §2.8);
-# the resume-side commands (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read
-# PR/branch state from git and gh, not the handoff, so their absence is fine.
+# tracks the remote branch rather than creating a new one. If the originating machine
+# synced a per-task ref (refs/cdd/<branch>, see cdd-state), the handoff and state
+# record are fetched and materialized here before launch (most-advanced-stage wins,
+# advisory — a missing ref just means nothing to transfer); the resume-side commands
+# (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read PR/branch state from git and
+# gh, not the handoff, so its absence is still fine.
 cdd-worktree-resume() {
   local branch="${1:-}"
 
@@ -405,8 +489,11 @@ cdd-worktree-resume() {
 
   echo
   echo "Resumed worktree for '$branch' on origin/$branch (now in $worktree_path)."
-  echo "Handoff/state were NOT transferred (they're local to the originating machine)."
-  echo "Resume-side commands read PR/branch state from git and gh, so this is fine."
+  # Fetch + materialize the handoff/state from refs/cdd/<branch> if it was synced.
+  if ! cdd-worktree-materialize-ref "$branch"; then
+    echo "No synced task ref (refs/cdd/$branch); handoff/state not transferred."
+    echo "Resume-side commands read PR/branch state from git and gh, so this is fine."
+  fi
   echo "Next: start Claude Code here and run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
 }
 

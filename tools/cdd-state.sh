@@ -42,6 +42,10 @@
 # `dir` on a session entry is the worktree root the session ran in (from
 # `git rev-parse --show-toplevel`): the natural `cd` target for `claude --resume`.
 #
+# Both `seed` and `set` also sync the handoff + record to a per-task ref
+# `refs/cdd/<branch>` on origin (best-effort, advisory), so a resume on another
+# machine can materialize them; see cdd-worktree-resume and shell-helpers.md.
+#
 # Stages (a single enum; the record carries no separate status):
 #   scoped  plan_approved  implementation_done  merged  checks_passed  pr_open  addressed
 
@@ -65,6 +69,45 @@ cdd-state-write() {
   local dest="$1" content="$2" tmp
   tmp="$(mktemp "${dest}.XXXXXX")" || return 1
   printf '%s\n' "$content" >"$tmp" && mv -f "$tmp" "$dest"
+}
+
+# Sync the handoff + state record to a per-task ref refs/cdd/<branch> on origin, so a
+# resume on another machine can materialize them (see cdd-worktree-resume). Bundles
+# whichever of the two files exist into a git tree (stable in-tree names handoff.md /
+# state.json, decoupled from the branch-named on-disk files), wraps it in a parentless
+# commit, and force-pushes (advisory, latest-wins). Best-effort end-to-end: no origin,
+# offline, a missing object, or a rejected push warns once and returns 0 — it must
+# never fail the state write that called it. Uses plumbing only (hash-object/mktree/
+# commit-tree), so it never touches the index or working tree. The commit uses a fixed
+# cdd/cdd@local identity so it never depends on (or fails from) an unset user git
+# identity; the SHA is irrelevant under force-push. See doc/architecture/shell-helpers.md.
+cdd-state-push-ref() {
+  local handoff_md="$1" state_json="$2" branch="$3"
+  local entries="" blob
+  if [[ -f "$handoff_md" ]]; then
+    blob="$(git hash-object -w "$handoff_md" 2>/dev/null)" \
+      || { echo "cdd-state: could not hash handoff; skipping ref sync (advisory)." >&2; return 0; }
+    entries+="100644 blob ${blob}"$'\t'"handoff.md"$'\n'
+  fi
+  if [[ -f "$state_json" ]]; then
+    blob="$(git hash-object -w "$state_json" 2>/dev/null)" \
+      || { echo "cdd-state: could not hash state; skipping ref sync (advisory)." >&2; return 0; }
+    entries+="100644 blob ${blob}"$'\t'"state.json"$'\n'
+  fi
+  [[ -z "$entries" ]] && return 0
+  local tree commit
+  tree="$(printf '%s' "$entries" | git mktree 2>/dev/null)" \
+    || { echo "cdd-state: git mktree failed; skipping ref sync (advisory)." >&2; return 0; }
+  commit="$(GIT_AUTHOR_NAME=cdd GIT_AUTHOR_EMAIL=cdd@local \
+            GIT_COMMITTER_NAME=cdd GIT_COMMITTER_EMAIL=cdd@local \
+            git commit-tree "$tree" -m "cdd: sync ${branch}" 2>/dev/null)" \
+    || { echo "cdd-state: git commit-tree failed; skipping ref sync (advisory)." >&2; return 0; }
+  if git push --force origin "${commit}:refs/cdd/${branch}" 2>/dev/null; then
+    echo "Synced task ref: refs/cdd/${branch}"
+  else
+    echo "cdd-state: could not push refs/cdd/${branch} (no origin/offline?); state stays local (advisory)." >&2
+  fi
+  return 0
 }
 
 cdd-state() {
@@ -101,8 +144,11 @@ cdd-state() {
         --arg branch "$branch" \
         --argjson sessions "$sessions" \
         '{schema_version: $v, branch: $branch, stage: "scoped", pr: null, sessions: $sessions}')" || return 1
-      cdd-state-write "${dir}/${branch}.state.json" "$content" \
-        && echo "Seeded state: ${dir}/${branch}.state.json"
+      if cdd-state-write "${dir}/${branch}.state.json" "$content"; then
+        echo "Seeded state: ${dir}/${branch}.state.json"
+        # Land the handoff .md (immutable after seed) and the fresh state on the ref.
+        cdd-state-push-ref "${dir}/${branch}.md" "${dir}/${branch}.state.json" "$branch"
+      fi
       ;;
     set)
       local stage="$1"; shift 2>/dev/null
@@ -144,8 +190,13 @@ cdd-state() {
         --arg sid "$sid" \
         --arg dir "$toplevel" \
         "$filter" "$file")" || { echo "cdd-state: failed to update $file" >&2; return 1; }
-      cdd-state-write "$file" "$content" \
-        && echo "State: $(basename "$file") -> $stage${pr:+ (pr #$pr)}"
+      if cdd-state-write "$file" "$content"; then
+        echo "State: $(basename "$file") -> $stage${pr:+ (pr #$pr)}"
+        # Refresh the state .json on the ref (bundling the handoff .md if present).
+        # $file is <dir>/<branch>.state.json → strip the suffix for branch/handoff.
+        local base="${file%.state.json}"
+        cdd-state-push-ref "${base}.md" "$file" "$(basename "$base")"
+      fi
       ;;
     install|"")
       cdd-state-install "$@"
