@@ -156,4 +156,38 @@ markers=$(grep -cF "CDD state helper (managed by cdd-state.sh install) BEGIN" "$
 [[ "$markers" -eq 1 ]] || fail "self-repair left more than one state marker block (found $markers)"
 pass "install self-repairs a disabled state block (active again, still single)"
 
+# `cdd-state seed` must record the handoff session (issue #51): with a session id
+# in the environment, the seeded record's first `sessions[]` entry is the current
+# session at stage `scoped`, carrying `dir` = the worktree root. Run it from this
+# repo (a real git repo) against FAKE_HOME so the record lands under the temp tree.
+# Guarded on jq, like the helper itself.
+if command -v jq >/dev/null 2>&1; then
+  SEED_BRANCH="issue51_seed_probe"
+  # The record path uses the repo name derived from git's common-dir (the main
+  # worktree), not this checkout's basename — mirror the helper's derivation.
+  REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
+  EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
+  # The helper is dual-mode: executed directly it only installs, so source it and
+  # call the function (the same path the PATH shim takes) to reach `seed`.
+  ( cd "$REPO_ROOT" \
+    && HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 \
+       bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
+  [[ -f "$SEED_FILE" ]] || fail "seed did not write $SEED_FILE"
+  got="$(jq -r '.sessions[0] | "\(.id)|\(.stage)|\(.dir)"' "$SEED_FILE")"
+  [[ "$got" == "seed-probe-123|scoped|$EXPECT_DIR" ]] \
+    || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
+  pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
+
+  # Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
+  ( cd "$REPO_ROOT" \
+    && HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' \
+       bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
+  count="$(jq -r '.sessions | length' "$SEED_FILE")"
+  [[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
+  pass "cdd-state seed omits the session entry when no session id is set"
+else
+  echo "skip: jq not found; seed assertions skipped (advisory)"
+fi
+
 echo "all install smoke checks passed"
