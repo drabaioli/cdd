@@ -88,7 +88,7 @@ CDD ships seven slash commands, all prefixed `cdd-` so they autocomplete as a gr
 | `/cdd‑retrofit` | Install or upgrade CDD in an existing project. |
 | `/cdd‑quick‑create` | Produce a one-off self-contained deliverable (script + README), no project substrate. |
 
-`cdd-worktree` (and its companions `cdd-worktree-done`, `cdd-worktree-list`, and `cdd-worktree-resume`) is a **shell helper**, not a slash command. It's a single project-independent script — a machine-global toolchain dependency, like `git` or `gh` — that you install once and that then works in every CDD project. From a CDD repo checkout: `tools/cdd-worktree.sh install`. On a fresh machine with only a downstream project (no CDD repo), one command fetches and installs it:
+`cdd-worktree` (and its companions `cdd-worktree-done`, `cdd-worktree-list`, `cdd-worktree-resume`, and `cdd-worktree-gc`) is a **shell helper**, not a slash command. It's a single project-independent script — a machine-global toolchain dependency, like `git` or `gh` — that you install once and that then works in every CDD project. From a CDD repo checkout: `tools/cdd-worktree.sh install`. On a fresh machine with only a downstream project (no CDD repo), one command fetches and installs it:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
@@ -96,7 +96,7 @@ curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktr
   && bash ~/.cdd/tools/cdd-worktree.sh install
 ```
 
-Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. It spins up and tears down the per-task git worktree that an implementation session runs in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch, no handoff needed — so a task started elsewhere can be picked up to run `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`.
+Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. It spins up and tears down the per-task git worktree that an implementation session runs in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch — so a task started elsewhere can be picked up to run `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`. The task's handoff and state record ride along too, synced through a per-task git ref (advisory — resume still works without them). `cdd-worktree-gc` periodically reaps the handoff, state record, and synced ref of tasks whose PR has merged (dry-run unless `--force`), so those artifacts don't accumulate across machines.
 
 ## Questions?
 

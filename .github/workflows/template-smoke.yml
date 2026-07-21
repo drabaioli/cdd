@@ -34,6 +34,12 @@ jobs:
       - name: Worktree-resume smoke (local bare repo as origin)
         run: ./scripts/worktree-resume-assert.sh
 
+      - name: Task-ref sync smoke (refs/cdd/<branch> round-trip, local bare origin)
+        run: ./scripts/ref-sync-assert.sh
+
+      - name: Worktree GC smoke (reap merged tasks, keep scoped ones; stubbed gh)
+        run: ./scripts/gc-assert.sh
+
       - name: Configure git identity for the scaffold commit
         run: |
           git config --global user.email "ci@example.com"
