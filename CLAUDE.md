@@ -63,6 +63,10 @@ bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 # wins); the no-ref path still resumes cleanly.
 ./scripts/ref-sync-assert.sh
 
+# Worktree GC: with a stubbed `gh`, cdd-worktree-gc reaps a merged task's local
+# handoff/state + remote refs/cdd/<branch>, but keeps a scoped-but-unstarted one.
+./scripts/gc-assert.sh
+
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
 ./tools/bootstrap-cdd-project.sh --name "Demo Project" \
@@ -74,7 +78,7 @@ rm -rf /tmp/cdd-demo-smoke
 demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
 ```
 
-The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the prompt-seam check, the worktree-helper install smoke, the end-to-end smoke, and the demo seed-overlay step.
+The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the prompt-seam check, the worktree-helper install smoke, the task-ref sync smoke, the worktree GC smoke, the end-to-end smoke, and the demo seed-overlay step.
 
 When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
 
@@ -113,4 +117,5 @@ This project uses CDD on itself. Every CDD session is a fresh context doing exac
 - **When main has advanced under a feature branch** (merge session): run `/cdd-merge-base` in a fresh context on the feature branch.
 - **Before opening a PR** (pre-PR session): run `/cdd-pre-pr` in a fresh context to verify the process doc and template are consistent and the roadmap reflects what landed; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (adding `Closes #NN` when the branch carries the `gh_issue_NN` token).
 - **When a PR review leaves comments** (PR-review session): run `/cdd-process-pr` in a fresh context on the feature branch.
+- **To clean up finished tasks' artifacts** (maintenance, not a session): run `cdd-worktree-gc` from the main worktree. It reaps the handoff, state record, and synced `refs/cdd/<branch>` of any task whose PR has merged — the backstop for `cdd-worktree-done` never running or its ref cleanup failing across machines. Dry-run by default; `--force` to delete.
 - Keep the process doc, template, and roadmap consistent as part of every change. Process-first, then template.
