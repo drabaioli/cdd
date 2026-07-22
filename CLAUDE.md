@@ -67,6 +67,10 @@ bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
 # handoff/state + remote refs/cdd/<branch>, but keeps a scoped-but-unstarted one.
 ./scripts/gc-assert.sh
 
+# Per-task base branch: `cdd-state seed --base` records base_branch, `cdd-state get`
+# reads it, and `cdd-worktree` cuts from the recorded base (else the default branch).
+./scripts/base-branch-assert.sh
+
 # End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
 rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
 ./tools/bootstrap-cdd-project.sh --name "Demo Project" \
@@ -78,7 +82,7 @@ rm -rf /tmp/cdd-demo-smoke
 demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
 ```
 
-The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the prompt-seam check, the worktree-helper install smoke, the task-ref sync smoke, the worktree GC smoke, the end-to-end smoke, and the demo seed-overlay step.
+The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the prompt-seam check, the worktree-helper install smoke, the task-ref sync smoke, the worktree GC smoke, the per-task base-branch smoke, the end-to-end smoke, and the demo seed-overlay step.
 
 When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
 

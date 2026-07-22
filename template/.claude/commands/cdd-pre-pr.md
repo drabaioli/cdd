@@ -2,18 +2,19 @@ Run a pre-PR checklist for the current branch. Compare against the base branch t
 
 This session is **fresh and separate** from the implementation session by design, so that the verification work is not biased by the context that produced the change. Any "propose to the user" step in this command is a proposal to the user running this session.
 
-## 0. Resolve the default branch
+## 0. Resolve the base branch
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)
+BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
+BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)}
 ```
 
-Use `$DEFAULT_BRANCH` wherever `main`/`origin/main` appears in git commands below.
+This reads the task's recorded base branch — the branch it was cut from and merges back into (process doc §2.13) — and falls back to the hosting platform's default branch when none was recorded (unchanged behaviour for single-integration-branch projects). Use `$BASE_BRANCH` wherever `main`/`origin/main` appears in git commands below.
 
 ## 1. Identify changes
 
 ```bash
-git diff "$DEFAULT_BRANCH"...HEAD --name-only
+git diff "$BASE_BRANCH"...HEAD --name-only
 git status --porcelain
 ```
 
@@ -85,11 +86,11 @@ Do **not** propose generic CI improvements every run. The default is silence. If
 ## 7. Upstream drift check
 
 ```bash
-git fetch origin "$DEFAULT_BRANCH"
-git log --oneline "HEAD..origin/$DEFAULT_BRANCH"
+git fetch origin "$BASE_BRANCH"
+git log --oneline "HEAD..origin/$BASE_BRANCH"
 ```
 
-If `origin/$DEFAULT_BRANCH` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-base` before opening the PR. Do not merge from this session.
+If `origin/$BASE_BRANCH` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-base` before opening the PR. Do not merge from this session.
 
 ## 8. Summary
 
@@ -150,5 +151,5 @@ If §7 found upstream drift, restate the recommendation to run `/cdd-merge-base`
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary, then run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then advance the task **state record** (§2.13), passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
+- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then advance the task **state record** (§2.13), passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist above already stands on its own.

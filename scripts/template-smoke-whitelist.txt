@@ -9,7 +9,7 @@
 <build command>
 <count>
 <count or "none">
-<DEFAULT_BRANCH>
+<BASE_BRANCH>
 <deferred open questions for the implementation session, proposed roadmap edits, caveats — or "None" if clean>
 <descriptive_slug>
 <exact checkbox line(s) from the roadmap being addressed>

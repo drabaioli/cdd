@@ -40,6 +40,9 @@ jobs:
       - name: Worktree GC smoke (reap merged tasks, keep scoped ones; stubbed gh)
         run: ./scripts/gc-assert.sh
 
+      - name: Per-task base-branch smoke (seed --base, get, cut-from-base; local bare origin)
+        run: ./scripts/base-branch-assert.sh
+
       - name: Configure git identity for the scaffold commit
         run: |
           git config --global user.email "ci@example.com"

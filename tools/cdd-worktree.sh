@@ -90,12 +90,14 @@ cdd-worktree() {
   fi
 
   # The sibling worktree name is derived from $PWD; run from a feature worktree
-  # this would nest names, so insist on the main worktree.
-  local default_branch current_branch
-  default_branch="$(cdd-worktree-default-branch)"
-  current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
-  if [[ "$current_branch" != "$default_branch" ]]; then
-    echo "Run this from the main worktree on '$default_branch' (current: '$current_branch')." >&2
+  # this would nest names, so insist on the main worktree. git-dir == git-common-dir
+  # only in the main worktree (a linked worktree's git-dir is .git/worktrees/<name>),
+  # so this allows a gitflow main worktree sitting on a non-default branch.
+  local git_dir common_dir
+  git_dir="$(git rev-parse --path-format=absolute --git-dir 2>/dev/null)" || return 1
+  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  if [[ "$git_dir" != "$common_dir" ]]; then
+    echo "Run this from the main worktree, not a feature worktree." >&2
     return 1
   fi
 
@@ -110,11 +112,31 @@ cdd-worktree() {
     return 1
   fi
 
+  # Cut the new branch from the task's recorded base branch (§2.13), falling back
+  # to the default branch when none was recorded. Prefer a local base branch, else
+  # origin/<base> (fetched best-effort); an unresolved base drops to current HEAD.
+  local base_branch="" start_point=""
+  if command -v jq >/dev/null 2>&1 && [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
+    base_branch="$(jq -r '.base_branch // empty' "${handoff_dir}/${branch}.state.json" 2>/dev/null)"
+  fi
+  [[ -z "$base_branch" ]] && base_branch="$(cdd-worktree-default-branch)"
+  if git show-ref --verify --quiet "refs/heads/$base_branch"; then
+    start_point="$base_branch"
+  else
+    git fetch --quiet origin "$base_branch" 2>/dev/null || true
+    git show-ref --verify --quiet "refs/remotes/origin/$base_branch" && start_point="origin/$base_branch"
+  fi
+  [[ -z "$start_point" ]] \
+    && echo "Base branch '$base_branch' not found locally or on origin; cutting from current HEAD." >&2
+
   local repo_dir
   repo_dir="$(basename "$PWD")"
   local worktree_path="../${repo_dir}-${branch}"
 
-  git worktree add -b "$branch" "$worktree_path" || return 1
+  echo "Cutting '$branch' from ${start_point:-current HEAD}."
+  local -a start=()
+  [[ -n "$start_point" ]] && start=("$start_point")
+  git worktree add -b "$branch" "$worktree_path" "${start[@]}" || return 1
   cd "$worktree_path" || return 1
 
   local first_prompt="Read ${handoff} and follow the Implementation prompt."
