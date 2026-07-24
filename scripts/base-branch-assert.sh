@@ -11,6 +11,9 @@
 #   - `cdd-worktree <branch>` cuts the new branch from the recorded base
 #     (develop), and falls back to the default branch when none was recorded —
 #     with a stubbed `claude` guarding that the launch happens but nothing real runs
+#   - `cdd-worktree` runs from a main worktree sitting on a non-default branch
+#     (gitflow develop): the guard is "not a linked worktree", not "on the
+#     default branch", so this must be admitted
 #
 # Usage: scripts/base-branch-assert.sh
 # Takes no arguments; provisions and tears down its own temp tree. Requires jq
@@ -159,5 +162,21 @@ WT_DEF="$WORK/${REPO_NAME}-feat_default"
 [[ ! -f "$WT_DEF/dev_only.txt" ]] \
   || fail "feat_default (no recorded base) must not be cut from develop"
 pass "cdd-worktree falls back to the default branch when no base was recorded"
+
+# 6. Guard: cdd-worktree runs from the main worktree even when it sits on a
+#    non-default branch (gitflow develop). The guard is "not a linked worktree"
+#    (git-dir == git-common-dir), not "on the default branch", so this is
+#    admitted — the branch-name guard it replaced would have rejected it here.
+(cd "$WORK/machine" && git switch -q -c "$BASE_BRANCH" "origin/$BASE_BRANCH")
+run_state seed feat_gitflow --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_gitflow failed"
+printf '# Task: feat_gitflow\n\nbody\n' > "$DIR/feat_gitflow.md"
+: > "$CLAUDE_STUB_LOG"
+run_worktree feat_gitflow >/dev/null 2>&1 \
+  || fail "cdd-worktree must run from a main worktree on a non-default branch (gitflow)"
+WT_GF="$WORK/${REPO_NAME}-feat_gitflow"
+[[ -d "$WT_GF" ]] || fail "cdd-worktree did not create the feat_gitflow worktree"
+[[ -s "$CLAUDE_STUB_LOG" ]] \
+  || fail "cdd-worktree must launch claude from a non-default main worktree"
+pass "cdd-worktree runs from a main worktree on a non-default branch (gitflow guard)"
 
 echo "all base-branch smoke checks passed"
