@@ -166,7 +166,7 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/cdd
 ```
 
-Then seed the task **state record** beside the handoff — the slash commands advance this file as the task moves through its stages, and external tools read it (see the process doc §2.13). Record the task's **base branch** (§4) with it, defaulting to the branch checked out here; substitute the agreed base for the `$(…)` default when the task stacks on a branch not checked out here:
+Then seed the task **state record** beside the handoff — the slash commands advance this file as the task moves through its stages, and external tools read it (see the process doc §2.13). Record the task's **base branch** (agreed in §4 above) with it, defaulting to the branch checked out here; substitute the agreed base for the `$(…)` default when the task stacks on a branch not checked out here:
 
 ```bash
 cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"

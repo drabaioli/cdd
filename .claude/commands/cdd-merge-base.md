@@ -12,7 +12,7 @@ BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
 BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)}
 ```
 
-This reads the task's recorded base branch — the branch it was cut from and merges back into (process doc §2.13). When no base was recorded (every single-integration-branch project), it falls back to the hosting platform's default branch, so behaviour is unchanged there. Use `$BASE_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
+This reads the task's recorded base branch — the branch it was cut from and merges back into. When no base was recorded (every single-integration-branch project), it falls back to the hosting platform's default branch, so behaviour is unchanged there. Use `$BASE_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
 
 ## 1. Sanity check
 
