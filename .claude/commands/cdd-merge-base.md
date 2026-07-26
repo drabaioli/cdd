@@ -5,15 +5,14 @@ Run this command on the feature branch (not on the base branch). Use it when:
 - The base branch has advanced under your feature branch and you want to integrate before opening or merging the PR.
 - Something useful has landed on the base branch (a new utility, a refactor, an updated convention) that this branch should pick up without a separate roadmap task.
 
-## 0. Resolve the default branch
+## 0. Resolve the base branch
 
 ```bash
-DEFAULT_BRANCH=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)
+BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
+BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)}
 ```
 
-Use `$DEFAULT_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
-
-> **Scope note:** this detects the hosting platform's default branch. If the project uses a gitflow model where the platform default is a release branch and daily work targets a different integration branch (e.g. platform default is `main` but features branch off `devel`), this command targets the wrong branch. That case requires an explicit `BASE_BRANCH` config and is tracked as a separate roadmap item.
+This reads the task's recorded base branch — the branch it was cut from and merges back into. When no base was recorded (every single-integration-branch project), it falls back to the hosting platform's default branch, so behaviour is unchanged there. Use `$BASE_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
 
 ## 1. Sanity check
 
@@ -34,29 +33,29 @@ If there are uncommitted changes, stop and ask the user whether to stash or comm
 ## 2. Update local base branch reference
 
 ```bash
-git fetch origin "$DEFAULT_BRANCH"
+git fetch origin "$BASE_BRANCH"
 ```
 
-Determine how far the branch has diverged from `origin/$DEFAULT_BRANCH`:
+Determine how far the branch has diverged from `origin/$BASE_BRANCH`:
 
 ```bash
-git log --oneline "HEAD..origin/$DEFAULT_BRANCH" | head -50
-git log --oneline "origin/$DEFAULT_BRANCH..HEAD" | head -50
+git log --oneline "HEAD..origin/$BASE_BRANCH" | head -50
+git log --oneline "origin/$BASE_BRANCH..HEAD" | head -50
 ```
 
 Report:
 
-- Number of commits on `origin/$DEFAULT_BRANCH` not in this branch.
-- Number of commits on this branch not in `origin/$DEFAULT_BRANCH`.
+- Number of commits on `origin/$BASE_BRANCH` not in this branch.
+- Number of commits on this branch not in `origin/$BASE_BRANCH`.
 
-If there is nothing on `origin/$DEFAULT_BRANCH` not in this branch, there is nothing to merge. Stop and report.
+If there is nothing on `origin/$BASE_BRANCH` not in this branch, there is nothing to merge. Stop and report.
 
 ## 3. Dry-run conflict assessment
 
 Perform a non-committing test merge to surface conflicts without mutating the working tree:
 
 ```bash
-git merge-tree --write-tree --name-only "origin/$DEFAULT_BRANCH" HEAD
+git merge-tree --write-tree --name-only "origin/$BASE_BRANCH" HEAD
 ```
 
 Capture the list of conflicting files.
@@ -70,16 +69,16 @@ If there are conflicts, for each conflicting file:
 
 - Read both versions and the merge base. Use:
   ```bash
-  git show "origin/$DEFAULT_BRANCH:<file>"
+  git show "origin/$BASE_BRANCH:<file>"
   git show HEAD:<file>
-  git show "$(git merge-base "origin/$DEFAULT_BRANCH" HEAD):<file>"
+  git show "$(git merge-base "origin/$BASE_BRANCH" HEAD):<file>"
   ```
 - Classify the conflict:
   - **Mechanical**: textual collision in a region where the intent is obvious (e.g. both sides added an import, both sides added an entry to the same list, formatting drift).
   - **Logical**: the two sides changed the same logical concern in incompatible ways (e.g. one renamed a function the other modified the body of).
   - **Structural**: file moved/renamed/deleted on one side and modified on the other.
 
-Also scan the non-conflicting changes on `origin/$DEFAULT_BRANCH` for items relevant to this branch:
+Also scan the non-conflicting changes on `origin/$BASE_BRANCH` for items relevant to this branch:
 
 - New conventions established on the base branch that this branch's code should adopt.
 - New utilities or helpers that obviate code on this branch.
@@ -92,7 +91,7 @@ Present to the user:
 ```
 ## Merge-base assessment
 
-Commits to integrate from origin/<DEFAULT_BRANCH>: <N>
+Commits to integrate from origin/<BASE_BRANCH>: <N>
 Commits unique to this branch:                     <M>
 
 ### Conflicts
@@ -117,7 +116,7 @@ If conflicts are non-trivial, **stop and wait for explicit user approval**. Do n
 On user approval:
 
 ```bash
-git merge "origin/$DEFAULT_BRANCH"
+git merge "origin/$BASE_BRANCH"
 ```
 
 Resolve conflicts file by file:

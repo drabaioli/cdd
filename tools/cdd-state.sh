@@ -119,9 +119,16 @@ cdd-state() {
   local cmd="$1"; shift 2>/dev/null
   case "$cmd" in
     seed)
-      local branch="$1"
+      local branch="$1"; shift 2>/dev/null
+      local base=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --base) base="$2"; shift 2 ;;
+          *) echo "cdd-state seed: unknown arg '$1'" >&2; return 2 ;;
+        esac
+      done
       if [[ -z "$branch" ]]; then
-        echo "usage: cdd-state seed <branch>" >&2
+        echo "usage: cdd-state seed <branch> [--base <branch>]" >&2
         return 2
       fi
       local repo_name dir
@@ -139,11 +146,15 @@ cdd-state() {
           '[{id: $id, stage: "scoped", dir: $dir}]')" || return 1
       fi
       local content
+      # base_branch is the task's base — the branch it was cut from and merges
+      # back into (§2.13). Empty --base → null ("no base recorded"), so consumers
+      # fall back to the runtime default branch. Set once here; never mutated.
       content="$(jq -n \
         --argjson v "$CDD_STATE_SCHEMA_VERSION" \
         --arg branch "$branch" \
+        --arg base "$base" \
         --argjson sessions "$sessions" \
-        '{schema_version: $v, branch: $branch, stage: "scoped", pr: null, sessions: $sessions}')" || return 1
+        '{schema_version: $v, branch: $branch, stage: "scoped", pr: null, base_branch: ($base | if . == "" then null else . end), sessions: $sessions}')" || return 1
       if cdd-state-write "${dir}/${branch}.state.json" "$content"; then
         echo "Seeded state: ${dir}/${branch}.state.json"
         # Land the handoff .md (immutable after seed) and the fresh state on the ref.
@@ -198,11 +209,25 @@ cdd-state() {
         cdd-state-push-ref "${base}.md" "$file" "$(basename "$base")"
       fi
       ;;
+    get)
+      # Read accessor for the cwd-derived record: print .<field>, empty on an
+      # absent record or an absent/null field. Advisory and read-only; the jq
+      # guard at the top already handles a machine without jq.
+      local field="$1"
+      if [[ -z "$field" ]]; then
+        echo "usage: cdd-state get <field>" >&2
+        return 2
+      fi
+      local file
+      file="$(cdd-state-file)" || return 0
+      [[ -f "$file" ]] || return 0
+      jq -r --arg f "$field" '.[$f] // empty' "$file" 2>/dev/null || return 0
+      ;;
     install|"")
       cdd-state-install "$@"
       ;;
     *)
-      echo "usage: cdd-state {seed <branch> | set <stage> [--pr N] | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | install}" >&2
       return 2
       ;;
   esac

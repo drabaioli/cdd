@@ -29,9 +29,13 @@ The rc `source` line only reaches interactive shells (`~/.bashrc` returns early 
 
 Nothing project-specific is configured or copied per project: the repo name (the handoff-directory namespace) is derived from the worktree's git common directory, and the default branch from `origin`'s HEAD (`git symbolic-ref refs/remotes/origin/HEAD`), falling back to `main`. The remote is assumed to be named `origin`; that assumption is documented in `template/BOOTSTRAP.md`.
 
+The default branch is the *fallback* base for a task, not always its actual base. Each task records its own base branch (§ below); `cdd-worktree` cuts the new branch from that base and the resume-side commands target it, both falling back to the runtime-derived default branch when a task recorded none.
+
 ## State-record writes (`cdd-state`)
 
 Every write is atomic — rendered to a temp file in the destination directory, then `mv`'d into place — so a crashed or concurrent write cannot leave a truncated record. The session chain's ids come from `CLAUDE_CODE_SESSION_ID`: an entry is appended only when the variable is non-empty and differs from the last entry's id (deduping repeated writes within one session); when it is unset (older Claude Code), the entry is omitted rather than guessed. Each entry also carries `dir`, the worktree root the session ran in (`git rev-parse --show-toplevel`) — the natural `cd` target before `claude --resume`. Seeding records the handoff session (`/cdd-next-step`, on the main worktree) as the first entry so it is resumable too, then `set` appends each in-worktree session thereafter. The helper is advisory end-to-end: absent `jq`, or an absent record, it no-ops rather than failing the workflow (writers never fabricate a record; only `/cdd-next-step` seeds one).
+
+`seed` also records the task's base branch when passed `--base <branch>` (`/cdd-next-step` supplies the branch it is standing on); without the flag the field is `null`. It is set once at seed and never mutated: `set` rewrites only `stage`/`pr`/`sessions`, so `base_branch` rides through every later write untouched (`jq` passes unreferenced fields through), and the whole-record materialize on resume carries it to other machines for free. A read accessor, `cdd-state get <field>`, prints `.<field>` from the cwd-derived record (empty on absent `jq`, absent record, or an absent/`null` field) — the resume-side commands read `base_branch` through it.
 
 ### Schema
 
@@ -43,11 +47,12 @@ Every write is atomic — rendered to a temp file in the destination directory, 
   "branch": "task_state_tracking",
   "stage": "plan_approved",
   "pr": null,
+  "base_branch": "develop",
   "sessions": [ { "id": "<uuid>", "stage": "plan_approved", "dir": "<worktree-root>" } ]
 }
 ```
 
-`pr` is the integer PR number once a PR exists, else `null`. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`, run from `dir`. `dir` is additive and optional — not versioned by `schema_version`, so old and new records interoperate; a consumer that finds it absent falls back to the branch's known worktree path.
+`pr` is the integer PR number once a PR exists, else `null`. `base_branch` is the branch the task was cut from and merges back into, recorded once at seed and immutable thereafter; `null` (or absent, on records predating the field) means "no base recorded", and consumers fall back to the runtime-derived default branch. Like `dir`, it is additive and optional — not versioned by `schema_version`, so old and new records interoperate. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`, run from `dir`. `dir` is additive and optional — not versioned by `schema_version`, so old and new records interoperate; a consumer that finds it absent falls back to the branch's known worktree path.
 
 ### Stages and writers
 

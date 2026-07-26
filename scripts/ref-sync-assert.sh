@@ -53,6 +53,7 @@ EOF
 DEFAULT_BRANCH="main"
 FEATURE="feat_sync"
 FEATURE_NO="feat_noref"  # pushed to origin, but never gets a refs/cdd/* ref
+BASE_TASK="develop"      # a non-default base recorded at seed; must ride the ref
 
 # Stub `claude` on PATH as a negative guard: resume must never invoke it.
 mkdir -p "$WORK/bin"
@@ -120,11 +121,13 @@ mkdir -p "$DIR_A"
 HANDOFF_A="$DIR_A/$FEATURE.md"
 printf '# Task: %s\n\nScoped handoff body.\nNo trailing weirdness.\n' "$FEATURE" > "$HANDOFF_A"
 
-run_state "$WORK/machineA" "$HOME_A" seed "$FEATURE" >/dev/null 2>&1 \
+run_state "$WORK/machineA" "$HOME_A" seed "$FEATURE" --base "$BASE_TASK" >/dev/null 2>&1 \
   || fail "cdd-state seed failed on machine A"
 git -C "$WORK/machineA" ls-remote origin "refs/cdd/$FEATURE" | grep -q "refs/cdd/$FEATURE" \
   || fail "seed did not push refs/cdd/$FEATURE to origin"
-pass "seed pushed refs/cdd/$FEATURE to origin"
+[[ "$(jq -r '.base_branch' "$DIR_A/$FEATURE.state.json")" == "$BASE_TASK" ]] \
+  || fail "seed --base did not record base_branch on machine A"
+pass "seed pushed refs/cdd/$FEATURE to origin (with base_branch)"
 
 git -C "$WORK/machineA" switch -q "$FEATURE"
 run_state "$WORK/machineA" "$HOME_A" set implementation_done >/dev/null 2>&1 \
@@ -149,8 +152,10 @@ cmp -s "$HANDOFF_A" "$DIR_B/$FEATURE.md" \
   || fail "materialized handoff differs from machine A's (not byte-for-byte)"
 [[ "$(jq -r '.stage' "$DIR_B/$FEATURE.state.json")" == "implementation_done" ]] \
   || fail "materialized state is not at the advanced stage implementation_done"
+[[ "$(jq -r '.base_branch' "$DIR_B/$FEATURE.state.json")" == "$BASE_TASK" ]] \
+  || fail "base_branch did not ride the ref sync to machine B"
 [[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "resume must not launch claude"
-pass "resume materialized handoff byte-for-byte and the advanced state, no claude"
+pass "resume materialized handoff byte-for-byte, advanced state, and base_branch, no claude"
 
 # 4. Most-advanced wins (ref ahead): a stale local record is overwritten, and a
 #    pre-existing local handoff is preserved (immutable after seed).

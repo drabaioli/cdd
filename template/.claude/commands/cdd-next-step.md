@@ -99,6 +99,7 @@ Discuss with the user. Ask clarifying questions, but keep them to the requiremen
 - Exact scope boundaries (what is in, what is deferred).
 - Which existing module owns the new code.
 - Whether the work needs a new test category.
+- The task's **base branch** — the branch it is cut from and merges back into. It defaults to the branch checked out here (ordinary work, and gitflow where you sit on `develop`); confirm an override only when the task stacks on another feature branch.
 
 Hard, open-ended technical questions are deferred to the implementation session, which will have a clean context dedicated to one task. Examples of expensive clarification (defer):
 
@@ -165,10 +166,10 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>
 ```
 
-Then seed the task **state record** beside the handoff — the slash commands advance this file as the task moves through its stages, and external tools read it (see the process doc §2.13). One command does it:
+Then seed the task **state record** beside the handoff — the slash commands advance this file as the task moves through its stages, and external tools read it (see the process doc §2.13). Record the task's **base branch** (agreed in §4 above) with it, defaulting to the branch checked out here; substitute the agreed base for the `$(…)` default when the task stacks on a branch not checked out here:
 
 ```bash
-cdd-state seed <branch>
+cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"
 ```
 
 ## 8. Print the next command
