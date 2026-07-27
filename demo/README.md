@@ -86,9 +86,17 @@ The roadmap (`demo/seed/doc/knowledge_base/roadmap.md`) is designed so a fresh i
 ## Verifying the subsystem
 
 ```bash
-bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
+# The gate CI runs: bootstrap + seed overlay into a scratch dir, asserting no
+# leftover placeholders and that the conflict seam survived. No GitHub side effects.
+./scripts/ci.sh demo-seed
 
-# End-to-end without touching GitHub:
+# The demo scripts' syntax and lint are covered by the syntax/shellcheck gates:
+./scripts/ci.sh syntax shellcheck
+```
+
+The gate cleans up after itself. To keep an instance around and poke at it:
+
+```bash
 rm -rf /tmp/cdd-demo-smoke
 demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
 ```

@@ -87,7 +87,7 @@ The implementation prompt is self-contained: it includes only context the implem
 Project-level Claude Code slash commands. They are declarative — they describe what to do, not how to orchestrate it; orchestration (worktree creation, branch lifecycle) lives in the shell helpers (§2.8). CDD ships four commands in the per-task lifecycle:
 
 - `/cdd-next-step`, exploratory session, run on main, produces a handoff.
-- `/cdd-pre-pr`, verification session, run on the feature branch, runs CI and reconciles docs.
+- `/cdd-pre-pr`, verification session, run on the feature branch, runs the check runner (§2.14) and reconciles docs.
 - `/cdd-merge-base`, side-loop, run on a feature branch when main has advanced: conflict assessment, then merge.
 - `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed: reads the review comments, addresses them, posts replies, commits + pushes. (See §4.1 for the deliberate checkpoint exception it carries.)
 
@@ -145,7 +145,7 @@ The project's engineering floor, written down — the artifact that makes Sectio
 - **Enforced** — a CDD gate guarantees it on every change. If an enforced practice is failing, `/cdd-pre-pr` reports it and the change is not ready.
 - **Expected** — the project is committed to the practice but has not yet mechanized it. Each expected practice is tracked as a roadmap task until it becomes enforced. "Expected" is a promise with a due date, not an opt-out.
 
-A practice moves from expected to enforced in the same change that lands its mechanism: the mechanism and the status flip ship together. The contract is deliberately generic and language-agnostic — it names *what* the floor is and carries placeholders for the project's own commands, never a shipped CI or lint config. The canonical practice set (documentation, tested behaviour, CI, lint & format, dependency hygiene) lives in the template skeleton, `template/doc/knowledge_base/engineering-practices.md`; new practices are added as the project matures, and a row that genuinely does not apply is dropped with a recorded reason, never silently.
+A practice moves from expected to enforced in the same change that lands its mechanism: the mechanism and the status flip ship together. The gates behind the enforced practices are collected in one place, the check runner (§2.14), which is what makes them verifiable *before* the PR rather than only in CI. The contract is deliberately generic and language-agnostic — it names *what* the floor is and carries placeholders for the project's own commands, never a shipped CI or lint config. The canonical practice set (documentation, tested behaviour, CI, lint & format, dependency hygiene) lives in the template skeleton, `template/doc/knowledge_base/engineering-practices.md`; new practices are added as the project matures, and a row that genuinely does not apply is dropped with a recorded reason, never silently.
 
 ### 2.13 Per-task state record (`~/.cdd/handoffs/<repo>/<branch>.state.json`)
 
@@ -154,6 +154,16 @@ A small JSON sibling of the handoff (§2.6) — same directory, same `<branch>` 
 The base branch encodes the invariant that **every branch has exactly one base**: `/cdd-next-step` records it when it seeds the record, defaulting to the branch then checked out (so gitflow and recursively stacked branches capture their real parent), and it never changes thereafter. `cdd-worktree` (§2.8) cuts the new branch from it; the resume-side commands `/cdd-merge-base` and `/cdd-pre-pr` (§3.4, §3.5) target it. It is an additive, optional field: a record without one — including every record predating the field — falls back to the platform default branch (`origin`'s HEAD, else `main`), so single-integration-branch projects are unaffected and need no configuration.
 
 The record is **advisory**: a consumer that finds it missing or stale falls back to inferring state from handoffs, branches, and `gh`, and a writer that finds it missing does not fabricate one (only `/cdd-next-step` seeds it). It syncs across machines: every write also pushes the handoff and record to a per-task ref, which `cdd-worktree-resume` (§2.8) materializes on the picking-up machine — best-effort, so it degrades to purely local when there is no remote to reach. Writes go through the `cdd-state` helper (§2.8), which keeps them atomic and well-formed and no-ops rather than failing the workflow. The slash commands call it at their stage transitions; the implementation session's calls are driven by a standing instruction in the handoff (§3.3). The schema and the stage-to-writer mapping live in `doc/architecture/shell-helpers.md`.
+
+### 2.14 The check runner
+
+One command that runs every gate the project has, and is the **sole source of the gate sequence**. CI delegates to it, keeping only platform-specific setup in the CI config, and `/cdd-pre-pr` (§3.5) invokes the same command — so "it passed locally" means "it will pass CI", and there is no second list of checks to keep in sync. Adding a gate to the runner is the only way to add one.
+
+This exists for two reasons, and the second is the larger. A project's gates are otherwise written out once in the CI config, once in `CLAUDE.md`, and once in the pre-PR command — three lists that silently drift. And a pre-PR session that runs only *some* of the gates gives a green verdict that guarantees very little, so the rest of the failures surface after the PR is open, which is exactly when they are most expensive.
+
+The runner is **host-direct and degrades gracefully**: it assumes no container and pins no toolchain. A gate whose tool is not installed on this host is reported **skipped — loudly, and non-fatally**. It never fails the run over a missing tool, and it never lets a gate pass silently, because a silent skip is worse than either outcome. The cost of that choice is explicit: a host missing a tool gets a *weaker* verdict than CI, not a wrong one, and the skip says so. A project may of course make a gate's tool a hard requirement instead; that is a per-project call, not a workflow rule.
+
+The runner is a project artifact, not a shared CDD helper — every project's gates are its own — so CDD ships the practice rather than a script. Its own conventions (registry shape, skip semantics, output grouping) belong in the project's architecture docs; this repo's live in `doc/architecture/overview.md`.
 
 ## 3. Lifecycle
 
@@ -271,13 +281,13 @@ Run on the feature branch when main has advanced and the feature branch needs to
 
 ### 3.5 Pre-PR session: `/cdd-pre-pr`
 
-A fresh session on the feature branch, started after the implementation session has closed — deliberately, so the implementation session never grades its own homework. It runs the CI gates, code-reviews the diff, and reconciles three things:
+A fresh session on the feature branch, started after the implementation session has closed — deliberately, so the implementation session never grades its own homework. It runs the project's check runner (§2.14) — the same command CI runs, so the verdict carries over — code-reviews the diff, and reconciles three things:
 
 - **Docs**: architecture and feature docs are compared against the actual code and fixed directly; roadmap checkboxes are ticked directly, while structural roadmap edits (add/modify/remove) are proposed to the human for approval before applying.
 - **Test coverage**: each behavioural change in the diff either has a test exercising it, or the reason it doesn't is recorded — the recurring guardrail behind §2.12's tested-behaviour row. If the project has no test harness yet, the step notes the untested change and confirms that standing up tests is tracked on the roadmap; it does not invent a framework.
 - **CI**: a conditional improvement proposal, only when the change genuinely surfaces a gap the existing CI doesn't cover. The default is silence.
 
-Output is a pass/fail summary across the gates. The session then auto-commits its reconciliation edits locally per §2.11, and ends with an optional, human-gated step to open the PR: a single yes/no question; on approval it derives the title and body and runs `gh pr create`, adding a `Closes #NN` line when the branch carries the `gh_issue_NN` token so the issue auto-closes on merge. `/cdd-pre-pr` never opens a PR without explicit confirmation.
+Output is a pass/fail/skipped summary across the gates. The session then auto-commits its reconciliation edits locally per §2.11, and ends with an optional, human-gated step to open the PR: a single yes/no question; on approval it derives the title and body and runs `gh pr create`, adding a `Closes #NN` line when the branch carries the `gh_issue_NN` token so the issue auto-closes on merge. `/cdd-pre-pr` never opens a PR without explicit confirmation.
 
 ### 3.6 PR review and merge
 
