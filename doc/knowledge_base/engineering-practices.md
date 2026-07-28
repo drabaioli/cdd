@@ -17,7 +17,7 @@ There is no unit-test suite; behaviour is exercised by integration-style smoke a
 
 - `bash -n` over all shell scripts (syntax).
 - `./scripts/command-drift-check.sh` — repo `.claude/commands/` vs the rendered template, plus the handoff-schema and worktree-helper assertions.
-- `./scripts/prompt-seam-check.sh` — deterministic seam contracts between the repo's own prompts: `/cdd-*` references resolve to a command file, the `gh_issue_NN` branch token is produced and consumed in agreement, backticked file paths resolve, and each command keeps its load-bearing headings.
+- `./scripts/prompt-seam-check.sh` — deterministic seam contracts between the repo's own prompts: `/cdd-*` references resolve to a command file, the `gh_issue_NN` branch token is produced and consumed in agreement, backticked file paths resolve, each command keeps its load-bearing headings, and the gate count stated in prose matches `./scripts/ci.sh list`.
 - End-to-end bootstrap smoke: `tools/bootstrap-cdd-project.sh` into a tmpdir + `scripts/template-smoke-assert.sh` (clean, link-valid tree) — in four shapes: plain, CamelCase dir, `--stage` render-only, and `--template-dir` snapshot.
 - Demo seed-overlay smoke: `demo/setup.sh … --local-only`.
 - `./scripts/ci-runner-assert.sh` — the check runner's own contract: registry and gate functions agree, an unknown gate is rejected, a missing tool yields a non-fatal SKIP, and the workflow delegates instead of holding its own gate list.

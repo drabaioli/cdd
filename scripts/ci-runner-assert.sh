@@ -17,6 +17,9 @@
 #      was checking a single file and passing regardless of the others. Pinned by
 #      dropping a deliberately broken script into the lint scope and requiring the
 #      gate to fail.
+#   6. `-h` prints the header block and stops there. The runner documents its own
+#      usage by echoing its header, so the extraction must not run on into the
+#      section comments further down the file.
 #
 # Sets CDD_CI_SELFTEST so the runner's own `runner` gate does not re-enter this
 # script when the full suite runs.
@@ -118,5 +121,15 @@ rm -f "$PROBE"
 "./$RUNNER" syntax >/dev/null 2>&1 \
   || fail "the syntax gate fails on a clean tree once the probe is removed"
 pass "syntax gate covers every script in scope"
+
+# --- 6. -h prints the header block, and only that ------------------------------
+help_out="$("./$RUNNER" -h 2>&1)"
+help_status=$?
+[[ $help_status -eq 0 ]] || fail "$RUNNER -h exited $help_status"
+grep -q '^Usage:' <<<"$help_out" || fail "$RUNNER -h printed no Usage: section"
+grep -q '^!' <<<"$help_out" && fail "$RUNNER -h leaked the shebang line"
+grep -q '^--- ' <<<"$help_out" \
+  && fail "$RUNNER -h ran past the header into the script's section comments"
+pass "-h prints the header block and stops there"
 
 echo "ci runner contract: clean"

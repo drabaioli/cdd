@@ -20,6 +20,9 @@
 #      CLAUDE.md, and README.md resolve to real files (whitelist covers downstream paths).
 #   4. Required-section presence — each cdd-*.md still carries its load-bearing headings,
 #      so an edit can't silently drop one.
+#   5. Gate-count contract — the gate count CLAUDE.md and cdd-pre-pr.md state in prose
+#      matches what `scripts/ci.sh list` actually registers, so adding a gate can't leave
+#      the prose (which is what a session reads to know what it just ran) stale.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -113,6 +116,18 @@ require_headings "$REPO_CMDS/cdd-quick-create.md" \
 require_headings "$REPO_CMDS/cdd-retrofit.md" \
   '## 3. Install mode' \
   '## 4. Upgrade mode'
+
+# --- Check 5: gate-count contract --------------------------------------------
+# The runner's registry is the source of truth for how many gates there are; both
+# CLAUDE.md and cdd-pre-pr.md also state the count in prose, and a pre-PR session
+# reads the prose to describe what it ran. `ci.sh list` is the same interface
+# ci-runner-assert.sh consumes; `list` returns before the runner does any work.
+gate_count="$(./scripts/ci.sh list | grep -c .)"
+for f in CLAUDE.md "$REPO_CMDS/cdd-pre-pr.md"; do
+  grep -qE "(^|[^0-9])$gate_count gates?([^a-z]|$)" "$f" && continue
+  note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
+  grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
+done
 
 if [[ "$fail" -ne 0 ]]; then
   echo "prompt-seam check: FAILED (see above)" >&2

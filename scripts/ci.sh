@@ -191,7 +191,10 @@ gate_runner() {
 # --- Runner ------------------------------------------------------------------
 
 usage() {
-  grep '^#' "${BASH_SOURCE[0]}" | sed 's/^# \?//'
+  # The header block only: skip the shebang, stop at the first non-comment line.
+  # A bare `grep '^#'` would also print every section comment further down as if
+  # it were help text.
+  sed -n '2,/^[^#]/{ /^[^#]/q; s/^# \?//; p; }' "${BASH_SOURCE[0]}"
 }
 
 # A slug is kebab-case; its gate function is snake_case.
