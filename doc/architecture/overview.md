@@ -39,7 +39,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 
 ## Layer relationships
 
-The process doc references the template by example (it describes what a CLAUDE.md should contain; the template provides a concrete skeleton). The template does not reference the process doc by default. A downstream project using the template does not get a copy of the process doc; the template is self-sufficient for users who don't need the philosophy.
+The process doc references the template by example (it describes what a CLAUDE.md should contain; the template provides a concrete skeleton). The template never references the process doc: a bootstrapped project gets no copy of it, so a `(process doc §N)` pointer in a shipped file would dangle for its reader. Shipped files carry whatever they need inline; a pointer that is genuinely CDD-meta belongs behind a `cdd-only` fence or in a one-sided command. The template is self-sufficient for users who don't need the philosophy.
 
 The CDD repo is itself a CDD project and dogfoods the workflow on its own evolution — the meta-project hosting its own template is the cleanest available demonstration of CDD's value, and anything awkward about applying CDD to itself is treated as a real bug in the workflow. The repo therefore carries two layers of the same shape: its own scaffolding at the root (`./CLAUDE.md`, `./.claude/commands/`, `./doc/`), which is how Claude Code works on this repo, and the template under `./template/`, which is content the project ships. The process doc lives under `doc/knowledge_base/` because it is the project's founding design document — the special case of a founding doc that is also the shipped product, so unlike an ordinary founding document it is kept current.
 

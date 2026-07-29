@@ -2,7 +2,7 @@ Address the open PR's review feedback: read the review comments for the current 
 
 Run this command on the feature branch (not on main), after a PR has been opened and someone has reviewed it. It is a post-review side-loop, analogous in position to `/cdd-merge-base`.
 
-**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates (see the process doc, "The `/cdd-process-pr` exception"). Do not add per-action gates after the plan is approved. Review threads are never resolved by this command; the user resolves them.
+**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates. Do not add per-action gates after the plan is approved. Review threads are never resolved by this command; the user resolves them.
 
 ## 1. Discover the open PR
 
@@ -154,4 +154,4 @@ Summarize what was processed:
 - Commits pushed: <count>
 ```
 
-Then advance the task **state record** (advisory; see the process doc §2.13), passing the PR number: run `cdd-state set addressed --pr NUMBER`. It skips silently if the record is absent.
+Then advance the task **state record** (advisory), passing the PR number: run `cdd-state set addressed --pr NUMBER`. It skips silently if the record is absent.
