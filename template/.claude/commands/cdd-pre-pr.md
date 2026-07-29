@@ -24,7 +24,15 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run each CI job sequentially. **Capture only the last 40 lines + exit code, do not read the full output.** Stop on first failure.
+Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Because it is the same command, a green run here means CI will be green too. **Capture only the last 40 lines + exit code, do not read the full output.**
+
+```bash
+<check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
+```
+
+Report each gate as pass ✓ / fail ✗ / skipped ⊘ from the runner's summary. On failure, include the captured tail. A **skipped** gate is not a pass: say which gate was skipped and why (usually a tool missing on this host), so the reader knows the local verdict is weaker than CI's.
+
+If the project has no single runner yet, run each gate command in sequence instead — and note the gap for step 6, because a split gate list drifts and a pre-PR session that runs only some of the gates gives a green verdict that guarantees little:
 
 ```bash
 <build command>          2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
@@ -33,8 +41,6 @@ Run each CI job sequentially. **Capture only the last 40 lines + exit code, do n
 <unit test command>      2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 <integration test cmd>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 ```
-
-Report pass ✓ / fail ✗ for each job. On failure, include the captured tail in the report.
 
 ## 3. Code review
 
@@ -98,11 +104,7 @@ Present a checklist summary:
 
 ```
 ## Pre-PR Checklist
-- [ ] Build passes
-- [ ] Formatting passes
-- [ ] Lint passes
-- [ ] Unit tests pass
-- [ ] Integration tests pass
+- [ ] Check runner passed (<N> gates: <N> passed, <N> skipped)
 - [ ] Code review: no issues / issues flagged (list them)
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
@@ -151,5 +153,5 @@ If §7 found upstream drift, restate the recommendation to run `/cdd-merge-base`
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then advance the task **state record** (§2.13), passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
+- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist above already stands on its own.

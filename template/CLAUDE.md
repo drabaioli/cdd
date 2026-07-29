@@ -35,12 +35,20 @@ Once a coding standard exists, link it from the Key references table and referen
 ## Build & test
 
 ```bash
+<check runner command>   # every gate, the one command CI runs (see below)
+```
+
+The individual gates the runner should call:
+
+```bash
 <build command>
 <test command>
 <integration test command>
 <format check command>
 <lint command>
 ```
+
+Keep the runner the **single source of the gate sequence**: CI delegates to it and `/cdd-pre-pr` invokes it, so a gate is never listed twice and a local pass means CI will pass.
 
 ## Module layout
 

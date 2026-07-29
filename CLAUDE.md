@@ -36,55 +36,21 @@ Each doc directory keeps an `index.md` pointer list: read the index, then load o
 
 ## Build & test
 
-This repo is documentation and shell scripts; there is no build step. Verification is done by hand:
+This repo is documentation and shell scripts; there is no build step. Every check runs from one command:
 
 ```bash
-# Shell script sanity (CI also runs shellcheck over the same set).
-bash -n scripts/*.sh
-bash -n tools/bootstrap-cdd-project.sh tools/cdd-worktree.sh tools/cdd-state.sh
-bash -n demo/setup.sh demo/teardown.sh demo/lib.sh
-
-# Command-set drift: repo .claude/commands/ vs the rendered template.
-./scripts/command-drift-check.sh
-
-# Prompt-seam contracts: /cdd-* refs resolve, gh_issue_NN token agrees across
-# producer/consumer, backticked paths resolve, commands keep load-bearing headings.
-./scripts/prompt-seam-check.sh
-
-# Worktree-helper install: run `cdd-worktree.sh install` against a throwaway HOME.
-./scripts/install-smoke-assert.sh
-
-# Worktree-resume: recreate a worktree on an existing remote branch, using a
-# local bare repo as `origin`; a stubbed `claude` guards that it is never launched.
-./scripts/worktree-resume-assert.sh
-
-# Task-ref sync: seed/set on "machine A" push refs/cdd/<branch> to a local bare
-# `origin`; resume on "machine B" materializes the handoff + state (most-advanced
-# wins); the no-ref path still resumes cleanly.
-./scripts/ref-sync-assert.sh
-
-# Worktree GC: with a stubbed `gh`, cdd-worktree-gc reaps a merged task's local
-# handoff/state + remote refs/cdd/<branch>, but keeps a scoped-but-unstarted one.
-./scripts/gc-assert.sh
-
-# Per-task base branch: `cdd-state seed --base` records base_branch, `cdd-state get`
-# reads it, and `cdd-worktree` cuts from the recorded base (else the default branch).
-./scripts/base-branch-assert.sh
-
-# End-to-end smoke: bootstrap into a tmpdir and run the assertion script.
-rm -rf /tmp/cdd-smoke && mkdir -p /tmp/cdd-smoke
-./tools/bootstrap-cdd-project.sh --name "Demo Project" \
-  --path /tmp/cdd-smoke/demo-project
-./scripts/template-smoke-assert.sh /tmp/cdd-smoke/demo-project
-
-# Demo subsystem smoke: bootstrap + seed overlay into a tmp base, no GitHub side effects.
-rm -rf /tmp/cdd-demo-smoke
-demo/setup.sh mdr_demo_99 --base /tmp/cdd-demo-smoke --local-only
+./scripts/ci.sh                  # every gate, then a PASS/FAIL/SKIP summary
+./scripts/ci.sh list             # the gate slugs
+./scripts/ci.sh <gate> [<gate>]  # rerun one gate while iterating on a failure
 ```
 
-The `template-smoke` GitHub Actions workflow runs the same checks on every PR: shellcheck, the command-set drift check, the prompt-seam check, the worktree-helper install smoke, the task-ref sync smoke, the worktree GC smoke, the per-task base-branch smoke, the end-to-end smoke, and the demo seed-overlay step.
+`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14) — the gate registry at the top of the script is the list, and there is no second copy. `.github/workflows/template-smoke.yml` holds no gate list at all: it checks out and calls the runner, so CI and a local run cannot drift. `/cdd-pre-pr` invokes the same command, so a green local run means a green CI run.
 
-When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into the checks above plus a doc reconciliation pass.
+The 16 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` vs the rendered template), `seams` (prompt-seam contracts) and `seams-contract` (the seam checker's own contract, mutation-tested); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `base-branch`; the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
+
+Two behaviours worth knowing: a gate whose tool is missing (`shellcheck`, `jq`) is reported **SKIPPED — loudly and non-fatally**, so a host without it gets a weaker verdict, not a wrong one; and the run is **not fail-fast**, so one invocation surfaces every problem. The runner provisions its own scratch dir and a throwaway git identity, so it needs no host setup and is unaffected by your git signing config.
+
+When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into `./scripts/ci.sh` plus a doc reconciliation pass.
 
 ## Module layout
 
@@ -101,8 +67,8 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | Template smoke assertions + install smoke + command-set drift check + prompt-seam check (with whitelists) |
-| `.github/workflows/`               | CI: `template-smoke.yml` runs the bootstrap end-to-end    |
+| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check (with whitelists) |
+| `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) |
 

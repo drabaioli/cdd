@@ -24,7 +24,15 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run each CI job sequentially. **Capture only the last 40 lines + exit code, do not read the full output.** Stop on first failure.
+Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Because it is the same command, a green run here means CI will be green too. **Capture only the last 40 lines + exit code, do not read the full output.**
+
+```bash
+<check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
+```
+
+Report each gate as pass ✓ / fail ✗ / skipped ⊘ from the runner's summary. On failure, include the captured tail. A **skipped** gate is not a pass: say which gate was skipped and why (usually a tool missing on this host), so the reader knows the local verdict is weaker than CI's.
+
+If the project has no single runner yet, run each gate command in sequence instead — and note the gap for step 6, because a split gate list drifts and a pre-PR session that runs only some of the gates gives a green verdict that guarantees little:
 
 ```bash
 <build command>          2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
@@ -33,8 +41,10 @@ Run each CI job sequentially. **Capture only the last 40 lines + exit code, do n
 <unit test command>      2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 <integration test cmd>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 ```
+<!-- cdd-only-begin -->
 
-Report pass ✓ / fail ✗ for each job. On failure, include the captured tail in the report.
+**In this repo the runner is `./scripts/ci.sh`** — 16 gates: shell syntax and shellcheck, the command-set drift and prompt-seam checks plus the seam checker's own contract, the helper install / worktree-resume / ref-sync / GC / base-branch assertions, the four bootstrap-and-render smokes, the demo seed overlay, and the runner's own contract. `./scripts/ci.sh list` names them; `./scripts/ci.sh <gate>` reruns one while iterating on a failure. It is not fail-fast — every gate runs, so one invocation surfaces every problem. Two of its gates need interpretation rather than a rerun; see the sections below.
+<!-- cdd-only-end -->
 
 ## 3. Code review
 
@@ -93,33 +103,19 @@ git log --oneline "HEAD..origin/$BASE_BRANCH"
 If `origin/$BASE_BRANCH` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-base` before opening the PR. Do not merge from this session.
 
 <!-- cdd-only-begin -->
-## Command-set drift (CDD repo only)
+## Triaging the `drift` and `seams` gates (CDD repo only)
 
-This check is specific to the CDD repo (the meta-project): it surfaces unintended divergence between the repo's own `.claude/commands/` and the `template/.claude/commands/` it ships to downstream projects.
+Two of the runner's gates are specific to the CDD repo (the meta-project) and, unlike the rest, a failure is a **judgement call, not a bug to fix blindly**. Step 2 already ran both; these notes are for reading a failure.
 
-```bash
-./scripts/command-drift-check.sh
-```
+**`drift` — `scripts/command-drift-check.sh`.** Surfaces unintended divergence between the repo's own `.claude/commands/` and the `template/.claude/commands/` it ships downstream. It renders the template through `bootstrap-cdd-project.sh --stage` with this repo's own identifiers, so expected substitution drift cancels out mechanically. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-meta-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. The same gate asserts that the handoff schema headings match between the process doc (Section 2.6) and `cdd-next-step.md`, and that no `cdd-only` markers leak into the template itself.
 
-The script renders the template through `bootstrap-cdd-project.sh --stage` with this repo's own identifiers, so expected substitution drift cancels out mechanically. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-meta-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. The same script asserts that the handoff schema headings match between the process doc (Section 2.6) and `cdd-next-step.md`, and that no `cdd-only` markers leak into the template itself. CI runs it on every PR via `template-smoke.yml`.
+On divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence).
 
-If the script exits 0, report "no drift" and continue. If it reports divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence). Apply fixes only on user approval. Do not auto-edit either tree from this step.
+**`seams` — `scripts/prompt-seam-check.sh`.** Deterministic seam-contract checks over the repo's own prompts, guarding against a one-sided edit silently stranding a downstream prompt-driven step. It verifies five seams with grep only (no LLM, no API key): every `/cdd-*` reference across the repo's markdown resolves to an existing command file (known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`); the `gh_issue_NN` branch token produced in `cdd-next-step.md` is still consumed (turned into a `Closes #NN` line) in `cdd-pre-pr.md`; backticked file paths in the command files, `CLAUDE.md`, and `README.md` resolve to real files; each `cdd-*.md` still carries its load-bearing headings; and the gate count stated in prose here and in `CLAUDE.md` matches what `./scripts/ci.sh list` registers.
 
-When presenting the step 8 checklist, append a `- [ ] Command-set drift clean` line to it.
+On a broken seam, present each one to the user; for each, the user decides whether to fix the reference/heading/path or record a justified exception (a whitelist entry).
 
-## Prompt-seam checks (CDD repo only)
-
-Also specific to the CDD repo: deterministic seam-contract checks over the repo's own prompts (the slash-commands and the docs around them), guarding against a one-sided edit silently stranding a downstream prompt-driven step.
-
-```bash
-./scripts/prompt-seam-check.sh
-```
-
-It verifies four seams with grep only (no LLM, no API key): every `/cdd-*` reference across the repo's markdown resolves to an existing command file (known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`); the `gh_issue_NN` branch token produced in `cdd-next-step.md` is still consumed (turned into a `Closes #NN` line) in `cdd-pre-pr.md`; backticked file paths in the command files, `CLAUDE.md`, and `README.md` resolve to real files; and each `cdd-*.md` still carries its load-bearing headings. CI runs it on every PR via `template-smoke.yml`.
-
-If the script exits 0, report "prompt seams clean" and continue. If it reports a broken seam, present each one to the user; for each, the user decides whether to fix the reference/heading/path or record a justified exception (a whitelist entry). Apply fixes only on user approval.
-
-When presenting the step 8 checklist, append a `- [ ] Prompt seams clean` line to it.
+For both: apply fixes only on user approval, and do not auto-edit either tree from this step.
 <!-- cdd-only-end -->
 ## 8. Summary
 
@@ -127,11 +123,7 @@ Present a checklist summary:
 
 ```
 ## Pre-PR Checklist
-- [ ] Build passes
-- [ ] Formatting passes
-- [ ] Lint passes
-- [ ] Unit tests pass
-- [ ] Integration tests pass
+- [ ] Check runner passed (<N> gates: <N> passed, <N> skipped)
 - [ ] Code review: no issues / issues flagged (list them)
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
@@ -180,5 +172,5 @@ If §7 found upstream drift, restate the recommendation to run `/cdd-merge-base`
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then advance the task **state record** (§2.13), passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
+- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. If the branch name matches `gh_issue_NN` (e.g. `gh_issue_42_dark_mode`), parse `NN` and append a `Closes #NN` line to the body so the issue auto-closes on merge. Then advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist above already stands on its own.
