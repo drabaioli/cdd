@@ -21,6 +21,7 @@ There is no unit-test suite; behaviour is exercised by integration-style smoke a
 - End-to-end bootstrap smoke: `tools/bootstrap-cdd-project.sh` into a tmpdir + `scripts/template-smoke-assert.sh` (clean, link-valid tree) — in four shapes: plain, CamelCase dir, `--stage` render-only, and `--template-dir` snapshot.
 - Demo seed-overlay smoke: `demo/setup.sh … --local-only`.
 - `./scripts/ci-runner-assert.sh` — the check runner's own contract: registry and gate functions agree, an unknown gate is rejected, a missing tool yields a non-fatal SKIP, and the workflow delegates instead of holding its own gate list.
+- `./scripts/prompt-seam-assert.sh` — the seam checker's own contract, by mutation: each of its five checks is required to *fail* on a tree where that one seam is broken, in a throwaway copy. Two controls (an unmutated copy passes; a whitelisted dangling reference is silenced) keep the five honest. A guard that only ever passes is indistinguishable from one that stopped working.
 
 New behaviour in a script or the bootstrap path ships with the relevant smoke or assertion extended to cover it.
 

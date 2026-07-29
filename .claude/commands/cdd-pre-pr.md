@@ -43,7 +43,7 @@ If the project has no single runner yet, run each gate command in sequence inste
 ```
 <!-- cdd-only-begin -->
 
-**In this repo the runner is `./scripts/ci.sh`** — 15 gates: shell syntax and shellcheck, the command-set drift and prompt-seam checks, the helper install / worktree-resume / ref-sync / GC / base-branch assertions, the four bootstrap-and-render smokes, the demo seed overlay, and the runner's own contract. `./scripts/ci.sh list` names them; `./scripts/ci.sh <gate>` reruns one while iterating on a failure. It is not fail-fast — every gate runs, so one invocation surfaces every problem. Two of its gates need interpretation rather than a rerun; see the sections below.
+**In this repo the runner is `./scripts/ci.sh`** — 16 gates: shell syntax and shellcheck, the command-set drift and prompt-seam checks plus the seam checker's own contract, the helper install / worktree-resume / ref-sync / GC / base-branch assertions, the four bootstrap-and-render smokes, the demo seed overlay, and the runner's own contract. `./scripts/ci.sh list` names them; `./scripts/ci.sh <gate>` reruns one while iterating on a failure. It is not fail-fast — every gate runs, so one invocation surfaces every problem. Two of its gates need interpretation rather than a rerun; see the sections below.
 <!-- cdd-only-end -->
 
 ## 3. Code review

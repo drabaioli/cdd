@@ -58,6 +58,7 @@ GATES=(
   "shellcheck|shellcheck|shellcheck over every shell script"
   "drift||command-set drift: repo commands vs the rendered template"
   "seams||prompt-seam contracts between the repo's own prompts"
+  "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "install-smoke||worktree/state helper install, against a throwaway HOME"
   "worktree-resume||worktree resume on an existing remote branch"
   "ref-sync|jq|refs/cdd/<branch> handoff + state round-trip"
@@ -106,6 +107,10 @@ gate_drift() {
 
 gate_seams() {
   ./scripts/prompt-seam-check.sh
+}
+
+gate_seams_contract() {
+  ./scripts/prompt-seam-assert.sh
 }
 
 gate_install_smoke() {
