@@ -17,9 +17,11 @@
 #      was checking a single file and passing regardless of the others. Pinned by
 #      dropping a deliberately broken script into the lint scope and requiring the
 #      gate to fail.
-#   6. `-h` prints the header block and stops there. The runner documents its own
-#      usage by echoing its header, so the extraction must not run on into the
-#      section comments further down the file.
+#   6. `-h` prints the header block and stops there, from any working directory.
+#      The runner documents its own usage by echoing its header, so the extraction
+#      must not run on into the section comments further down the file — nor break
+#      when invoked by a relative path from elsewhere, since it cd's to the repo
+#      root before reading itself back.
 #
 # Sets CDD_CI_SELFTEST so the runner's own `runner` gate does not re-enter this
 # script when the full suite runs.
@@ -130,6 +132,13 @@ grep -q '^Usage:' <<<"$help_out" || fail "$RUNNER -h printed no Usage: section"
 grep -q '^!' <<<"$help_out" && fail "$RUNNER -h leaked the shebang line"
 grep -q '^--- ' <<<"$help_out" \
   && fail "$RUNNER -h ran past the header into the script's section comments"
-pass "-h prints the header block and stops there"
+
+# ...and from any working directory. The runner cd's to the repo root before it
+# extracts its own header, so reading it back through $BASH_SOURCE would break on
+# a relative invocation path from elsewhere (sed: can't read ./…/scripts/ci.sh).
+rel_out="$(cd "$(dirname "$REPO_ROOT")" && "./$(basename "$REPO_ROOT")/$RUNNER" -h 2>&1)"
+grep -q '^Usage:' <<<"$rel_out" \
+  || fail "$RUNNER -h via a relative path from another cwd printed no header: $rel_out"
+pass "-h prints the header block and stops there, from any cwd"
 
 echo "ci runner contract: clean"

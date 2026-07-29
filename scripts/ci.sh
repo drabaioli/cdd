@@ -33,8 +33,10 @@
 #     script is covered without touching this file.
 #   - Output folds into named groups under GitHub Actions (::group::) and into
 #     plain banners elsewhere; a failure also emits an ::error:: annotation.
-#   - Scratch space: one mktemp -d per run (override with CDD_CI_TMPDIR), removed
-#     on exit. Replaces the /tmp/smoke paths the workflow used to hardcode.
+#   - Scratch space: one mktemp -d per run, removed on exit. Replaces the
+#     /tmp/smoke paths the workflow used to hardcode. CDD_CI_TMPDIR overrides the
+#     location and, deliberately, keeps it: that is the knob for inspecting what a
+#     gate produced.
 #   - git is made hermetic (GIT_CONFIG_SYSTEM/GIT_CONFIG_GLOBAL pointed at a
 #     throwaway config, as ref-sync-assert.sh and gc-assert.sh already do), so the
 #     bootstrap gates' scaffold commits need neither a preconfigured identity —
@@ -194,7 +196,11 @@ usage() {
   # The header block only: skip the shebang, stop at the first non-comment line.
   # A bare `grep '^#'` would also print every section comment further down as if
   # it were help text.
-  sed -n '2,/^[^#]/{ /^[^#]/q; s/^# \?//; p; }' "${BASH_SOURCE[0]}"
+  #
+  # Read via the repo-relative path, not $BASH_SOURCE: we have already cd'd to
+  # $REPO_ROOT, so a relative invocation path (../cdd/scripts/ci.sh) would no
+  # longer resolve from here.
+  sed -n '2,/^[^#]/{ /^[^#]/q; s/^# \?//; p; }' scripts/ci.sh
 }
 
 # A slug is kebab-case; its gate function is snake_case.
