@@ -135,7 +135,7 @@ git commit -m '<message>'
 
 Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
 
-Then advance the task **state record** (advisory; see the process doc §2.13): run `cdd-state set checks_passed`. It skips silently if the record is absent.
+Then advance the task **state record** (advisory): run `cdd-state set checks_passed`. It skips silently if the record is absent.
 
 ## 10. Open PR (optional)
 
