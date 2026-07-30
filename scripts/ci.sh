@@ -41,6 +41,9 @@
 #     throwaway config, as ref-sync-assert.sh and gc-assert.sh already do), so the
 #     bootstrap gates' scaffold commits need neither a preconfigured identity —
 #     the workflow no longer sets one — nor the caller's signing config.
+#   - The gates that bootstrap a real tree also get a throwaway HOME, so the
+#     per-repo marker a bootstrap writes (~/.cdd/handoffs/<repo>/repo.json) lands
+#     in the scratch dir instead of the caller's home.
 #
 # Architecture notes: doc/architecture/overview.md. Workflow altitude: process doc
 # §2.14.
@@ -133,8 +136,12 @@ gate_base_branch() {
   ./scripts/base-branch-assert.sh
 }
 
+# The three gates that bootstrap a real tree (both of these plus demo-seed) run with a
+# throwaway HOME: a non-staged bootstrap writes the per-repo marker
+# ~/.cdd/handoffs/<repo>/repo.json, and the runner must not leave markers for its own
+# temp projects behind in the caller's home. The --stage gates write no marker.
 gate_bootstrap() {
-  ./tools/bootstrap-cdd-project.sh \
+  HOME="$TMP/home" ./tools/bootstrap-cdd-project.sh \
     --name "Demo Project" \
     --path "$TMP/demo-project" \
     && ./scripts/template-smoke-assert.sh "$TMP/demo-project" \
@@ -142,7 +149,7 @@ gate_bootstrap() {
 }
 
 gate_bootstrap_camelcase() {
-  ./tools/bootstrap-cdd-project.sh \
+  HOME="$TMP/home" ./tools/bootstrap-cdd-project.sh \
     --name "My CamelCase Project" \
     --path "$TMP/MyProject" \
     && ./scripts/template-smoke-assert.sh "$TMP/MyProject"
@@ -174,7 +181,7 @@ gate_snapshot_render() {
 gate_demo_seed() {
   local instance="mdr_demo_99" target
   target="$TMP/$instance"
-  ./demo/setup.sh "$instance" --base "$TMP" --local-only || return 1
+  HOME="$TMP/home" ./demo/setup.sh "$instance" --base "$TMP" --local-only || return 1
   if grep -rnE '<PROJECT_(NAME|DIR)>' "$target"; then
     echo "FAIL: leftover placeholder tokens in the seeded instance" >&2
     return 1

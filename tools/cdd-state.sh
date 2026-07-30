@@ -46,20 +46,40 @@
 # `refs/cdd/<branch>` on origin (best-effort, advisory), so a resume on another
 # machine can materialize them; see cdd-worktree-resume and shell-helpers.md.
 #
+# Both also refresh the per-repo marker `~/.cdd/handoffs/<repo>/repo.json`, which
+# records this repo's main worktree and is the one artifact in that directory that
+# survives task GC (see cdd-state-write-repo-marker). It is machine-local and is
+# never carried on the task ref.
+#
 # Stages (a single enum; the record carries no separate status):
 #   scoped  plan_approved  implementation_done  merged  checks_passed  pr_open  addressed
 
 # The schema version this helper writes; consumers version their parser on it.
 CDD_STATE_SCHEMA_VERSION=1
 
+# The per-repo marker's schema version, deliberately independent of the state
+# record's: the two files carry unrelated shapes and can evolve apart.
+CDD_REPO_MARKER_SCHEMA_VERSION=1
+
 cdd-state-stages() {
   printf '%s\n' scoped plan_approved implementation_done merged checks_passed pr_open addressed
 }
 
+# The MAIN worktree of the current repo — the dirname of git's common dir, NOT
+# `--show-toplevel`, which names the feature worktree when a task session asks.
+# Its basename is the repo name that namespaces ~/.cdd/handoffs/<repo>/.
+cdd-state-main-worktree() {
+  local common_dir
+  common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  [[ -n "$common_dir" ]] || return 1
+  dirname "$common_dir"
+}
+
 # Path to the state record for the current worktree's branch.
 cdd-state-file() {
-  local repo_name branch
-  repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")")" || return 1
+  local main_wt repo_name branch
+  main_wt="$(cdd-state-main-worktree)" || return 1
+  repo_name="$(basename "$main_wt")"
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
   printf '%s\n' "$HOME/.cdd/handoffs/${repo_name}/${branch}.state.json"
 }
@@ -69,6 +89,40 @@ cdd-state-write() {
   local dest="$1" content="$2" tmp
   tmp="$(mktemp "${dest}.XXXXXX")" || return 1
   printf '%s\n' "$content" >"$tmp" && mv -f "$tmp" "$dest"
+}
+
+# Write the per-repo marker ~/.cdd/handoffs/<repo>/repo.json — {schema_version, name,
+# path} — recording where this repo's MAIN worktree lives. Everything else in that
+# directory is task-scoped and reaped when the task merges, so once a repo's tasks are
+# all done the directory goes empty and the repo becomes unlocatable; the marker is the
+# one artifact that outlives them (GC's candidate set globs *.md / *.state.json /
+# refs/cdd/*, none of which it matches). Overwrites unconditionally, so it self-heals
+# when a repo moves or is re-cloned — latest writer wins, like the task ref.
+#
+# Advisory end-to-end, like the rest of this helper: a failing rev-parse, an unwritable
+# directory, or a jq failure warns once and returns 0. It must never fail the state write
+# that called it, nor a `set -e` caller (bootstrap-cdd-project.sh sources this file).
+# `cdd-state` reaches it below its own jq guard; the jq branch here is what covers the
+# direct callers (bootstrap) that have no guard of their own. See
+# doc/architecture/shell-helpers.md.
+cdd-state-write-repo-marker() {
+  local main_wt repo_name dir content
+  main_wt="$(cdd-state-main-worktree)" || {
+    echo "cdd-state: not in a git repo; skipping repo marker (advisory)." >&2; return 0; }
+  repo_name="$(basename "$main_wt")"
+  dir="$HOME/.cdd/handoffs/${repo_name}"
+  mkdir -p "$dir" 2>/dev/null || {
+    echo "cdd-state: could not create $dir; skipping repo marker (advisory)." >&2; return 0; }
+  content="$(jq -n \
+    --argjson v "$CDD_REPO_MARKER_SCHEMA_VERSION" \
+    --arg name "$repo_name" \
+    --arg path "$main_wt" \
+    '{schema_version: $v, name: $name, path: $path}' 2>/dev/null)" || {
+    echo "cdd-state: could not render repo marker (jq missing/failed); skipping (advisory)." >&2
+    return 0; }
+  cdd-state-write "${dir}/repo.json" "$content" \
+    || echo "cdd-state: could not write ${dir}/repo.json; skipping (advisory)." >&2
+  return 0
 }
 
 # Sync the handoff + state record to a per-task ref refs/cdd/<branch> on origin, so a
@@ -131,10 +185,13 @@ cdd-state() {
         echo "usage: cdd-state seed <branch> [--base <branch>]" >&2
         return 2
       fi
-      local repo_name dir
-      repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")")" || return 1
+      local main_wt repo_name dir
+      main_wt="$(cdd-state-main-worktree)" || return 1
+      repo_name="$(basename "$main_wt")"
       dir="$HOME/.cdd/handoffs/${repo_name}"
       mkdir -p "$dir"
+      # Refresh the per-repo marker on every seed (advisory; never fails the seed).
+      cdd-state-write-repo-marker
       # Record the handoff session (this /cdd-next-step session, on the main
       # worktree) so it is resumable too — guarded exactly like `set`'s append:
       # only when CLAUDE_CODE_SESSION_ID is set (older Claude Code → empty list,
@@ -174,6 +231,11 @@ cdd-state() {
         echo "cdd-state set: invalid stage '$stage' (one of: $(cdd-state-stages | paste -sd' '))" >&2
         return 2
       fi
+      # Refresh the per-repo marker first, deliberately BEFORE the absent-record
+      # return below: the marker is per-repo, not per-task, so a repo whose records
+      # have all been reaped still gets (and keeps) one. "Writers never fabricate a
+      # record" is about the task record, which the branch below still respects.
+      cdd-state-write-repo-marker
       local file
       file="$(cdd-state-file)" || return 1
       # Writers never fabricate a record; only `seed` (i.e. /cdd-next-step) creates one.
