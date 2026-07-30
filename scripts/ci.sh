@@ -140,11 +140,41 @@ gate_base_branch() {
 # throwaway HOME: a non-staged bootstrap writes the per-repo marker
 # ~/.cdd/handoffs/<repo>/repo.json, and the runner must not leave markers for its own
 # temp projects behind in the caller's home. The --stage gates write no marker.
+
+# Assert that a non-staged bootstrap wrote the per-repo marker for $repo under the
+# throwaway $home, pointing at $want. The bootstrap's writer is advisory end-to-end
+# (it sources tools/cdd-state.sh and warns rather than failing), so without this the
+# sourcing seam has no test: a rename fails the gate under `set -e`, but a silent
+# no-op would pass. jq-gated exactly like the writer — no jq means no marker was
+# written at all, which is the documented degradation, not a failure.
+assert_repo_marker() {
+  local home="$1" repo="$2" want="$3"
+  local marker="$home/.cdd/handoffs/$repo/repo.json" got_ver got_name got_path
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "skip: jq absent, so the bootstrap wrote no marker; assertion skipped (advisory)"
+    return 0
+  fi
+  [[ -f "$marker" ]] || { echo "FAIL: bootstrap wrote no per-repo marker at $marker" >&2; return 1; }
+  got_ver="$(jq -r '.schema_version' "$marker")"
+  got_name="$(jq -r '.name' "$marker")"
+  got_path="$(jq -r '.path' "$marker")"
+  [[ "$got_ver|$got_name" == "1|$repo" ]] || {
+    echo "FAIL: $marker {schema_version, name} = '$got_ver|$got_name', expected '1|$repo'" >&2
+    return 1; }
+  # Compare physical paths: git can hand back a symlink-resolved path while $TMP still
+  # names the symlink, so a plain string compare would fail spuriously on such a host.
+  [[ -d "$got_path" && "$(cd "$got_path" && pwd -P)" == "$(cd "$want" && pwd -P)" ]] || {
+    echo "FAIL: $marker .path = '$got_path', expected '$want'" >&2
+    return 1; }
+  echo "per-repo marker: $marker -> $got_path"
+}
+
 gate_bootstrap() {
   HOME="$TMP/home" ./tools/bootstrap-cdd-project.sh \
     --name "Demo Project" \
     --path "$TMP/demo-project" \
     && ./scripts/template-smoke-assert.sh "$TMP/demo-project" \
+    && assert_repo_marker "$TMP/home" demo-project "$TMP/demo-project" \
     && git -C "$TMP/demo-project" log --oneline
 }
 
