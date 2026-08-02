@@ -54,6 +54,28 @@ Every write is atomic — rendered to a temp file in the destination directory, 
 
 `pr` is the integer PR number once a PR exists, else `null`. `base_branch` is the branch the task was cut from and merges back into, recorded once at seed and immutable thereafter; `null` (or absent, on records predating the field) means "no base recorded", and consumers fall back to the runtime-derived default branch. Like `dir`, it is additive and optional — not versioned by `schema_version`, so old and new records interoperate. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`, run from `dir`. `dir` is additive and optional — not versioned by `schema_version`, so old and new records interoperate; a consumer that finds it absent falls back to the branch's known worktree path.
 
+### Per-repo marker (`repo.json`)
+
+Everything else in `~/.cdd/handoffs/<repo>/` is task-scoped: handoffs and state records are named after a branch and reaped when that task merges (`cdd-worktree-done`, `cdd-worktree-gc`). So a repo whose tasks have all landed leaves an *empty* directory, and nothing on disk still says where that repo is checked out. `repo.json` is the one artifact in there that is not task-scoped:
+
+```json
+{
+  "schema_version": 1,
+  "name": "cdd",
+  "path": "/home/you/Code/cdd"
+}
+```
+
+`path` is the repo's **main worktree** — `dirname` of `git rev-parse --path-format=absolute --git-common-dir`, deliberately *not* `--show-toplevel`, which names the *feature* worktree whenever a task session is the one writing (the common case: every `cdd-state set` after `seed` runs from a worktree). `name` is that path's basename, i.e. the same repo name that namespaces the directory. `schema_version` is versioned independently of the state record's: the two files carry unrelated shapes and can evolve apart.
+
+**One writer, three callers.** `cdd-state-write-repo-marker` renders the JSON and writes it through the same atomic `cdd-state-write`. `cdd-state seed` and `cdd-state set` both call it — `set` *before* its absent-record return, so a repo whose records have all been reaped still gets one (the "writers never fabricate a record" rule is about the *task* record) — and `bootstrap-cdd-project.sh` calls it after `git init`, by sourcing its sibling `cdd-state.sh` (dual-mode: sourcing defines functions only) rather than duplicating the shape. Not in `--stage` mode: that path does no `git init` and its target is a staging dir, not a repo. Each write **overwrites unconditionally**, so the marker self-heals when a repo moves or is re-cloned — latest writer wins, like the task ref.
+
+It is **advisory** like the rest of the helper: a failing `rev-parse`, an unwritable directory, or a missing/failing `jq` warns once and returns 0, so it can never fail the state write that called it (nor the `set -e` bootstrap that sources it).
+
+**Machine-local by design.** The path is true only on the machine that wrote it, so the marker is never carried across machines: `cdd-state-push-ref` bundles `handoff.md` and `state.json` and nothing else, so `refs/cdd/<branch>` excludes it by construction. Each machine writes its own on its first `cdd-state` call in that repo. It also survives GC by construction — the candidate set globs `*.md` ∪ `*.state.json` ∪ `refs/cdd/*`, and `repo.json` matches none (pinned by `scripts/gc-assert.sh`).
+
+**Consumer rule.** Prefer a live resolution from `sessions[].dir` when one is available, and fall back to the marker; a marker can be stale (repo moved, never rewritten since), and a stale one must not outvote a directory a session is demonstrably using. The marker's value is the case where no record exists at all.
+
 ### Stages and writers
 
 `stage` is a single enum (the record carries no separate status); each transition and its writer:

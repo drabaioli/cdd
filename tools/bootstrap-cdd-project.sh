@@ -194,6 +194,24 @@ fi
   git -c commit.gpgsign=false commit -m "Initial CDD scaffold" >/dev/null
 )
 
+# Record the new repo in ~/.cdd/handoffs/<repo>/repo.json, so it is locatable before
+# it has any task artifacts. Reuse the state helper's writer rather than a second
+# copy of the JSON shape: sourcing it defines functions only (it installs only when
+# executed directly), and the writer is advisory — it warns and returns 0 on a
+# missing jq or an unwritable dir, so it can't fail the bootstrap under `set -e`.
+# Runs from inside $TARGET, since the writer derives the path from git. Skipped if the
+# sibling helper is absent (script copied out on its own) — also advisory.
+if [[ -f "$SCRIPT_DIR/cdd-state.sh" ]]; then
+  (
+    cd "$TARGET"
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/cdd-state.sh"
+    cdd-state-write-repo-marker
+  )
+else
+  echo "note: $SCRIPT_DIR/cdd-state.sh not found; skipped the ~/.cdd/handoffs/<repo>/repo.json marker." >&2
+fi
+
 cat <<EOF
 
 Bootstrapped CDD project: $PROJECT_NAME

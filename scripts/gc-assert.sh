@@ -10,6 +10,8 @@
 #     and NOTHING is actually deleted
 #   - --force: the merged branch's local files + remote ref are gone, while the
 #     scoped branch's files + ref are untouched
+#   - the per-repo marker (repo.json), written as a side effect of `cdd-state seed`,
+#     survives the reap — it is what keeps the repo locatable once every task is gone
 #
 # Usage: scripts/gc-assert.sh   (provisions and tears down its own temp tree)
 
@@ -104,6 +106,13 @@ for b in "$MERGED" "$SCOPED"; do
 done
 pass "seeded two tasks (handoff + state + refs/cdd/*) on the machine"
 
+# The per-repo marker is a side effect of every seed, and records the MAIN worktree.
+[[ -f "$DIR/repo.json" ]] || fail "seed did not write the per-repo marker $DIR/repo.json"
+marker_path="$(jq -r '.path' "$DIR/repo.json")"
+[[ "$marker_path" == "$WORK/machine" ]] \
+  || fail "repo.json .path = '$marker_path', expected '$WORK/machine'"
+pass "seed wrote the per-repo marker pointing at the main worktree"
+
 run_gc() {
   (
     cd "$WORK/machine"
@@ -138,5 +147,11 @@ git -C "$WORK/machine" ls-remote origin "refs/cdd/$MERGED" | grep -q "refs/cdd/$
 git -C "$WORK/machine" ls-remote origin "refs/cdd/$SCOPED" | grep -q "refs/cdd/$SCOPED" \
   || fail "--force must not delete the scoped task's remote ref"
 pass "--force reaps the merged task (local + ref), leaves the scoped task intact"
+
+# 3. The per-repo marker is not task-scoped and must survive the reap: it is what keeps
+# the repo locatable once every task is merged and its artifacts are gone. Safe by
+# construction (GC's candidates glob *.md / *.state.json / refs/cdd/*), pinned here.
+[[ -f "$DIR/repo.json" ]] || fail "--force reaped the per-repo marker $DIR/repo.json"
+pass "--force leaves the per-repo marker in place"
 
 echo "all gc smoke checks passed"

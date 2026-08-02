@@ -14,7 +14,10 @@
 #   - a second run is idempotent (no duplicate marker block, no second copy)
 #
 # It also runs `tools/cdd-state.sh install` and asserts the same shim contract
-# for the `cdd-state` command, since that helper self-installs identically.
+# for the `cdd-state` command, since that helper self-installs identically, plus two
+# properties of `cdd-state seed`: the recorded handoff session, and the per-repo
+# marker repo.json — whose `path` must be the MAIN worktree, not the worktree the
+# writer ran in.
 #
 # Usage: scripts/install-smoke-assert.sh
 # Takes no arguments; it provisions and tears down its own temp HOME.
@@ -186,6 +189,22 @@ if command -v jq >/dev/null 2>&1; then
   count="$(jq -r '.sessions | length' "$SEED_FILE")"
   [[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
   pass "cdd-state seed omits the session entry when no session id is set"
+
+  # The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
+  # writer ran in. This assertion only bites when the two differ — i.e. whenever the
+  # check runs from a feature worktree, which is the case that regresses if someone
+  # swaps the derivation for `git rev-parse --show-toplevel`.
+  MARKER="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/repo.json"
+  MAIN_WT="$(cd "$REPO_ROOT" && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+  [[ -f "$MARKER" ]] || fail "seed did not write the per-repo marker $MARKER"
+  got="$(jq -r '"\(.schema_version)|\(.name)|\(.path)"' "$MARKER")"
+  [[ "$got" == "1|$REPO_NAME|$MAIN_WT" ]] \
+    || fail "repo.json = '$got', expected '1|$REPO_NAME|$MAIN_WT'"
+  if [[ "$MAIN_WT" != "$EXPECT_DIR" ]]; then
+    pass "cdd-state seed writes repo.json with the MAIN worktree ($MAIN_WT), not this worktree ($EXPECT_DIR)"
+  else
+    pass "cdd-state seed writes repo.json {schema_version, name, path} (run from the main worktree)"
+  fi
 else
   echo "skip: jq not found; seed assertions skipped (advisory)"
 fi
