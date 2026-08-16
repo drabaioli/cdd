@@ -36,4 +36,4 @@ Dependencies are pinned or locked; toolchain versions are documented.
 
 ## How this list grows
 
-New practices are added here as the project matures. `/cdd-pre-pr`'s CI-improvement check and the roadmap's "Suggested infrastructure tasks" feed it: when one of those surfaces a gap and the project closes it, add the corresponding row here or flip it from **Expected** to **Enforced**.
+New practices are added here as the project matures. Three things feed it: `/cdd-pre-pr`'s CI-improvement check, its workflow-improvement check (a rule the code review applied from inference rather than from a written standard belongs here), and the roadmap's "Suggested infrastructure tasks". When one of those surfaces a gap and the project closes it, add the corresponding row here or flip it from **Expected** to **Enforced**.

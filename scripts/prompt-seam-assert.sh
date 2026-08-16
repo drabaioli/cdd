@@ -123,9 +123,9 @@ expect_fail "check 3 catches a backticked path to a missing file" \
 
 # --- Check 4: required-section presence ---------------------------------------
 fresh_sandbox
-sandbox_sed '/^## 9\. Commit reconciliation edits$/d' "$CMDS/cdd-pre-pr.md"
+sandbox_sed '/^## 10\. Commit reconciliation edits$/d' "$CMDS/cdd-pre-pr.md"
 expect_fail "check 4 catches a dropped load-bearing heading" \
-  "missing required heading in $CMDS/cdd-pre-pr.md: ## 9. Commit reconciliation edits"
+  "missing required heading in $CMDS/cdd-pre-pr.md: ## 10. Commit reconciliation edits"
 
 # --- Check 5: gate-count contract ---------------------------------------------
 # Derive the true count from the registry rather than hardcoding it, so adding a

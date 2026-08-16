@@ -20,7 +20,7 @@ git status --porcelain
 
 Capture the list of changed files. Use it as the scope for steps 3 and 4.
 
-Also record the `git status --porcelain` output as the **entry snapshot**. The tree should be clean here (the implementation session commits its own work). If it is already dirty, those are changes this session did not create — note them now; step 8 must not sweep them into the auto-commit.
+Also record the `git status --porcelain` output as the **entry snapshot**. The tree should be clean here (the implementation session commits its own work). If it is already dirty, those are changes this session did not create — note them now; step 10 must not sweep them into the auto-commit.
 
 ## 2. Build & QA
 
@@ -93,7 +93,28 @@ If, and only if, the change introduces a category of work that the existing CI d
 
 Do **not** propose generic CI improvements every run. The default is silence. If you do propose, the user has two options: apply now in this PR, or defer as a new roadmap task. Apply only on approval.
 
-## 7. Upstream drift check
+## 7. Workflow improvement check (conditional)
+
+If, and only if, this task surfaced something about *how the project works* that no artifact captures, route it. This is the recurring channel behind the "the workflow improves itself" commitment. Concrete triggers:
+
+- A step in this task had to be done by hand that no artifact describes: a command not in `CLAUDE.md`'s build/test section, a file hand-edited that the docs imply is generated, a setup detail rediscovered from scratch.
+- The code review in step 3 enforced a rule that is written down nowhere — a convention applied from inference rather than from `CLAUDE.md` or the coding standard.
+- The handoff was materially wrong or incomplete: the diff contains work the handoff did not scope, or a constraint it missed cost rework.
+- Step 4 had to update a doc that no pointer in `doc/index.md` or `CLAUDE.md` would have led you to.
+- A slash command's own instructions were ambiguous or wrong for this task and had to be worked around.
+
+Route each one by scope; never leave it as a remark that dies with the session:
+
+- **Project-specific** → the user chooses where it lands, and you recommend: applied now as an edit (a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer), riding along in step 10's commit, or proposed as a roadmap item for later. A line or two argues for the edit, anything larger for the roadmap — say which you'd pick and why, ask once, apply the answer. Never pick silently. Step 9's summary names whichever landed.
+- **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken.
+<!-- cdd-only-begin -->
+
+  This repo *is* CDD, so the third route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
+<!-- cdd-only-end -->
+
+Do **not** manufacture an improvement every run. The default is silence, and "nothing surfaced" is the common, correct outcome. The bar is judgement, not a checklist sweep: raise it only if it would change how a future session behaves, and only if it is a pattern rather than a one-off annoyance — a friction hit twice, or one that would cost the next session the same rework. Surface at most one item per run; if two look worth it, take the stronger one. This step records; it never blocks the PR, and it is not a checkpoint.
+
+## 8. Upstream drift check
 
 ```bash
 git fetch origin "$BASE_BRANCH"
@@ -117,7 +138,7 @@ On a broken seam, present each one to the user; for each, the user decides wheth
 
 For both: apply fixes only on user approval, and do not auto-edit either tree from this step.
 <!-- cdd-only-end -->
-## 8. Summary
+## 9. Summary
 
 Present a checklist summary:
 
@@ -132,15 +153,16 @@ Present a checklist summary:
 - [ ] Roadmap up to date
 - [ ] New behaviour tested (or untested-with-reason recorded)
 - [ ] CI gaps surfaced: none / proposed (list them)
+- [ ] Workflow improvements: none / routed (list them)
 - [ ] No upstream drift (or: /cdd-merge-base recommended)
 - [ ] Reconciliation edits committed
 ```
 
 Mark each item as pass ✓ or needs attention ✗ with details.
 
-## 9. Commit reconciliation edits
+## 10. Commit reconciliation edits
 
-Commit the documentation reconciliation edits this session made in steps 3–7 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). This is a local commit only — **no push**. Pushing happens, if at all, in step 10.
+Commit the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). This is a local commit only — **no push**. Pushing happens, if at all, in step 11.
 
 First check the entry snapshot from step 1:
 
@@ -148,7 +170,7 @@ First check the entry snapshot from step 1:
 - **Otherwise**, commit only the files this session edited. Add them by path — do not `git add -A`:
 
 ```bash
-git add <files reconciled in steps 3–7>
+git add <files reconciled in steps 3–8>
 git commit -m '<message>'
 ```
 
@@ -156,7 +178,7 @@ Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of
 
 Then advance the task **state record** (advisory): run `cdd-state set checks_passed`. It skips silently if the record is absent.
 
-## 10. Open PR (optional)
+## 11. Open PR (optional)
 
 After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
 
@@ -168,7 +190,7 @@ gh auth status && git remote get-url origin   # origin should be a github.com UR
 
 If either is missing, say so in one line and skip this step (the checklist above still stands).
 
-If §7 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
+If §8 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
