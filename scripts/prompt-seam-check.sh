@@ -97,9 +97,9 @@ require_headings "$REPO_CMDS/cdd-next-step.md" \
 require_headings "$REPO_CMDS/cdd-pre-pr.md" \
   '## 1. Identify changes' \
   '## 2. Build & QA' \
-  '## 8. Summary' \
-  '## 9. Commit reconciliation edits' \
-  '## 10. Open PR (optional)'
+  '## 9. Summary' \
+  '## 10. Commit reconciliation edits' \
+  '## 11. Open PR (optional)'
 require_headings "$REPO_CMDS/cdd-merge-base.md" \
   '## 3. Dry-run conflict assessment' \
   '## 5. Perform the merge' \
