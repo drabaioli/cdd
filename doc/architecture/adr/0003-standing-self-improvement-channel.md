@@ -1,4 +1,4 @@
-# 0003: A standing self-improvement channel in the pre-PR session
+# 0003: A standing self-improvement channel
 
 **Status:** Accepted
 
@@ -22,7 +22,9 @@ now, design the channel separately, do not reintroduce the log.
 ## Decision
 
 **Add a conditional step to `/cdd-pre-pr`** — step 7, "Workflow improvement check" — in both
-command copies, sitting beside the CI-improvement check as a sibling improvement-proposal step.
+command copies, sitting beside the CI-improvement check as a sibling improvement-proposal step,
+**and a `workflow-gap` triage class to `/cdd-process-pr`** that routes review comments the same
+way.
 
 - **The pre-PR session, not `/cdd-next-step`, and not both.** The pre-PR session is the one point
   in the lifecycle that has just read the whole diff, the handoff, and the docs, and is already
@@ -36,7 +38,7 @@ command copies, sitting beside the CI-improvement check as a sibling improvement
 - **Concrete, observable triggers rather than a quality bar.** The step enumerates six triggers
   that a pre-PR session can *observe from the material in front of it* — a manual step no artifact
   describes, a review rule written down nowhere, a handoff that missed scope, a fix-up repeated
-  from a recent PR, a doc no pointer would have led it to, a slash command it had to work around.
+  inside the task, a doc no pointer would have led it to, a slash command it had to work around.
   This is the load-bearing part of the design: step 6 works because its triggers are enumerable
   events. A vague trigger ("propose a workflow improvement") degrades into noise every run or
   silence forever.
@@ -45,8 +47,19 @@ command copies, sitting beside the CI-improvement check as a sibling improvement
   item under the normal human-approval rule; anything general enough for any CDD project is
   offered as a **GitHub issue against the CDD repo**, human-gated, with the roadmap item as the
   fallback when `gh` is unavailable or the user declines.
+- **Judgement, capped at one item per run.** The triggers say what to look at; the bar says what
+  clears it — it would change how a future session behaves, and it is a pattern rather than a
+  one-off annoyance. Without the cap, an enumerable trigger list invites a checklist sweep that
+  finds something every time.
 - **Default silence, records rather than blocks, not a checkpoint.** The six human checkpoints of
   process doc §4 are unchanged; this step never gates the PR.
+- **A second, review-time entry point in `/cdd-process-pr`** (added in PR #65 review). The pre-PR
+  check judges only from the material in front of it and deliberately does not scan earlier PRs —
+  a scan the session cannot afford and would do badly. But a gap that is invisible from inside one
+  task is often exactly what a *reviewer* points at, and `/cdd-process-pr` already holds those
+  comments in context. It reuses the same three routes and the same bar. It costs no new
+  checkpoint: the class is declared in the triage plan, which is that command's existing single
+  gate, and only the two routes that reach beyond the PR ask again.
 
 **Upstream destination — why an issue.** Three candidates were considered. A roadmap item tagged
 as an upstream candidate, kept local and harvested later by `/cdd-retrofit` upgrade mode, keeps
@@ -61,9 +74,10 @@ repo — is bounded by the human gate and the roadmap fallback.
 
 - Commitment 5 now has a recurring guardrail in steady state, so all three founding objectives
   are guarded by a mechanism rather than by intent.
-- The two channels are complementary, not duplicative: this one fires at **discovery** time in
-  any CDD project; `/cdd-retrofit` §4.5 fires at **upgrade** time on the accumulated diff. A
-  general improvement now has two independent chances of reaching CDD.
+- The three channels are complementary, not duplicative: the pre-PR check fires at **discovery**
+  time, the `/cdd-process-pr` route at **review** time on what someone else saw, and
+  `/cdd-retrofit` §4.5 at **upgrade** time on the accumulated diff. A general improvement now has
+  three independent chances of reaching CDD.
 - Inserting step 7 renumbered steps 7–10 to 8–11, which propagates into
   `scripts/prompt-seam-check.sh`'s pinned heading list and the corresponding mutation case in
   `scripts/prompt-seam-assert.sh`. Future insertions carry the same cost; the seam checker makes
