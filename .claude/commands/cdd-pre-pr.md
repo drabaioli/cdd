@@ -108,7 +108,11 @@ Route each one by scope; never leave it as a remark that dies with the session:
 
 - **Project-specific, and an edit's worth** → apply it now: a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer. It rides along in step 10's commit.
 - **Project-specific, and bigger than an edit** → propose a roadmap item. That is a structural roadmap edit, so it needs the user's approval before it is written.
-- **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken. If this project *is* the CDD repo, there is no upstream: it is a normal roadmap item plus a process-doc and template change.
+- **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken.
+<!-- cdd-only-begin -->
+
+  This repo *is* CDD, so the third route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
+<!-- cdd-only-end -->
 
 Do **not** manufacture an improvement every run. The default is silence, and "nothing surfaced" is the common, correct outcome. This step records; it never blocks the PR, and it is not a checkpoint.
 
