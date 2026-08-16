@@ -96,14 +96,12 @@ If, and only if, this task surfaced something about *how the project works* that
 - A step in this task had to be done by hand that no artifact describes: a command not in `CLAUDE.md`'s build/test section, a file hand-edited that the docs imply is generated, a setup detail rediscovered from scratch.
 - The code review in step 3 enforced a rule that is written down nowhere — a convention applied from inference rather than from `CLAUDE.md` or the coding standard.
 - The handoff was materially wrong or incomplete: the diff contains work the handoff did not scope, or a constraint it missed cost rework.
-- The same correction had to be made more than once inside this task — a repeated fix-up is a missing rule. Judge that from what is in front of you (this diff, this session); do not go scanning earlier PRs. A gap visible only from review feedback is `/cdd-process-pr`'s to catch, from the comments it already has in context.
 - Step 4 had to update a doc that no pointer in `doc/index.md` or `CLAUDE.md` would have led you to.
 - A slash command's own instructions were ambiguous or wrong for this task and had to be worked around.
 
 Route each one by scope; never leave it as a remark that dies with the session:
 
-- **Project-specific, and an edit's worth** → apply it now: a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer. A line or two is an edit's worth; anything larger belongs in the next route, where the user approves it. It rides along in step 10's commit, and step 9's summary names it, so nothing lands unseen.
-- **Project-specific, and bigger than an edit** → propose a roadmap item. That is a structural roadmap edit, so it needs the user's approval before it is written.
+- **Project-specific** → the user chooses where it lands, and you recommend: applied now as an edit (a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer), riding along in step 10's commit, or proposed as a roadmap item for later. A line or two argues for the edit, anything larger for the roadmap — say which you'd pick and why, ask once, apply the answer. Never pick silently. Step 9's summary names whichever landed.
 - **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken.
 
 Do **not** manufacture an improvement every run. The default is silence, and "nothing surfaced" is the common, correct outcome. The bar is judgement, not a checklist sweep: raise it only if it would change how a future session behaves, and only if it is a pattern rather than a one-off annoyance — a friction hit twice, or one that would cost the next session the same rework. Surface at most one item per run; if two look worth it, take the stronger one. This step records; it never blocks the PR, and it is not a checkpoint.

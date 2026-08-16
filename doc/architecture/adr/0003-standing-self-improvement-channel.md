@@ -35,18 +35,20 @@ way.
   CI-improvement and test-coverage steps, neither of which has a mechanical guard. What the step
   produces (a `CLAUDE.md` edit, a roadmap item, an issue) is already covered by existing
   machinery.
-- **Concrete, observable triggers rather than a quality bar.** The step enumerates six triggers
+- **Concrete, observable triggers rather than a quality bar.** The step enumerates five triggers
   that a pre-PR session can *observe from the material in front of it* — a manual step no artifact
-  describes, a review rule written down nowhere, a handoff that missed scope, a fix-up repeated
-  inside the task, a doc no pointer would have led it to, a slash command it had to work around.
+  describes, a review rule written down nowhere, a handoff that missed scope, a doc no pointer
+  would have led it to, a slash command it had to work around.
   This is the load-bearing part of the design: step 6 works because its triggers are enumerable
   events. A vague trigger ("propose a workflow improvement") degrades into noise every run or
   silence forever.
-- **Three routes, by scope.** An edit's worth of project-specific improvement is applied now and
-  rides along in the session's reconciliation commit; anything larger becomes a proposed roadmap
-  item under the normal human-approval rule; anything general enough for any CDD project is
-  offered as a **GitHub issue against the CDD repo**, human-gated, with the roadmap item as the
-  fallback when `gh` is unavailable or the user declines.
+- **Three destinations, and the human picks.** A project-specific improvement is either folded
+  into this PR as an edit riding along in the session's commit, or a proposed roadmap item;
+  anything general enough for any CDD project is offered as a **GitHub issue against the CDD
+  repo**, with the roadmap item as the fallback when `gh` is unavailable or the user declines.
+  The step recommends a destination and asks once — it never picks silently, since routing is a
+  scope decision and scope decisions are the human's (§1). Size is the recommendation's input,
+  not its verdict: a line or two argues for the edit, anything larger for the roadmap.
 - **Judgement, capped at one item per run.** The triggers say what to look at; the bar says what
   clears it — it would change how a future session behaves, and it is a pattern rather than a
   one-off annoyance. Without the cap, an enumerable trigger list invites a checklist sweep that
@@ -59,7 +61,7 @@ way.
   task is often exactly what a *reviewer* points at, and `/cdd-process-pr` already holds those
   comments in context. It reuses the same three routes and the same bar. It costs no new
   checkpoint: the class is declared in the triage plan, which is that command's existing single
-  gate, and only the two routes that reach beyond the PR ask again.
+  gate, and the destination question that follows is a routing choice, not a gate on the PR.
 
 **Upstream destination — why an issue.** Three candidates were considered. A roadmap item tagged
 as an upstream candidate, kept local and harvested later by `/cdd-retrofit` upgrade mode, keeps

@@ -2,7 +2,7 @@ Address the open PR's review feedback: read the review comments for the current 
 
 Run this command on the feature branch (not on main), after a PR has been opened and someone has reviewed it. It is a post-review side-loop, analogous in position to `/cdd-merge-base`.
 
-**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates. Do not add per-action gates after the plan is approved — the one exception is step 5's workflow-gap routing when it reaches beyond this PR (a roadmap edit, or an issue filed on another repo), which the triage plan does not authorize and which is asked once. Review threads are never resolved by this command; the user resolves them.
+**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates. Do not add per-action gates after the plan is approved — the one exception is where step 5 routes a workflow gap (folded into this PR, a roadmap item, or an issue on another repo), which the triage plan does not settle and which is asked once, with a recommendation. Review threads are never resolved by this command; the user resolves them.
 
 ## 1. Discover the open PR
 
@@ -96,7 +96,7 @@ Present the plan compactly, e.g.:
 2. [question]        review summary — "why no retry?" → will answer, no code change.
 3. [change-request] src/bar.ts:10 — "drop the lock here" → DISAGREE (introduces a race); will explain in reply.
 4. [nit]             general comment — "typo in log" → will fix.
-5. [workflow-gap]   src/baz.ts:8 — third PR asked for the same import order → will add the rule to CLAUDE.md.
+5. [workflow-gap]   src/baz.ts:8 — third PR asked for the same import order → will add the rule to the coding standard.
 ```
 
 This is the one human checkpoint in this command. Wait for the user to confirm the triage before proceeding to edit. That approval covers the rest of the run, including the GitHub actions in steps 6–7.
@@ -111,8 +111,7 @@ For questions, prepare the answer text. For discussion comments, prepare a brief
 
 **Route the workflow-gaps.** A review comment is the one place a gap in how the project works becomes visible from outside the session that caused it, so this is where it gets captured — the review-time arm of the "the workflow improves itself" commitment, alongside `/cdd-pre-pr`'s discovery-time check. Route by scope, using the same bar that step's check uses (it would change how a future session behaves, and it is a pattern rather than a one-off):
 
-- **Project-specific, and an edit's worth** → apply it now, in this run's commit: a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer. A line or two is an edit's worth; anything larger belongs in the next route.
-- **Project-specific, and bigger than an edit** → propose a roadmap item, and get the user's approval before writing it — a structural roadmap edit is theirs to approve even though the triage plan is already approved.
+- **Project-specific** → the user chooses where it lands, and you recommend: folded into this PR as an edit in this run's commit (a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer), or a roadmap item for later. A line or two argues for folding it in, anything larger for the roadmap — say which you'd pick and why, ask once, apply the answer. Never pick silently; the approved triage plan settles which comments get addressed, not where a gap that outlives this diff should land.
 - **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken.
 <!-- cdd-only-begin -->
 
