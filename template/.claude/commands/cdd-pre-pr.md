@@ -108,12 +108,15 @@ Do **not** manufacture an improvement every run. The default is silence, and "no
 
 ## 8. Upstream drift check
 
+Step 1 diffed against the *local* `$BASE_BRANCH`; this step needs the remote, so it fetches first:
+
 ```bash
 git fetch origin "$BASE_BRANCH"
+git rev-list --count "HEAD..origin/$BASE_BRANCH"
 git log --oneline "HEAD..origin/$BASE_BRANCH"
 ```
 
-If `origin/$BASE_BRANCH` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-base` before opening the PR. Do not merge from this session.
+Report the count. If it is non-zero, `origin/$BASE_BRANCH` has advanced beyond the branch point: say by how many commits, summarize what landed, and recommend running `/cdd-merge-base` in a fresh session before opening the PR. This is advisory — it never blocks the checklist, and this session neither merges nor invokes `/cdd-merge-base` itself.
 
 ## 9. Summary
 
@@ -131,7 +134,7 @@ Present a checklist summary:
 - [ ] New behaviour tested (or untested-with-reason recorded)
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] Workflow improvements: none / routed (list them)
-- [ ] No upstream drift (or: /cdd-merge-base recommended)
+- [ ] Upstream drift: none (or: <N> commits behind origin/<BASE_BRANCH>, /cdd-merge-base recommended)
 - [ ] Reconciliation edits committed
 ```
 
