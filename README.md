@@ -27,7 +27,7 @@ One full turn around the cycle:
 1. **Select a task** — one, or several to run in parallel.
 2. **Write the handoff and create a git worktree** for the task, isolated from your main checkout.
 3. **Launch an implementation session.** It opens in plan mode; you approve the plan, then let it implement. You know what to expect, because you approved the plan.
-4. **Merge from the base branch if it moved** while you were working, approving the merge plan.
+4. **Merge from the base branch if it moved** while you were working, approving the merge plan — unless the merge is mechanically trivial (nothing conflicts, nothing to adopt), in which case it just happens and reports afterwards.
 5. **Let an agent review the code before the PR opens** — this is also where tests run and the docs are checked, linted, and formatted. It opens the PR at the end.
 6. **Review the PR** and ask the agent to address your feedback.
 7. **Merge the PR, delete the worktree, pull the changes into your main worktree — and start over.**
@@ -61,7 +61,7 @@ Prefer to script it? The non-interactive `tools/bootstrap-cdd-project.sh` does t
 
 CDD is built around three goals, in tension and balanced on purpose.
 
-**Automate everything except the decisions that matter.** Everything between the human gates is automated; the gates, picking the task, approving the plan, approving any base-branch merge, merging the PR, never are.
+**Automate everything except the decisions that matter.** Everything between the human gates is automated; the gates, picking the task, approving the plan, approving a base-branch merge that has anything to decide, merging the PR, never are.
 
 **Bake in engineering best practices.** Tests, linting, formatting, CI, and living documentation aren't bolted on at the end. The workflow expects them at every step, so quality and context don't erode as the project grows.
 

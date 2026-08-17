@@ -1,4 +1,4 @@
-Integrate the current state of the base branch into the feature branch. Two phases: a **dry-run conflict assessment** first, then the actual merge with conflict resolution. The approval between the two phases is conditional — the merge runs automatically when the dry run proves the case mechanically trivial (§4), and stops for approval otherwise.
+Integrate the current state of the base branch into the feature branch. Two phases: a **dry-run conflict assessment** first, then the actual merge with conflict resolution. The approval between the two phases is conditional — the merge runs automatically when the dry run proves the case mechanically trivial (step 4), and stops for approval otherwise.
 
 Run this command on the feature branch (not on the base branch). Use it when:
 
@@ -85,7 +85,7 @@ Record the outcome of this scan as an explicit count — "flagged N items" or "f
 
 **The merge proceeds automatically, with no approval prompt, when all of these hold:**
 
-1. The worktree was clean (§1).
+1. The worktree was clean (step 1).
 2. Step 3's `git merge-tree` reported **zero** conflicting files.
 3. Step 3's non-conflict scan flagged **nothing**.
 4. The post-merge verify (step 7) passes. This one is a *safety net, not a precondition* — it is checked after the merge exists, and step 7 says what to do when it fails.
