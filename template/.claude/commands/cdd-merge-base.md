@@ -128,8 +128,10 @@ Then **stop and wait for explicit user approval**. Do not begin the merge. This 
 On user approval, or automatically via step 4's trivial path:
 
 ```bash
-git merge "origin/$BASE_BRANCH"
+git merge --no-edit "origin/$BASE_BRANCH"
 ```
+
+`--no-edit` takes the default merge message: on the trivial path nobody is watching, and a merge that drops into an editor would hang the session.
 
 On the trivial path there is nothing to resolve — step 4's criterion 2 established zero conflicting files — so the merge command is the whole step. Otherwise resolve conflicts file by file:
 
