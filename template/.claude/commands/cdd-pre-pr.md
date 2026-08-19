@@ -60,11 +60,12 @@ Check and **update** documentation based on the changes:
 
 - **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc to reflect it. Edit directly.
 - **Feature docs** (`doc/features/`): if user-visible behaviour changed or a new feature landed, update or add the relevant feature doc. Edit directly.
-- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly.
+- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly. It stays an index, not a knowledge dump — do not add detail a slash command already injects into the sessions that need it.
 - **README.md**: if anything it states — quick start, layout, status, links — went stale relative to the change, update it. Edit directly.
 - **Roadmap** (`doc/knowledge_base/roadmap.md`):
   1. Tick any newly completed checkboxes directly.
   2. Identify items that should be **added, modified, or removed** based on what was implemented. Present these suggestions explicitly to the user **before** making any edits. Apply only on approval.
+  3. Keep every annotation at the roadmap's own bar — read "Annotation conventions" in the roadmap file itself. A ticked item reads like a PR title or barely more; the default is no annotation at all, and at most one short clause for what no other artifact carries (a deferred sub-item, a caveat, a scope change). The implementation detail, the rejected alternatives, and the reasoning belong in the PR description, an ADR, and the docs — not here.
 
 Read each relevant doc and compare against the actual code changes. Fix discrepancies directly when they are reconciliation (the doc is out of date relative to what landed). Ask before applying structural changes (adding new doc files, restructuring an existing doc).
 
@@ -108,12 +109,15 @@ Do **not** manufacture an improvement every run. The default is silence, and "no
 
 ## 8. Upstream drift check
 
+Step 1 diffed against the *local* `$BASE_BRANCH`; this step needs the remote, so it fetches first:
+
 ```bash
 git fetch origin "$BASE_BRANCH"
+git rev-list --count "HEAD..origin/$BASE_BRANCH"
 git log --oneline "HEAD..origin/$BASE_BRANCH"
 ```
 
-If `origin/$BASE_BRANCH` has advanced beyond the branch point, mention it and recommend running `/cdd-merge-base` before opening the PR. Do not merge from this session.
+Report the count. If it is non-zero, `origin/$BASE_BRANCH` has advanced beyond the branch point: say by how many commits, summarize what landed, and recommend running `/cdd-merge-base` in a fresh session before opening the PR. This is advisory — it never blocks the checklist, and this session neither merges nor invokes `/cdd-merge-base` itself.
 
 ## 9. Summary
 
@@ -131,7 +135,7 @@ Present a checklist summary:
 - [ ] New behaviour tested (or untested-with-reason recorded)
 - [ ] CI gaps surfaced: none / proposed (list them)
 - [ ] Workflow improvements: none / routed (list them)
-- [ ] No upstream drift (or: /cdd-merge-base recommended)
+- [ ] Upstream drift: none (or: <N> commits behind origin/<BASE_BRANCH>, /cdd-merge-base recommended)
 - [ ] Reconciliation edits committed
 ```
 

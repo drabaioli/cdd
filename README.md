@@ -61,7 +61,7 @@ Prefer to script it? The non-interactive `tools/bootstrap-cdd-project.sh` does t
 
 CDD is built around three goals, in tension and balanced on purpose.
 
-**Automate everything except the decisions that matter.** Everything between the human gates is automated; the gates, picking the task, approving the plan, approving any base-branch merge, merging the PR, never are.
+**Automate everything except the decisions that matter.** Everything between the human gates is automated; the gates, picking the task, approving the plan, approving a base-branch merge that has anything to decide, merging the PR, never are.
 
 **Bake in engineering best practices.** Tests, linting, formatting, CI, and living documentation aren't bolted on at the end. The workflow expects them at every step, so quality and context don't erode as the project grows.
 

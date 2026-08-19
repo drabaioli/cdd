@@ -38,7 +38,7 @@ Three rules govern it:
 
 1. **The handoff session never edits the roadmap file.** It records desired edits in the handoff for the implementation session to apply. Two reinforcing reasons: its context is already spent on cross-phase reasoning, and it runs on main, which is protected from direct edits — so the restriction is structural, not just convention.
 2. **Roadmap edits beyond ticking a checkbox require human approval.** Adding, removing, or splitting tasks; restructuring phases; reordering priorities: the agent proposes, the human approves.
-3. **Inline annotations stay terse.** Tick the box; annotate only what no other artifact (commit, PR, docs) will carry — a deferred sub-item, a surprising caveat, a scope change. One short clause, not a restatement of the work.
+3. **Inline annotations stay terse.** Tick the box; annotate only what no other artifact (commit, PR, docs) will carry — a deferred sub-item, a surprising caveat, a scope change. One short clause, not a restatement of the work. A completed item reads like a PR title or barely more: enough for a reader to place the task in the roadmap's arc, with the fine-grained detail left to the PR description, the ADRs, and the docs — which the same change updates anyway. The bar is stated in full, with an example, under "Annotation conventions" in the roadmap itself, so the session applying an edit reads it in the file it is editing.
 
 ### 2.3 Architecture docs (`doc/architecture/`)
 
@@ -279,7 +279,9 @@ Opens in plan mode, reads the handoff, and rebuilds its context from CLAUDE.md, 
 
 ### 3.4 Merge session (optional): `/cdd-merge-base`
 
-Run on the feature branch when main has advanced and the feature branch needs to integrate the new state. Two-phase: a **dry run** — identify what main contains that this branch lacks, assess which files conflict and whether the conflicts look mechanical or logical, report, do not merge — then, on human approval, the **merge** itself, asking for clarification mid-resolution if conflicts are non-trivial. This is also where the agent can pull in improvements from main that are useful here without scheduling a roadmap task.
+Run on the feature branch when main has advanced and the feature branch needs to integrate the new state. Two-phase: a **dry run** — identify what main contains that this branch lacks, assess which files conflict and whether the conflicts look mechanical or logical, report, do not merge — then the **merge** itself, asking for clarification mid-resolution if conflicts are non-trivial. This is also where the agent can pull in improvements from main that are useful here without scheduling a roadmap task.
+
+The approval between the two phases is **conditional** (checkpoint 4, §4). On the mechanically-trivial path — clean worktree, zero conflicting files, and nothing flagged by the dry run's scan of the non-conflicting changes — there is no decision for the human to make, so the merge proceeds automatically and the assessment is reported afterwards rather than as a prompt. Anything else stops for approval as before. The trivial path never adopts improvements from main: it is reachable only when the scan flagged none.
 
 ### 3.5 Pre-PR session: `/cdd-pre-pr`
 
@@ -311,13 +313,15 @@ Six explicit checkpoints. The human is also free to interject at any other point
 1. **Task selection** (end of `/cdd-next-step`): the human chooses among proposed candidates.
 2. **Handoff approval** (end of `/cdd-next-step`): the human approves the drafted implementation prompt and notes.
 3. **Plan approval** (start of implementation session, plan mode): the human approves the plan before any file is written.
-4. **Merge-base approval** (between dry run and merge in `/cdd-merge-base`): the human approves after seeing conflict complexity.
+4. **Merge-base approval** (between dry run and merge in `/cdd-merge-base`) — *conditional*: the human approves after seeing conflict complexity, whenever there is complexity to see. Skipped only on the mechanically-trivial path (below).
 5. **Roadmap edit approval** (during `/cdd-pre-pr`): the human approves proposed add/modify/remove edits before they are applied.
 6. **PR merge** (after `/cdd-pre-pr`): standard GitHub PR review and merge.
 
 These six are the gates. The agent should never proceed past a gate without explicit human confirmation.
 
 The auto-commits some sessions make at their gates (§2.11) do not change this count. A local commit with no push is reversible from git history, so it adds no checkpoint and removes none — it is not a seventh gate. The only gate that pushes is `/cdd-process-pr`, and its single up-front checkpoint is described in §4.1.
+
+Checkpoint 4's conditionality does not change the count either. It fires whenever human input is actually needed and is skipped on one path only, defined by three mechanical facts and never by the agent's own judgement: the worktree was clean, `git merge-tree` reported **zero** conflicting files, and the dry run's scan of the non-conflicting changes flagged nothing to adopt. On that path the human is confirming a merge git has already proven textually clean — an approval that carries no decision, which §1's "automate everything except decisions" calls a gap rather than a gate. The same argument §2.11 makes for auto-commits applies: the merge is local and unpushed, and fully revertable (`git merge --abort` mid-merge, `git reset --hard ORIG_HEAD` after), so this defers a gate rather than removing one — the human still sees everything at the PR (checkpoint 6). The post-merge build and tests run on the trivial path exactly as on the approved one, and a failure there is reported with the revert offered, never swallowed. The residual risk is real and worth stating: **a zero-conflict merge can still be a semantic break** — two sides that never touch the same lines can still contradict each other — and the two criteria that would catch it, the scan and the tests, only catch what the scan notices and what the tests cover. The rule is deliberately strict for that reason: a conflict the agent judges "mechanical" is exactly the judgement this checkpoint exists to check, so no auto-resolve tier exists, and there is no flag to widen the path. Reasoning in `doc/architecture/adr/0004-conditional-merge-base-approval.md` (CDD repo).
 
 ### 4.1 The `/cdd-process-pr` exception
 
