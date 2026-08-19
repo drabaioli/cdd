@@ -64,11 +64,12 @@ Check and **update** documentation based on the changes:
 
 - **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc to reflect it. Edit directly.
 - **Feature docs** (`doc/features/`): if user-visible behaviour changed or a new feature landed, update or add the relevant feature doc. Edit directly.
-- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly.
+- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly. It stays an index, not a knowledge dump — do not add detail a slash command already injects into the sessions that need it.
 - **README.md**: if anything it states — quick start, layout, status, links — went stale relative to the change, update it. Edit directly.
 - **Roadmap** (`doc/knowledge_base/roadmap.md`):
   1. Tick any newly completed checkboxes directly.
   2. Identify items that should be **added, modified, or removed** based on what was implemented. Present these suggestions explicitly to the user **before** making any edits. Apply only on approval.
+  3. Keep every annotation at the roadmap's own bar — read "Annotation conventions" in the roadmap file itself. A ticked item reads like a PR title or barely more; the default is no annotation at all, and at most one short clause for what no other artifact carries (a deferred sub-item, a caveat, a scope change). The implementation detail, the rejected alternatives, and the reasoning belong in the PR description, an ADR, and the docs — not here.
 
 Read each relevant doc and compare against the actual code changes. Fix discrepancies directly when they are reconciliation (the doc is out of date relative to what landed). Ask before applying structural changes (adding new doc files, restructuring an existing doc).
 

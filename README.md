@@ -27,7 +27,7 @@ One full turn around the cycle:
 1. **Select a task** — one, or several to run in parallel.
 2. **Write the handoff and create a git worktree** for the task, isolated from your main checkout.
 3. **Launch an implementation session.** It opens in plan mode; you approve the plan, then let it implement. You know what to expect, because you approved the plan.
-4. **Merge from the base branch if it moved** while you were working, approving the merge plan — unless the merge is mechanically trivial (nothing conflicts, nothing to adopt), in which case it just happens and reports afterwards.
+4. **Merge from the base branch if it moved** while you were working, approving the merge plan.
 5. **Let an agent review the code before the PR opens** — this is also where tests run and the docs are checked, linted, and formatted. It opens the PR at the end.
 6. **Review the PR** and ask the agent to address your feedback.
 7. **Merge the PR, delete the worktree, pull the changes into your main worktree — and start over.**

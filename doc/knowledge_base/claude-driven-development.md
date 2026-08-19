@@ -38,7 +38,7 @@ Three rules govern it:
 
 1. **The handoff session never edits the roadmap file.** It records desired edits in the handoff for the implementation session to apply. Two reinforcing reasons: its context is already spent on cross-phase reasoning, and it runs on main, which is protected from direct edits — so the restriction is structural, not just convention.
 2. **Roadmap edits beyond ticking a checkbox require human approval.** Adding, removing, or splitting tasks; restructuring phases; reordering priorities: the agent proposes, the human approves.
-3. **Inline annotations stay terse.** Tick the box; annotate only what no other artifact (commit, PR, docs) will carry — a deferred sub-item, a surprising caveat, a scope change. One short clause, not a restatement of the work.
+3. **Inline annotations stay terse.** Tick the box; annotate only what no other artifact (commit, PR, docs) will carry — a deferred sub-item, a surprising caveat, a scope change. One short clause, not a restatement of the work. A completed item reads like a PR title or barely more: enough for a reader to place the task in the roadmap's arc, with the fine-grained detail left to the PR description, the ADRs, and the docs — which the same change updates anyway. The bar is stated in full, with an example, under "Annotation conventions" in the roadmap itself, so the session applying an edit reads it in the file it is editing.
 
 ### 2.3 Architecture docs (`doc/architecture/`)
 
