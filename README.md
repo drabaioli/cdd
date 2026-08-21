@@ -45,7 +45,7 @@ claude
 
 Then, from inside that Claude Code session:
 
-1. Run **`/cdd-bootstrap`** and start a new project. It walks you through defining the project and drafting a real roadmap through conversation, then scaffolds everything in one go — overview, `CLAUDE.md`, and roadmap already filled in.
+1. Run **`/cdd-bootstrap`** and start a new project. It walks you through defining the project and drafting a real roadmap through conversation, then scaffolds everything in one go — overview, `CLAUDE.md`, engineering-practices contract, and roadmap already filled in.
 2. **`cd`** into your freshly created project and launch `claude` there.
 3. Run **`/cdd-next-step`** to scope your first task.
 4. Lift off — you're now running the task cycle above.

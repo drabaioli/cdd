@@ -19,16 +19,17 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 - **Constraints** — language/platform, hard technical limits, regulatory/business constraints, compatibility, deadlines.
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
+- **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch: nothing exists yet to detect, so the answers are commitments, and most of them will honestly be *expected*.
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
 **Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (`doc/features/template.md`, "Deliverable or project?") and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
 
-**Checkpoint:** present a structured summary of the captured definition (the seven headings above). Get explicit confirmation or corrections before writing anything.
+**Checkpoint:** present a structured summary of the captured definition (the headings above). Get explicit confirmation or corrections before writing anything.
 
 ## 2. Draft the initial roadmap
 
-From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Slot in the template's suggested infrastructure tasks (CI, linting, tests, README, dependency pinning, release/versioning) where they fit the early phases.
+From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Every practice the engineering floor leaves *expected* becomes one task, phrased so closing it flips that row to *enforced*; the template's suggested infrastructure tasks (README, coding guidelines, release/versioning) cover the rest. One set, not two.
 
 Do **not** include the template's pre-filled "Phase 1: CDD bootstrap" survey phase. That phase exists for files-only starts where the docs haven't been written; here you are writing the docs through this conversation, so the roadmap starts at the project's real first phase.
 
@@ -72,7 +73,8 @@ Write, into `$OVERLAY`:
 
 - `doc/knowledge_base/project-overview.md` — the project charter, filled from the discovery summary (the section structure ships in the template skeleton: what it is / goals / what it does / what it explicitly does not do / constraints / architecture intentions / audience).
 - `doc/knowledge_base/roadmap.md` — the roadmap approved in step 2.
-- `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (leave genuinely-unknown build/test commands as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
+- `doc/knowledge_base/engineering-practices.md` — every row marked **Enforced** or **Expected** from the engineering-floor answers, with no `<…>` status marker left standing. Documentation is enforced from day one; fill a command placeholder only where a command was actually chosen, never to clear the placeholder.
+- `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (build/test commands as settled in the contract; leave unchosen ones as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
 - *Optionally* `doc/architecture/overview.md` — only if discovery produced enough concrete structural intent to be worth committing; otherwise leave the template's architecture index pointing at a doc the project writes in its first phase.
 
 Author the identifiers as placeholders (`<PROJECT_NAME>`, `<PROJECT_DIR>`) wherever they appear; the bootstrap script substitutes overlaid files too, so this keeps them consistent. Use concrete prose for everything else. Do not leave either reserved token (`<PROJECT_NAME>`, `<PROJECT_DIR>`) standing in for content you meant to write — only as genuine identifier placeholders.
