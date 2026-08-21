@@ -20,7 +20,7 @@ New behaviour ships with a test, or an explicit, recorded reason it does not. `/
 
 ## Continuous integration — <Enforced once CI runs on every change; Expected until then>
 
-Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so the local verdict is CI's verdict and no gate list is written twice. A gate whose tool is missing on the host is reported skipped — loudly and non-fatally — never passed silently.
+Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so the local verdict is CI's verdict and no gate list is written twice. By default a gate whose tool is missing on the host is reported skipped — loudly and non-fatally — never passed silently; detection is per gate, so a partial toolchain yields a partial verdict rather than none. Making a gate's tool a hard requirement instead is a legitimate per-project call: skip-and-continue is right where gates carry independent optional tools, and wrong where every gate shares one toolchain, because there a missing tool means no gate ran at all — reported green.
 
 - CI entry point: `<ci workflow / command>`
 - Check runner: `<check runner command>`
