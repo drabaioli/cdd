@@ -23,6 +23,9 @@
 #   5. Gate-count contract — the gate count CLAUDE.md and cdd-pre-pr.md state in prose
 #      matches what `scripts/ci.sh list` actually registers, so adding a gate can't leave
 #      the prose (which is what a session reads to know what it just ran) stale.
+#   6. Engineering-floor practice set — every negotiable row of the template's
+#      engineering-practices contract is named in cdd-bootstrap.md's engineering-floor
+#      discovery bullet, so a row added or renamed there can't ship resolved by guess.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -128,6 +131,28 @@ for f in CLAUDE.md "$REPO_CMDS/cdd-pre-pr.md"; do
   note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
   grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
 done
+
+# --- Check 6: engineering-floor practice-set contract ------------------------
+# /cdd-bootstrap resolves the engineering-practices contract from one batched discovery
+# question, so the practices it asks about must be the ones the template contract
+# actually carries as open. A row added to (or renamed in) the contract that the prompt
+# never asks about ships resolved by guess — the one thing resolving-at-bootstrap exists
+# to prevent. Negotiable means "status not plainly Enforced": a row marked `— Enforced`
+# outright (documentation) is not up for discussion, and a heading with no `— <status>`
+# suffix at all ("How this list grows") is not a practice row. Both sides must name the
+# row identically, exactly as with the gh_issue_NN token — no mapping table here, which
+# would be a third copy free to drift from both.
+CONTRACT="template/doc/knowledge_base/engineering-practices.md"
+BOOTSTRAP="$REPO_CMDS/cdd-bootstrap.md"
+floor_bullet="$(grep -F -- '- **Engineering floor**' "$BOOTSTRAP" || true)"
+if [[ -z "$floor_bullet" ]]; then
+  note "engineering-floor seam broken: $BOOTSTRAP no longer carries the '- **Engineering floor**' discovery bullet"
+else
+  while IFS= read -r practice; do
+    grep -qiF -- "$practice" <<<"$floor_bullet" && continue
+    note "engineering-floor seam broken: $CONTRACT carries the open practice '$practice', which $BOOTSTRAP's engineering-floor bullet does not name"
+  done < <(awk -F' — ' '/^## / && NF > 1 { sub(/^## /, ""); if ($NF != "Enforced") print $1 }' "$CONTRACT")
+fi
 
 if [[ "$fail" -ne 0 ]]; then
   echo "prompt-seam check: FAILED (see above)" >&2

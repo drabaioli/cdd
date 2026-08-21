@@ -19,7 +19,7 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 - **Constraints** — language/platform, hard technical limits, regulatory/business constraints, compatibility, deadlines.
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
-- **Engineering floor** — what the project commits to for tested behaviour, CI, lint & format, and dependency pinning. Ask this as one batch: nothing exists yet to detect, so the answers are commitments, and most of them will honestly be *expected*.
+- **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch: nothing exists yet to detect, so the answers are commitments, and most of them will honestly be *expected*.
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
@@ -73,7 +73,7 @@ Write, into `$OVERLAY`:
 
 - `doc/knowledge_base/project-overview.md` — the project charter, filled from the discovery summary (the section structure ships in the template skeleton: what it is / goals / what it does / what it explicitly does not do / constraints / architecture intentions / audience).
 - `doc/knowledge_base/roadmap.md` — the roadmap approved in step 2.
-- `doc/knowledge_base/engineering-practices.md` — every row marked **Enforced** or **Expected** from the engineering-floor answers, with no `<Enforced once …>` marker left standing. Documentation is enforced from day one; fill a command placeholder only where a command was actually chosen, never to clear the placeholder.
+- `doc/knowledge_base/engineering-practices.md` — every row marked **Enforced** or **Expected** from the engineering-floor answers, with no `<…>` status marker left standing. Documentation is enforced from day one; fill a command placeholder only where a command was actually chosen, never to clear the placeholder.
 - `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (build/test commands as settled in the contract; leave unchosen ones as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
 - *Optionally* `doc/architecture/overview.md` — only if discovery produced enough concrete structural intent to be worth committing; otherwise leave the template's architecture index pointing at a doc the project writes in its first phase.
 
