@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "branch": "--help",
+  "stage": "scoped",
+  "pr": null,
+  "base_branch": null,
+  "sessions": [
+    {
+      "id": "04fb15d8-0ec9-46d3-8803-be17452fbc99",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    }
+  ]
+}
