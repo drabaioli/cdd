@@ -94,6 +94,7 @@ require_headings() {
 
 require_headings "$REPO_CMDS/cdd-next-step.md" \
   '## 0. Mode: roadmap-driven, intent-driven, or issue-driven' \
+  '## 0a. Verify the checkout is current' \
   '## 5. Draft the handoff' \
   '## 7. Write the handoff file' \
   '## 8. Print the next command'

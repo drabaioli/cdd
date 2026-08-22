@@ -13,13 +13,31 @@ This command has one optional argument. Dispatch on its shape:
 | `issue` or `issues`                 | **issue-driven**, browse      | §0b         |
 | anything else                       | **intent-driven**             | §3-intent   |
 
-Every mode first runs §1 (read context) and §2 (stale-handoff sweep); the "Branches at" column is only where the mode-specific path begins after that.
+Every mode first runs §0a (checkout freshness), §1 (read context) and §2 (stale-handoff sweep); the "Branches at" column is only where the mode-specific path begins after that.
 
 - **Roadmap-driven**: pick the next item off the roadmap. Run §1–§8 as written.
 - **Intent-driven**: the task is already chosen by the user, so skip candidate proposal (§3 is replaced by §3-intent below). Use this when the user wants to start something off-roadmap rather than picking the next checkbox.
 - **Issue-driven**: a thin front-end onto intent-driven mode — the intent text comes from a GitHub issue instead of being typed. §0b resolves the issue, then the flow is exactly intent-driven (§1 adaptive load, §3-intent, §4 onward).
 
 All modes converge on the same machinery from §4 onward (stale-handoff sweep in §2 runs in all of them). Do not fork the flow beyond what §0b, §1, and §3 describe.
+
+## 0a. Verify the checkout is current
+
+Scoping work from a stale checkout can hand off a task that is already merged, so before reading any context, confirm this checkout is not behind its upstream. Compare the **checked-out** branch — the branch a task cut here would be based on (§4) — against its upstream, not the platform default branch:
+
+```bash
+BRANCH="$(git rev-parse --abbrev-ref HEAD)"
+UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "origin/$BRANCH")"
+git fetch --quiet origin "$BRANCH" && git rev-list --left-right --count "HEAD...$UPSTREAM"
+```
+
+The count prints two numbers, ahead then behind. The fetch updates remote-tracking refs only — it never touches the working tree, so this session still modifies no file in the repo.
+
+- **Behind** (second number non-zero): **stop**. Say how many commits behind the upstream this checkout is, and tell the user to run `git pull --ff-only` here and re-run the command. Do not pull, and do not offer to.
+- **Ahead or diverged**: report it in one line and continue. Never a block.
+- **Fetch failed or no upstream** (offline, no remote, or no counterpart branch on `origin`): say in one line that the freshness check was skipped, and continue — the command stays usable offline, the same way roadmap and intent modes stay usable without `gh`.
+
+Then continue with §0b (issue-driven mode) or §1.
 
 ## 0b. Resolve the issue (issue-driven mode)
 
