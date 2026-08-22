@@ -10,16 +10,17 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's six checks gets one mutation:
+# checker's six checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file.
-#   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading.
+#   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading; and,
+#      separately, cdd-next-step.md loses its checkout-freshness precondition.
 #   5. Gate-count contract     — CLAUDE.md's stated gate count stops matching `ci.sh list`.
 #   6. Engineering-floor set    — the template contract gains a practice row that
 #                                 cdd-bootstrap.md's discovery bullet does not ask about.
 #
-# Plus two control cases, which are what make the six above mean anything:
+# Plus two control cases, which are what make the mutations above mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected"
 #     by a checker that is simply broken and fails on everything.
 #   - A dangling reference that is whitelisted must PASS, pinning the documented
@@ -128,6 +129,13 @@ fresh_sandbox
 sandbox_sed '/^## 10\. Commit reconciliation edits$/d' "$CMDS/cdd-pre-pr.md"
 expect_fail "check 4 catches a dropped load-bearing heading" \
   "missing required heading in $CMDS/cdd-pre-pr.md: ## 10. Commit reconciliation edits"
+
+# The freshness precondition is a stop-the-session gate with no downstream artifact of its
+# own, so nothing else in the workflow would notice its removal — hence its own case.
+fresh_sandbox
+sandbox_sed '/^## 0a\. Verify the checkout is current$/d' "$CMDS/cdd-next-step.md"
+expect_fail "check 4 catches a dropped checkout-freshness precondition" \
+  "missing required heading in $CMDS/cdd-next-step.md: ## 0a. Verify the checkout is current"
 
 # --- Check 5: gate-count contract ---------------------------------------------
 # Derive the true count from the registry rather than hardcoding it, so adding a
