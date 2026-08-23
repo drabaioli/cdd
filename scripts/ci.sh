@@ -324,9 +324,10 @@ group_end() {
 
 run_gates() {  # run_gates <slug>...
   local total=$#
-  local slug needs desc started elapsed status
+  local slug needs desc started elapsed status log
   local -a summary=()
   local -a skipped=()
+  local -a failed_logs=()
   local passed=0 failed=0
 
   for slug in "$@"; do
@@ -342,8 +343,14 @@ run_gates() {  # run_gates <slug>...
 
     group_begin "$slug" "$desc"
     started="$SECONDS"
-    "$(fn_for_slug "$slug")"
-    status=$?
+    # Tee each gate to its own log as well as to the terminal. Live output alone is not
+    # enough: a gate that fails once and then passes leaves nothing behind to read, and
+    # a caller who piped this run through `tail` has already discarded the only copy —
+    # which is exactly how one intermittent failure here had to be reverse-engineered
+    # from a duration. PIPESTATUS[0] keeps the gate's own status; tee's is irrelevant.
+    log="$TMP/gate-$slug.log"
+    "$(fn_for_slug "$slug")" 2>&1 | tee "$log"
+    status=${PIPESTATUS[0]}
     elapsed=$((SECONDS - started))
     group_end
 
@@ -355,6 +362,7 @@ run_gates() {  # run_gates <slug>...
       echo "FAIL $slug (${elapsed}s, exit $status)"
       [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=$slug failed::$desc (exit $status)"
       summary+=("$(printf '  %-4s  %-20s  %s' FAIL "$slug" "exit $status, ${elapsed}s")")
+      failed_logs+=("$slug")
       failed=$((failed + 1))
     fi
   done
@@ -367,6 +375,19 @@ run_gates() {  # run_gates <slug>...
   local line="$total gate(s): $passed passed, $failed failed, ${#skipped[@]} skipped"
   [[ ${#skipped[@]} -gt 0 ]] && line+=" — SKIPPED: ${skipped[*]}"
   echo "$line"
+
+  # Repeat each failure's tail after the summary, so a failed run is legible without
+  # scrolling back past every passing gate — and so a caller that keeps only the last
+  # lines of this run still keeps the evidence. Set CDD_CI_TMPDIR to retain the full logs.
+  if [[ ${#failed_logs[@]} -gt 0 ]]; then
+    for slug in "${failed_logs[@]}"; do
+      echo
+      echo "--- $slug: last 20 lines (full log: $TMP/gate-$slug.log)"
+      tail -n 20 "$TMP/gate-$slug.log" | sed 's/^/  /'
+    done
+    [[ -z "${CDD_CI_TMPDIR:-}" ]] && echo && \
+      echo "note: gate logs live in a temp dir removed on exit; set CDD_CI_TMPDIR to keep them."
+  fi
 
   [[ $failed -eq 0 ]]
 }

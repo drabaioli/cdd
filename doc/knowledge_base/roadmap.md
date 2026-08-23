@@ -154,6 +154,7 @@ Elevate the two under-guarded founding objectives — instilling engineering bes
 - [x] One check runner shared by CI and `/cdd-pre-pr` (issue #36): `scripts/ci.sh` is the sole source of the gate sequence; pre-PR review added the `seams-contract` mutation gate
 - [x] Strip the dangling `(process doc §N)` pointers from the shipped commands, symmetrically in repo and template copies (PR #55); a sixth, a bare `(§2.13)`, turned up later
 - [x] Recompact every roadmap item to a 200-char cap, pending and completed alike, enforced by the `roadmap-length` gate; detail now goes to a GitHub issue or the handoff (ADR 0005)
+- [x] Fix the flaky `install-smoke`: bash sourced the fake HOME's rc under socket stdin, so its shim probes tested functions. Also made it hermetic and gave the runner per-gate logs.
 
 **Milestone:** all three founding objectives are named commitments in §1, each with at least one recurring guardrail or a tracked plan to add one.
 
