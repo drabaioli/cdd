@@ -254,6 +254,26 @@ if command -v jq >/dev/null 2>&1; then
   [[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
   pass "cdd-state seed omits the session entry when no session id is set"
 
+  # An option-shaped branch is rejected before anything is written or pushed. `cdd-state
+  # seed --help` used to take "--help" as the branch, write --help.state.json, and
+  # force-push refs/cdd/--help to the REAL origin -- which is how one appeared on the
+  # shared repo. Assert both halves: no record, and no ref in the throwaway origin.
+  for bad_arg in --help --bogus; do
+    # `|| true`: a rejected argument exits non-zero by design, and this script runs under
+    # `set -e`. What is asserted is the absence of effects, not the exit status.
+    # shellcheck disable=SC2016  # $1/$2 are `bash -c` positional parameters
+    ( cd "$REPO_ROOT" \
+      && env HOME="$FAKE_HOME" "${PUSH_TO_FAKE[@]}" \
+         "${NOSHELLRC[@]}" -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$bad_arg" \
+         </dev/null >/dev/null 2>&1 ) || true
+    [[ ! -f "$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$bad_arg.state.json" ]] \
+      || fail "cdd-state seed '$bad_arg' wrote a state record for an option-shaped branch"
+    if git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$bad_arg" >/dev/null; then
+      fail "cdd-state seed '$bad_arg' pushed refs/cdd/$bad_arg"
+    fi
+  done
+  pass "cdd-state seed rejects an option-shaped branch without writing or pushing"
+
   # The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
   # writer ran in. This assertion only bites when the two differ — i.e. whenever the
   # check runs from a feature worktree, which is the case that regresses if someone

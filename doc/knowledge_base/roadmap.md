@@ -185,6 +185,7 @@ Give each task a machine-readable record of where it sits in its lifecycle and w
 - [x] Multi-machine resume, handoff + state sync across machines via a per-task ref `refs/cdd/<branch>` (issue #22); advisory end-to-end, design in `doc/architecture/shell-helpers.md`
 - [x] Per-repo main-worktree marker `~/.cdd/handoffs/<repo>/repo.json` (issue #58), so a repo stays locatable once all its task records are reaped; design in `doc/architecture/shell-helpers.md`
 - [x] Garbage-collect finished tasks' artifacts: `cdd-worktree-gc [--force]` reaps the handoff, state record, and ref of any task whose PR has merged; the backstop for `cdd-worktree-done`
+- [x] Reject option-shaped branch names in the worktree and state helpers; `cdd-state seed --help` had written a record and force-pushed `refs/cdd/--help` to the real origin.
 
 **Milestone:** a task's lifecycle stage and its working sessions are recorded as data and surfaced by CDD tooling, not reconstructed by inference.
 

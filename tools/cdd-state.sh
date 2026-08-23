@@ -174,6 +174,14 @@ cdd-state() {
   case "$cmd" in
     seed)
       local branch="$1"; shift 2>/dev/null
+      # The branch is positional with no flags before it, so an option-shaped value is
+      # always a mistake -- and an expensive one here: `cdd-state seed --help` used to
+      # write "--help.state.json" and force-push refs/cdd/--help to the real origin,
+      # which is exactly how one turned up on the shared repo.
+      case "$branch" in
+        -h|--help) echo "usage: cdd-state seed <branch> [--base <branch>]" >&2; return 0 ;;
+        -*) echo "cdd-state seed: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
+      esac
       local base=""
       while [[ $# -gt 0 ]]; do
         case "$1" in
@@ -287,6 +295,9 @@ cdd-state() {
       ;;
     install|"")
       cdd-state-install "$@"
+      ;;
+    -h|--help|help)
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | install}" >&2
       ;;
     *)
       echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | install}" >&2

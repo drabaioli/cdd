@@ -36,12 +36,13 @@ not fit is routed to a named artifact rather than trimmed away.**
   chosen over rendered width, backtick-excluding, or link-target-collapsing measures because a cap
   is only useful if a session can apply it without running the checker.
 - It is enforced by `scripts/roadmap-length-check.sh`, registered as the `roadmap-length` gate in
-  `scripts/ci.sh`, and it covers both **maintained** roadmaps: this repo's own and the skeleton the
-  template ships. The template's pre-filled Phase 1 items are inherited verbatim by every
-  bootstrapped project, so letting them bloat ships the problem downstream and starts each new
-  project from items that violate the convention it just read. Detail trimmed out of a template item
-  goes to the phase intro, which is prose and uncapped. `demo/seed/`'s roadmap is excluded: it is
-  filled-in content for a throwaway demo instance, not an artifact anyone maintains.
+  `scripts/ci.sh`, and it covers **every roadmap the repo ships**: its own, the skeleton in
+  `template/`, and the filled-in one in `demo/seed/`. The rule is that a file stating this
+  convention has to obey it. The template's pre-filled items are inherited verbatim by every
+  bootstrapped project, so bloat there ships the problem downstream and starts each new project from
+  items violating the convention it just read; the demo seed is the worked example a reader copies
+  from, which is the same argument. Detail trimmed out of an instructional item goes to the phase
+  intro, which is prose and uncapped.
 - The escape clause is deleted. Every pre-existing item was rewritten to the cap rather than
   grandfathered.
 - Detail that no longer fits goes to one of two places: a **GitHub issue** referenced by number on
@@ -81,6 +82,10 @@ reconcile.
   is not optional politeness, it is the precondition for cutting a line.
 - The trailing clause is introduced by a **semicolon**, not an em dash. Nothing mechanical depends on
   the choice; it is a house-style preference, and the gate measures length only.
+- All three conventions sections now say the same thing, and `demo/seed/`'s is a byte-for-byte copy
+  of the template's. It had drifted — missing the ADR clause and the PR-title bar — which is the
+  ordinary fate of a rule stated in three places with nothing tying them together. Worth a seam
+  check if it drifts again; the gate only pins item length, not the prose stating the rule.
 - The rule now lives in three places that must agree: process doc §2.2 rule 3, the roadmap's own
   conventions section, and `template/doc/knowledge_base/roadmap.md`. No mechanical check ties them
   together — `command-drift-check.sh` only covers `.claude/commands/` — so that consistency is

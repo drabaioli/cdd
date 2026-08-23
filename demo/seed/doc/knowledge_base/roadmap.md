@@ -9,7 +9,7 @@ This file is the central artifact of the Claude-Driven Development workflow. It 
 Stand up the Flask app, render Markdown to HTML with the `markdown` library, show a live preview, and ship the first action ("Copy rendered"). The defining architectural move of this phase is the **actions pipeline**: a single `ACTIONS = [...]` registry in Python and a matching `<div class="actions">` toolbar in the template. Every later output (email-safe copy, export, …) is added as one entry in that registry and one button in that toolbar — this is the seam the rest of the roadmap extends.
 
 - [ ] Flask app with a paste box, a live preview pane, and a render route that calls `markdown.markdown()`.
-- [ ] Define the actions pipeline: an `ACTIONS = [...]` registry where each action knows its button label and how to produce its output; render one toolbar button per action into `<div class="actions">`.
+- [ ] Define the actions pipeline: an `ACTIONS = [...]` registry where each action knows its button label and how to produce its output, rendered as one toolbar button per action.
 - [ ] Ship the first action, `CopyRenderedAction`: put rendered HTML on the clipboard as a `ClipboardItem` with a `text/html` part and a `text/plain` fallback.
 - [ ] Escape user text so `<`, `>`, `&`, and raw HTML in the Markdown body render as literal text, not injected markup.
 - [ ] Handle the obvious edge cases: empty input, nested emphasis (`***bold italic***`), and correct clipboard MIME on copy.
@@ -56,7 +56,7 @@ Add file exports: a self-contained "Download standalone .html" and an "Download 
 
 ## Phase 6: `mdr` CLI
 
-- [ ] A `mdr` command that reads Markdown on stdin, renders it, and copies/opens the result — so the user can pipe Claude Code's Markdown output straight through the tool.
+- [ ] A `mdr` command that reads Markdown on stdin, renders it, and copies/opens the result; so the user can pipe Claude Code's Markdown output straight through the tool.
 
 **Milestone:** `claude ... | mdr` puts rendered, email-safe rich text on the clipboard from the terminal.
 
@@ -69,12 +69,21 @@ Add file exports: a self-contained "Download standalone .html" and an "Download 
 
 ## Annotation conventions
 
+**Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else. A one-line length check in this project's check runner keeps it honest, since a cap nobody measures drifts back.
+
 The default is no annotation. Tick the box and stop.
 
-Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change.
-
-If you do annotate, keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
+Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in an ADR, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change. Keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
 
 ```
-- [x] <Task description> — <one short clause: deferred X / caveat Y / out-of-scope Z>
+- [x] <Task description>; <one short clause: deferred X / caveat Y / out-of-scope Z>
 ```
+
+Detail that does not fit has a home, and it is never this file:
+
+- a **GitHub issue**, referenced by number on the roadmap line — `/cdd-next-step #NN` sources a task straight from it, and issues are already the inbox feeding this roadmap;
+- the **handoff file**, for detail the implementation session needs and nobody afterwards does.
+
+When a task hinges on a design decision, the ADR is written when the decision is *taken*; the issue carries the thinking until then. ADRs record decisions, not pending scope.
+
+Cite an ADR by number (`ADR 0002`), not by a full relative link: the link target alone can eat a third of the budget, and `doc/architecture/index.md` lists them all. Do not add a separate backlog or notes document — a second list of pending work is a second thing to keep in sync, and this roadmap is the source of truth.

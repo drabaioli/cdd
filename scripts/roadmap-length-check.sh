@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roadmap item length: the 200-character cap on the repo's and the template's roadmaps.
+# Roadmap item length: the 200-character cap, on every roadmap this repo ships.
 #
 # The roadmap is simultaneously a plan, a progress log, and a context document that every
 # CDD session loads, so an over-long item costs context on every future run. The bar has
@@ -28,13 +28,13 @@
 # before measuring: one byte survives per character, on any awk, in any locale. The
 # self-check below pins that with a deliberately multibyte-heavy fixture.
 #
-# Scope is the two **maintained** roadmaps: this repo's own and the skeleton the template
-# ships (template/doc/knowledge_base/roadmap.md), whose pre-filled Phase 1 items are
-# inherited verbatim by every bootstrapped project — so letting those bloat would ship the
-# problem downstream, and a project that never reads the convention still starts from items
-# that obey it. Detail trimmed out of a template item belongs in the phase intro, which is
-# prose and uncapped. demo/seed/'s roadmap is deliberately excluded: it is filled-in content
-# for a throwaway demo instance, not an artifact anyone maintains.
+# Scope is every roadmap the repo ships: its own, the skeleton in template/, and the
+# filled-in one in demo/seed/. The rule is simply that a file stating this convention has to
+# obey it. The template's pre-filled items are inherited verbatim by every bootstrapped
+# project, so bloat there ships the problem downstream and starts each new project from
+# items violating the convention it just read; the demo seed is the worked example a reader
+# copies from, which is the same argument. Detail trimmed out of an instructional item
+# belongs in the phase intro, which is prose and uncapped.
 #
 # A line "shaped like an item" is held to the cap wherever it appears, including the
 # example inside the conventions section's fenced block. That is intentional: an example
@@ -49,6 +49,7 @@ cd "$REPO_ROOT"
 ROADMAPS=(
   "doc/knowledge_base/roadmap.md"
   "template/doc/knowledge_base/roadmap.md"
+  "demo/seed/doc/knowledge_base/roadmap.md"
 )
 CAP=200
 
