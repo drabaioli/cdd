@@ -36,16 +36,25 @@ not fit is routed to a named artifact rather than trimmed away.**
   chosen over rendered width, backtick-excluding, or link-target-collapsing measures because a cap
   is only useful if a session can apply it without running the checker.
 - It is enforced by `scripts/roadmap-length-check.sh`, registered as the `roadmap-length` gate in
-  `scripts/ci.sh`, and it is scoped to `doc/knowledge_base/roadmap.md` **only**. The template's and
-  the demo seed's roadmaps are instructional prose meant to be read by a human bootstrapping a
-  project, not progress-log lines, and are legitimately longer.
+  `scripts/ci.sh`, and it covers both **maintained** roadmaps: this repo's own and the skeleton the
+  template ships. The template's pre-filled Phase 1 items are inherited verbatim by every
+  bootstrapped project, so letting them bloat ships the problem downstream and starts each new
+  project from items that violate the convention it just read. Detail trimmed out of a template item
+  goes to the phase intro, which is prose and uncapped. `demo/seed/`'s roadmap is excluded: it is
+  filled-in content for a throwaway demo instance, not an artifact anyone maintains.
 - The escape clause is deleted. Every pre-existing item was rewritten to the cap rather than
   grandfathered.
-- Detail that no longer fits goes to one of three places: a **GitHub issue** referenced by number on
-  the roadmap line, an **ADR with `Status: Proposed`** when the detail *is* a design decision, or the
-  **handoff file** for detail only the implementation session needs. Issues were already framed as
-  the inbox feeding the roadmap (process doc §3.1) and `/cdd-next-step #NN` already consumes one, so
-  this makes them the detail store too rather than introducing anything.
+- Detail that no longer fits goes to one of two places: a **GitHub issue** referenced by number on
+  the roadmap line, or the **handoff file** for detail only the implementation session needs. Issues
+  were already framed as the inbox feeding the roadmap (process doc §3.1) and `/cdd-next-step #NN`
+  already consumes one, so this makes them the detail store too rather than introducing anything.
+- **An ADR is not a detail store.** Routing pending scope into an ADR with `Status: Proposed` was
+  drafted and rejected. `Proposed` appears in exactly one place in this workflow — the status line of
+  `adr/0000-template.md` — and nothing defines what it means, when it applies, or who flips it to
+  `Accepted`; no ADR has ever used it. Leaning a routing rule on an undefined status would have made
+  the rule depend on a convention that does not exist, and it cuts against §2.3's framing of an ADR
+  as the record of a decision *taken*. So: where a task hinges on a design decision, the ADR is
+  written when the decision is taken, and the issue carries the thinking until then.
 - Before any line was cut, the rationale carried only by an over-long item was relocated. Most was
   already documented elsewhere; two items were not, and their reasoning moved into
   `doc/architecture/shell-helpers.md` and `doc/architecture/overview.md` first.
@@ -70,6 +79,8 @@ reconcile.
 - Some provenance genuinely leaves the roadmap. That is the trade being made, and it is only safe
   because the same change updates the PR, the ADRs, and the architecture docs — so the salvage pass
   is not optional politeness, it is the precondition for cutting a line.
+- The trailing clause is introduced by a **semicolon**, not an em dash. Nothing mechanical depends on
+  the choice; it is a house-style preference, and the gate measures length only.
 - The rule now lives in three places that must agree: process doc §2.2 rule 3, the roadmap's own
   conventions section, and `template/doc/knowledge_base/roadmap.md`. No mechanical check ties them
   together — `command-drift-check.sh` only covers `.claude/commands/` — so that consistency is
@@ -80,6 +91,7 @@ reconcile.
   would have been a second script and an eighteenth gate for no additional coverage.
 - Counting characters portably turned out to be the one real subtlety: `awk`'s `length()` is
   byte-based in mawk and character-based in gawk under a UTF-8 locale, so the naive check would have
-  given different verdicts on different contributors' machines — and an em dash, which the
-  convention mandates, would silently have cost 3 of the 200 on one of them. The gate runs under
-  `LC_ALL=C` and strips UTF-8 continuation bytes before measuring.
+  given different verdicts on different contributors' machines, and the items are full of
+  multibyte punctuation (`§` in process-doc references, `→` and `≠` in the Phase 10 entries) that
+  would silently have cost 3 of the 200 on one of them. The gate runs under `LC_ALL=C` and strips
+  UTF-8 continuation bytes before measuring.

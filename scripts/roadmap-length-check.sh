@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roadmap item length: the 200-character cap on doc/knowledge_base/roadmap.md.
+# Roadmap item length: the 200-character cap on the repo's and the template's roadmaps.
 #
 # The roadmap is simultaneously a plan, a progress log, and a context document that every
 # CDD session loads, so an over-long item costs context on every future run. The bar has
@@ -8,8 +8,8 @@
 # convention shipped its own escape clause grandfathering existing violations, so 46 of 94
 # items had drifted past 200 characters, the worst of them to 3,872. This gate is what
 # replaces that escape clause: the cap is now mechanical, and it applies to pending items
-# as much as to completed ones. Detail that no longer fits goes to a GitHub issue, an ADR
-# with Status: Proposed, or the handoff — see ADR 0005.
+# as much as to completed ones. Detail that no longer fits goes to a GitHub issue or the
+# handoff — see ADR 0005.
 #
 # The cap is 200 **raw characters of the whole line**, "- [x] " prefix included. Raw and
 # whole-line was chosen over any cleverer measure (rendered width, backticks excluded,
@@ -22,16 +22,19 @@
 # Characters, not bytes, and the same answer on every host. `awk`'s length() is byte-based
 # in mawk (Debian's default, not multibyte-aware) and character-based in gawk under a UTF-8
 # locale, so the naive check would give two different verdicts on two contributors' machines
-# — and an em dash, which the convention actually mandates, would silently cost 3 of the 200
-# on one of them. So the scan runs under LC_ALL=C and strips UTF-8 continuation bytes
-# (0x80-0xBF) before measuring: one byte survives per character, on any awk, in any locale.
-# The self-check below pins that with a deliberately em-dash-heavy fixture.
+# — and the items are full of multibyte punctuation that would silently cost 3 of the 200 on
+# one of them (a section sign in "process doc §2.13", the arrows and the "≠" in the phase-10
+# entries). So the scan runs under LC_ALL=C and strips UTF-8 continuation bytes (0x80-0xBF)
+# before measuring: one byte survives per character, on any awk, in any locale. The
+# self-check below pins that with a deliberately multibyte-heavy fixture.
 #
-# Scope is doc/knowledge_base/roadmap.md **only**, deliberately. The template's roadmap
-# (template/doc/knowledge_base/roadmap.md) and the demo seed's are instructional prose
-# written to be read by a human bootstrapping a project, not progress log lines, and are
-# legitimately longer. Widening this gate to them would be a different decision, not a
-# generalization of this one.
+# Scope is the two **maintained** roadmaps: this repo's own and the skeleton the template
+# ships (template/doc/knowledge_base/roadmap.md), whose pre-filled Phase 1 items are
+# inherited verbatim by every bootstrapped project — so letting those bloat would ship the
+# problem downstream, and a project that never reads the convention still starts from items
+# that obey it. Detail trimmed out of a template item belongs in the phase intro, which is
+# prose and uncapped. demo/seed/'s roadmap is deliberately excluded: it is filled-in content
+# for a throwaway demo instance, not an artifact anyone maintains.
 #
 # A line "shaped like an item" is held to the cap wherever it appears, including the
 # example inside the conventions section's fenced block. That is intentional: an example
@@ -43,7 +46,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-ROADMAP="doc/knowledge_base/roadmap.md"
+ROADMAPS=(
+  "doc/knowledge_base/roadmap.md"
+  "template/doc/knowledge_base/roadmap.md"
+)
 CAP=200
 
 # Reads a roadmap on stdin, prints "<line-no>:<length>" for every checkbox item over the
@@ -83,18 +89,23 @@ self_check() {
 
 self_check
 
-[[ -f "$ROADMAP" ]] || { echo "roadmap-length check: $ROADMAP not found" >&2; exit 1; }
-
 fail=0
-while IFS=: read -r lineno len; do
-  echo "  $ROADMAP:$lineno — $len chars (cap $CAP, over by $((len - CAP)))" >&2
-  fail=1
-done < <(violations < "$ROADMAP")
+for roadmap in "${ROADMAPS[@]}"; do
+  if [[ ! -f "$roadmap" ]]; then
+    echo "roadmap-length check: $roadmap not found" >&2
+    fail=1
+    continue
+  fi
+  while IFS=: read -r lineno len; do
+    echo "  $roadmap:$lineno — $len chars (cap $CAP, over by $((len - CAP)))" >&2
+    fail=1
+  done < <(violations < "$roadmap")
+done
 
 if [[ "$fail" -ne 0 ]]; then
   echo "roadmap-length check: FAILED — items over the $CAP-character cap (see above)." >&2
   echo "  Trim to a PR-title description plus at most one short trailing clause." >&2
-  echo "  Detail belongs in a GitHub issue, a Status: Proposed ADR, or the handoff (ADR 0005)." >&2
+  echo "  Detail belongs in a GitHub issue or the handoff (ADR 0005)." >&2
   exit 1
 fi
 
