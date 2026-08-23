@@ -64,12 +64,20 @@ Use this section to record principles that apply across phases. Examples:
 
 ## Annotation conventions
 
+**Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after an em dash. The cap is the whole line, `- [x] ` prefix included. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else. A one-line length check in this project's check runner keeps it honest, since a cap nobody measures drifts back.
+
 The default is no annotation. Tick the box and stop.
 
-Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in an ADR, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change.
-
-A completed item reads like a PR title or barely more. If you do annotate, keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
+Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in an ADR, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change. Keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
 
 ```
 - [x] <Task description> — <one short clause: deferred X / caveat Y / out-of-scope Z>
 ```
+
+Detail that does not fit has a home, and it is never this file:
+
+- a **GitHub issue**, referenced by number on the roadmap line — `/cdd-next-step #NN` sources a task straight from it, and issues are already the inbox feeding this roadmap;
+- an **ADR with `Status: Proposed`** when the detail *is* a design decision, so the alternatives are recorded before the work starts;
+- the **handoff file**, for detail the implementation session needs and nobody afterwards does.
+
+Cite an ADR by number (`ADR 0002`), not by a full relative link: the link target alone can eat a third of the budget, and `doc/architecture/index.md` lists them all. Do not add a separate backlog or notes document — a second list of pending work is a second thing to keep in sync, and this roadmap is the source of truth.

@@ -62,6 +62,7 @@ GATES=(
   "drift||command-set drift: repo commands vs the rendered template"
   "seams||prompt-seam contracts between the repo's own prompts"
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
+  "roadmap-length||roadmap item length: the 200-char cap"
   "install-smoke||worktree/state helper install, against a throwaway HOME"
   "worktree-resume||worktree resume on an existing remote branch"
   "ref-sync|jq|refs/cdd/<branch> handoff + state round-trip"
@@ -114,6 +115,10 @@ gate_seams() {
 
 gate_seams_contract() {
   ./scripts/prompt-seam-assert.sh
+}
+
+gate_roadmap_length() {
+  ./scripts/roadmap-length-check.sh
 }
 
 gate_install_smoke() {

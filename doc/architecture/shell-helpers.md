@@ -29,7 +29,7 @@ The rc `source` line only reaches interactive shells (`~/.bashrc` returns early 
 
 Nothing project-specific is configured or copied per project: the repo name (the handoff-directory namespace) is derived from the worktree's git common directory, and the default branch from `origin`'s HEAD (`git symbolic-ref refs/remotes/origin/HEAD`), falling back to `main`. The remote is assumed to be named `origin`; that assumption is documented in `template/BOOTSTRAP.md`.
 
-The default branch is the *fallback* base for a task, not always its actual base. Each task records its own base branch (§ below); `cdd-worktree` cuts the new branch from that base and the resume-side commands target it, both falling back to the runtime-derived default branch when a task recorded none.
+The default branch is the *fallback* base for a task, not always its actual base. Each task records its own base branch (§ below); `cdd-worktree` cuts the new branch from that base and the resume-side commands target it, both falling back to the runtime-derived default branch when a task recorded none. A project-wide base-branch config was rejected: the base is per-task, not per-project — gitflow projects cut a release branch from `develop` while daily work also branches off `develop`, and stacked branches make each part's base its own parent. Recording it per task covers all of those with zero new configuration; a single project-wide setting covers none of them.
 
 ## State-record writes (`cdd-state`)
 
