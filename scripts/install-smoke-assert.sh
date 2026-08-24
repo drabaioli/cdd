@@ -12,12 +12,18 @@
 #     case that motivates the shims: Claude Code's Bash tool never sources ~/.bashrc)
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
 #   - a second run is idempotent (no duplicate marker block, no second copy)
+#   - cdd-worktree and cdd-worktree-resume reject an option-shaped branch name (exit 2,
+#     nothing created) and treat --help as usage (exit 0) — the guard whose absence had
+#     `cdd-worktree --help` cutting a branch and a worktree literally called "--help"
 #
 # It also runs `tools/cdd-state.sh install` and asserts the same shim contract
-# for the `cdd-state` command, since that helper self-installs identically, plus two
-# properties of `cdd-state seed`: the recorded handoff session, and the per-repo
-# marker repo.json — whose `path` must be the MAIN worktree, not the worktree the
-# writer ran in.
+# for the `cdd-state` command, since that helper self-installs identically, plus three
+# properties of `cdd-state seed`: the recorded handoff session, the synced task ref
+# refs/cdd/<branch>, and the per-repo marker repo.json — whose `path` must be the MAIN
+# worktree, not the worktree the writer ran in.
+#
+# The gate is offline and free of side effects: the seed's ref sync pushes to `origin`, so
+# the push is redirected at a throwaway bare repo. See the comment at that point for why.
 #
 # Usage: scripts/install-smoke-assert.sh
 # Takes no arguments; it provisions and tears down its own temp HOME.
@@ -46,6 +52,13 @@ comment_block() {
 
 [[ -x "$HELPER" ]] || fail "helper not found/executable: $HELPER"
 [[ -x "$STATE_HELPER" ]] || fail "state helper not found/executable: $STATE_HELPER"
+
+# A truncated helper passes the -x test above (truncation preserves the mode bit) and then
+# installs a 0-byte file, which surfaces a dozen lines down as the misleading "helper not
+# copied". Parse both first, so a torn file -- a concurrent write, an interrupted editor --
+# says what it is instead of sending the reader after a copy bug that isn't there.
+bash -n "$HELPER" || fail "helper does not parse: $HELPER (truncated by a concurrent write?)"
+bash -n "$STATE_HELPER" || fail "state helper does not parse: $STATE_HELPER (truncated?)"
 
 FAKE_HOME="$(mktemp -d)"
 trap 'rm -rf "$FAKE_HOME"' EXIT
@@ -82,26 +95,92 @@ for cmd in cdd-worktree cdd-worktree-resume cdd-worktree-list cdd-worktree-done;
 done
 pass "cdd-worktree* PATH shims written to ~/.local/bin and executable"
 
-# The shim must actually resolve and dispatch from a non-interactive shell with
-# only ~/.local/bin on PATH and no rc sourced — the exact case it exists for.
-# `cdd-worktree-list` is side-effect-free AND changes no cwd, so it keeps a real
-# source+dispatch shim; use it as the probe.
+# The shim must resolve and dispatch from a non-interactive shell with only ~/.local/bin on
+# PATH and no rc sourced — the case it exists for. `cdd-worktree-list` is side-effect-free
+# and changes no cwd, so it keeps a real source+dispatch shim; use it as the probe.
+#
+# `--norc --noprofile </dev/null` is load-bearing. `env -i` clears the environment but bash
+# still reads `$HOME/.bashrc` for a *non-interactive* shell whenever it decides stdin is a
+# network connection (its remote-shell heuristic). `$FAKE_HOME/.bashrc` is the file `install`
+# just wrote, which sources the helper — so every cdd-* name becomes a shell function and the
+# probes below stop testing shims. Redirecting stdin defeats the heuristic; --norc makes it
+# unconditional. Both, so neither is load-bearing alone.
+NOSHELLRC=(bash --norc --noprofile)
+
+# Pin the no-rc property itself: drop --norc or the stdin redirect and every probe below goes
+# green again, passing for the reason it exists to rule out. In the probe shell a cdd-* name
+# must resolve to a FILE (the shim), never to a function.
+rc_leak="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+  "${NOSHELLRC[@]}" -c 'type -t cdd-worktree-list' </dev/null 2>&1)"
+[[ "$rc_leak" == "file" ]] \
+  || fail "probe shell sourced a shell rc: cdd-worktree-list is a '$rc_leak', not the PATH shim"
+pass "probe shell sources no rc (shim names resolve to files, not functions)"
+
 env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
-  bash -c 'command -v cdd-worktree-list >/dev/null && cdd-worktree-list >/dev/null 2>&1' \
+  "${NOSHELLRC[@]}" -c 'command -v cdd-worktree-list >/dev/null && cdd-worktree-list >/dev/null 2>&1' \
+  </dev/null \
   || fail "cdd-worktree-list shim did not resolve/dispatch in a non-interactive shell"
 pass "cdd-worktree-list shim resolves and dispatches non-interactively"
 
-# The cwd-changing commands (cdd-worktree, cdd-worktree-resume, cdd-worktree-done)
-# must FAIL LOUDLY via the shim rather than dispatch into a subshell whose `cd`
-# can't reach the caller — the regression that stranded the user in the removed
-# worktree. Probe cdd-worktree-done (the regression subject): the shim exits
-# before sourcing anything, so no git state is needed.
+# The cwd-changing commands (cdd-worktree, cdd-worktree-resume, cdd-worktree-done) must FAIL
+# LOUDLY via the shim rather than dispatch into a subshell whose `cd` can't reach the caller.
+# Probe cdd-worktree-done: its shim exits before sourcing anything, so no git state is needed.
+# Same no-rc requirement as above, or the probe reaches the real function instead.
 done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
-  bash -c 'cdd-worktree-done' 2>&1)" && \
+  "${NOSHELLRC[@]}" -c 'cdd-worktree-done' </dev/null 2>&1)" && \
   fail "cdd-worktree-done shim succeeded silently (should refuse when unsourced)"
 grep -qF "must run as a sourced shell function" <<<"$done_out" \
   || fail "cdd-worktree-done shim did not print the sourced-function guidance; got: $done_out"
 pass "cwd-changing shim (cdd-worktree-done) fails loudly instead of silently no-op'ing the cd"
+
+# The worktree commands reject option-shaped arguments too, not just `cdd-state seed`
+# (asserted further down): without the guard, `cdd-worktree --help` took "--help" as the
+# branch and cut a branch and sibling worktree called that. Probed as sourced FUNCTIONS, since
+# the cwd-changing shims refuse before sourcing anything and would never reach the guard.
+#
+# Assert the pair (exit 2, the guard's own message): both commands have later refusals of
+# their own that also exit non-zero, so status alone would pass for the wrong reason. The
+# throwaway repo plus a handoff named for the bad argument makes "no branch, no sibling
+# directory" bite too — without the guard, cdd-worktree reaches branch creation.
+OPT_ROOT="$FAKE_HOME/optguard"
+mkdir -p "$OPT_ROOT/repo"
+git init -q "$OPT_ROOT/repo"
+mkdir -p "$FAKE_HOME/.cdd/handoffs/repo"
+: > "$FAKE_HOME/.cdd/handoffs/repo/--bogus.md"
+
+# Runs the sourced $cmd with $arg in the throwaway repo and echoes its output plus a
+# trailing "STATUS:<exit>". The rejected exit code travels in that line rather than in the
+# function's own status, so nothing here trips `set -e`: `bash -c` ends on the echo.
+probe_opt_guard() {  # probe_opt_guard <cmd> <arg>
+  local cmd="$1" arg="$2"
+  ( cd "$OPT_ROOT/repo" || exit 1
+    # shellcheck disable=SC2016  # $1 is a `bash -c` positional parameter, not ours
+    HOME="$FAKE_HOME" "${NOSHELLRC[@]}" -c \
+      'source "$1"; '"$cmd"' '"$arg"'; echo "STATUS:$?"' _ "$HELPER" </dev/null 2>&1 )
+}
+
+for cmd in cdd-worktree cdd-worktree-resume; do
+  opt_out="$(probe_opt_guard "$cmd" --bogus)"
+  grep -qF "$cmd: '--bogus' looks like an option, not a branch name." <<<"$opt_out" \
+    || fail "$cmd '--bogus' did not print the option guard; got: $opt_out"
+  grep -qF "STATUS:2" <<<"$opt_out" \
+    || fail "$cmd '--bogus' did not exit 2; got: $opt_out"
+
+  # `--help` is the same shape but a legitimate request: usage, exit 0, still no branch.
+  help_out="$(probe_opt_guard "$cmd" --help)"
+  grep -qF "usage: $cmd" <<<"$help_out" \
+    || fail "$cmd --help did not print usage; got: $help_out"
+  grep -qF "STATUS:0" <<<"$help_out" \
+    || fail "$cmd --help did not exit 0; got: $help_out"
+done
+
+for bad_arg in --bogus --help; do
+  git -C "$OPT_ROOT/repo" rev-parse --verify -q "refs/heads/$bad_arg" >/dev/null \
+    && fail "an option-shaped argument ('$bad_arg') was cut as a branch"
+  [[ ! -e "$OPT_ROOT/repo$bad_arg" && ! -e "$OPT_ROOT/$bad_arg" ]] \
+    || fail "an option-shaped argument ('$bad_arg') created a worktree directory"
+done
+pass "cdd-worktree/-resume reject an option-shaped branch (exit 2) and honour --help (exit 0)"
 
 [[ -f "$FAKE_HOME/.cdd/handoffs/someproj/feature_x.md" ]] \
   || fail "legacy handoff not migrated to ~/.cdd/handoffs/"
@@ -139,7 +218,7 @@ STATE_SHIM="$FAKE_HOME/.local/bin/cdd-state"
 # Resolution under a non-interactive, PATH-only shell is the property that keeps
 # `cdd-state set …` from silently no-oping when Claude Code's Bash tool runs it.
 resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
-  bash -c 'command -v cdd-state') \
+  "${NOSHELLRC[@]}" -c 'command -v cdd-state' </dev/null) \
   || fail "cdd-state shim did not resolve in a non-interactive shell"
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
 pass "cdd-state PATH shim written and resolves non-interactively"
@@ -171,10 +250,27 @@ if command -v jq >/dev/null 2>&1; then
   REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
   EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
+
+  # `cdd-state seed` pushes refs/cdd/<branch> to `origin` — the repo's REAL remote, so this
+  # gate used to make live SSH round-trips and force-publish a test fixture to GitHub on every
+  # run. Point it at a throwaway bare repo instead: offline, deterministic, no side effects.
+  # Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
+  # helper's own `git push --force origin ...` is untouched, so the real path still runs.
+  # GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
+  FAKE_ORIGIN="$FAKE_HOME/origin.git"
+  git init -q --bare "$FAKE_ORIGIN"
+  PUSH_TO_FAKE=(
+    GIT_CONFIG_COUNT=1
+    GIT_CONFIG_KEY_0=remote.origin.pushurl
+    GIT_CONFIG_VALUE_0="$FAKE_ORIGIN"
+  )
   # The helper is dual-mode: executed directly it only installs, so source it and
   # call the function (the same path the PATH shim takes) to reach `seed`.
+  # SC2016: the single quotes are deliberate -- $1/$2 are `bash -c` positional parameters,
+  # bound from the trailing arguments, not variables to expand here.
+  # shellcheck disable=SC2016
   ( cd "$REPO_ROOT" \
-    && HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 \
+    && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 "${PUSH_TO_FAKE[@]}" \
        bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
   [[ -f "$SEED_FILE" ]] || fail "seed did not write $SEED_FILE"
   got="$(jq -r '.sessions[0] | "\(.id)|\(.stage)|\(.dir)"' "$SEED_FILE")"
@@ -182,13 +278,39 @@ if command -v jq >/dev/null 2>&1; then
     || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
   pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
 
+  # The push is now observable, so assert it instead of leaving it an unchecked side effect.
+  git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$SEED_BRANCH" >/dev/null \
+    || fail "seed did not sync refs/cdd/$SEED_BRANCH to origin"
+  pass "cdd-state seed syncs the task ref to origin (a throwaway one: no network, no side effects)"
+
   # Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
+  # shellcheck disable=SC2016  # as above: `bash -c` positional parameters
   ( cd "$REPO_ROOT" \
-    && HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' \
+    && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' "${PUSH_TO_FAKE[@]}" \
        bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
   count="$(jq -r '.sessions | length' "$SEED_FILE")"
   [[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
   pass "cdd-state seed omits the session entry when no session id is set"
+
+  # An option-shaped branch is rejected before anything is written or pushed. `cdd-state
+  # seed --help` used to take "--help" as the branch, write --help.state.json, and
+  # force-push refs/cdd/--help to the REAL origin -- which is how one appeared on the
+  # shared repo. Assert both halves: no record, and no ref in the throwaway origin.
+  for bad_arg in --help --bogus; do
+    # `|| true`: a rejected argument exits non-zero by design, and this script runs under
+    # `set -e`. What is asserted is the absence of effects, not the exit status.
+    # shellcheck disable=SC2016  # $1/$2 are `bash -c` positional parameters
+    ( cd "$REPO_ROOT" \
+      && env HOME="$FAKE_HOME" "${PUSH_TO_FAKE[@]}" \
+         "${NOSHELLRC[@]}" -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$bad_arg" \
+         </dev/null >/dev/null 2>&1 ) || true
+    [[ ! -f "$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$bad_arg.state.json" ]] \
+      || fail "cdd-state seed '$bad_arg' wrote a state record for an option-shaped branch"
+    if git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$bad_arg" >/dev/null; then
+      fail "cdd-state seed '$bad_arg' pushed refs/cdd/$bad_arg"
+    fi
+  done
+  pass "cdd-state seed rejects an option-shaped branch without writing or pushing"
 
   # The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
   # writer ran in. This assertion only bites when the two differ — i.e. whenever the

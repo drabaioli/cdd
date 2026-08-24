@@ -28,6 +28,12 @@
 #   - Not fail-fast: every gate runs, and the exit status is non-zero if any
 #     FAILed. One run surfaces every problem. The gates are independent, so
 #     nothing cascades.
+#   - Gate isolation is part of that independence, not a side effect: each gate
+#     runs in a subshell (it is teed to a per-gate log), so a gate cannot pass a
+#     shell variable to a later gate or leave the runner in a different
+#     directory. Do not write a gate that relies on either. ci-runner-assert.sh
+#     asserts this, so replacing the pipeline with a form that runs gates in the
+#     current shell fails the `runner` gate rather than silently changing it.
 #   - The lint gates glob tools/, scripts/, and demo/, so every script — including
 #     this one — is inside its own syntax and shellcheck scope, and a newly added
 #     script is covered without touching this file.
@@ -62,6 +68,7 @@ GATES=(
   "drift||command-set drift: repo commands vs the rendered template"
   "seams||prompt-seam contracts between the repo's own prompts"
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
+  "roadmap-length||roadmap item length: the 200-char cap"
   "install-smoke||worktree/state helper install, against a throwaway HOME"
   "worktree-resume||worktree resume on an existing remote branch"
   "ref-sync|jq|refs/cdd/<branch> handoff + state round-trip"
@@ -114,6 +121,10 @@ gate_seams() {
 
 gate_seams_contract() {
   ./scripts/prompt-seam-assert.sh
+}
+
+gate_roadmap_length() {
+  ./scripts/roadmap-length-check.sh
 }
 
 gate_install_smoke() {
@@ -319,9 +330,10 @@ group_end() {
 
 run_gates() {  # run_gates <slug>...
   local total=$#
-  local slug needs desc started elapsed status
+  local slug needs desc started elapsed status log
   local -a summary=()
   local -a skipped=()
+  local -a failed_logs=()
   local passed=0 failed=0
 
   for slug in "$@"; do
@@ -337,8 +349,14 @@ run_gates() {  # run_gates <slug>...
 
     group_begin "$slug" "$desc"
     started="$SECONDS"
-    "$(fn_for_slug "$slug")"
-    status=$?
+    # Tee each gate to its own log as well as to the terminal. Live output alone is not
+    # enough: a gate that fails once and then passes leaves nothing behind to read, and
+    # a caller who piped this run through `tail` has already discarded the only copy —
+    # which is exactly how one intermittent failure here had to be reverse-engineered
+    # from a duration. PIPESTATUS[0] keeps the gate's own status; tee's is irrelevant.
+    log="$TMP/gate-$slug.log"
+    "$(fn_for_slug "$slug")" 2>&1 | tee "$log"
+    status=${PIPESTATUS[0]}
     elapsed=$((SECONDS - started))
     group_end
 
@@ -350,6 +368,7 @@ run_gates() {  # run_gates <slug>...
       echo "FAIL $slug (${elapsed}s, exit $status)"
       [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=$slug failed::$desc (exit $status)"
       summary+=("$(printf '  %-4s  %-20s  %s' FAIL "$slug" "exit $status, ${elapsed}s")")
+      failed_logs+=("$slug")
       failed=$((failed + 1))
     fi
   done
@@ -362,6 +381,19 @@ run_gates() {  # run_gates <slug>...
   local line="$total gate(s): $passed passed, $failed failed, ${#skipped[@]} skipped"
   [[ ${#skipped[@]} -gt 0 ]] && line+=" — SKIPPED: ${skipped[*]}"
   echo "$line"
+
+  # Repeat each failure's tail after the summary, so a failed run is legible without
+  # scrolling back past every passing gate — and so a caller that keeps only the last
+  # lines of this run still keeps the evidence. Set CDD_CI_TMPDIR to retain the full logs.
+  if [[ ${#failed_logs[@]} -gt 0 ]]; then
+    for slug in "${failed_logs[@]}"; do
+      echo
+      echo "--- $slug: last 20 lines (full log: $TMP/gate-$slug.log)"
+      tail -n 20 "$TMP/gate-$slug.log" | sed 's/^/  /'
+    done
+    [[ -z "${CDD_CI_TMPDIR:-}" ]] && echo && \
+      echo "note: gate logs live in a temp dir removed on exit; set CDD_CI_TMPDIR to keep them."
+  fi
 
   [[ $failed -eq 0 ]]
 }

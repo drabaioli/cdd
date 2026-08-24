@@ -12,10 +12,12 @@ Get the CDD substrate to reflect reality: survey what exists, write the initial 
 - A `future-work.md` / TODO / backlog doc → this roadmap.
 - An oversized `CLAUDE.md` duplicating command/troubleshooting content → slim to pointers (it costs context every session).
 
-- [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted. For a greenfield project, write architecture guidelines and intentions instead. Where architecture notes already exist (a README, design docs), fold them in rather than starting from scratch.
-- [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability. Likely empty for a greenfield project. Where features are already documented elsewhere, adopt and reconcile that content here.
-- [ ] Fill in the project charter at `doc/knowledge_base/project-overview.md` (what it is, goals, non-goals, constraints, architecture intentions) and the `CLAUDE.md` stubs (project description, critical constraints, build/test commands, module layout).
-- [ ] Fill in the engineering-practices contract (`doc/knowledge_base/engineering-practices.md`): mark each practice *enforced* or *expected* for this project, and fill the command placeholders for the ones that already exist.
+On a greenfield project, write architecture guidelines and intentions rather than a survey, and expect `doc/features/` to start out empty. On an existing project, fold in what is already written — a README, design docs, feature notes — rather than starting from scratch.
+
+- [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted.
+- [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability.
+- [ ] Fill in the project charter (`doc/knowledge_base/project-overview.md`) and the `CLAUDE.md` stubs: what the project is, goals, non-goals, constraints, build/test commands, module layout.
+- [ ] Fill in the engineering-practices contract (`doc/knowledge_base/engineering-practices.md`): mark each practice *enforced* or *expected*, and fill the command placeholders that apply.
 - [ ] Fill in this roadmap: replace the placeholder phases below with the project's real plan, slotting in items from "Suggested infrastructure tasks" where they fit.
 
 **Milestone: the docs describe the project as it actually is, and the roadmap below is a real plan.**
@@ -64,12 +66,21 @@ Use this section to record principles that apply across phases. Examples:
 
 ## Annotation conventions
 
+**Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else. A cap nobody measures drifts back, so add a one-line length check to this project's check runner once it has one.
+
 The default is no annotation. Tick the box and stop.
 
-Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in an ADR, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change.
-
-A completed item reads like a PR title or barely more. If you do annotate, keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
+Only add an inline annotation when a future session needs information that none of the other artifacts will carry — i.e. *not* in the commit, *not* in the PR description, *not* in an ADR, *not* in the process / architecture / feature docs (which you should be updating as part of the same change). Typical cases: a deferred sub-item, a surprising caveat, a scope change. Keep it to a single short clause. Do not restate what the task did or how it was implemented; that information already lives where readers will look for it.
 
 ```
-- [x] <Task description> — <one short clause: deferred X / caveat Y / out-of-scope Z>
+- [x] <Task description>; <one short clause: deferred X / caveat Y / out-of-scope Z>
 ```
+
+Detail that does not fit has a home, and it is never this file:
+
+- a **GitHub issue**, referenced by number on the roadmap line — `/cdd-next-step #NN` sources a task straight from it, and issues are already the inbox feeding this roadmap;
+- the **handoff file**, for detail the implementation session needs and nobody afterwards does.
+
+When a task hinges on a design decision, the ADR is written when the decision is *taken*; the issue carries the thinking until then. ADRs record decisions, not pending scope.
+
+Cite an ADR by number (`ADR 0002`), not by a full relative link: the link target alone can eat a third of the budget, and `doc/architecture/index.md` lists them all. Do not add a separate backlog or notes document — a second list of pending work is a second thing to keep in sync, and this roadmap is the source of truth.

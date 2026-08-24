@@ -88,6 +88,14 @@ cdd-worktree() {
     echo "usage: cdd-worktree <branch>" >&2
     return 1
   fi
+  # An option-shaped argument is never a branch name, and these commands take the branch
+  # positionally with no flags in front of it. Without this guard `cdd-worktree --help`
+  # took "--help" AS the branch and went on to cut a branch and a worktree called that;
+  # the sibling state helper did the same and force-pushed refs/cdd/--help to origin.
+  case "$branch" in
+    -h|--help) echo "usage: cdd-worktree <branch>" >&2; return 0 ;;
+    -*) echo "cdd-worktree: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
+  esac
 
   # The sibling worktree name is derived from $PWD; run from a feature worktree
   # this would nest names, so insist on the main worktree. git-dir == git-common-dir
@@ -501,6 +509,11 @@ cdd-worktree-materialize-ref() {
 # gh, not the handoff, so its absence is still fine.
 cdd-worktree-resume() {
   local branch="${1:-}"
+  # No argument is the discovery mode, so only option-shaped input is rejected here.
+  case "$branch" in
+    -h|--help) echo "usage: cdd-worktree-resume [<branch>]" >&2; return 0 ;;
+    -?*) echo "cdd-worktree-resume: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
+  esac
 
   # Same guard as cdd-worktree: the sibling worktree name is derived from $PWD, so
   # insist on the main worktree to avoid nesting names.

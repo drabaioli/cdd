@@ -46,7 +46,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 
 `scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14) — the gate registry at the top of the script is the list, and there is no second copy. `.github/workflows/template-smoke.yml` holds no gate list at all: it checks out and calls the runner, so CI and a local run cannot drift. `/cdd-pre-pr` invokes the same command, so a green local run means a green CI run.
 
-The 16 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` vs the rendered template), `seams` (prompt-seam contracts) and `seams-contract` (the seam checker's own contract, mutation-tested); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `base-branch`; the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
+The 17 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` vs the rendered template), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `base-branch`; the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
 
 Two behaviours worth knowing: a gate whose tool is missing (`shellcheck`, `jq`) is reported **SKIPPED — loudly and non-fatally**, so a host without it gets a weaker verdict, not a wrong one; and the run is **not fail-fast**, so one invocation surfaces every problem. The runner provisions its own scratch dir and a throwaway git identity, so it needs no host setup and is unaffected by your git signing config.
 
@@ -67,7 +67,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check (with whitelists) |
+| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists) |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) |
