@@ -22,6 +22,10 @@
 #      must not run on into the section comments further down the file — nor break
 #      when invoked by a relative path from elsewhere, since it cd's to the repo
 #      root before reading itself back.
+#   7. Gates are isolated: a gate cannot leak a shell variable or a cd into a
+#      later gate. They are declared independent, and the runner enforces that by
+#      running each in a subshell — asserted so the enforcement is a property of
+#      the contract rather than an accident of how the per-gate logs are teed.
 #
 # Sets CDD_CI_SELFTEST so the runner's own `runner` gate does not re-enter this
 # script when the full suite runs.
@@ -112,7 +116,8 @@ pass "workflow delegates to $RUNNER and holds no gate list"
 # obvious, refused if it already exists, and removed by the trap either way.
 PROBE="scripts/zz-ci-runner-assert-probe.sh"
 [[ -e "$PROBE" ]] && fail "probe path already exists, refusing to overwrite: $PROBE"
-trap 'rm -rf "$STUB_HOME"; rm -f "$PROBE"' EXIT
+ISO_PROBE="scripts/zz-ci-runner-assert-iso.sh"
+trap 'rm -rf "$STUB_HOME"; rm -f "$PROBE" "$ISO_PROBE"' EXIT
 
 # Sorts last in scripts/*.sh, so only a gate that checks every file will see it.
 printf '#!/usr/bin/env bash\nif true; then\n' > "$PROBE"
@@ -140,5 +145,40 @@ rel_out="$(cd "$(dirname "$REPO_ROOT")" && "./$(basename "$REPO_ROOT")/$RUNNER" 
 grep -q '^Usage:' <<<"$rel_out" \
   || fail "$RUNNER -h via a relative path from another cwd printed no header: $rel_out"
 pass "-h prints the header block and stops there, from any cwd"
+
+# --- 7. A gate cannot leak shell state into the runner or a later gate --------
+# Gates are declared independent ("nothing cascades"), and the runner enforces that by
+# running each one in a pipeline subshell -- a side effect of teeing to a per-gate log,
+# which would be a silent trap if it were only a side effect: a gate that set a variable
+# for a later gate, or cd'd somewhere the runner then depended on, would fail in a way no
+# test would catch. So the isolation is asserted here, which turns an accident of the
+# implementation into a property of the contract. If someone later replaces the pipeline
+# with a form that runs gates in the current shell, this fails and says why.
+#
+# Behavioural, not a grep for `| tee`: what matters is the isolation, not how it is
+# achieved. A copy of the runner carries two injected gates -- the first dirties the shell
+# (sets a variable, changes directory), the second reports what it can see. The copy lives
+# in scripts/ because the runner resolves REPO_ROOT from its own path and cd's there.
+[[ -e "$ISO_PROBE" ]] && fail "probe path already exists, refusing to overwrite: $ISO_PROBE"
+awk -f - "$RUNNER" > "$ISO_PROBE" <<'INJECT'
+/^main "\$@"$/ {
+  print "gate_iso_a() { ISO_LEAK=leaked; cd / || return 1; }"
+  print "gate_iso_b() { echo \"ISO_VAR:${ISO_LEAK:-unset}\"; echo \"ISO_CWD:$PWD\"; }"
+  print ""
+}
+{ print }
+/^GATES=\($/ {
+  print "  \"iso-a||probe: dirty the shell\""
+  print "  \"iso-b||probe: report what leaked\""
+}
+INJECT
+chmod +x "$ISO_PROBE"
+iso_out="$("./$ISO_PROBE" iso-a iso-b 2>&1)"
+grep -qF "ISO_VAR:unset" <<<"$iso_out" \
+  || fail "a gate's shell variable leaked into the next gate (gates must be isolated); got: $iso_out"
+grep -qF "ISO_CWD:$REPO_ROOT" <<<"$iso_out" \
+  || fail "a gate's cd leaked into the next gate, which must start at the repo root; got: $iso_out"
+rm -f "$ISO_PROBE"
+pass "a gate cannot leak a variable or a cd into a later gate"
 
 echo "ci runner contract: clean"

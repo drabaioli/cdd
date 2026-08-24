@@ -28,6 +28,12 @@
 #   - Not fail-fast: every gate runs, and the exit status is non-zero if any
 #     FAILed. One run surfaces every problem. The gates are independent, so
 #     nothing cascades.
+#   - Gate isolation is part of that independence, not a side effect: each gate
+#     runs in a subshell (it is teed to a per-gate log), so a gate cannot pass a
+#     shell variable to a later gate or leave the runner in a different
+#     directory. Do not write a gate that relies on either. ci-runner-assert.sh
+#     asserts this, so replacing the pipeline with a form that runs gates in the
+#     current shell fails the `runner` gate rather than silently changing it.
 #   - The lint gates glob tools/, scripts/, and demo/, so every script — including
 #     this one — is inside its own syntax and shellcheck scope, and a newly added
 #     script is covered without touching this file.
