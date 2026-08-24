@@ -95,28 +95,21 @@ for cmd in cdd-worktree cdd-worktree-resume cdd-worktree-list cdd-worktree-done;
 done
 pass "cdd-worktree* PATH shims written to ~/.local/bin and executable"
 
-# The shim must actually resolve and dispatch from a non-interactive shell with
-# only ~/.local/bin on PATH and no rc sourced — the exact case it exists for.
-# `cdd-worktree-list` is side-effect-free AND changes no cwd, so it keeps a real
-# source+dispatch shim; use it as the probe.
+# The shim must resolve and dispatch from a non-interactive shell with only ~/.local/bin on
+# PATH and no rc sourced — the case it exists for. `cdd-worktree-list` is side-effect-free
+# and changes no cwd, so it keeps a real source+dispatch shim; use it as the probe.
 #
-# `--norc --noprofile </dev/null` is load-bearing, not belt-and-braces. `env -i` clears the
-# environment but does not stop bash from reading `$HOME/.bashrc`: bash also sources it for a
-# *non-interactive* shell whenever it decides stdin is a network connection (its remote-shell
-# heuristic, for rshd). Under a caller whose stdin is a socket — an agent harness, a CI
-# runner, an ssh command — that fires, and `$FAKE_HOME/.bashrc` is the file `install` wrote
-# one step earlier, whose whole content is `source ~/.cdd/tools/cdd-worktree.sh`. So every
-# cdd-* name below became a *shell function*, and these probes silently stopped testing the
-# shims: this one passed because the function ran, i.e. for exactly the reason it exists to
-# rule out, and the cdd-worktree-done probe below failed intermittently depending on the
-# caller's stdin. Redirecting stdin defeats the heuristic; --norc/--noprofile makes it
+# `--norc --noprofile </dev/null` is load-bearing. `env -i` clears the environment but bash
+# still reads `$HOME/.bashrc` for a *non-interactive* shell whenever it decides stdin is a
+# network connection (its remote-shell heuristic). `$FAKE_HOME/.bashrc` is the file `install`
+# just wrote, which sources the helper — so every cdd-* name becomes a shell function and the
+# probes below stop testing shims. Redirecting stdin defeats the heuristic; --norc makes it
 # unconditional. Both, so neither is load-bearing alone.
 NOSHELLRC=(bash --norc --noprofile)
 
-# Pin the no-rc property itself. Without this, a future edit that drops --norc or the stdin
-# redirect puts the functions back in scope and every probe below goes green again -- passing
-# for the reason it exists to rule out, which is how this went unnoticed. In the probe shell
-# a cdd-* name must resolve to a FILE (the shim), never to a function.
+# Pin the no-rc property itself: drop --norc or the stdin redirect and every probe below goes
+# green again, passing for the reason it exists to rule out. In the probe shell a cdd-* name
+# must resolve to a FILE (the shim), never to a function.
 rc_leak="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
   "${NOSHELLRC[@]}" -c 'type -t cdd-worktree-list' </dev/null 2>&1)"
 [[ "$rc_leak" == "file" ]] \
@@ -129,13 +122,10 @@ env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
   || fail "cdd-worktree-list shim did not resolve/dispatch in a non-interactive shell"
 pass "cdd-worktree-list shim resolves and dispatches non-interactively"
 
-# The cwd-changing commands (cdd-worktree, cdd-worktree-resume, cdd-worktree-done)
-# must FAIL LOUDLY via the shim rather than dispatch into a subshell whose `cd`
-# can't reach the caller — the regression that stranded the user in the removed
-# worktree. Probe cdd-worktree-done (the regression subject): the shim exits
-# before sourcing anything, so no git state is needed. Same no-rc requirement as above --
-# without it this probe reached the real function and reported whichever of its early
-# returns the ambient working tree happened to trigger.
+# The cwd-changing commands (cdd-worktree, cdd-worktree-resume, cdd-worktree-done) must FAIL
+# LOUDLY via the shim rather than dispatch into a subshell whose `cd` can't reach the caller.
+# Probe cdd-worktree-done: its shim exits before sourcing anything, so no git state is needed.
+# Same no-rc requirement as above, or the probe reaches the real function instead.
 done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
   "${NOSHELLRC[@]}" -c 'cdd-worktree-done' </dev/null 2>&1)" && \
   fail "cdd-worktree-done shim succeeded silently (should refuse when unsourced)"
@@ -143,19 +133,15 @@ grep -qF "must run as a sourced shell function" <<<"$done_out" \
   || fail "cdd-worktree-done shim did not print the sourced-function guidance; got: $done_out"
 pass "cwd-changing shim (cdd-worktree-done) fails loudly instead of silently no-op'ing the cd"
 
-# Option-shaped arguments are rejected by the worktree commands too, not just by
-# `cdd-state seed` (asserted further down). This is the half that bit: without the guard
-# `cdd-worktree --help` took "--help" AS the branch and went on to cut a branch and a
-# sibling worktree called that. Probed as sourced FUNCTIONS, not through the shims -- the
-# cwd-changing shims refuse before sourcing anything, so a shim probe would pass on the
-# refusal above and never reach the guard.
+# The worktree commands reject option-shaped arguments too, not just `cdd-state seed`
+# (asserted further down): without the guard, `cdd-worktree --help` took "--help" as the
+# branch and cut a branch and sibling worktree called that. Probed as sourced FUNCTIONS, since
+# the cwd-changing shims refuse before sourcing anything and would never reach the guard.
 #
-# The load-bearing assertion is the pair (exit 2, the guard's own message): both commands
-# have a later refusal of their own (not-the-main-worktree, wrong-branch) that would also
-# exit non-zero, so status alone would pass for the wrong reason. A throwaway repo plus a
-# handoff named for the bad argument makes the no-effect half bite as well: with the guard
-# removed, cdd-worktree gets past the main-worktree and handoff checks and reaches branch
-# creation, so "no branch, no sibling directory" is a real assertion rather than a tautology.
+# Assert the pair (exit 2, the guard's own message): both commands have later refusals of
+# their own that also exit non-zero, so status alone would pass for the wrong reason. The
+# throwaway repo plus a handoff named for the bad argument makes "no branch, no sibling
+# directory" bite too — without the guard, cdd-worktree reaches branch creation.
 OPT_ROOT="$FAKE_HOME/optguard"
 mkdir -p "$OPT_ROOT/repo"
 git init -q "$OPT_ROOT/repo"
@@ -265,16 +251,12 @@ if command -v jq >/dev/null 2>&1; then
   SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
   EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
 
-  # `cdd-state seed` syncs the task ref by pushing refs/cdd/<branch> to `origin`, and here
-  # `origin` is the repo's REAL remote. So this gate used to make two live SSH round-trips
-  # per run -- essentially its whole runtime, and its only source of nondeterminism -- and
-  # it force-published a test fixture, refs/cdd/issue51_seed_probe, to the shared GitHub
-  # repo on every CI run. A throwaway bare repo as the push target keeps the sync seam
-  # exercised while making the gate offline, deterministic, and free of side effects.
-  # Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever: the
-  # helper's own `git push --force origin ...` is untouched, so the real code path still
-  # runs. GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL, and nothing in ci.sh sets
-  # GIT_CONFIG_COUNT, so there is no caller value to clobber.
+  # `cdd-state seed` pushes refs/cdd/<branch> to `origin` — the repo's REAL remote, so this
+  # gate used to make live SSH round-trips and force-publish a test fixture to GitHub on every
+  # run. Point it at a throwaway bare repo instead: offline, deterministic, no side effects.
+  # Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
+  # helper's own `git push --force origin ...` is untouched, so the real path still runs.
+  # GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
   FAKE_ORIGIN="$FAKE_HOME/origin.git"
   git init -q --bare "$FAKE_ORIGIN"
   PUSH_TO_FAKE=(

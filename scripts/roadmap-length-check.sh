@@ -1,44 +1,27 @@
 #!/usr/bin/env bash
 # Roadmap item length: the 200-character cap, on every roadmap this repo ships.
 #
-# The roadmap is simultaneously a plan, a progress log, and a context document that every
-# CDD session loads, so an over-long item costs context on every future run. The bar has
-# always been "an item reads like a PR title or barely more" (process doc §2.2 rule 3, and
-# the roadmap's own "Annotation conventions" section), but it was convention-only — and the
-# convention shipped its own escape clause grandfathering existing violations, so 46 of 94
-# items had drifted past 200 characters, the worst of them to 3,872. This gate is what
-# replaces that escape clause: the cap is now mechanical, and it applies to pending items
-# as much as to completed ones. Detail that no longer fits goes to a GitHub issue or the
-# handoff — see ADR 0005.
+# The roadmap is loaded by every CDD session, so an over-long item costs context on every
+# future run. The bar ("an item reads like a PR title or barely more", process doc §2.2 rule 3)
+# was convention-only, and the convention shipped an escape clause grandfathering existing
+# violations — 46 of 94 items had drifted past 200 characters, the worst to 3,872. This gate
+# replaces that clause: mechanical, and applied to pending items as much as completed ones.
+# Detail that no longer fits goes to a GitHub issue or the handoff — see ADR 0005.
 #
-# The cap is 200 **raw characters of the whole line**, "- [x] " prefix included. Raw and
-# whole-line was chosen over any cleverer measure (rendered width, backticks excluded,
-# markdown link targets collapsed) because a cap is only useful if a session can apply it
-# without running the checker, and "the length of the line" is the one rule that needs no
-# explanation. Its one visible consequence is that a full relative ADR link can cost a
-# third of the budget, so the convention is to cite an ADR by number ("ADR 0002") and let
-# doc/architecture/index.md carry the links.
+# The cap is 200 **raw characters of the whole line**, "- [x] " prefix included: a cap is only
+# useful if a session can apply it without running the checker. Its visible consequence is that
+# a full relative ADR link costs a third of the budget, hence citing "ADR 0002" by number.
 #
-# Characters, not bytes, and the same answer on every host. `awk`'s length() is byte-based
-# in mawk (Debian's default, not multibyte-aware) and character-based in gawk under a UTF-8
-# locale, so the naive check would give two different verdicts on two contributors' machines
-# — and the items are full of multibyte punctuation that would silently cost 3 of the 200 on
-# one of them (a section sign in "process doc §2.13", the arrows and the "≠" in the phase-10
-# entries). So the scan runs under LC_ALL=C and strips UTF-8 continuation bytes (0x80-0xBF)
-# before measuring: one byte survives per character, on any awk, in any locale. The
-# self-check below pins that with a deliberately multibyte-heavy fixture.
+# Characters, not bytes, and the same answer on every host: awk's length() is byte-based in
+# mawk and character-based in gawk under UTF-8, and the items carry multibyte punctuation
+# (§, →, ≠). So the scan runs under LC_ALL=C and strips UTF-8 continuation bytes (0x80-0xBF)
+# first — one byte per character on any awk. The self-check below pins that.
 #
-# Scope is every roadmap the repo ships: its own, the skeleton in template/, and the
-# filled-in one in demo/seed/. The rule is simply that a file stating this convention has to
-# obey it. The template's pre-filled items are inherited verbatim by every bootstrapped
-# project, so bloat there ships the problem downstream and starts each new project from
-# items violating the convention it just read; the demo seed is the worked example a reader
-# copies from, which is the same argument. Detail trimmed out of an instructional item
-# belongs in the phase intro, which is prose and uncapped.
-#
-# A line "shaped like an item" is held to the cap wherever it appears, including the
-# example inside the conventions section's fenced block. That is intentional: an example
-# that violates the rule it illustrates is a defect, so no fenced-block exemption exists.
+# Scope is every roadmap the repo ships (its own, template/, demo/seed/): a file stating this
+# convention has to obey it, and the template's items are inherited verbatim by every
+# bootstrapped project. Trimmed detail belongs in the phase intro, which is prose and uncapped.
+# A line shaped like an item is capped wherever it appears, the conventions section's own
+# example included — an example that violates its rule is a defect.
 #
 # Usage: scripts/roadmap-length-check.sh   (no arguments; no side effects)
 set -euo pipefail
