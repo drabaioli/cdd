@@ -69,7 +69,7 @@ Add file exports: a self-contained "Download standalone .html" and an "Download 
 
 ## Annotation conventions
 
-**Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else. A one-line length check in this project's check runner keeps it honest, since a cap nobody measures drifts back.
+**Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else. A cap nobody measures drifts back, so add a one-line length check to this project's check runner once it has one.
 
 The default is no annotation. Tick the box and stop.
 

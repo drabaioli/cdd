@@ -92,7 +92,7 @@ reconcile.
   convention-enforced, and a future divergence is a candidate for a seam check.
 - The gate carries an inline self-check rather than a sibling `*-assert.sh` mutation harness. A
   length rule has a narrow silent-failure surface (the item pattern stops matching, or character
-  counting regresses to byte counting), and two fixtures pin both; a full sandbox-and-mutate harness
+  counting regresses to byte counting), and three fixtures pin both; a full sandbox-and-mutate harness
   would have been a second script and an eighteenth gate for no additional coverage.
 - Counting characters portably turned out to be the one real subtlety: `awk`'s `length()` is
   byte-based in mawk and character-based in gawk under a UTF-8 locale, so the naive check would have

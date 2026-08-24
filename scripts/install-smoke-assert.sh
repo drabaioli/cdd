@@ -12,6 +12,9 @@
 #     case that motivates the shims: Claude Code's Bash tool never sources ~/.bashrc)
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
 #   - a second run is idempotent (no duplicate marker block, no second copy)
+#   - cdd-worktree and cdd-worktree-resume reject an option-shaped branch name (exit 2,
+#     nothing created) and treat --help as usage (exit 0) — the guard whose absence had
+#     `cdd-worktree --help` cutting a branch and a worktree literally called "--help"
 #
 # It also runs `tools/cdd-state.sh install` and asserts the same shim contract
 # for the `cdd-state` command, since that helper self-installs identically, plus three
@@ -139,6 +142,59 @@ done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" 
 grep -qF "must run as a sourced shell function" <<<"$done_out" \
   || fail "cdd-worktree-done shim did not print the sourced-function guidance; got: $done_out"
 pass "cwd-changing shim (cdd-worktree-done) fails loudly instead of silently no-op'ing the cd"
+
+# Option-shaped arguments are rejected by the worktree commands too, not just by
+# `cdd-state seed` (asserted further down). This is the half that bit: without the guard
+# `cdd-worktree --help` took "--help" AS the branch and went on to cut a branch and a
+# sibling worktree called that. Probed as sourced FUNCTIONS, not through the shims -- the
+# cwd-changing shims refuse before sourcing anything, so a shim probe would pass on the
+# refusal above and never reach the guard.
+#
+# The load-bearing assertion is the pair (exit 2, the guard's own message): both commands
+# have a later refusal of their own (not-the-main-worktree, wrong-branch) that would also
+# exit non-zero, so status alone would pass for the wrong reason. A throwaway repo plus a
+# handoff named for the bad argument makes the no-effect half bite as well: with the guard
+# removed, cdd-worktree gets past the main-worktree and handoff checks and reaches branch
+# creation, so "no branch, no sibling directory" is a real assertion rather than a tautology.
+OPT_ROOT="$FAKE_HOME/optguard"
+mkdir -p "$OPT_ROOT/repo"
+git init -q "$OPT_ROOT/repo"
+mkdir -p "$FAKE_HOME/.cdd/handoffs/repo"
+: > "$FAKE_HOME/.cdd/handoffs/repo/--bogus.md"
+
+# Runs the sourced $cmd with $arg in the throwaway repo and echoes its output plus a
+# trailing "STATUS:<exit>". The rejected exit code travels in that line rather than in the
+# function's own status, so nothing here trips `set -e`: `bash -c` ends on the echo.
+probe_opt_guard() {  # probe_opt_guard <cmd> <arg>
+  local cmd="$1" arg="$2"
+  ( cd "$OPT_ROOT/repo" || exit 1
+    # shellcheck disable=SC2016  # $1 is a `bash -c` positional parameter, not ours
+    HOME="$FAKE_HOME" "${NOSHELLRC[@]}" -c \
+      'source "$1"; '"$cmd"' '"$arg"'; echo "STATUS:$?"' _ "$HELPER" </dev/null 2>&1 )
+}
+
+for cmd in cdd-worktree cdd-worktree-resume; do
+  opt_out="$(probe_opt_guard "$cmd" --bogus)"
+  grep -qF "$cmd: '--bogus' looks like an option, not a branch name." <<<"$opt_out" \
+    || fail "$cmd '--bogus' did not print the option guard; got: $opt_out"
+  grep -qF "STATUS:2" <<<"$opt_out" \
+    || fail "$cmd '--bogus' did not exit 2; got: $opt_out"
+
+  # `--help` is the same shape but a legitimate request: usage, exit 0, still no branch.
+  help_out="$(probe_opt_guard "$cmd" --help)"
+  grep -qF "usage: $cmd" <<<"$help_out" \
+    || fail "$cmd --help did not print usage; got: $help_out"
+  grep -qF "STATUS:0" <<<"$help_out" \
+    || fail "$cmd --help did not exit 0; got: $help_out"
+done
+
+for bad_arg in --bogus --help; do
+  git -C "$OPT_ROOT/repo" rev-parse --verify -q "refs/heads/$bad_arg" >/dev/null \
+    && fail "an option-shaped argument ('$bad_arg') was cut as a branch"
+  [[ ! -e "$OPT_ROOT/repo$bad_arg" && ! -e "$OPT_ROOT/$bad_arg" ]] \
+    || fail "an option-shaped argument ('$bad_arg') created a worktree directory"
+done
+pass "cdd-worktree/-resume reject an option-shaped branch (exit 2) and honour --help (exit 0)"
 
 [[ -f "$FAKE_HOME/.cdd/handoffs/someproj/feature_x.md" ]] \
   || fail "legacy handoff not migrated to ~/.cdd/handoffs/"
