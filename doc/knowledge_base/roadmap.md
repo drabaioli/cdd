@@ -180,7 +180,7 @@ Give each task a machine-readable record of where it sits in its lifecycle and w
 
 - [x] Per-task state record + `cdd-state` helper: a `<branch>.state.json` sibling of the handoff, advanced through the lifecycle by the slash commands; advisory, design in process doc §2.13
 - [x] Record the handoff session and each session's working dir in seeded state records (issue #51, writer half); additive and optional, no `schema_version` bump
-- [ ] Consume the record: teach the `cdd-dash` dashboard to read `stage`/`sessions` instead of inferring task state; `cdd-worktree-list` infers fine and does not need it
+- [x] Consume the record: teach the `cdd-dash` dashboard to read `stage`/`sessions` instead of inferring task state; landed in the `cdd-dash` repo, so no commit here
 - [x] Multi-machine resume, worktree + branch (issue #22): `cdd-worktree-resume [<branch>]` recreates a worktree on an existing remote branch, no handoff required.
 - [x] Multi-machine resume, handoff + state sync across machines via a per-task ref `refs/cdd/<branch>` (issue #22); advisory end-to-end, design in `doc/architecture/shell-helpers.md`
 - [x] Per-repo main-worktree marker `~/.cdd/handoffs/<repo>/repo.json` (issue #58), so a repo stays locatable once all its task records are reaped; design in `doc/architecture/shell-helpers.md`
