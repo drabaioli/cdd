@@ -23,6 +23,9 @@
 #   5. Gate-count contract — the gate count CLAUDE.md and cdd-pre-pr.md state in prose
 #      matches what `scripts/ci.sh list` actually registers, so adding a gate can't leave
 #      the prose (which is what a session reads to know what it just ran) stale.
+#   6. Plan-file section contract — every `## ` section cdd-plan.md writes into the plan
+#      file is still named in cdd-implement.md, which reads it. The plan file is the only
+#      thing crossing between the two sessions, so a one-sided rename would strand it.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -116,6 +119,15 @@ require_headings "$REPO_CMDS/cdd-quick-create.md" \
 require_headings "$REPO_CMDS/cdd-retrofit.md" \
   '## 3. Install mode' \
   '## 4. Upgrade mode'
+require_headings "$REPO_CMDS/cdd-plan.md" \
+  '## 2. Explore' \
+  '## 4. Print the bounded digest' \
+  '## 6. Write the plan file' \
+  '## 7. Print the next command'
+require_headings "$REPO_CMDS/cdd-implement.md" \
+  '## 1. Read the plan' \
+  '## 2. Deviation rule: stop and report, never improvise' \
+  '## 6. Commit'
 
 # --- Check 5: gate-count contract --------------------------------------------
 # The runner's registry is the source of truth for how many gates there are; both
@@ -128,6 +140,28 @@ for f in CLAUDE.md "$REPO_CMDS/cdd-pre-pr.md"; do
   note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
   grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
 done
+
+# --- Check 6: plan-file section contract ------------------------------------
+# The plan file (process doc 2.15) is the ONLY artifact crossing from the plan session
+# to the implementation session, so a section renamed on one side and not the other
+# strands it silently. cdd-plan.md is the producer: its fenced `# Plan:` schema block
+# names the sections. cdd-implement.md is the consumer and must still name each one.
+# Same awk shape command-drift-check.sh uses for the handoff schema.
+PLAN="$REPO_CMDS/cdd-plan.md"
+IMPL="$REPO_CMDS/cdd-implement.md"
+plan_schema_headings() {
+  awk '/^# Plan:/ { in_schema = 1 }
+       in_schema && /^## / { print }
+       in_schema && /^```/ { exit }' "$1"
+}
+mapfile -t plan_sections < <(plan_schema_headings "$PLAN")
+if (( ${#plan_sections[@]} == 0 )); then
+  note "plan-file producer broken: $PLAN no longer carries a '# Plan:' schema block with ## sections"
+else
+  for h in "${plan_sections[@]}"; do
+    grep -qF -- "${h#\#\# }" "$IMPL"       || note "plan-file consumer broken: section '${h#\#\# }' is written by $PLAN but no longer named in $IMPL"
+  done
+fi
 
 if [[ "$fail" -ne 0 ]]; then
   echo "prompt-seam check: FAILED (see above)" >&2

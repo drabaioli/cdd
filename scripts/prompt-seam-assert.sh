@@ -10,12 +10,14 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's five checks gets one mutation:
+# checker's six checks gets one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file.
 #   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading.
 #   5. Gate-count contract     — CLAUDE.md's stated gate count stops matching `ci.sh list`.
+#   6. Plan-file section contract — cdd-implement.md stops naming a plan-file section
+#      that cdd-plan.md still writes.
 #
 # Plus two control cases, which are what make the five above mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected"
@@ -138,5 +140,16 @@ grep -qE "(^|[^0-9])$count gates?([^a-z]|$)" "$SANDBOX/CLAUDE.md" \
   && fail "check 5 setup: CLAUDE.md still states the true gate count after mutation"
 expect_fail "check 5 catches a stale gate count in the prose" \
   "gate-count drift in CLAUDE.md"
+
+# --- Check 6: plan-file section contract --------------------------------------
+# Rename the section on the CONSUMER side only: cdd-plan.md keeps writing
+# `## Dead ends` into the plan file while cdd-implement.md stops naming it, which is
+# exactly the one-sided edit that would strand the plan silently.
+fresh_sandbox
+sandbox_sed 's/Dead ends/Abandoned leads/g' "$CMDS/cdd-implement.md"
+grep -qF 'Dead ends' "$SANDBOX/$CMDS/cdd-implement.md" \
+  && fail "check 6 setup: cdd-implement.md still names the section after mutation"
+expect_fail "check 6 catches a plan-file section the consumer stopped naming" \
+  "section 'Dead ends' is written by"
 
 echo "prompt-seam contract: clean"

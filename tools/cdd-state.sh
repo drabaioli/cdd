@@ -38,11 +38,15 @@
 #                                      one). Appends a {id, stage, dir} entry for
 #                                      $CLAUDE_CODE_SESSION_ID unless it is empty or
 #                                      already the last entry's id.
+#   cdd-state stages               Print the lifecycle enum, least -> most advanced,
+#                                      one stage per line. Read-only, needs no record
+#                                      and no jq; it is the capability probe an older
+#                                      helper fails (see cdd-worktree's skew check).
 #
 # `dir` on a session entry is the worktree root the session ran in (from
 # `git rev-parse --show-toplevel`): the natural `cd` target for `claude --resume`.
 #
-# Both `seed` and `set` also sync the handoff + record to a per-task ref
+# Both `seed` and `set` also sync the handoff + plan file + record to a per-task ref
 # `refs/cdd/<branch>` on origin (best-effort, advisory), so a resume on another
 # machine can materialize them; see cdd-worktree-resume and shell-helpers.md.
 #
@@ -52,7 +56,8 @@
 # never carried on the task ref.
 #
 # Stages (a single enum; the record carries no separate status):
-#   scoped  plan_approved  implementation_done  merged  checks_passed  pr_open  addressed
+#   scoped  plan_approved  plan_written  implementation_done  merged  checks_passed
+#   pr_open  addressed
 
 # The schema version this helper writes; consumers version their parser on it.
 CDD_STATE_SCHEMA_VERSION=1
@@ -62,7 +67,8 @@ CDD_STATE_SCHEMA_VERSION=1
 CDD_REPO_MARKER_SCHEMA_VERSION=1
 
 cdd-state-stages() {
-  printf '%s\n' scoped plan_approved implementation_done merged checks_passed pr_open addressed
+  printf '%s\n' scoped plan_approved plan_written implementation_done merged checks_passed \
+                pr_open addressed
 }
 
 # The MAIN worktree of the current repo — the dirname of git's common dir, NOT
@@ -95,9 +101,9 @@ cdd-state-write() {
 # path} — recording where this repo's MAIN worktree lives. Everything else in that
 # directory is task-scoped and reaped when the task merges, so once a repo's tasks are
 # all done the directory goes empty and the repo becomes unlocatable; the marker is the
-# one artifact that outlives them (GC's candidate set globs *.md / *.state.json /
-# refs/cdd/*, none of which it matches). Overwrites unconditionally, so it self-heals
-# when a repo moves or is re-cloned — latest writer wins, like the task ref.
+# one artifact that outlives them (GC's candidate set globs *.md / plans/*.md /
+# *.state.json / refs/cdd/*, none of which it matches). Overwrites unconditionally, so
+# it self-heals when a repo moves or is re-cloned — latest writer wins, like the task ref.
 #
 # Advisory end-to-end, like the rest of this helper: a failing rev-parse, an unwritable
 # directory, or a jq failure warns once and returns 0. It must never fail the state write
@@ -125,23 +131,35 @@ cdd-state-write-repo-marker() {
   return 0
 }
 
-# Sync the handoff + state record to a per-task ref refs/cdd/<branch> on origin, so a
-# resume on another machine can materialize them (see cdd-worktree-resume). Bundles
-# whichever of the two files exist into a git tree (stable in-tree names handoff.md /
-# state.json, decoupled from the branch-named on-disk files), wraps it in a parentless
-# commit, and force-pushes (advisory, latest-wins). Best-effort end-to-end: no origin,
-# offline, a missing object, or a rejected push warns once and returns 0 — it must
+# Sync the handoff + plan + state record to a per-task ref refs/cdd/<branch> on origin,
+# so a resume on another machine can materialize them (see cdd-worktree-resume). Bundles
+# whichever of the three files exist into a git tree (stable in-tree names handoff.md /
+# plan.md / state.json, decoupled from the branch-named on-disk files), wraps it in a
+# parentless commit, and force-pushes (advisory, latest-wins). Best-effort end-to-end:
+# no origin, offline, a missing object, or a rejected push warns once and returns 0 — it must
 # never fail the state write that called it. Uses plumbing only (hash-object/mktree/
 # commit-tree), so it never touches the index or working tree. The commit uses a fixed
 # cdd/cdd@local identity so it never depends on (or fails from) an unset user git
 # identity; the SHA is irrelevant under force-push. See doc/architecture/shell-helpers.md.
 cdd-state-push-ref() {
   local handoff_md="$1" state_json="$2" branch="$3"
+  # The plan file (§2.15) is derived, not passed: it is the plans/ sibling of the
+  # handoff, so both callers stay two-argument. It is written after seed — by
+  # /cdd-plan on approval — so the `set plan_written` push is what first carries it.
+  local plan_md
+  plan_md="$(dirname "$handoff_md")/plans/$(basename "$handoff_md")"
   local entries="" blob
+  # git mktree wants entries sorted by name: handoff.md < plan.md < state.json, which
+  # is the order these three blocks emit them in.
   if [[ -f "$handoff_md" ]]; then
     blob="$(git hash-object -w "$handoff_md" 2>/dev/null)" \
       || { echo "cdd-state: could not hash handoff; skipping ref sync (advisory)." >&2; return 0; }
     entries+="100644 blob ${blob}"$'\t'"handoff.md"$'\n'
+  fi
+  if [[ -f "$plan_md" ]]; then
+    blob="$(git hash-object -w "$plan_md" 2>/dev/null)" \
+      || { echo "cdd-state: could not hash plan; skipping ref sync (advisory)." >&2; return 0; }
+    entries+="100644 blob ${blob}"$'\t'"plan.md"$'\n'
   fi
   if [[ -f "$state_json" ]]; then
     blob="$(git hash-object -w "$state_json" 2>/dev/null)" \
@@ -165,6 +183,14 @@ cdd-state-push-ref() {
 }
 
 cdd-state() {
+  # `stages` is a pure read of the lifecycle enum — no record, no jq. It is answered
+  # BEFORE the jq guard below so that a capability probe (cdd-worktree's skew check,
+  # §2.8) reads the real answer on a host without jq instead of an empty one.
+  if [[ "${1:-}" == "stages" ]]; then
+    cdd-state-stages
+    return 0
+  fi
+
   if ! command -v jq >/dev/null 2>&1; then
     echo "cdd-state: jq not found; skipping state update (advisory)." >&2
     return 0
@@ -289,7 +315,7 @@ cdd-state() {
       cdd-state-install "$@"
       ;;
     *)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | stages | install}" >&2
       return 2
       ;;
   esac
@@ -373,7 +399,20 @@ RCBLOCK
 #!/usr/bin/env bash
 # Managed by cdd-state.sh install — thin PATH entry point so `cdd-state` resolves
 # in non-interactive shells too. Regenerated on each install; do not hand-edit.
-source "$HOME/.cdd/tools/cdd-state.sh"
+# The guards are load-bearing: without them, a missing or broken helper leaves the
+# function undefined, the call below re-resolves to THIS shim through PATH, and the
+# result is unbounded recursion rather than an error.
+helper="$HOME/.cdd/tools/cdd-state.sh"
+if [[ ! -f "$helper" ]]; then
+  echo "cdd-state: helper not found at $helper; reinstall with: bash <cdd>/tools/cdd-state.sh install" >&2
+  exit 127
+fi
+# shellcheck source=/dev/null
+source "$helper"
+if ! declare -F cdd-state >/dev/null 2>&1; then
+  echo "cdd-state: $helper did not define cdd-state; reinstall it." >&2
+  exit 127
+fi
 cdd-state "$@"
 SHIM
   chmod +x "$shim"
