@@ -164,8 +164,20 @@ pass "install self-repairs a disabled state block (active again, still single)"
 # session at stage `scoped`, carrying `dir` = the worktree root. Run it from this
 # repo (a real git repo) against FAKE_HOME so the record lands under the temp tree.
 # Guarded on jq, like the helper itself.
+#
+# `seed` also pushes refs/cdd/<branch> to `origin`. Running in the real repo, that
+# would reach the project's actual remote — network-dependent, and it would leave a
+# probe ref on it after every run. A bare repo under the temp tree stands in as the
+# push target via git's env-based config override (highest precedence, and `pushurl`
+# is unset in the repo, so nothing is being fought over). Everything else the probe
+# asserts still comes from the real repo, which is the point of running here.
 if command -v jq >/dev/null 2>&1; then
   SEED_BRANCH="issue51_seed_probe"
+  PUSH_TARGET="$FAKE_HOME/push-target.git"
+  git init -q --bare "$PUSH_TARGET" || fail "could not create the stand-in push target"
+  export GIT_CONFIG_COUNT=1
+  export GIT_CONFIG_KEY_0=remote.origin.pushurl
+  export GIT_CONFIG_VALUE_0="$PUSH_TARGET"
   # The record path uses the repo name derived from git's common-dir (the main
   # worktree), not this checkout's basename — mirror the helper's derivation.
   REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
@@ -181,6 +193,13 @@ if command -v jq >/dev/null 2>&1; then
   [[ "$got" == "seed-probe-123|scoped|$EXPECT_DIR" ]] \
     || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
   pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
+
+  # The push went to the stand-in, not to the project's real remote — which is what
+  # keeps this gate hermetic. Assert it landed, so a silently skipped push (or a
+  # regression in the override) is visible rather than mistaken for good hygiene.
+  git --git-dir="$PUSH_TARGET" show-ref --verify --quiet "refs/cdd/$SEED_BRANCH" \
+    || fail "seed's ref push did not reach the stand-in target $PUSH_TARGET"
+  pass "cdd-state seed pushes refs/cdd/<branch> to origin, here a local stand-in"
 
   # Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
   ( cd "$REPO_ROOT" \
