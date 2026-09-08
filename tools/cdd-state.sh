@@ -148,8 +148,8 @@ cdd-state-push-ref() {
   # /cdd-plan on approval — so the `set plan_written` push is what first carries it.
   local plan_md="${handoff_md%.md}.plan.md"
   local entries="" blob
-  # git mktree wants entries sorted by name: handoff.md < plan.md < state.json, which
-  # is the order these three blocks emit them in.
+  # Emitted in name order (handoff.md < plan.md < state.json) for readability only:
+  # `git mktree` normalises entry order itself, so pre-sorting is not required.
   if [[ -f "$handoff_md" ]]; then
     blob="$(git hash-object -w "$handoff_md" 2>/dev/null)" \
       || { echo "cdd-state: could not hash handoff; skipping ref sync (advisory)." >&2; return 0; }

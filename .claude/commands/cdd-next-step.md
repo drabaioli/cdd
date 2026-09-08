@@ -51,7 +51,7 @@ Use the issue's title + body + comments as the **intent text**, and continue wit
 
 ## 1. Read context
 
-Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the implementation session will rebuild detailed context.
+Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the plan session will rebuild detailed context.
 
 **Intent-driven and issue-driven modes**, load context adaptively to preserve context economy: after the roadmap and the two indexes above, selectively open only the docs the described task (or the resolved issue) actually touches — enough to scope it and detect overlap with existing work, not an exhaustive read.
 
@@ -63,13 +63,15 @@ List existing handoff files:
 ls ~/.cdd/handoffs/cdd/ 2>/dev/null
 ```
 
-For each file `<branch>.md`, check whether the branch still exists locally:
+The handoffs are the `<branch>.md` files. Their branch-named siblings are **not** handoffs — skip `<branch>.plan.md` (the plan file) and `<branch>.state.json`, and skip the per-repo `repo.json`; treating `<branch>.plan.md` as a handoff would invent a task named `<branch>.plan`.
+
+For each handoff `<branch>.md`, check whether the branch still exists locally:
 
 ```bash
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it together with its state sibling (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it together with its branch-named siblings (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.plan.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
