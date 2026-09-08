@@ -12,7 +12,7 @@ Derive the task's paths from git — no argument is passed:
 repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
-echo "plan:    ~/.cdd/handoffs/$repo/plans/$branch.md"
+echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 ```
 
 Read the handoff. Its `## Requirements` section is the done-test for this task: your plan must satisfy every criterion, and you check it against them in step 3. Its `## Notes` section lists open questions deferred to you — address them up front rather than mid-plan.
@@ -63,11 +63,7 @@ On approval, first advance the task **state record** (advisory; it skips silentl
 cdd-state set plan_approved
 ```
 
-Then write `~/.cdd/handoffs/<repo>/plans/<branch>.md`, creating the directory if needed:
-
-```bash
-mkdir -p ~/.cdd/handoffs/<repo>/plans
-```
+Then write `~/.cdd/handoffs/<repo>/<branch>.plan.md` — a flat, branch-named sibling of the handoff (`<branch>.md`) and the state record (`<branch>.state.json`). The directory already exists (`/cdd-next-step` created it when it wrote the handoff).
 
 The plan is written **for the implementing session, not for the human** — the human read the digest above. That gives it one governing rule:
 
@@ -114,7 +110,7 @@ cdd-state set plan_written
 Print exactly:
 
 ```
-Plan written: ~/.cdd/handoffs/<repo>/plans/<branch>.md
+Plan written: ~/.cdd/handoffs/<repo>/<branch>.plan.md
 Next: open a fresh `claude` in this worktree and run /cdd-implement
 
 Read or edit the plan first if you want to — /cdd-implement builds from the file, not from this conversation.

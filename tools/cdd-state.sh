@@ -101,9 +101,9 @@ cdd-state-write() {
 # path} — recording where this repo's MAIN worktree lives. Everything else in that
 # directory is task-scoped and reaped when the task merges, so once a repo's tasks are
 # all done the directory goes empty and the repo becomes unlocatable; the marker is the
-# one artifact that outlives them (GC's candidate set globs *.md / plans/*.md /
-# *.state.json / refs/cdd/*, none of which it matches). Overwrites unconditionally, so
-# it self-heals when a repo moves or is re-cloned — latest writer wins, like the task ref.
+# one artifact that outlives them (GC's candidate set globs *.md and *.state.json plus
+# refs/cdd/*, none of which it matches). Overwrites unconditionally, so it self-heals
+# when a repo moves or is re-cloned — latest writer wins, like the task ref.
 #
 # Advisory end-to-end, like the rest of this helper: a failing rev-parse, an unwritable
 # directory, or a jq failure warns once and returns 0. It must never fail the state write
@@ -143,11 +143,10 @@ cdd-state-write-repo-marker() {
 # identity; the SHA is irrelevant under force-push. See doc/architecture/shell-helpers.md.
 cdd-state-push-ref() {
   local handoff_md="$1" state_json="$2" branch="$3"
-  # The plan file (§2.15) is derived, not passed: it is the plans/ sibling of the
-  # handoff, so both callers stay two-argument. It is written after seed — by
+  # The plan file (§2.15) is derived, not passed: it is the <branch>.plan.md sibling
+  # of the handoff, so both callers stay two-argument. It is written after seed — by
   # /cdd-plan on approval — so the `set plan_written` push is what first carries it.
-  local plan_md
-  plan_md="$(dirname "$handoff_md")/plans/$(basename "$handoff_md")"
+  local plan_md="${handoff_md%.md}.plan.md"
   local entries="" blob
   # git mktree wants entries sorted by name: handoff.md < plan.md < state.json, which
   # is the order these three blocks emit them in.

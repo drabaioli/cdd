@@ -12,10 +12,10 @@
 #     scoped branch's files + ref are untouched
 #   - the per-repo marker (repo.json), written as a side effect of `cdd-state seed`,
 #     survives the reap — it is what keeps the repo locatable once every task is gone
-#   - the plan file (plans/<branch>.md, process doc 2.15) is reaped with the rest for a
+#   - the plan file (<branch>.plan.md, process doc 2.15) is reaped with the rest for a
 #     merged task and left alone for a scoped one
-#   - a plan file produces NO phantom row in cdd-worktree-list: it lives in plans/
-#     precisely so it stays out of the top-level *.md glob
+#   - a plan file produces NO phantom row in cdd-worktree-list, even though it shares
+#     the handoff's .md extension: the shared enumerator filters branch-named sidecars
 #
 # Usage: scripts/gc-assert.sh   (provisions and tears down its own temp tree)
 
@@ -102,10 +102,9 @@ run_state() {
     cdd-state "$@"
   )
 }
-mkdir -p "$DIR/plans"
 for b in "$MERGED" "$SCOPED"; do
   printf '# Task: %s\n\nbody\n' "$b" > "$DIR/$b.md"
-  printf '# Plan: %s\n\n## Summary\n- body\n' "$b" > "$DIR/plans/$b.md"
+  printf '# Plan: %s\n\n## Summary\n- body\n' "$b" > "$DIR/$b.plan.md"
   run_state seed "$b" >/dev/null 2>&1 || fail "cdd-state seed failed for $b"
   git -C "$WORK/machine" ls-remote origin "refs/cdd/$b" | grep -q "refs/cdd/$b" \
     || fail "seed did not push refs/cdd/$b"
@@ -138,7 +137,7 @@ grep -q "keep  $SCOPED" <<<"$out" \
   || fail "dry-run did not keep the scoped task. Output:\n$out"
 grep -q "reap  $MERGED (MERGED): would remove .*plan" <<<"$out" \
   || fail "dry-run did not list the plan file among the merged task's artifacts. Output:\n$out"
-[[ -f "$DIR/$MERGED.md" && -f "$DIR/$MERGED.state.json" && -f "$DIR/plans/$MERGED.md" ]] \
+[[ -f "$DIR/$MERGED.md" && -f "$DIR/$MERGED.state.json" && -f "$DIR/$MERGED.plan.md" ]] \
   || fail "dry-run must not delete local files"
 git -C "$WORK/machine" ls-remote origin "refs/cdd/$MERGED" | grep -q "refs/cdd/$MERGED" \
   || fail "dry-run must not delete the remote ref"
@@ -146,11 +145,11 @@ pass "dry-run reports the merged task, keeps the scoped one, deletes nothing"
 
 # 2. --force: merged artifacts gone; scoped artifacts untouched.
 out="$(run_gc --force 2>&1)" || fail "gc --force exited non-zero"
-[[ ! -f "$DIR/$MERGED.md" && ! -f "$DIR/$MERGED.state.json" && ! -f "$DIR/plans/$MERGED.md" ]] \
+[[ ! -f "$DIR/$MERGED.md" && ! -f "$DIR/$MERGED.state.json" && ! -f "$DIR/$MERGED.plan.md" ]] \
   || fail "--force did not remove the merged task's local files"
 git -C "$WORK/machine" ls-remote origin "refs/cdd/$MERGED" | grep -q "refs/cdd/$MERGED" \
   && fail "--force did not delete the merged task's remote ref"
-[[ -f "$DIR/$SCOPED.md" && -f "$DIR/$SCOPED.state.json" && -f "$DIR/plans/$SCOPED.md" ]] \
+[[ -f "$DIR/$SCOPED.md" && -f "$DIR/$SCOPED.state.json" && -f "$DIR/$SCOPED.plan.md" ]] \
   || fail "--force must not touch the scoped task's local files"
 git -C "$WORK/machine" ls-remote origin "refs/cdd/$SCOPED" | grep -q "refs/cdd/$SCOPED" \
   || fail "--force must not delete the scoped task's remote ref"
@@ -158,15 +157,15 @@ pass "--force reaps the merged task (handoff + plan + state + ref), leaves the s
 
 # 3. The per-repo marker is not task-scoped and must survive the reap: it is what keeps
 # the repo locatable once every task is merged and its artifacts are gone. Safe by
-# construction (GC's candidates glob *.md / plans/*.md / *.state.json / refs/cdd/*),
-# pinned here.
+# construction (GC's candidates glob *.md and *.state.json plus refs/cdd/*, and it
+# matches none of them), pinned here.
 [[ -f "$DIR/repo.json" ]] || fail "--force reaped the per-repo marker $DIR/repo.json"
 pass "--force leaves the per-repo marker in place"
 
-# 4. A plan file must never surface as a task of its own. It lives in plans/ so that the
-# top-level *.md glob cannot see it; a flat <branch>.plan.md sibling would have shown up
-# in the listing as a phantom branch named "<branch>.plan". The SCOPED task still has
-# its plan file (case 2 asserted it survived), so the listing is the honest test.
+# 4. A plan file must never surface as a task of its own. It shares the handoff's .md
+# extension, so a bare *.md glob would list it as a phantom branch named
+# "<branch>.plan" — the whole reason cdd-worktree-handoff-branches exists. The SCOPED
+# task still has its plan file (case 2 asserted it survived), so this is the honest test.
 run_list() {
   (
     cd "$WORK/machine"

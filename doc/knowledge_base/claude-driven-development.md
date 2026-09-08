@@ -60,7 +60,7 @@ The **project overview** (`project-overview.md`) is the exception to append-only
 
 ### 2.6 Handoff files (`~/.cdd/handoffs/<repo-name>/<branch>.md`)
 
-The contract between the handoff session and the plan session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide; branch-scoped and ephemeral — created by `/cdd-next-step`, consumed by the first prompt of the plan session, deleted when the branch is deleted. Two siblings share its lifecycle: the **state record** (`<branch>.state.json`, §2.13) seeded beside it, and the **plan file** (`plans/<branch>.md`, §2.15) written later by `/cdd-plan`.
+The contract between the handoff session and the plan session. Lives outside the repo, namespaced by repo so multiple CDD projects don't collide; branch-scoped and ephemeral — created by `/cdd-next-step`, consumed by the first prompt of the plan session, deleted when the branch is deleted. Two siblings share its lifecycle: the **state record** (`<branch>.state.json`, §2.13) seeded beside it, and the **plan file** (`<branch>.plan.md`, §2.15) written later by `/cdd-plan`.
 
 Schema:
 
@@ -184,11 +184,13 @@ The runner is **host-direct and degrades gracefully**: it assumes no container a
 
 The runner is a project artifact, not a shared CDD helper — every project's gates are its own — so CDD ships the practice rather than a script. Its own conventions (registry shape, skip semantics, output grouping) belong in the project's architecture docs; this repo's live in `doc/architecture/overview.md`.
 
-### 2.15 Plan files (`~/.cdd/handoffs/<repo>/plans/<branch>.md`)
+### 2.15 Plan files (`~/.cdd/handoffs/<repo>/<branch>.plan.md`)
 
 The contract between the plan session (§3.3) and the implementation session (§3.4). A third branch-scoped sibling of the handoff (§2.6) and the state record (§2.13), sharing their directory, their `<branch>` basename and their ephemeral lifecycle — written by `/cdd-plan` on plan approval, synced on the task ref, reaped when the branch is deleted.
 
-It lives one level down, in `plans/`, rather than as a flat `<branch>.plan.md` sibling. The reason is mechanical and worth keeping: the handoff directory is enumerated by `*.md` globs, and a flat plan file would match them and surface as a phantom task named after itself. A subdirectory is immune by construction, including in consumers nobody controls, at the cost of being reaped explicitly rather than incidentally — a leak rather than a phantom, which is the safer of the two failure modes.
+Every task artifact in that directory is a **flat, branch-named sibling** — `<branch>.md`, `<branch>.plan.md`, `<branch>.state.json` — and the plan follows that shape rather than introducing a subdirectory, so one convention describes the whole layout and a reader can tell a task's artifacts apart by suffix alone.
+
+That consistency has a cost worth stating, because it is a trap: unlike `.state.json`, the plan's extension *is* `.md`, so it matches the same `*.md` glob the handoff does, and a naive enumerator would turn `<branch>.plan.md` into a phantom task named `<branch>.plan`. The rule is therefore that **the handoff directory is enumerated in exactly one place** — a single helper that globs `*.md` and skips the branch-named sidecars — and every consumer goes through it rather than repeating the filter. A new sidecar of this shape adds one line there and nothing anywhere else.
 
 Schema:
 

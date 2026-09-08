@@ -9,7 +9,7 @@ Derive the task's paths from git — no argument is passed:
 ```bash
 repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
 branch="$(git rev-parse --abbrev-ref HEAD)"
-echo "plan:    ~/.cdd/handoffs/$repo/plans/$branch.md"
+echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
 ```
 

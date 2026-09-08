@@ -135,8 +135,7 @@ pass "seed pushed refs/cdd/$FEATURE to origin (with base_branch)"
 git -C "$WORK/machineA" switch -q "$FEATURE"
 # The plan file is written by /cdd-plan after seed, so the `set` that follows it is what
 # first carries it onto the ref — exactly the ordering the real workflow has.
-mkdir -p "$DIR_A/plans"
-PLAN_A="$DIR_A/plans/$FEATURE.md"
+PLAN_A="$DIR_A/$FEATURE.plan.md"
 printf '# Plan: %s\n\n## Summary\n- one line\n\n## Dead ends\nNone\n' "$FEATURE" > "$PLAN_A"
 run_state "$WORK/machineA" "$HOME_A" set implementation_done >/dev/null 2>&1 \
   || fail "cdd-state set failed on machine A"
@@ -162,8 +161,8 @@ cmp -s "$HANDOFF_A" "$DIR_B/$FEATURE.md" \
   || fail "materialized state is not at the advanced stage implementation_done"
 [[ "$(jq -r '.base_branch' "$DIR_B/$FEATURE.state.json")" == "$BASE_TASK" ]] \
   || fail "base_branch did not ride the ref sync to machine B"
-[[ -f "$DIR_B/plans/$FEATURE.md" ]] || fail "resume did not materialize the plan file"
-cmp -s "$PLAN_A" "$DIR_B/plans/$FEATURE.md" \
+[[ -f "$DIR_B/$FEATURE.plan.md" ]] || fail "resume did not materialize the plan file"
+cmp -s "$PLAN_A" "$DIR_B/$FEATURE.plan.md" \
   || fail "materialized plan differs from machine A's (not byte-for-byte)"
 [[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "resume must not launch claude"
 pass "resume materialized handoff + plan byte-for-byte, advanced state, and base_branch, no claude"
@@ -175,8 +174,7 @@ git clone -q "$WORK/origin.git" "$WORK/machineC"
 DIR_C="$(handoff_dir "$HOME_C" "$WORK/machineC")"
 mkdir -p "$DIR_C"
 printf 'LOCAL HANDOFF — must be preserved\n' > "$DIR_C/$FEATURE.md"
-mkdir -p "$DIR_C/plans"
-printf 'STALE LOCAL PLAN\n' > "$DIR_C/plans/$FEATURE.md"
+printf 'STALE LOCAL PLAN\n' > "$DIR_C/$FEATURE.plan.md"
 jq -n '{schema_version:1, branch:"'"$FEATURE"'", stage:"plan_written", pr:null, sessions:[]}' \
   > "$DIR_C/$FEATURE.state.json"
 set +e
@@ -189,7 +187,7 @@ set -e
 grep -q "LOCAL HANDOFF" "$DIR_C/$FEATURE.md" \
   || fail "present local handoff must not be clobbered by the ref"
 # The plan is mutable and travels with the record, so a winning ref brings its plan too.
-cmp -s "$PLAN_A" "$DIR_C/plans/$FEATURE.md" \
+cmp -s "$PLAN_A" "$DIR_C/$FEATURE.plan.md" \
   || fail "ref-ahead should have replaced the stale local plan with the ref's"
 pass "ref-ahead overwrites stale local state and plan, preserves local handoff"
 
@@ -198,8 +196,7 @@ HOME_D="$WORK/homeD"
 git clone -q "$WORK/origin.git" "$WORK/machineD"
 DIR_D="$(handoff_dir "$HOME_D" "$WORK/machineD")"
 mkdir -p "$DIR_D"
-mkdir -p "$DIR_D/plans"
-printf 'LOCAL PLAN — must be kept\n' > "$DIR_D/plans/$FEATURE.md"
+printf 'LOCAL PLAN — must be kept\n' > "$DIR_D/$FEATURE.plan.md"
 jq -n '{schema_version:1, branch:"'"$FEATURE"'", stage:"addressed", pr:7, sessions:[]}' \
   > "$DIR_D/$FEATURE.state.json"
 set +e
@@ -209,7 +206,7 @@ set -e
 [[ "$rc" -eq 0 ]] || fail "resume on machine D exited $rc"
 [[ "$(jq -r '.stage' "$DIR_D/$FEATURE.state.json")" == "addressed" ]] \
   || fail "more-advanced local state (addressed) should have been kept"
-grep -q "LOCAL PLAN" "$DIR_D/plans/$FEATURE.md" \
+grep -q "LOCAL PLAN" "$DIR_D/$FEATURE.plan.md" \
   || fail "the local plan must be kept when the local record wins (it may have been edited)"
 pass "local-ahead state record and plan are kept over a less-advanced ref"
 

@@ -198,10 +198,9 @@ cdd-worktree-done() {
   local handoff="$HOME/.cdd/handoffs/${repo_name}/${branch}.md"
   # The per-task state record (written by the slash commands) is an additive
   # sibling of the handoff; it shares the handoff's deletion lifecycle. So does the
-  # plan file, which lives one level down in plans/ precisely so it stays out of the
-  # `*.md` globs that list and GC use (§2.15).
+  # plan file (§2.15), named on the same <branch>.<kind> pattern.
   local state_file="${handoff%.md}.state.json"
-  local plan_file="$HOME/.cdd/handoffs/${repo_name}/plans/${branch}.md"
+  local plan_file="${handoff%.md}.plan.md"
 
   cd "$main_path" || return 1
   if ! git pull --ff-only origin "$default_branch"; then
@@ -281,6 +280,26 @@ cdd-worktree-done() {
   echo "Done. In $main_path on $default_branch at $(git rev-parse --short HEAD)."
 }
 
+# Print the task branches that have a handoff in $1, one per line.
+#
+# THE ONE PLACE that knows how to read the handoff directory. Every task artifact
+# there is a flat, branch-named sibling — <branch>.md (handoff), <branch>.plan.md
+# (plan, §2.15), <branch>.state.json (state record) — so a bare *.md glob matches
+# the handoff AND the plan, and `basename … .md` would turn the latter into a
+# phantom task named "<branch>.plan". The .state.json sidecar never had this problem
+# because its extension differs; the plan's does not. Rather than repeat the filter
+# in every enumerator (and oblige the next one to remember it), both callers —
+# cdd-worktree-list and cdd-worktree-gc — go through here.
+cdd-worktree-handoff-branches() {
+  local dir="$1" f
+  shopt -s nullglob
+  for f in "$dir"/*.md; do
+    [[ "$f" == *.plan.md ]] && continue
+    basename "$f" .md
+  done
+  shopt -u nullglob
+}
+
 cdd-worktree-list() {
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
@@ -291,10 +310,9 @@ cdd-worktree-list() {
     return 0
   fi
 
-  shopt -s nullglob
-  local files=( "$handoff_dir"/*.md )
-  shopt -u nullglob
-  if (( ${#files[@]} == 0 )); then
+  local branches=()
+  mapfile -t branches < <(cdd-worktree-handoff-branches "$handoff_dir")
+  if (( ${#branches[@]} == 0 )); then
     echo "No handoffs in $handoff_dir."
     return 0
   fi
@@ -314,10 +332,8 @@ cdd-worktree-list() {
   printf '%-40s  %-8s  %-8s  %-12s  %s\n' \
          "------" "--------" "-------" "--" "------"
 
-  local f branch wt br pr status
-  for f in "${files[@]}"; do
-    branch="$(basename "$f" .md)"
-
+  local branch wt br pr status
+  for branch in "${branches[@]}"; do
     if grep -qx "$branch" <<<"$worktree_branches"; then
       wt="yes"
     else
@@ -386,15 +402,15 @@ cdd-worktree-gc() {
   local handoff_dir="$HOME/.cdd/handoffs/${repo_name}"
 
   # Candidate branches = local handoff/plan/state basenames ∪ remote refs/cdd/* names.
-  # The plan glob is a separate line because plan files live in plans/ (§2.15), out of
-  # the top-level *.md glob by design — so they are reaped explicitly, never
-  # incidentally, and a plan can never surface as a phantom task in the listing.
+  # Handoffs (and, filtered out by it, plans) come through the shared enumerator; the
+  # plan needs no glob of its own, since a task with a plan always has a handoff.
   # Track which refs exist on origin so the reap reports and acts accurately.
   local -A seen=() has_ref=()
   local f branch ref
+  while IFS= read -r branch; do
+    [[ -n "$branch" ]] && seen["$branch"]=1
+  done < <(cdd-worktree-handoff-branches "$handoff_dir")
   shopt -s nullglob
-  for f in "$handoff_dir"/*.md;         do seen["$(basename "$f" .md)"]=1; done
-  for f in "$handoff_dir"/plans/*.md;   do seen["$(basename "$f" .md)"]=1; done
   for f in "$handoff_dir"/*.state.json; do seen["$(basename "$f" .state.json)"]=1; done
   shopt -u nullglob
   while IFS= read -r ref; do
@@ -422,7 +438,7 @@ cdd-worktree-gc() {
     # Merged → finished → reap the local handoff/plan/state and the remote ref.
     reaped=$(( reaped + 1 ))
     handoff="${handoff_dir}/${branch}.md"
-    plan="${handoff_dir}/plans/${branch}.md"
+    plan="${handoff_dir}/${branch}.plan.md"
     state="${handoff_dir}/${branch}.state.json"
     items=()
     [[ -f "$handoff" ]] && items+=("handoff")
@@ -499,7 +515,7 @@ cdd-worktree-materialize-ref() {
   mkdir -p "$dir"
   local handoff_dest="${dir}/${branch}.md"
   local state_dest="${dir}/${branch}.state.json"
-  local plan_dest="${dir}/plans/${branch}.md"
+  local plan_dest="${dir}/${branch}.plan.md"
 
   # Handoff: immutable after seed → materialize only when absent locally.
   if [[ ! -f "$handoff_dest" ]] && git cat-file -e FETCH_HEAD:handoff.md 2>/dev/null; then
@@ -537,7 +553,6 @@ cdd-worktree-materialize-ref() {
   fi
 
   if (( take_plan )) && git cat-file -e FETCH_HEAD:plan.md 2>/dev/null; then
-    mkdir -p "${dir}/plans"
     cdd-worktree-extract plan.md "$plan_dest" \
       && echo "Materialized plan: $plan_dest"
   elif [[ -f "$plan_dest" ]]; then
