@@ -14,6 +14,9 @@
 #   - the handoff schema headings match between the process doc (section 2.6) and
 #     .claude/commands/cdd-next-step.md; the template copy of cdd-next-step.md is already
 #     covered by the render-diff.
+#   - the plan-file schema headings match between the process doc (section 2.15) and
+#     .claude/commands/cdd-plan.md, the same way. Both carry the schema, so either can
+#     drift from the other; the seam checker only pins cdd-plan.md against cdd-implement.md.
 #   - no cdd-only markers appear in template/.claude/commands/ — they belong in the
 #     repo copies only; a marker in the template would be stripped from both sides
 #     of the comparison above and hide real drift.
@@ -94,6 +97,26 @@ if [[ -z "$doc_schema" ]]; then
 elif [[ "$doc_schema" != "$cmd_schema" ]]; then
   echo "DRIFT: handoff schema headings differ between $PROCESS_DOC and $REPO_CMDS/cdd-next-step.md" >&2
   diff <(printf '%s\n' "$doc_schema") <(printf '%s\n' "$cmd_schema") >&2 || true
+  fail=1
+fi
+
+# Plan-file-schema consistency: the same shape, keyed on the "# Plan:" line. The seam
+# checker (check 7) pins the producer against its consumer; this pins the producer
+# against the process doc, which documents the same schema and can drift from it.
+plan_schema_headings() {
+  awk '/^# Plan:/ { in_schema = 1 }
+       in_schema && /^## / { print }
+       in_schema && /^```/ { exit }' "$1"
+}
+
+doc_plan="$(plan_schema_headings "$PROCESS_DOC")"
+cmd_plan="$(plan_schema_headings "$REPO_CMDS/cdd-plan.md")"
+if [[ -z "$doc_plan" ]]; then
+  echo "ERROR: could not locate the plan-file schema block in $PROCESS_DOC" >&2
+  fail=1
+elif [[ "$doc_plan" != "$cmd_plan" ]]; then
+  echo "DRIFT: plan-file schema headings differ between $PROCESS_DOC and $REPO_CMDS/cdd-plan.md" >&2
+  diff <(printf '%s\n' "$doc_plan") <(printf '%s\n' "$cmd_plan") >&2 || true
   fail=1
 fi
 

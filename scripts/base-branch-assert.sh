@@ -14,6 +14,11 @@
 #   - `cdd-worktree` runs from a main worktree sitting on a non-default branch
 #     (gitflow develop): the guard is "not a linked worktree", not "on the
 #     default branch", so this must be admitted
+#   - `cdd-worktree`'s FIRST PROMPT is chosen by a capability probe, not a version:
+#     a worktree carrying .claude/commands/cdd-plan.md is launched on /cdd-plan; one
+#     without it gets the pre-split prose prompt naming the handoff. Plus the reverse
+#     skew — a retrofitted project against a cdd-state that predates `plan_written`
+#     prints one warning line and still launches
 #
 # Usage: scripts/base-branch-assert.sh
 # Takes no arguments; provisions and tears down its own temp tree. Requires jq
@@ -65,6 +70,23 @@ echo "claude $*" >> "$CLAUDE_STUB_LOG"
 exit 0
 EOF
 chmod +x "$WORK/bin/claude"
+
+# Stub `cdd-state` on PATH so the first-prompt probe's skew check has a ground truth
+# to read. cdd-worktree's subshell sources only the worktree helper, so `cdd-state`
+# there resolves through PATH to this stub; run_state below sources the real helper,
+# whose function shadows it. CDD_STUB_STATE_MODE picks which fleet we are standing in.
+cat > "$WORK/bin/cdd-state" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "stages" && "${CDD_STUB_STATE_MODE:-new}" == "new" ]]; then
+  printf '%s\n' scoped plan_approved plan_written implementation_done merged \
+                checks_passed pr_open addressed
+  exit 0
+fi
+# An older cdd-state has no `stages` subcommand at all: it prints usage and fails.
+echo "usage: cdd-state {seed|set|get|install}" >&2
+exit 2
+EOF
+chmod +x "$WORK/bin/cdd-state"
 
 # 1. Bare origin with a default branch and a develop branch cut from it. Each
 #    branch carries a distinct file so we can tell which one a worktree was cut from.
@@ -161,7 +183,12 @@ WT_DEF="$WORK/${REPO_NAME}-feat_default"
   || fail "feat_default should have been cut from the default branch (main_only.txt missing)"
 [[ ! -f "$WT_DEF/dev_only.txt" ]] \
   || fail "feat_default (no recorded base) must not be cut from develop"
+grep -qF "and follow the Implementation prompt." "$CLAUDE_STUB_LOG" \
+  || fail "a project without .claude/commands/cdd-plan.md must get the pre-split prose prompt. Log: $(cat "$CLAUDE_STUB_LOG")"
+grep -qF "/cdd-plan" "$CLAUDE_STUB_LOG" \
+  && fail "a project without .claude/commands/cdd-plan.md must not be launched on /cdd-plan"
 pass "cdd-worktree falls back to the default branch when no base was recorded"
+pass "first prompt: a non-retrofitted project gets the pre-split prose prompt"
 
 # 6. Guard: cdd-worktree runs from the main worktree even when it sits on a
 #    non-default branch (gitflow develop). The guard is "not a linked worktree"
@@ -178,5 +205,48 @@ WT_GF="$WORK/${REPO_NAME}-feat_gitflow"
 [[ -s "$CLAUDE_STUB_LOG" ]] \
   || fail "cdd-worktree must launch claude from a non-default main worktree"
 pass "cdd-worktree runs from a main worktree on a non-default branch (gitflow guard)"
+
+# 7. First-prompt probe, retrofitted project: with .claude/commands/cdd-plan.md
+#    committed on the base branch, the new worktree carries it and the helper must
+#    launch Claude on /cdd-plan in plan mode. The probe reads the worktree it just
+#    created — no marker, no recorded version.
+(
+  cd "$WORK/machine"
+  mkdir -p .claude/commands
+  printf 'Plan a task.
+
+# Plan: <t>
+
+## Summary
+' > .claude/commands/cdd-plan.md
+  git add .claude/commands/cdd-plan.md
+  git commit -q -m "retrofit: add cdd-plan"
+  git push -q origin "$BASE_BRANCH"
+)
+run_state seed feat_split --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_split failed"
+printf '# Task: feat_split
+
+body
+' > "$DIR/feat_split.md"
+: > "$CLAUDE_STUB_LOG"
+err="$(run_worktree feat_split 2>&1 >/dev/null)" || fail "cdd-worktree feat_split failed"
+[[ -d "$WORK/${REPO_NAME}-feat_split" ]]   || fail "cdd-worktree did not create the feat_split worktree"
+grep -qF -- "--permission-mode plan /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "a retrofitted project must be launched on /cdd-plan. Log: $(cat "$CLAUDE_STUB_LOG")"
+grep -qF "predates it" <<<"$err"   && fail "no skew warning is due when cdd-state knows plan_written. stderr: $err"
+pass "first prompt: a retrofitted project is launched on /cdd-plan, no skew warning"
+
+# 8. Reverse skew: same retrofitted project, but a cdd-state that predates the split.
+#    The probe cannot cover this direction, so the helper prints exactly one warning
+#    line — a visible degradation instead of a silent one — and still launches.
+run_state seed feat_skew --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_skew failed"
+printf '# Task: feat_skew
+
+body
+' > "$DIR/feat_skew.md"
+: > "$CLAUDE_STUB_LOG"
+err="$(CDD_STUB_STATE_MODE=old run_worktree feat_skew 2>&1 >/dev/null)"   || fail "cdd-worktree feat_skew failed"
+grep -qF -- "--permission-mode plan /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "skew must not stop the launch. Log: $(cat "$CLAUDE_STUB_LOG")"
+[[ "$(grep -c "plan/implement split" <<<"$err")" -eq 1 ]]   || fail "expected exactly one skew warning line. stderr: $err"
+pass "first prompt: an outdated cdd-state produces one visible skew warning, launch proceeds"
 
 echo "all base-branch smoke checks passed"

@@ -13,9 +13,11 @@ After bootstrap, the new project directory contains:
 ├── CLAUDE.md                                 # entry point Claude Code reads
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
-│   ├── settings.json                         # auto-allows sessions to read the handoff + run the cdd-state helper
+│   ├── settings.json                         # auto-allows sessions to read the handoff, write the plan file, run cdd-state
 │   └── commands/
 │       ├── cdd-next-step.md                      # handoff session
+│       ├── cdd-plan.md                           # plan session (explore, approve, write the plan file)
+│       ├── cdd-implement.md                      # implementation session (build from the plan file)
 │       ├── cdd-pre-pr.md                         # pre-PR session
 │       ├── cdd-merge-base.md                     # merge session (merge from main, with dry-run)
 │       └── cdd-process-pr.md                     # PR-review session (address PR review feedback)
@@ -90,7 +92,7 @@ The script will:
 
 3. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
 
-4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand.
+4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand. `cdd-worktree <branch>` then opens the task's worktree in plan mode on `/cdd-plan`, which writes the plan file and stops; you open a fresh `claude` in that worktree and run `/cdd-implement` to build from it.
 
 ## Per-project customisation
 

@@ -15,6 +15,9 @@
 #     GitHub does on merge), so it does not appear in the list
 #   - explicit `cdd-worktree-resume <branch>` for a remote-deleted branch is
 #     refused and creates no worktree
+#   - the closing "Next:" guidance branches on the task's stage: a task parked at
+#     `plan_written` is sent to /cdd-implement, anything else to the review-side
+#     commands (needs jq to read the record; skipped without it)
 #
 # Usage: scripts/worktree-resume-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. A stubbed
@@ -46,6 +49,8 @@ cat > "$GIT_CONFIG_GLOBAL" <<'EOF'
 [commit]
 	gpgsign = false
 EOF
+
+mkdir -p "$WORK/home"
 
 DEFAULT_BRANCH="main"
 FEATURE_A="gh_issue_99_demo"
@@ -91,6 +96,9 @@ git clone -q "$WORK/origin.git" "$WORK/seed" 2>/dev/null  # empty-repo warning i
 run_resume() {
   (
     cd "$1"
+    # Isolate HOME: resume materializes into $HOME/.cdd/handoffs/<repo>/, and the
+    # stage-dependent guidance below reads the record from there.
+    export HOME="$WORK/home"
     export PATH="$WORK/bin:$PATH"
     # shellcheck source=/dev/null
     source "$HELPER"
@@ -177,5 +185,42 @@ set -e
   || fail "explicit resume of remote-deleted $FEATURE_C must not create a worktree"
 [[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "refused resume must not launch claude"
 pass "explicit resume of a remote-deleted branch is refused without a worktree"
+
+# 7. The closing guidance branches on the task's stage. A task parked at
+#    `plan_written` has an approved plan on disk and no code yet, so it resumes into
+#    /cdd-implement rather than into a review-side command. The helper reads the
+#    record itself (no cdd-state dependency), so this needs jq.
+if command -v jq >/dev/null 2>&1; then
+  git clone -q "$WORK/origin.git" "$WORK/repoD"
+  state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoD")"
+  mkdir -p "$state_dir"
+  printf '{"schema_version":1,"branch":"%s","stage":"plan_written","pr":null,"sessions":[]}\n' \
+    "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
+  set +e
+  out="$(run_resume "$WORK/repoD" "$FEATURE_B" "" 2>&1)"
+  rc=$?
+  set -e
+  [[ "$rc" -eq 0 ]] || fail "resume of a plan_written task exited $rc: $out"
+  grep -q "/cdd-implement" <<<"$out" \
+    || fail "a plan_written task must be sent to /cdd-implement. Output:\n$out"
+  pass "a task parked at plan_written resumes into /cdd-implement"
+
+  # And the default is unchanged for any other stage.
+  git clone -q "$WORK/origin.git" "$WORK/repoE"
+  state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoE")"
+  mkdir -p "$state_dir"
+  printf '{"schema_version":1,"branch":"%s","stage":"implementation_done","pr":null,"sessions":[]}\n' \
+    "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
+  set +e
+  out="$(run_resume "$WORK/repoE" "$FEATURE_B" "" 2>&1)"
+  rc=$?
+  set -e
+  [[ "$rc" -eq 0 ]] || fail "resume of an implementation_done task exited $rc: $out"
+  grep -q "/cdd-pre-pr" <<<"$out" \
+    || fail "a non-plan_written task must keep the review-side guidance. Output:\n$out"
+  pass "any other stage keeps the review-side resume guidance"
+else
+  echo "skip: jq not available; the stage-dependent resume guidance reads the record with jq"
+fi
 
 echo "all worktree-resume smoke checks passed"
