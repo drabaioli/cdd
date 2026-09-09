@@ -387,7 +387,7 @@ The approval between the two phases is **conditional** (checkpoint 4, §4). On t
 
 ### 3.6 Pre-PR session: `/cdd-pre-pr`
 
-A fresh session on the feature branch, started after the implementation session has closed — deliberately, so the implementation session never grades its own homework. It runs the project's check runner (§2.14) — the same command CI runs, so the verdict carries over — code-reviews the diff, and reconciles four things:
+A fresh session on the feature branch, started after the implementation session has closed — deliberately, so the implementation session never grades its own homework. It runs the project's check runner (§2.14) — the same command CI runs, so the verdict carries over — code-reviews the diff and checks it against the handoff's `## Requirements` (§2.6), and reconciles four things:
 
 - **Docs**: architecture and feature docs are compared against the actual code and fixed directly; roadmap checkboxes are ticked directly, while structural roadmap edits (add/modify/remove) are proposed to the human for approval before applying.
 - **Test coverage**: each behavioural change in the diff either has a test exercising it, or the reason it doesn't is recorded — the recurring guardrail behind §2.12's tested-behaviour row. If the project has no test harness yet, the step notes the untested change and confirms that standing up tests is tracked on the roadmap; it does not invent a framework.
