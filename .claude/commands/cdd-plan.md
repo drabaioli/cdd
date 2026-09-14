@@ -17,7 +17,7 @@ echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 
 Read the handoff. Its `## Requirements` section is the done-test for this task: your plan must satisfy every criterion, and you check it against them in step 3. Its `## Notes` section lists open questions deferred to you — address them up front rather than mid-plan.
 
-Then rebuild context from the repo: the roadmap and the architecture/feature doc indexes, loading only the documents the task touches. (`CLAUDE.md` is already in context — do not re-read it.)
+Then rebuild context from the repo: the roadmap and the architecture/feature doc indexes, loading only the documents the task touches.
 
 If the plan file already exists, this task has already been planned. Say so, show the existing plan's `## Summary`, and ask whether to replan from scratch or hand off to `/cdd-implement` — do not silently overwrite.
 
@@ -53,9 +53,9 @@ No granular detail and no exploration log — the human should be able to approv
 
 ## 5. Checkpoint: plan approval
 
-This is checkpoint 3, and it is the only gate in the implementation cycle. Ask the human, plainly, to approve the plan or push back — the same explicit ask `/cdd-next-step` makes for the handoff. This session is an ordinary one: nothing mechanical stops you from writing, so **write nothing — inside the repo or out of it — until the answer is yes**.
+This is checkpoint 3, and it is the only gate in the implementation cycle. Ask the human to approve the plan or push back, and iterate until it is approved.
 
-Iterate on the plan until it is approved.
+Nothing mechanical stops you from writing here, so **write nothing — inside the repo or out of it — until the answer is yes**.
 
 ## 6. Write the plan file
 

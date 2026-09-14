@@ -161,7 +161,7 @@ cdd-worktree() {
     fi
   else
     # DEPRECATION SEAM: pre-split flow, whose checkpoint was plan mode. Remove once
-    # every project is retrofitted; needs the handoff's `## Implementation prompt`.
+    # every project is retrofitted (issue #90); needs `## Implementation prompt`.
     launch=(--permission-mode plan "Read ${handoff} and follow the Implementation prompt.")
   fi
   claude "${launch[@]}"

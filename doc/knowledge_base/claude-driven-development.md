@@ -367,7 +367,7 @@ It surfaces deferred or freshly-discovered open questions, confirms scope, check
 
 The handoff is immutable (§2.6), so a `## Requirements` criterion the human agrees to amend or drop here is recorded in the plan instead. That record is the channel to `/cdd-pre-pr` (§3.6), which otherwise re-checks the diff against wording nobody stands behind any more and reports the amendment as a miss.
 
-Approval is the load-bearing checkpoint, and the session is an **ordinary one** — it asks for approval explicitly, the way the handoff session does, rather than leaning on an agent harness's plan mode. That is deliberate: the gate is a workflow rule, so it must hold on any harness, and tying it to one vendor's feature would make it disappear wherever that feature does not exist. On approval the session writes the plan file (§2.15) and advances the state record to `plan_written` — the write that pushes the plan onto the task ref — prints the next command, and **stops**. It edits nothing in the repo.
+Approval is the load-bearing checkpoint, and it is an **explicit ask** — the session asks the human to approve the plan, the way the handoff session asks. The gate is a workflow rule and has to hold wherever the workflow runs, so it does not lean on an agent harness's plan mode. On approval the session writes the plan file (§2.15) and advances the state record to `plan_written` — the write that pushes the plan onto the task ref — prints the next command, and **stops**. It edits nothing in the repo.
 
 ### 3.4 Implementation session: `/cdd-implement` (on the same worktree)
 
