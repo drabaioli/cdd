@@ -33,8 +33,8 @@
 #
 # Provides (when sourced):
 #   cdd-worktree <branch>   Create a new worktree for <branch> and launch
-#                               `claude` in plan mode in it with the suggested
-#                               first prompt already submitted. Requires a
+#                               `claude` in it with the suggested first prompt
+#                               already submitted. Requires a
 #                               handoff file at
 #                               ~/.cdd/handoffs/<repo-name>/<branch>.md (run
 #                               /cdd-next-step first). Run from the main worktree.
@@ -58,10 +58,12 @@
 #                           Pick up a task started on another machine: recreate
 #                               a worktree tracking an EXISTING remote branch
 #                               (no handoff required) and cd into it, ready for
-#                               you to run /cdd-process-pr, /cdd-merge-base, or
-#                               /cdd-pre-pr. With no argument, lists remote
-#                               feature branches not already checked out and
-#                               prompts for one. Run from the main worktree.
+#                               you to run /cdd-implement (a task parked at
+#                               plan_written), or /cdd-process-pr,
+#                               /cdd-merge-base, or /cdd-pre-pr. With no
+#                               argument, lists remote feature branches not
+#                               already checked out and prompts for one. Run
+#                               from the main worktree.
 #
 #   cdd-worktree-gc [--force]
 #                           Reap the artifacts of FINISHED tasks: the local
@@ -147,8 +149,22 @@ cdd-worktree() {
   git worktree add -b "$branch" "$worktree_path" "${start[@]}" || return 1
   cd "$worktree_path" || return 1
 
-  local first_prompt="Read ${handoff} and follow the Implementation prompt."
-  claude --permission-mode plan "$first_prompt"
+  # Capability probe, not a version check (§2.8): ask the worktree whether this
+  # project has the plan/implement split. No marker to go stale.
+  local -a launch=("/cdd-plan")
+  if [[ -f .claude/commands/cdd-plan.md ]]; then
+    # Reverse skew the probe cannot see: an installed cdd-state predating the split
+    # would reject `set plan_written` and stall the task silently.
+    if ! cdd-state stages 2>/dev/null | grep -qx plan_written; then
+      echo "This project uses the plan/implement split, but your cdd-state helper is" >&2
+      echo "missing or predates it. Reinstall: ./tools/cdd-state.sh install" >&2
+    fi
+  else
+    # DEPRECATION SEAM: pre-split flow, whose checkpoint was plan mode. Remove once
+    # every project is retrofitted (issue #90); needs `## Implementation prompt`.
+    launch=(--permission-mode plan "Read ${handoff} and follow the Implementation prompt.")
+  fi
+  claude "${launch[@]}"
 }
 
 cdd-worktree-done() {
@@ -182,8 +198,10 @@ cdd-worktree-done() {
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   local handoff="$HOME/.cdd/handoffs/${repo_name}/${branch}.md"
   # The per-task state record (written by the slash commands) is an additive
-  # sibling of the handoff; it shares the handoff's deletion lifecycle.
+  # sibling of the handoff; it shares the handoff's deletion lifecycle. So does the
+  # plan file (§2.15).
   local state_file="${handoff%.md}.state.json"
+  local plan_file="${handoff%.md}.plan.md"
 
   cd "$main_path" || return 1
   if ! git pull --ff-only origin "$default_branch"; then
@@ -247,6 +265,7 @@ cdd-worktree-done() {
   # 3. Handoff + state-record deletion (only if branch was actually deleted).
   if (( branch_deleted )); then
     [[ -f "$handoff" ]] && rm "$handoff" && echo "Removed handoff: $handoff"
+    [[ -f "$plan_file" ]] && rm "$plan_file" && echo "Removed plan: $plan_file"
     [[ -f "$state_file" ]] && rm "$state_file" && echo "Removed state: $state_file"
     # Best-effort: drop the per-task sync ref on origin so refs/cdd/* doesn't
     # accumulate. Advisory — a failed delete (no such ref, offline) never blocks.
@@ -255,10 +274,27 @@ cdd-worktree-done() {
     fi
   else
     [[ -f "$handoff" ]] && echo "Kept handoff: $handoff"
+    [[ -f "$plan_file" ]] && echo "Kept plan: $plan_file"
     [[ -f "$state_file" ]] && echo "Kept state: $state_file"
   fi
 
   echo "Done. In $main_path on $default_branch at $(git rev-parse --short HEAD)."
+}
+
+# Print the task branches that have a handoff in $1, one per line.
+#
+# THE ONE PLACE that reads the handoff directory (§2.15): a bare *.md glob matches
+# <branch>.plan.md too, and basename'ing that yields a phantom "<branch>.plan" task.
+# Both callers (cdd-worktree-list, cdd-worktree-gc) go through here rather than
+# repeating the filter.
+cdd-worktree-handoff-branches() {
+  local dir="$1" f
+  shopt -s nullglob
+  for f in "$dir"/*.md; do
+    [[ "$f" == *.plan.md ]] && continue
+    basename "$f" .md
+  done
+  shopt -u nullglob
 }
 
 cdd-worktree-list() {
@@ -271,10 +307,9 @@ cdd-worktree-list() {
     return 0
   fi
 
-  shopt -s nullglob
-  local files=( "$handoff_dir"/*.md )
-  shopt -u nullglob
-  if (( ${#files[@]} == 0 )); then
+  local branches=()
+  mapfile -t branches < <(cdd-worktree-handoff-branches "$handoff_dir")
+  if (( ${#branches[@]} == 0 )); then
     echo "No handoffs in $handoff_dir."
     return 0
   fi
@@ -294,10 +329,8 @@ cdd-worktree-list() {
   printf '%-40s  %-8s  %-8s  %-12s  %s\n' \
          "------" "--------" "-------" "--" "------"
 
-  local f branch wt br pr status
-  for f in "${files[@]}"; do
-    branch="$(basename "$f" .md)"
-
+  local branch wt br pr status
+  for branch in "${branches[@]}"; do
     if grep -qx "$branch" <<<"$worktree_branches"; then
       wt="yes"
     else
@@ -336,11 +369,11 @@ cdd-worktree-list() {
   done
 }
 
-# Garbage-collect the artifacts of FINISHED tasks: the local handoff + state record
-# and the remote sync ref refs/cdd/<branch>. This is the safety net for the cleanup
-# in cdd-worktree-done never running, its remote-ref delete failing while offline, or
-# a task resumed on several machines leaving materialized copies behind on every
-# machine but the one where `done` ran. It reaps ONLY tasks whose PR has merged — the
+# Garbage-collect the artifacts of FINISHED tasks: the local handoff, plan file and
+# state record, and the remote sync ref refs/cdd/<branch>. This is the safety net for
+# the cleanup in cdd-worktree-done never running, its remote-ref delete failing while
+# offline, or a task resumed on several machines leaving materialized copies behind on
+# every machine but the one where `done` ran. It reaps ONLY tasks whose PR has merged — the
 # same signal cdd-worktree-done trusts — so it never touches a task that is merely
 # scoped-but-unstarted (the handoff and ref exist before the branch does, §2.6/§2.13)
 # or one with an open PR: those are indistinguishable from a finished task by ref or
@@ -366,11 +399,14 @@ cdd-worktree-gc() {
   local handoff_dir="$HOME/.cdd/handoffs/${repo_name}"
 
   # Candidate branches = local handoff/state basenames ∪ remote refs/cdd/* names.
+  # Plans need no glob: a task with a plan always has a handoff.
   # Track which refs exist on origin so the reap reports and acts accurately.
   local -A seen=() has_ref=()
   local f branch ref
+  while IFS= read -r branch; do
+    [[ -n "$branch" ]] && seen["$branch"]=1
+  done < <(cdd-worktree-handoff-branches "$handoff_dir")
   shopt -s nullglob
-  for f in "$handoff_dir"/*.md;         do seen["$(basename "$f" .md)"]=1; done
   for f in "$handoff_dir"/*.state.json; do seen["$(basename "$f" .state.json)"]=1; done
   shopt -u nullglob
   while IFS= read -r ref; do
@@ -385,7 +421,7 @@ cdd-worktree-gc() {
     return 0
   fi
 
-  local reaped=0 kept=0 pr_state handoff state items joined
+  local reaped=0 kept=0 pr_state handoff plan state items joined
   for branch in "${!seen[@]}"; do
     pr_state="$(gh pr list --head "$branch" --state all --json state \
                   --jq '.[0].state // empty' 2>/dev/null)"
@@ -395,17 +431,20 @@ cdd-worktree-gc() {
       continue
     fi
 
-    # Merged → finished → reap the local handoff/state and the remote ref.
+    # Merged → finished → reap the local handoff/plan/state and the remote ref.
     reaped=$(( reaped + 1 ))
     handoff="${handoff_dir}/${branch}.md"
+    plan="${handoff_dir}/${branch}.plan.md"
     state="${handoff_dir}/${branch}.state.json"
     items=()
     [[ -f "$handoff" ]] && items+=("handoff")
+    [[ -f "$plan" ]] && items+=("plan")
     [[ -f "$state" ]] && items+=("state")
     [[ -n "${has_ref[$branch]:-}" ]] && items+=("refs/cdd/$branch")
     joined="$(IFS=,; echo "${items[*]}")"
     if (( force )); then
       [[ -f "$handoff" ]] && rm -f "$handoff"
+      [[ -f "$plan" ]] && rm -f "$plan"
       [[ -f "$state" ]] && rm -f "$state"
       [[ -n "${has_ref[$branch]:-}" ]] && git push origin --delete "refs/cdd/$branch" 2>/dev/null
       echo "reap  $branch (MERGED): removed ${joined:-nothing present}"
@@ -427,7 +466,8 @@ cdd-worktree-gc() {
 # separate self-installing files). Prints the index of $1, or -1 when unknown.
 cdd-worktree-stage-index() {
   local stage="$1" i=0 s
-  for s in scoped plan_approved implementation_done merged checks_passed pr_open addressed; do
+  for s in scoped plan_written implementation_done merged checks_passed \
+           pr_open addressed; do
     [[ "$s" == "$stage" ]] && { printf '%s\n' "$i"; return 0; }
     i=$(( i + 1 ))
   done
@@ -449,14 +489,17 @@ cdd-worktree-extract() {
   fi
 }
 
-# Fetch the per-task ref refs/cdd/<branch> from origin and materialize the handoff +
-# state record into ~/.cdd/handoffs/<repo>/. Advisory and best-effort: returns 0 when
-# a ref was found (having printed what it did), 1 when there is no ref (offline, no
-# origin, or none pushed) so the caller keeps the honest no-transfer messaging.
-# Heuristics: the handoff .md is immutable after seed, so it is written only when
-# absent locally; the state .json follows most-advanced-stage-wins (compare .stage
+# Fetch the per-task ref refs/cdd/<branch> from origin and materialize the handoff,
+# plan file and state record into ~/.cdd/handoffs/<repo>/. Advisory and best-effort:
+# returns 0 when a ref was found (having printed what it did), 1 when there is no ref
+# (offline, no origin, or none pushed) so the caller keeps the honest no-transfer
+# messaging. Heuristics: the handoff .md is immutable after seed, so it is written only
+# when absent locally; the state .json follows most-advanced-stage-wins (compare .stage
 # indices, keep the further-along side), falling back to write-only-if-absent when jq
-# is unavailable. Never clobbers a more-advanced local record. See shell-helpers.md.
+# is unavailable. Never clobbers a more-advanced local record. The plan file is mutable
+# (the human may edit it before implementing), so it cannot use the handoff's rule; it
+# travels WITH the state record instead — taken when absent locally, or when the ref's
+# record won the stage comparison. See shell-helpers.md.
 cdd-worktree-materialize-ref() {
   local branch="$1"
   git fetch origin "refs/cdd/$branch" 2>/dev/null || return 1
@@ -468,12 +511,19 @@ cdd-worktree-materialize-ref() {
   mkdir -p "$dir"
   local handoff_dest="${dir}/${branch}.md"
   local state_dest="${dir}/${branch}.state.json"
+  local plan_dest="${dir}/${branch}.plan.md"
 
   # Handoff: immutable after seed → materialize only when absent locally.
   if [[ ! -f "$handoff_dest" ]] && git cat-file -e FETCH_HEAD:handoff.md 2>/dev/null; then
     cdd-worktree-extract handoff.md "$handoff_dest" \
       && echo "Materialized handoff: $handoff_dest"
   fi
+
+  # Plan file (§2.15): mutable, so it rides with the state record rather than with the
+  # handoff. `take_plan` records the verdict the state comparison below reaches; the
+  # extraction happens after it, so both files land on the same decision.
+  local take_plan=0
+  [[ ! -f "$plan_dest" ]] && take_plan=1
 
   # State record: most-advanced-stage wins.
   if git cat-file -e FETCH_HEAD:state.json 2>/dev/null; then
@@ -487,6 +537,7 @@ cdd-worktree-materialize-ref() {
       ref_idx="$(cdd-worktree-stage-index "$ref_stage")"
       local_idx="$(cdd-worktree-stage-index "$local_stage")"
       if (( ref_idx > local_idx )); then
+        take_plan=1
         cdd-worktree-extract state.json "$state_dest" \
           && echo "Updated state record from ref (stage ${local_stage:-?} -> ${ref_stage:-?})."
       else
@@ -496,15 +547,22 @@ cdd-worktree-materialize-ref() {
       echo "Kept local state record (jq unavailable to compare stages)."
     fi
   fi
+
+  if (( take_plan )) && git cat-file -e FETCH_HEAD:plan.md 2>/dev/null; then
+    cdd-worktree-extract plan.md "$plan_dest" \
+      && echo "Materialized plan: $plan_dest"
+  elif [[ -f "$plan_dest" ]]; then
+    echo "Kept local plan: $plan_dest"
+  fi
   return 0
 }
 
 # Recreate a worktree on an EXISTING remote branch so a task started on another
 # machine can be picked up here. Unlike cdd-worktree, this requires no handoff and
 # tracks the remote branch rather than creating a new one. If the originating machine
-# synced a per-task ref (refs/cdd/<branch>, see cdd-state), the handoff and state
-# record are fetched and materialized here before launch (most-advanced-stage wins,
-# advisory — a missing ref just means nothing to transfer); the resume-side commands
+# synced a per-task ref (refs/cdd/<branch>, see cdd-state), the handoff, plan file and
+# state record are fetched and materialized here before launch (most-advanced-stage
+# wins, advisory — a missing ref just means nothing to transfer); the resume-side commands
 # (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read PR/branch state from git and
 # gh, not the handoff, so its absence is still fine.
 cdd-worktree-resume() {
@@ -618,12 +676,27 @@ cdd-worktree-resume() {
 
   echo
   echo "Resumed worktree for '$branch' on origin/$branch (now in $worktree_path)."
-  # Fetch + materialize the handoff/state from refs/cdd/<branch> if it was synced.
+  # Fetch + materialize the handoff/plan/state from refs/cdd/<branch> if it was synced.
   if ! cdd-worktree-materialize-ref "$branch"; then
-    echo "No synced task ref (refs/cdd/$branch); handoff/state not transferred."
+    echo "No synced task ref (refs/cdd/$branch); handoff/plan/state not transferred."
     echo "Resume-side commands read PR/branch state from git and gh, so this is fine."
   fi
-  echo "Next: start Claude Code here and run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
+  # A task parked at plan_written has an approved plan on disk and no code yet, so it
+  # resumes into the implementation half of the split rather than into a review-side
+  # command. Read the record directly rather than shelling out to cdd-state: this
+  # helper already derives the same path in cdd-worktree, and staying self-contained
+  # keeps the two separately-installed helpers independent at runtime.
+  local stage="" repo_name_r state_r
+  repo_name_r="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  state_r="$HOME/.cdd/handoffs/${repo_name_r}/${branch}.state.json"
+  if command -v jq >/dev/null 2>&1 && [[ -f "$state_r" ]]; then
+    stage="$(jq -r '.stage // empty' "$state_r" 2>/dev/null)"
+  fi
+  if [[ "$stage" == "plan_written" ]]; then
+    echo "Next: start Claude Code here and run /cdd-implement (the plan is approved and on disk)."
+  else
+    echo "Next: start Claude Code here and run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
+  fi
 }
 
 # Install this helper to its stable home and wire it into the user's shells.
@@ -722,7 +795,20 @@ SHIM
 #!/usr/bin/env bash
 # Managed by cdd-worktree.sh install — PATH entry point so this command resolves
 # in non-interactive shells too. Regenerated on each install; do not hand-edit.
-source "\$HOME/.cdd/tools/cdd-worktree.sh"
+# The guards are load-bearing: without them, a missing or broken helper leaves the
+# function undefined, the call below re-resolves to THIS shim through PATH, and the
+# result is unbounded recursion rather than an error.
+helper="\$HOME/.cdd/tools/cdd-worktree.sh"
+if [[ ! -f "\$helper" ]]; then
+  echo "$cmd: helper not found at \$helper; reinstall with: bash <cdd>/tools/cdd-worktree.sh install" >&2
+  exit 127
+fi
+# shellcheck source=/dev/null
+source "\$helper"
+if ! declare -F $cmd >/dev/null 2>&1; then
+  echo "$cmd: \$helper did not define $cmd; reinstall it." >&2
+  exit 127
+fi
 $cmd "\$@"
 SHIM
     chmod +x "$bin_dir/$cmd"

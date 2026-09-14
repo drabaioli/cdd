@@ -3,6 +3,7 @@
 #
 # If you add a new <...> placeholder to a template slash command, add it here
 # too. The template-smoke CI workflow fails otherwise.
+<architecture/feature/CLAUDE.md edits and roadmap ticks the implementation must apply>
 <body>
 <branch>
 <branch_name>
@@ -11,9 +12,10 @@
 <count>
 <count or "none">
 <BASE_BRANCH>
-<deferred open questions for the implementation session, proposed roadmap edits, caveats — or "None" if clean>
+<deferred open questions for /cdd-plan, proposed roadmap edits, caveats — or "None" if clean>
 <descriptive_slug>
 <exact checkbox line(s) from the roadmap being addressed>
+<facts from outside the repo, quoted verbatim, each with its source — or "None">
 <file>
 <files reconciled in steps 3–8>
 <format check command>
@@ -25,17 +27,25 @@
 <N>
 <n>
 <new convention / new utility / refactored interface>
+<observable acceptance criteria, as few as possible — typically 3-6, hard cap 10; no design>
+<one paragraph, then the ordered steps; each step names the files it touches>
 <one-line description>
 <one-line description of what was adopted from main>
 <one-line description of what was adopted from the base branch>
 <one-line implication>
 <one of:>
+<path → what changes, plus the distilled fact: `file:line` + your one-line conclusion>
 <repo-name>
+<repo>
 <REPO_ROOT>
 <sha>
 <short title>
 <slug>
+<the handoff's deferred questions and the answers agreed here, plus any `## Requirements` criterion amended or dropped with the human's agreement — or "None">
+<the same bounded digest printed above>
 <the self-contained prompt from step 5>
 <title>
 <unit test command>
 <url>
+<what was tried and why it failed, so it is not re-explored — or "None">
+<which check-runner gates to run, which assertions or tests to add or extend>

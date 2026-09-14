@@ -1,6 +1,6 @@
-Scope the next roadmap task and produce a handoff file for a fresh implementation session.
+Scope the next roadmap task and produce a handoff file for a fresh plan session.
 
-This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated implementation session will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.cdd/handoffs/cdd/`.
+This is the exploratory-session command. Run on the main worktree. Output is a handoff file that a later, isolated plan session (`/cdd-plan`) will consume. This session does **not** modify any file in the repo; the only artifact it produces is the handoff file under `~/.cdd/handoffs/cdd/`.
 
 ## 0. Mode: roadmap-driven, intent-driven, or issue-driven
 
@@ -65,11 +65,11 @@ gh pr list --state open --json number,headRefName        # already-started issue
 
 Present the filtered list (number + title) and let the user pick one; then fetch its detail with `gh issue view` as above.
 
-Use the issue's title + body + comments as the **intent text**, and continue with §1, then §3-intent. The issue number is carried forward only via the branch name in §5 (`gh_issue_NN_<slug>`) — there is no commit trailer and the implementation session does not re-read the issue.
+Use the issue's title + body + comments as the **intent text**, and continue with §1, then §3-intent. The issue number is carried forward only via the branch name in §5 (`gh_issue_NN_<slug>`) — there is no commit trailer, and no downstream session is required to re-read the issue.
 
 ## 1. Read context
 
-Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the implementation session will rebuild detailed context.
+Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the plan session will rebuild detailed context.
 
 **Intent-driven and issue-driven modes**, load context adaptively to preserve context economy: after the roadmap and the two indexes above, selectively open only the docs the described task (or the resolved issue) actually touches — enough to scope it and detect overlap with existing work, not an exhaustive read.
 
@@ -81,13 +81,15 @@ List existing handoff files:
 ls ~/.cdd/handoffs/cdd/ 2>/dev/null
 ```
 
-For each file `<branch>.md`, check whether the branch still exists locally:
+The handoffs are the `<branch>.md` files. Their branch-named siblings are **not** handoffs — skip `<branch>.plan.md` (the plan file) and `<branch>.state.json`, and skip the per-repo `repo.json`; treating `<branch>.plan.md` as a handoff would invent a task named `<branch>.plan`.
+
+For each handoff `<branch>.md`, check whether the branch still exists locally:
 
 ```bash
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it together with its state sibling (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
+If the branch is gone, the handoff is stale. For each stale handoff, prompt the user inline whether to delete it together with its branch-named siblings (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.plan.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
 
 For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
 
@@ -119,19 +121,25 @@ Discuss with the user. Ask clarifying questions, but keep them to the requiremen
 - Whether the work needs a new test category.
 - The task's **base branch** — the branch it is cut from and merges back into. It defaults to the branch checked out here (ordinary work, and gitflow where you sit on `develop`); confirm an override only when the task stacks on another feature branch.
 
-Hard, open-ended technical questions are deferred to the implementation session, which will have a clean context dedicated to one task. Examples of expensive clarification (defer):
+Hard, open-ended technical questions are deferred to the **plan session** (`/cdd-plan`), which will have a clean context dedicated to one task, in the real worktree. Examples of expensive clarification (defer):
 
 - Detailed API design.
 - Algorithm selection where there are real tradeoffs.
 - Subtle concurrency or lifecycle questions.
 
-When you defer a question, list it explicitly in the handoff's Notes section so the implementation session addresses it up front.
+When you defer a question, list it explicitly in the handoff's Notes section so `/cdd-plan` addresses it up front.
 
 ## 5. Draft the handoff
 
 When the user signals they're ready, draft:
 
 **Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: prefix the name with the fixed `gh_issue_NN_` token so the issue number is durable and groups cleanly — `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). This token is the sole mechanism threading the issue to its PR (`/cdd-pre-pr` turns it into `Closes #NN`).
+
+**Requirements**: the observable acceptance criteria — what "done" means for this task, checkable against the finished diff. **As few as possible: typically 3–6, hard cap 10.** Each is an observation, not a design decision ("the command prints its digest before the approval checkpoint", not "add a `print_digest()` helper").
+
+This section exists because the plan and the implementation run in separate windows: it is the one artifact that survives both and can be checked against each — `/cdd-plan` checks its plan against it, `/cdd-implement` treats it as the done-test, and `/cdd-pre-pr` reconciles the diff against it instead of inferring intent.
+
+The cap is what keeps this from turning the session into a requirements interview, which the cheap/expensive split in step 4 exists to prevent. A criterion you cannot state cheaply here is a **deferred question for `/cdd-plan`**, recorded in Notes — not grounds for an interview.
 
 **Implementation prompt**: a self-contained prompt for the new session. Critical rule, the new session will read `CLAUDE.md`, the roadmap, and the architecture/feature docs itself. Include only context that is **not** inferable from the repo:
 
@@ -144,19 +152,29 @@ Do **not** restate project conventions, coding style, build commands, or anythin
 
 **Issue-driven mode**: open the implementation prompt by noting the source issue inline — `Sourced from GitHub issue #NN ("<title>", <url>).` — then write the scoped prompt as usual. The issue reference lives in the prose, not a separate handoff field.
 
-End the implementation prompt with these standing instructions (verbatim):
+The prompt is a plain task spec. It carries no standing instructions about planning, committing, or advancing the state record: those live in `/cdd-plan` and `/cdd-implement`, where they are improved once instead of regenerated into every handoff.
 
-> Before writing a plan, surface any remaining open questions and confirm scope with the user.
->
-> When the work is done, commit your own changes locally (no push), following the commit conventions in CLAUDE.md. Commit only the files you changed — add them by path, never `git add -A`. If the tree holds changes you didn't make, surface them rather than committing them.
->
-> Twice, advance the task **state record** with the `cdd-state` helper (advisory; it skips silently if the record is absent): **when the plan is approved**, before writing any code, run `cdd-state set plan_approved`; **after your local commit**, run `cdd-state set implementation_done`.
+Show the draft to the user for approval, after the digest below. Iterate if needed.
 
-Show the draft to the user for approval. Iterate if needed.
+## 5b. Print the bounded digest
+
+Immediately before asking for approval, print a plainly-worded digest of the handoff in chat: **at most 7 bullets, one line each**. The cap is the feature — an uncapped digest is the wall of text the checkpoint gets skimmed for, and the human should be able to approve or push back without reading the artifact.
+
+Cover, in this order, skipping any that do not apply:
+
+1. The task, in one line.
+2. Why now — the problem it addresses.
+3. What "done" means (the `## Requirements`, condensed).
+4. What rides along, or what this is coupled to.
+5. The mechanical surface — roughly what gets touched.
+6. What is explicitly out of scope.
+7. Questions deferred to `/cdd-plan`.
+
+(The cap is a starting point; tuning it, and generalizing this convention to the other commands, is tracked separately.)
 
 ## 6. Note any roadmap edits implied
 
-If the discussion surfaced changes the roadmap should reflect (new tasks to add, existing tasks to split or remove, tasks that need rewording), record these in the handoff's Notes section as an instruction to the implementation session. **Do not edit the roadmap file in this session.** The implementation session will make the edits as part of its work.
+If the discussion surfaced changes the roadmap should reflect (new tasks to add, existing tasks to split or remove, tasks that need rewording), record these in the handoff's Notes section as an instruction to the implementation session. **Do not edit the roadmap file in this session.** `/cdd-implement` will make the edits as part of its work.
 
 ## 7. Write the handoff file
 
@@ -171,11 +189,14 @@ On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
 ## Roadmap reference
 <exact checkbox line(s) from the roadmap being addressed>
 
+## Requirements
+<observable acceptance criteria, as few as possible — typically 3-6, hard cap 10; no design>
+
 ## Implementation prompt
 <the self-contained prompt from step 5>
 
 ## Notes
-<deferred open questions for the implementation session, proposed roadmap edits, caveats — or "None" if clean>
+<deferred open questions for /cdd-plan, proposed roadmap edits, caveats — or "None" if clean>
 ```
 
 Create the per-repo handoff directory if it doesn't exist:
@@ -196,7 +217,7 @@ After writing, print exactly (the install line is a static reminder — do **not
 
 ```
 Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
-Next: cdd-worktree <branch>
+Next: cdd-worktree <branch>   (opens a plan session on /cdd-plan; /cdd-implement follows in a fresh session)
 
 If `cdd-worktree` or `cdd-state` is "command not found", install the shared helpers once (machine-global, like git/gh), then open a new shell:
   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
@@ -204,4 +225,4 @@ If `cdd-worktree` or `cdd-state` is "command not found", install the shared help
   (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install)
 ```
 
-The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with the first prompt already submitted.
+The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with `/cdd-plan` already submitted. That session plans and stops; the user then opens another fresh session in the same worktree and runs `/cdd-implement`.

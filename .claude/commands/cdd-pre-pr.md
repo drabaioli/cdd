@@ -58,6 +58,21 @@ Review for:
 
 Flag any issues found. If new conventions are established during this review (something the change does that should become the project norm), update the coding standard accordingly.
 
+**Then check the diff against the handoff's acceptance criteria.** The handoff carries a `## Requirements` section: the observable done-test, written before a plan existed and the one artifact that survives both the plan and the implementation window — so it is what catches a plan that misread the intent and an implementation that faithfully built the wrong thing.
+
+```bash
+repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+branch="$(git rev-parse --abbrev-ref HEAD)"
+echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
+echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
+```
+
+Read it and check the diff criterion by criterion. Report any criterion the diff does not satisfy, and any it satisfies differently than stated — the deviation may be right, but it should be named rather than discovered at review.
+
+**Read the plan file's `## Open questions resolved` before judging a miss.** The handoff is immutable, so a criterion the human agreed to amend or drop during planning is recorded there rather than edited into the handoff. A criterion the plan records as amended is not a miss — report it as an approved amendment, with what replaced it, so the change is visible without being an alarm. A criterion the diff simply does not satisfy, with no such record, still is.
+
+This is a check, not a gate: if the handoff is absent, or carries no `## Requirements` (an older task), or there is no plan file, say so in one line and move on.
+
 ## 4. Documentation reconciliation
 
 Check and **update** documentation based on the changes:
@@ -136,7 +151,7 @@ Two of the runner's gates are specific to the CDD repo (the meta-project) and, u
 
 On divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence).
 
-**`seams` — `scripts/prompt-seam-check.sh`.** Deterministic seam-contract checks over the repo's own prompts, guarding against a one-sided edit silently stranding a downstream prompt-driven step. It verifies six seams with grep only (no LLM, no API key): every `/cdd-*` reference across the repo's markdown resolves to an existing command file (known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`); the `gh_issue_NN` branch token produced in `cdd-next-step.md` is still consumed (turned into a `Closes #NN` line) in `cdd-pre-pr.md`; backticked file paths in the command files, `CLAUDE.md`, and `README.md` resolve to real files; each `cdd-*.md` still carries its load-bearing headings; the gate count stated in prose here and in `CLAUDE.md` matches what `./scripts/ci.sh list` registers; and every open row of the template's engineering-practices contract is named in the engineering-floor question `/cdd-bootstrap` asks, so a practice added there cannot ship resolved by guess.
+**`seams` — `scripts/prompt-seam-check.sh`.** Deterministic seam-contract checks over the repo's own prompts, guarding against a one-sided edit silently stranding a downstream prompt-driven step. It verifies seven seams with grep only (no LLM, no API key): every `/cdd-*` reference across the repo's markdown resolves to an existing command file (known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`); the `gh_issue_NN` branch token produced in `cdd-next-step.md` is still consumed (turned into a `Closes #NN` line) in `cdd-pre-pr.md`; backticked file paths in the command files, `CLAUDE.md`, and `README.md` resolve to real files; each `cdd-*.md` still carries its load-bearing headings; the gate count stated in prose here and in `CLAUDE.md` matches what `./scripts/ci.sh list` registers; every open row of the template's engineering-practices contract is named in the engineering-floor question `/cdd-bootstrap` asks, so a practice added there cannot ship resolved by guess; and every `## ` section `cdd-plan.md` writes into the plan file is still named in `cdd-implement.md`, which reads it.
 
 On a broken seam, present each one to the user; for each, the user decides whether to fix the reference/heading/path or record a justified exception (a whitelist entry).
 
@@ -150,6 +165,7 @@ Present a checklist summary:
 ## Pre-PR Checklist
 - [ ] Check runner passed (<N> gates: <N> passed, <N> skipped)
 - [ ] Code review: no issues / issues flagged (list them)
+- [ ] Handoff requirements met (or unmet/deviating criteria listed)
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
 - [ ] CLAUDE.md up to date

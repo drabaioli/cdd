@@ -10,6 +10,10 @@
 #   - PATH shims for every cdd-worktree* command are written to ~/.local/bin,
 #     are executable, and resolve+dispatch under a non-interactive shell (the
 #     case that motivates the shims: Claude Code's Bash tool never sources ~/.bashrc)
+#   - the dispatching shims refuse to recurse: with the helper missing, or no longer
+#     defining the function, the shim exits 127 with a reinstall hint
+#   - `cdd-state stages` answers with no jq on PATH: it is the capability probe
+#     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq guard
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
 #   - a second run is idempotent (no duplicate marker block, no second copy)
 #   - cdd-worktree and cdd-worktree-resume reject an option-shaped branch name (exit 2,
@@ -61,7 +65,9 @@ bash -n "$HELPER" || fail "helper does not parse: $HELPER (truncated by a concur
 bash -n "$STATE_HELPER" || fail "state helper does not parse: $STATE_HELPER (truncated?)"
 
 FAKE_HOME="$(mktemp -d)"
-trap 'rm -rf "$FAKE_HOME"' EXIT
+# Broken-install scratch, outside FAKE_HOME so copying FAKE_HOME never recurses.
+BROKEN_ROOT="$(mktemp -d)"
+trap 'rm -rf "$FAKE_HOME" "$BROKEN_ROOT"' EXIT
 
 # Seed a legacy handoff to exercise the migration branch.
 mkdir -p "$FAKE_HOME/.claude-handoffs/someproj"
@@ -222,6 +228,59 @@ resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
   || fail "cdd-state shim did not resolve in a non-interactive shell"
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
 pass "cdd-state PATH shim written and resolves non-interactively"
+
+# Each shim sources the helper then calls the function by bare name; unguarded, a
+# missing/blank helper leaves that name resolving back through PATH to the shim —
+# unbounded recursion, not an error. Probed against a COPY, so a healthy install
+# survives. `timeout` is half the assertion: a regressed guard hangs rather than fails.
+probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|blank> <arg>
+  local name="$1" rel="$2" how="$3" arg="$4"
+  local broken="$BROKEN_ROOT/$name-$how"
+  rm -rf "$broken"
+  cp -a "$FAKE_HOME" "$broken"
+  case "$how" in
+    rm)    rm -f "$broken/$rel" ;;
+    blank) printf '# a helper that no longer defines the function\n' > "$broken/$rel" ;;
+  esac
+  timeout 20 env -i HOME="$broken" PATH="$broken/.local/bin:/usr/bin:/bin" \
+    "${NOSHELLRC[@]}" -c "$name $arg" </dev/null 2>&1
+  echo "STATUS:$?"
+}
+
+# Read-only subcommands, so a regressed guard can do no damage on its way to failing.
+for probe in "cdd-worktree-list|.cdd/tools/cdd-worktree.sh|" \
+             "cdd-state|.cdd/tools/cdd-state.sh|stages"; do
+  IFS='|' read -r shim_name shim_rel shim_arg <<<"$probe"
+  for how in rm blank; do
+    guard_out="$(probe_shim_guard "$shim_name" "$shim_rel" "$how" "$shim_arg")"
+    grep -qF "STATUS:127" <<<"$guard_out" \
+      || fail "$shim_name shim ($how helper) did not exit 127; got: $guard_out"
+    grep -qiF "reinstall" <<<"$guard_out" \
+      || fail "$shim_name shim ($how helper) printed no reinstall hint; got: $guard_out"
+  done
+done
+pass "dispatching shims exit 127 with a reinstall hint instead of recursing (helper missing / not defining it)"
+
+# `stages` must answer BEFORE cdd-state's jq guard: behind it, a jq-less host reports an
+# empty enum, cdd-worktree's skew check fires on a current helper, and every run there
+# warns wrongly. base-branch-assert.sh stubs cdd-state, so only this — the real helper on
+# a jq-less PATH — pins the ordering. The PATH carries the shims plus bash and nothing
+# else; anything richer (/usr/bin) puts jq back and the case proves nothing.
+JQLESS_BIN="$FAKE_HOME/jqless-bin"
+mkdir -p "$JQLESS_BIN"
+ln -sf "$(command -v bash)" "$JQLESS_BIN/bash"
+JQLESS_PATH="$FAKE_HOME/.local/bin:$JQLESS_BIN"
+env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" "${NOSHELLRC[@]}" \
+  -c 'command -v jq' </dev/null >/dev/null 2>&1 \
+  && fail "probe setup: jq is still reachable on the stripped PATH, so this case proves nothing"
+stages_out="$(timeout 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
+  "${NOSHELLRC[@]}" -c 'cdd-state stages' </dev/null 2>&1)" \
+  || fail "cdd-state stages failed with no jq on PATH; got: $stages_out"
+grep -qx plan_written <<<"$stages_out" \
+  || fail "cdd-state stages must list plan_written even without jq; got: $stages_out"
+grep -qx scoped <<<"$stages_out" \
+  || fail "cdd-state stages printed no enum without jq (answered behind the jq guard?); got: $stages_out"
+pass "cdd-state stages answers the full lifecycle enum with no jq on PATH (before the jq guard)"
 
 # The cdd-state installer shares the self-repair guard; assert it too.
 ST_BEGIN="# --- CDD state helper (managed by cdd-state.sh install) BEGIN ---"
