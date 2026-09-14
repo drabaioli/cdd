@@ -56,7 +56,7 @@
 # never carried on the task ref.
 #
 # Stages (a single enum; the record carries no separate status):
-#   scoped  plan_approved  plan_written  implementation_done  merged  checks_passed
+#   scoped  plan_written  implementation_done  merged  checks_passed
 #   pr_open  addressed
 
 # The schema version this helper writes; consumers version their parser on it.
@@ -67,7 +67,7 @@ CDD_STATE_SCHEMA_VERSION=1
 CDD_REPO_MARKER_SCHEMA_VERSION=1
 
 cdd-state-stages() {
-  printf '%s\n' scoped plan_approved plan_written implementation_done merged checks_passed \
+  printf '%s\n' scoped plan_written implementation_done merged checks_passed \
                 pr_open addressed
 }
 

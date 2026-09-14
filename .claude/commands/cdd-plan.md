@@ -1,6 +1,6 @@
 Plan a task from its handoff and write the plan file a later `/cdd-implement` session builds from: `/cdd-plan` (takes no argument).
 
-This is the first half of the implementation cycle. It runs in the task's feature worktree, opens in plan mode, and its **only** artifact is the plan file — it writes no file inside the repo. The second half is a separate, fresh session running `/cdd-implement`.
+This is the first half of the implementation cycle. It runs in the task's feature worktree, and its **only** artifact is the plan file — it writes no file inside the repo. The second half is a separate, fresh session running `/cdd-implement`.
 
 Everything you learn here and do not write down is destroyed when this session ends. That is the whole reason the plan file has a schema; follow it.
 
@@ -17,7 +17,7 @@ echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 
 Read the handoff. Its `## Requirements` section is the done-test for this task: your plan must satisfy every criterion, and you check it against them in step 3. Its `## Notes` section lists open questions deferred to you — address them up front rather than mid-plan.
 
-Then rebuild context from the repo: `CLAUDE.md`, the roadmap, and the architecture/feature doc indexes, loading only the documents the task touches.
+Then rebuild context from the repo: the roadmap and the architecture/feature doc indexes, loading only the documents the task touches. (`CLAUDE.md` is already in context — do not re-read it.)
 
 If the plan file already exists, this task has already been planned. Say so, show the existing plan's `## Summary`, and ask whether to replan from scratch or hand off to `/cdd-implement` — do not silently overwrite.
 
@@ -33,9 +33,11 @@ Surface any remaining open questions and confirm scope with the user before draf
 
 Then check the plan you are about to present against the handoff's `## Requirements`, criterion by criterion. If your plan does not satisfy one, or you believe a criterion is wrong, say so explicitly — do not quietly redefine done. Any deviation is a bullet in the digest below.
 
+The handoff is immutable, so a criterion the human agrees to amend or drop is **recorded in the plan file's `## Open questions resolved`**, naming the original criterion and what replaced it. That record is the only thing that reaches `/cdd-pre-pr`, which otherwise re-checks the diff against the original wording and reports the amendment as a miss.
+
 ## 4. Print the bounded digest
 
-Immediately before asking for approval, print a plainly-worded digest in chat: **at most 7 bullets, one line each**. The cap is the feature — an uncapped digest is the wall of text the checkpoint gets skimmed for.
+Immediately before asking for approval, print a plainly-worded digest in chat: **one bullet per topic below, each a sentence or two**. The cap is the topic list, not a bullet budget — cover every topic that applies and nothing else. It is what the human approves against, so it has to carry the whole plan at high altitude: enough that approving it is a real decision, little enough that it is read rather than skimmed.
 
 Cover, in this order, skipping any that do not apply:
 
@@ -47,23 +49,17 @@ Cover, in this order, skipping any that do not apply:
 6. Any deviation from the handoff's `## Requirements`.
 7. One slack bullet for whatever else the human needs to decide.
 
-No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file. (The cap is a starting point; tuning it, and generalizing this convention to the other commands, is tracked separately.)
+No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file. (Generalizing this convention to the other commands is tracked separately.)
 
 ## 5. Checkpoint: plan approval
 
-This is checkpoint 3, and it is unchanged: plan mode means no file can be written until the human approves. The plan file is written *because* approval was given, so this adds no gate.
+This is checkpoint 3, and it is the only gate in the implementation cycle. Ask the human, plainly, to approve the plan or push back — the same explicit ask `/cdd-next-step` makes for the handoff. This session is an ordinary one: nothing mechanical stops you from writing, so **write nothing — inside the repo or out of it — until the answer is yes**.
 
 Iterate on the plan until it is approved.
 
 ## 6. Write the plan file
 
-On approval, first advance the task **state record** (advisory; it skips silently if the record is absent):
-
-```bash
-cdd-state set plan_approved
-```
-
-Then write `~/.cdd/handoffs/<repo>/<branch>.plan.md` — a flat, branch-named sibling of the handoff (`<branch>.md`) and the state record (`<branch>.state.json`). The directory already exists (`/cdd-next-step` created it when it wrote the handoff).
+On approval, write `~/.cdd/handoffs/<repo>/<branch>.plan.md` — a flat, branch-named sibling of the handoff (`<branch>.md`) and the state record (`<branch>.state.json`). The directory already exists (`/cdd-next-step` created it when it wrote the handoff).
 
 The plan is written **for the implementing session, not for the human** — the human read the digest above. That gives it one governing rule:
 
@@ -75,7 +71,7 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 # Plan: <short title>
 
 ## Summary
-<the same bounded digest printed above, at most 7 bullets>
+<the same bounded digest printed above>
 
 ## Approach
 <one paragraph, then the ordered steps; each step names the files it touches>
@@ -90,7 +86,7 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 <what was tried and why it failed, so it is not re-explored — or "None">
 
 ## Open questions resolved
-<the handoff's deferred questions and the answers agreed here — or "None">
+<the handoff's deferred questions and the answers agreed here, plus any `## Requirements` criterion amended or dropped with the human's agreement — or "None">
 
 ## Doc and roadmap edits
 <architecture/feature/CLAUDE.md edits and roadmap ticks the implementation must apply>
@@ -99,7 +95,7 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 <which check-runner gates to run, which assertions or tests to add or extend>
 ```
 
-Then advance the state record again — this second write is what pushes the plan onto the task's sync ref, so it reaches other machines:
+Then advance the task **state record** — this write is also what pushes the plan onto the task's sync ref, so it reaches other machines. It is advisory and skips silently if the record is absent (only `/cdd-next-step` seeds one; a mid-lifecycle writer never fabricates one):
 
 ```bash
 cdd-state set plan_written

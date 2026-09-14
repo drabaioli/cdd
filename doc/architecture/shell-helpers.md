@@ -51,10 +51,10 @@ Every write is atomic — rendered to a temp file in the destination directory, 
 {
   "schema_version": 1,
   "branch": "task_state_tracking",
-  "stage": "plan_approved",
+  "stage": "plan_written",
   "pr": null,
   "base_branch": "develop",
-  "sessions": [ { "id": "<uuid>", "stage": "plan_approved", "dir": "<worktree-root>" } ]
+  "sessions": [ { "id": "<uuid>", "stage": "plan_written", "dir": "<worktree-root>" } ]
 }
 ```
 
@@ -89,15 +89,20 @@ It is **advisory** like the rest of the helper: a failing `rev-parse`, an unwrit
 | `stage`               | written by                                          |
 | --------------------- | --------------------------------------------------- |
 | `scoped`              | `/cdd-next-step` — seeds the record and records itself as the first session `{id, stage: scoped, dir}` (empty `sessions` only when no session id is available); it runs on a different session, on the default branch |
-| `plan_approved`       | `/cdd-plan` — on plan approval, before the plan file is written |
-| `plan_written`        | `/cdd-plan` — after writing the plan file; this write is what carries it onto the task ref |
+| `plan_written`        | `/cdd-plan` — after writing the plan file, on approval; this write is what carries it onto the task ref |
 | `implementation_done` | `/cdd-implement` — after its local commit           |
 | `merged`              | `/cdd-merge-base` — after a successful merge         |
 | `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
 | `pr_open`             | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
 | `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
 
-Every stage is written by a command file; nothing rides on a standing instruction in the handoff any more. Note the asymmetry between the two `/cdd-plan` writes: `plan_approved` records that the checkpoint cleared, `plan_written` that the artifact exists — so a session that dies between them is distinguishable from one that never got approval.
+Every stage is written by a command file; nothing rides on a standing instruction in the handoff any more. `/cdd-plan` writes once, not twice: approval and the plan file are a second apart with no gate between them, so a separate `plan_approved` would distinguish two states nothing acts on differently.
+
+### Enumerating the handoff directory
+
+Task artifacts are flat, branch-named siblings — `<branch>.md`, `<branch>.plan.md`, `<branch>.state.json` — so a bare `*.md` glob matches the plan as well as the handoff, and `basename … .md` turns it into a phantom task called `<branch>.plan`. `.state.json` never had this problem; the plan does.
+
+So `cdd-worktree-handoff-branches` is the **one place** that reads the directory: it globs `*.md`, skips the branch-named sidecars, and prints branch names. `cdd-worktree-list` and `cdd-worktree-gc` both go through it, so a future sidecar of this shape costs one line there and nothing anywhere else. (`cdd-worktree-gc` still globs `*.state.json` separately, to catch a task whose handoff is already gone.) The one enumerator the helpers cannot own is `/cdd-next-step`'s stale-handoff scan, which is a prompt and restates the filter in prose — the named exception.
 
 ## Resume discovery (`cdd-worktree-resume`)
 

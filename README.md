@@ -20,13 +20,13 @@ Documentation gets the same care, and not just for your benefit. A structured kn
 
 ## How it works
 
-![CDD task cycle: start a session and run /cdd-next-step to queue a task, spin up an isolated worktree, build in plan mode, optionally /cdd-merge-base, run /cdd-pre-pr to self-review and open the PR, review on GitHub, optionally /cdd-process-pr for review feedback, merge, then clean up and repeat, with locked human gates down the left.](doc/assets/task-cycle.png)
+![CDD task cycle: start a session and run /cdd-next-step to queue a task, spin up an isolated worktree, plan and build, optionally /cdd-merge-base, run /cdd-pre-pr to self-review and open the PR, review on GitHub, optionally /cdd-process-pr for review feedback, merge, then clean up and repeat, with locked human gates down the left.](doc/assets/task-cycle.png)
 
 One full turn around the cycle:
 
 1. **Select a task** — one, or several to run in parallel.
 2. **Write the handoff and create a git worktree** for the task, isolated from your main checkout.
-3. **Plan the task.** The worktree opens in plan mode on `/cdd-plan`: it explores, shows you a short digest, and on your approval writes the plan to a file and stops. Read or edit that file if you want to.
+3. **Plan the task.** The worktree opens on `/cdd-plan`: it explores, shows you a short digest, and on your approval writes the plan to a file and stops. Read or edit that file if you want to.
 4. **Implement it.** Open a fresh session in the same worktree and run `/cdd-implement`. It builds from the plan — not from the exploration that produced it — so you know what to expect, because you approved the plan.
 5. **Merge from the base branch if it moved** while you were working, approving the merge plan.
 6. **Let an agent review the code before the PR opens** — this is also where tests run and the docs are checked, linted, and formatted. It opens the PR at the end.
@@ -77,7 +77,7 @@ CDD ships nine slash commands, all prefixed `cdd-` so they autocomplete as a gro
 | Command | What it does |
 | --- | --- |
 | `/cdd‑next‑step` | Scope the next task and write a handoff for a fresh plan session. Three front-ends: the next roadmap item, a typed task prompt (off-roadmap), or a GitHub issue (`#NN` / a bare integer / the `issue` keyword). |
-| `/cdd‑plan` | Auto-started by `cdd-worktree` in plan mode: explore, take plan approval, write the plan file, stop. Touches nothing in the repo. |
+| `/cdd‑plan` | Auto-started by `cdd-worktree`: explore, take plan approval, write the plan file, stop. Touches nothing in the repo. |
 | `/cdd‑implement` | Started by hand in the same worktree: build from the plan file, update the docs, commit locally. Stops and reports rather than improvising when reality contradicts the plan. |
 | `/cdd‑merge‑base` | Integrate the base branch into a feature branch when the base has advanced under you (dry-run first, then apply). |
 | `/cdd‑pre‑pr` | Pre-PR checklist: the project's check runner (the one command CI runs, so a green run here means a green CI), code review, and doc/roadmap reconciliation; ends with an opt-in step to open the PR. |

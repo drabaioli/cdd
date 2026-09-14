@@ -10,12 +10,10 @@
 #   - PATH shims for every cdd-worktree* command are written to ~/.local/bin,
 #     are executable, and resolve+dispatch under a non-interactive shell (the
 #     case that motivates the shims: Claude Code's Bash tool never sources ~/.bashrc)
-#   - the dispatching shims refuse to recurse: with the installed helper missing, or
-#     present but no longer defining the function, the shim exits 127 with a reinstall
-#     hint instead of re-resolving its own name through PATH forever
-#   - `cdd-state stages` answers on a host with no jq: it is a pure read of the lifecycle
-#     enum and is the capability probe cdd-worktree's skew check reads, so it must sit
-#     BEFORE cdd-state's jq guard rather than behind it
+#   - the dispatching shims refuse to recurse: with the helper missing, or no longer
+#     defining the function, the shim exits 127 with a reinstall hint
+#   - `cdd-state stages` answers with no jq on PATH: it is the capability probe
+#     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq guard
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
 #   - a second run is idempotent (no duplicate marker block, no second copy)
 #   - cdd-worktree and cdd-worktree-resume reject an option-shaped branch name (exit 2,
@@ -67,8 +65,7 @@ bash -n "$HELPER" || fail "helper does not parse: $HELPER (truncated by a concur
 bash -n "$STATE_HELPER" || fail "state helper does not parse: $STATE_HELPER (truncated?)"
 
 FAKE_HOME="$(mktemp -d)"
-# Scratch root for the deliberately-broken installs the shim-guard probes stand up; kept
-# outside FAKE_HOME so copying FAKE_HOME wholesale never recurses into a previous copy.
+# Broken-install scratch, outside FAKE_HOME so copying FAKE_HOME never recurses.
 BROKEN_ROOT="$(mktemp -d)"
 trap 'rm -rf "$FAKE_HOME" "$BROKEN_ROOT"' EXIT
 
@@ -232,15 +229,10 @@ resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
 pass "cdd-state PATH shim written and resolves non-interactively"
 
-# Both dispatching shims source the installed helper and then call the function by bare
-# name. Without a guard, a helper that is missing — or present but no longer defining the
-# function — leaves that name unresolved, the call falls back through PATH to the shim
-# itself, and the result is unbounded recursion rather than an error. Asserted here for
-# both self-installing helpers, against a COPY of the installed tree so everything after
-# this still runs on a healthy install.
-#
-# `timeout` carries as much of the assertion as the exit code does: a regressed guard
-# hangs or forks rather than failing, so a bounded run is what tells the two apart.
+# Each shim sources the helper then calls the function by bare name; unguarded, a
+# missing/blank helper leaves that name resolving back through PATH to the shim —
+# unbounded recursion, not an error. Probed against a COPY, so a healthy install
+# survives. `timeout` is half the assertion: a regressed guard hangs rather than fails.
 probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|blank> <arg>
   local name="$1" rel="$2" how="$3" arg="$4"
   local broken="$BROKEN_ROOT/$name-$how"
@@ -255,8 +247,7 @@ probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|b
   echo "STATUS:$?"
 }
 
-# `cdd-state stages` and `cdd-worktree-list` are the read-only subcommands of each shim,
-# so a guard that has regressed cannot do damage on its way to failing the assertion.
+# Read-only subcommands, so a regressed guard can do no damage on its way to failing.
 for probe in "cdd-worktree-list|.cdd/tools/cdd-worktree.sh|" \
              "cdd-state|.cdd/tools/cdd-state.sh|stages"; do
   IFS='|' read -r shim_name shim_rel shim_arg <<<"$probe"
@@ -270,18 +261,11 @@ for probe in "cdd-worktree-list|.cdd/tools/cdd-worktree.sh|" \
 done
 pass "dispatching shims exit 127 with a reinstall hint instead of recursing (helper missing / not defining it)"
 
-# `cdd-state stages` is the read-only accessor cdd-worktree's reverse-skew check consults
-# to decide whether the installed state helper knows about the plan/implement split. It
-# must be answered BEFORE cdd-state's jq guard: behind it, a host without jq would report
-# an empty enum, the skew check would fire on a perfectly current helper, and every
-# `cdd-worktree` run there would print a warning that is simply wrong.
-#
-# base-branch-assert.sh covers the consumer with a stubbed cdd-state, so only this — the
-# real helper, on a PATH with no jq at all — pins the ordering. A PATH holding just the
-# shim directory is enough: the stages path needs nothing but bash builtins.
-# The stripped PATH carries the shim directory plus a bin holding bash and nothing else:
-# the shim's `#!/usr/bin/env bash` needs bash resolvable, and `stages` needs no other
-# command. Anything richer (/usr/bin) would put jq back and the case would prove nothing.
+# `stages` must answer BEFORE cdd-state's jq guard: behind it, a jq-less host reports an
+# empty enum, cdd-worktree's skew check fires on a current helper, and every run there
+# warns wrongly. base-branch-assert.sh stubs cdd-state, so only this — the real helper on
+# a jq-less PATH — pins the ordering. The PATH carries the shims plus bash and nothing
+# else; anything richer (/usr/bin) puts jq back and the case proves nothing.
 JQLESS_BIN="$FAKE_HOME/jqless-bin"
 mkdir -p "$JQLESS_BIN"
 ln -sf "$(command -v bash)" "$JQLESS_BIN/bash"

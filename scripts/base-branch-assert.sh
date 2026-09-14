@@ -15,8 +15,10 @@
 #     (gitflow develop): the guard is "not a linked worktree", not "on the
 #     default branch", so this must be admitted
 #   - `cdd-worktree`'s FIRST PROMPT is chosen by a capability probe, not a version:
-#     a worktree carrying .claude/commands/cdd-plan.md is launched on /cdd-plan; one
-#     without it gets the pre-split prose prompt naming the handoff. Plus the reverse
+#     a worktree carrying .claude/commands/cdd-plan.md is launched on /cdd-plan as an
+#     ordinary session (NOT in plan mode — the checkpoint is /cdd-plan's own approval
+#     ask); one without it gets the pre-split prose prompt, in plan mode as before,
+#     naming the handoff. Plus the reverse
 #     skew — a retrofitted project against a cdd-state that predates `plan_written`
 #     prints one warning line and still launches
 #
@@ -78,7 +80,7 @@ chmod +x "$WORK/bin/claude"
 cat > "$WORK/bin/cdd-state" <<'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "stages" && "${CDD_STUB_STATE_MODE:-new}" == "new" ]]; then
-  printf '%s\n' scoped plan_approved plan_written implementation_done merged \
+  printf '%s\n' scoped plan_written implementation_done merged \
                 checks_passed pr_open addressed
   exit 0
 fi
@@ -187,6 +189,8 @@ grep -qF "and follow the Implementation prompt." "$CLAUDE_STUB_LOG" \
   || fail "a project without .claude/commands/cdd-plan.md must get the pre-split prose prompt. Log: $(cat "$CLAUDE_STUB_LOG")"
 grep -qF "/cdd-plan" "$CLAUDE_STUB_LOG" \
   && fail "a project without .claude/commands/cdd-plan.md must not be launched on /cdd-plan"
+grep -qF -- "--permission-mode plan" "$CLAUDE_STUB_LOG" \
+  || fail "the pre-split seam keeps plan mode, which was its checkpoint"
 pass "cdd-worktree falls back to the default branch when no base was recorded"
 pass "first prompt: a non-retrofitted project gets the pre-split prose prompt"
 
@@ -208,8 +212,9 @@ pass "cdd-worktree runs from a main worktree on a non-default branch (gitflow gu
 
 # 7. First-prompt probe, retrofitted project: with .claude/commands/cdd-plan.md
 #    committed on the base branch, the new worktree carries it and the helper must
-#    launch Claude on /cdd-plan in plan mode. The probe reads the worktree it just
-#    created — no marker, no recorded version.
+#    launch Claude on /cdd-plan — as an ordinary session, not in plan mode: the
+#    checkpoint is /cdd-plan's own approval ask. The probe reads the worktree it
+#    just created — no marker, no recorded version.
 (
   cd "$WORK/machine"
   mkdir -p .claude/commands
@@ -231,7 +236,8 @@ body
 : > "$CLAUDE_STUB_LOG"
 err="$(run_worktree feat_split 2>&1 >/dev/null)" || fail "cdd-worktree feat_split failed"
 [[ -d "$WORK/${REPO_NAME}-feat_split" ]]   || fail "cdd-worktree did not create the feat_split worktree"
-grep -qF -- "--permission-mode plan /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "a retrofitted project must be launched on /cdd-plan. Log: $(cat "$CLAUDE_STUB_LOG")"
+grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "a retrofitted project must be launched on /cdd-plan alone. Log: $(cat "$CLAUDE_STUB_LOG")"
+grep -qF -- "--permission-mode plan" "$CLAUDE_STUB_LOG"   && fail "the plan session must NOT be launched in plan mode. Log: $(cat "$CLAUDE_STUB_LOG")"
 grep -qF "predates it" <<<"$err"   && fail "no skew warning is due when cdd-state knows plan_written. stderr: $err"
 pass "first prompt: a retrofitted project is launched on /cdd-plan, no skew warning"
 
@@ -245,7 +251,7 @@ body
 ' > "$DIR/feat_skew.md"
 : > "$CLAUDE_STUB_LOG"
 err="$(CDD_STUB_STATE_MODE=old run_worktree feat_skew 2>&1 >/dev/null)"   || fail "cdd-worktree feat_skew failed"
-grep -qF -- "--permission-mode plan /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "skew must not stop the launch. Log: $(cat "$CLAUDE_STUB_LOG")"
+grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "skew must not stop the launch. Log: $(cat "$CLAUDE_STUB_LOG")"
 [[ "$(grep -c "plan/implement split" <<<"$err")" -eq 1 ]]   || fail "expected exactly one skew warning line. stderr: $err"
 pass "first prompt: an outdated cdd-state produces one visible skew warning, launch proceeds"
 

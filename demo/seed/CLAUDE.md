@@ -57,6 +57,6 @@ See `doc/architecture/index.md` for the full picture.
 This project uses the Claude-Driven Development workflow.
 
 - **Before opening a PR**: run `/cdd-pre-pr` to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change.
-- **To start a new task**: run `/cdd-next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the task worktree — it opens in plan mode on `/cdd-plan`, which writes the plan file and stops. Then open a fresh `claude` in that worktree and run `/cdd-implement` to build from the plan.
+- **To start a new task**: run `/cdd-next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the task worktree — it opens on `/cdd-plan`, which writes the plan file and stops. Then open a fresh `claude` in that worktree and run `/cdd-implement` to build from the plan.
 - **When main has advanced under a feature branch**: run `/cdd-merge-base` from the feature branch.
 - Keep `doc/architecture/`, `doc/features/`, and this file current as part of every change.

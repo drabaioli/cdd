@@ -225,4 +225,4 @@ If `cdd-worktree` or `cdd-state` is "command not found", install the shared help
   (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install)
 ```
 
-The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree in plan mode with `/cdd-plan` already submitted. That session plans and stops; the user then opens another fresh session in the same worktree and runs `/cdd-implement`.
+The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with `/cdd-plan` already submitted. That session plans and stops; the user then opens another fresh session in the same worktree and runs `/cdd-implement`.

@@ -33,8 +33,8 @@
 #
 # Provides (when sourced):
 #   cdd-worktree <branch>   Create a new worktree for <branch> and launch
-#                               `claude` in plan mode in it with the suggested
-#                               first prompt already submitted. Requires a
+#                               `claude` in it with the suggested first prompt
+#                               already submitted. Requires a
 #                               handoff file at
 #                               ~/.cdd/handoffs/<repo-name>/<branch>.md (run
 #                               /cdd-next-step first). Run from the main worktree.
@@ -149,29 +149,22 @@ cdd-worktree() {
   git worktree add -b "$branch" "$worktree_path" "${start[@]}" || return 1
   cd "$worktree_path" || return 1
 
-  # Capability probe, not a version check: this helper is machine-global and must work
-  # against every project baseline on the machine, so it asks the worktree it is
-  # standing in whether that project has been retrofitted with the plan/implement
-  # split (§2.8, §3.2). The command file either exists here or it does not — no marker
-  # to go stale. The per-project artifact carries the switch.
-  local first_prompt
+  # Capability probe, not a version check (§2.8): ask the worktree whether this
+  # project has the plan/implement split. No marker to go stale.
+  local -a launch=("/cdd-plan")
   if [[ -f .claude/commands/cdd-plan.md ]]; then
-    first_prompt="/cdd-plan"
-    # Reverse skew: this project expects the split but the separately-installed
-    # cdd-state predates it (or is missing), so `cdd-state set plan_written` would be
-    # rejected and the task would stall invisibly. One line turns that into a visible
-    # failure. The general mechanism is deferred (see the fleet-versioning issue).
+    # Reverse skew the probe cannot see: an installed cdd-state predating the split
+    # would reject `set plan_written` and stall the task silently.
     if ! cdd-state stages 2>/dev/null | grep -qx plan_written; then
       echo "This project uses the plan/implement split, but your cdd-state helper is" >&2
       echo "missing or predates it. Reinstall: ./tools/cdd-state.sh install" >&2
     fi
   else
-    # DEPRECATION SEAM: the pre-split flow, for projects not yet retrofitted. Remove
-    # once every project on every machine is retrofitted. Keeping the handoff heading
-    # `## Implementation prompt` is what makes this line keep working.
-    first_prompt="Read ${handoff} and follow the Implementation prompt."
+    # DEPRECATION SEAM: pre-split flow, whose checkpoint was plan mode. Remove once
+    # every project is retrofitted; needs the handoff's `## Implementation prompt`.
+    launch=(--permission-mode plan "Read ${handoff} and follow the Implementation prompt.")
   fi
-  claude --permission-mode plan "$first_prompt"
+  claude "${launch[@]}"
 }
 
 cdd-worktree-done() {
@@ -206,7 +199,7 @@ cdd-worktree-done() {
   local handoff="$HOME/.cdd/handoffs/${repo_name}/${branch}.md"
   # The per-task state record (written by the slash commands) is an additive
   # sibling of the handoff; it shares the handoff's deletion lifecycle. So does the
-  # plan file (§2.15), named on the same <branch>.<kind> pattern.
+  # plan file (§2.15).
   local state_file="${handoff%.md}.state.json"
   local plan_file="${handoff%.md}.plan.md"
 
@@ -290,14 +283,10 @@ cdd-worktree-done() {
 
 # Print the task branches that have a handoff in $1, one per line.
 #
-# THE ONE PLACE that knows how to read the handoff directory. Every task artifact
-# there is a flat, branch-named sibling — <branch>.md (handoff), <branch>.plan.md
-# (plan, §2.15), <branch>.state.json (state record) — so a bare *.md glob matches
-# the handoff AND the plan, and `basename … .md` would turn the latter into a
-# phantom task named "<branch>.plan". The .state.json sidecar never had this problem
-# because its extension differs; the plan's does not. Rather than repeat the filter
-# in every enumerator (and oblige the next one to remember it), both callers —
-# cdd-worktree-list and cdd-worktree-gc — go through here.
+# THE ONE PLACE that reads the handoff directory (§2.15): a bare *.md glob matches
+# <branch>.plan.md too, and basename'ing that yields a phantom "<branch>.plan" task.
+# Both callers (cdd-worktree-list, cdd-worktree-gc) go through here rather than
+# repeating the filter.
 cdd-worktree-handoff-branches() {
   local dir="$1" f
   shopt -s nullglob
@@ -409,9 +398,8 @@ cdd-worktree-gc() {
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")" || return 1
   local handoff_dir="$HOME/.cdd/handoffs/${repo_name}"
 
-  # Candidate branches = local handoff/plan/state basenames ∪ remote refs/cdd/* names.
-  # Handoffs (and, filtered out by it, plans) come through the shared enumerator; the
-  # plan needs no glob of its own, since a task with a plan always has a handoff.
+  # Candidate branches = local handoff/state basenames ∪ remote refs/cdd/* names.
+  # Plans need no glob: a task with a plan always has a handoff.
   # Track which refs exist on origin so the reap reports and acts accurately.
   local -A seen=() has_ref=()
   local f branch ref
@@ -478,7 +466,7 @@ cdd-worktree-gc() {
 # separate self-installing files). Prints the index of $1, or -1 when unknown.
 cdd-worktree-stage-index() {
   local stage="$1" i=0 s
-  for s in scoped plan_approved plan_written implementation_done merged checks_passed \
+  for s in scoped plan_written implementation_done merged checks_passed \
            pr_open addressed; do
     [[ "$s" == "$stage" ]] && { printf '%s\n' "$i"; return 0; }
     i=$(( i + 1 ))

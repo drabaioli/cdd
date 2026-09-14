@@ -189,6 +189,15 @@ Give each task a machine-readable record of where it sits in its lifecycle and w
 
 **Milestone:** a task's lifecycle stage and its working sessions are recorded as data and surfaced by CDD tooling, not reconstructed by inference.
 
+## Phase 14: Plan/implement split
+
+Split the implementation session in two — a plan session whose only artifact is a plan file, and a fresh implementation session that builds from it — so exploration debris never rides into the build. Issue #68.
+
+- [ ] Split the implementation session into `/cdd-plan` + `/cdd-implement`, with the plan file `<branch>.plan.md` as the contract between them (issue #68); process doc §2.15, §3.3, §3.4
+- [ ] Remove the two plan/implement migration seams — `cdd-worktree.sh`'s pre-split prompt fallback and `/cdd-retrofit`'s migration paragraph — once every project is retrofitted
+
+**Milestone:** every task is planned and built in two separate contexts, with the plan surviving as a file rather than as a transcript.
+
 ## Annotation conventions
 
 **Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included, and it is enforced mechanically by `scripts/roadmap-length-check.sh` (the `roadmap-length` gate), so it is not a matter of judgement. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else.

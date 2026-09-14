@@ -41,8 +41,8 @@
 <sha>
 <short title>
 <slug>
-<the handoff's deferred questions and the answers agreed here — or "None">
-<the same bounded digest printed above, at most 7 bullets>
+<the handoff's deferred questions and the answers agreed here, plus any `## Requirements` criterion amended or dropped with the human's agreement — or "None">
+<the same bounded digest printed above>
 <the self-contained prompt from step 5>
 <title>
 <unit test command>

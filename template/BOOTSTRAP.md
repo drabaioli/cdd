@@ -92,7 +92,7 @@ The script will:
 
 3. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
 
-4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand. `cdd-worktree <branch>` then opens the task's worktree in plan mode on `/cdd-plan`, which writes the plan file and stops; you open a fresh `claude` in that worktree and run `/cdd-implement` to build from it.
+4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand. `cdd-worktree <branch>` then opens the task's worktree on `/cdd-plan`, which writes the plan file and stops; you open a fresh `claude` in that worktree and run `/cdd-implement` to build from it.
 
 ## Per-project customisation
 
