@@ -18,6 +18,7 @@ After bootstrap, the new project directory contains:
 │       ├── cdd-next-step.md                      # handoff session
 │       ├── cdd-plan.md                           # plan session (explore, approve, write the plan file)
 │       ├── cdd-implement.md                      # implementation session (build from the plan file)
+│       ├── cdd-small-change.md                   # small-change session (the one-session lane)
 │       ├── cdd-pre-pr.md                         # pre-PR session
 │       ├── cdd-merge-base.md                     # merge session (merge from main, with dry-run)
 │       └── cdd-process-pr.md                     # PR-review session (address PR review feedback)

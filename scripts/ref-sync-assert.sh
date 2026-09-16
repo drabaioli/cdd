@@ -126,6 +126,9 @@ printf '# Task: %s\n\nScoped handoff body.\nNo trailing weirdness.\n' "$FEATURE"
 
 run_state "$WORK/machineA" "$HOME_A" seed "$FEATURE" --base "$BASE_TASK" >/dev/null 2>&1 \
   || fail "cdd-state seed failed on machine A"
+# The lane marker is written by /cdd-next-step right after seed, in the same session.
+run_state "$WORK/machineA" "$HOME_A" lane "$FEATURE" small >/dev/null 2>&1 \
+  || fail "cdd-state lane failed on machine A"
 git -C "$WORK/machineA" ls-remote origin "refs/cdd/$FEATURE" | grep -q "refs/cdd/$FEATURE" \
   || fail "seed did not push refs/cdd/$FEATURE to origin"
 [[ "$(jq -r '.base_branch' "$DIR_A/$FEATURE.state.json")" == "$BASE_TASK" ]] \
@@ -161,11 +164,13 @@ cmp -s "$HANDOFF_A" "$DIR_B/$FEATURE.md" \
   || fail "materialized state is not at the advanced stage implementation_done"
 [[ "$(jq -r '.base_branch' "$DIR_B/$FEATURE.state.json")" == "$BASE_TASK" ]] \
   || fail "base_branch did not ride the ref sync to machine B"
+[[ "$(jq -r '.lane' "$DIR_B/$FEATURE.state.json")" == "small" ]] \
+  || fail "the lane marker did not ride the ref sync to machine B"
 [[ -f "$DIR_B/$FEATURE.plan.md" ]] || fail "resume did not materialize the plan file"
 cmp -s "$PLAN_A" "$DIR_B/$FEATURE.plan.md" \
   || fail "materialized plan differs from machine A's (not byte-for-byte)"
 [[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "resume must not launch claude"
-pass "resume materialized handoff + plan byte-for-byte, advanced state, and base_branch, no claude"
+pass "resume materialized handoff + plan byte-for-byte, advanced state, base_branch and lane, no claude"
 
 # 4. Most-advanced wins (ref ahead): a stale local record is overwritten, and a
 #    pre-existing local handoff is preserved (immutable after seed).

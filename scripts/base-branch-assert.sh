@@ -21,6 +21,11 @@
 #     naming the handoff. Plus the reverse
 #     skew — a retrofitted project against a cdd-state that predates `plan_written`
 #     prints one warning line and still launches
+#   - the small-change lane's routing marker: `cdd-state lane <branch> small` records
+#     it (and `standard` records null), `cdd-worktree` launches /cdd-small-change only
+#     when the marker AND the command file are both present, and every miss — no
+#     marker, no command file, an older cdd-state that rejects `lane` outright —
+#     degrades to /cdd-plan with the seeded record (base branch included) intact
 #
 # Usage: scripts/base-branch-assert.sh
 # Takes no arguments; provisions and tears down its own temp tree. Requires jq
@@ -254,5 +259,89 @@ err="$(CDD_STUB_STATE_MODE=old run_worktree feat_skew 2>&1 >/dev/null)"   || fai
 grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "skew must not stop the launch. Log: $(cat "$CLAUDE_STUB_LOG")"
 [[ "$(grep -c "plan/implement split" <<<"$err")" -eq 1 ]]   || fail "expected exactly one skew warning line. stderr: $err"
 pass "first prompt: an outdated cdd-state produces one visible skew warning, launch proceeds"
+
+# 9. The small-change lane's routing marker. Conservative in every direction: the
+#    marker alone is not enough (the project must ship the command), and a helper too
+#    old to know the subcommand must not take the seeded record down with it.
+
+# 9a. `lane` records the field; `standard` records null (absent == standard lane).
+run_state seed feat_lane --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_lane failed"
+run_state lane feat_lane small >/dev/null 2>&1 || fail "cdd-state lane feat_lane small failed"
+[[ "$(jq -r '.lane' "$DIR/feat_lane.state.json")" == "small" ]] \
+  || fail "cdd-state lane did not record lane=small"
+[[ "$(jq -r '.base_branch' "$DIR/feat_lane.state.json")" == "$BASE_BRANCH" ]] \
+  || fail "cdd-state lane must leave base_branch untouched"
+pass "cdd-state lane records the lane marker without disturbing the seeded record"
+
+run_state seed feat_lane_std --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_lane_std failed"
+run_state lane feat_lane_std standard >/dev/null 2>&1 || fail "cdd-state lane ... standard failed"
+[[ "$(jq -r '.lane' "$DIR/feat_lane_std.state.json")" == "null" ]] \
+  || fail "cdd-state lane ... standard should record null"
+pass "cdd-state lane standard records null (absent and standard are the same state)"
+
+run_state lane feat_lane bogus >/dev/null 2>&1 \
+  && fail "cdd-state lane must reject a lane value outside {small, standard}"
+pass "cdd-state lane rejects an unknown lane value"
+
+# 9b. Marker present, command file absent: the project cannot run the lane, so the
+#     helper must fall back to /cdd-plan. (cdd-small-change.md is not on develop yet.)
+printf '# Task: feat_lane\n\nbody\n' > "$DIR/feat_lane.md"
+: > "$CLAUDE_STUB_LOG"
+run_worktree feat_lane >/dev/null 2>&1 || fail "cdd-worktree feat_lane failed"
+grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG" \
+  || fail "a small-lane task in a project without cdd-small-change.md must launch /cdd-plan. Log: $(cat "$CLAUDE_STUB_LOG")"
+pass "lane routing: the marker alone does not route — the command file must exist too"
+
+# 9c. Marker present and the command file shipped: launch the lane's session.
+(
+  cd "$WORK/machine"
+  printf 'Make a small, pre-stated change.\n' > .claude/commands/cdd-small-change.md
+  git add .claude/commands/cdd-small-change.md
+  git commit -q -m "ship cdd-small-change"
+  git push -q origin "$BASE_BRANCH"
+)
+run_state seed feat_small --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_small failed"
+run_state lane feat_small small >/dev/null 2>&1 || fail "cdd-state lane feat_small small failed"
+printf '# Task: feat_small\n\nbody\n' > "$DIR/feat_small.md"
+: > "$CLAUDE_STUB_LOG"
+run_worktree feat_small >/dev/null 2>&1 || fail "cdd-worktree feat_small failed"
+grep -qx -- "claude /cdd-small-change" "$CLAUDE_STUB_LOG" \
+  || fail "a small-lane task must be launched on /cdd-small-change alone. Log: $(cat "$CLAUDE_STUB_LOG")"
+grep -qF -- "--permission-mode plan" "$CLAUDE_STUB_LOG" \
+  && fail "the small-change session must NOT be launched in plan mode. Log: $(cat "$CLAUDE_STUB_LOG")"
+pass "lane routing: marker + command file launches /cdd-small-change"
+
+# 9d. No marker at all, same project: unchanged behaviour, /cdd-plan.
+run_state seed feat_nolane --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_nolane failed"
+printf '# Task: feat_nolane\n\nbody\n' > "$DIR/feat_nolane.md"
+: > "$CLAUDE_STUB_LOG"
+run_worktree feat_nolane >/dev/null 2>&1 || fail "cdd-worktree feat_nolane failed"
+grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG" \
+  || fail "an unmarked task must still launch /cdd-plan. Log: $(cat "$CLAUDE_STUB_LOG")"
+pass "lane routing: no marker is the standard lane, exactly as before"
+
+# 9e. Skew: a cdd-state predating the lane rejects `lane` as an unknown subcommand.
+#     The failure must be isolated to that one call — the record seeded a moment
+#     earlier keeps its base branch, and the task quietly runs the standard lane.
+#     The PATH stub is that older helper (it fails everything but `stages`).
+run_state seed feat_oldstate --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_oldstate failed"
+(
+  # shellcheck disable=SC2030,SC2031  # per-subshell HOME/PATH isolation is intended
+  export HOME="$HOME_DIR" PATH="$WORK/bin:$PATH"
+  cd "$WORK/machine" && cdd-state lane feat_oldstate small
+) >/dev/null 2>&1 \
+  && fail "the stubbed older cdd-state should have rejected the lane subcommand"
+[[ -f "$DIR/feat_oldstate.state.json" ]] \
+  || fail "a rejected lane call must not take the seeded record with it"
+[[ "$(jq -r '.base_branch' "$DIR/feat_oldstate.state.json")" == "$BASE_BRANCH" ]] \
+  || fail "a rejected lane call must leave base_branch recorded"
+[[ "$(jq -r '.lane // "absent"' "$DIR/feat_oldstate.state.json")" == "absent" ]] \
+  || fail "a rejected lane call must not have written a marker"
+printf '# Task: feat_oldstate\n\nbody\n' > "$DIR/feat_oldstate.md"
+: > "$CLAUDE_STUB_LOG"
+run_worktree feat_oldstate >/dev/null 2>&1 || fail "cdd-worktree feat_oldstate failed"
+grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG" \
+  || fail "a task whose lane call was rejected must run the standard lane. Log: $(cat "$CLAUDE_STUB_LOG")"
+pass "lane routing: an older cdd-state rejects only the lane call; the task runs the standard lane"
 
 echo "all base-branch smoke checks passed"

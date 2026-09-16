@@ -10,7 +10,7 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's seven checks gets at least one mutation:
+# checker's nine checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file.
@@ -21,6 +21,10 @@
 #                                 cdd-bootstrap.md's discovery bullet does not ask about.
 #   7. Plan-file section contract — cdd-implement.md stops naming a plan-file section
 #      that cdd-plan.md still writes.
+#   8. Lane-marker contract    — cdd-worktree.sh stops routing the resume path to
+#      /cdd-small-change while still routing the launch path to it.
+#   9. Eligibility heuristic   — cdd-small-change.md restates the lane heuristic in
+#      words of its own instead of the pinned sentence.
 #
 # Plus two control cases, which are what make the mutations above mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected"
@@ -171,5 +175,23 @@ grep -qF 'Dead ends' "$SANDBOX/$CMDS/cdd-implement.md" \
   && fail "check 7 setup: cdd-implement.md still names the section after mutation"
 expect_fail "check 7 catches a plan-file section the consumer stopped naming" \
   "section 'Dead ends' is written by"
+
+# --- Check 8: lane-marker contract --------------------------------------------
+# Sever the CONSUMER's resume path only, leaving the launch path intact. That is the
+# realistic one-sided edit — and the one nothing else would catch, because a lane that
+# stops routing degrades to the standard lane, which looks like a working workflow.
+fresh_sandbox
+sandbox_sed 's|run /cdd-small-change|run /cdd-plan|' tools/cdd-worktree.sh
+expect_fail "check 8 catches a lane consumer that stopped routing on one path" \
+  "no longer routes a resumed task to /cdd-small-change"
+
+# --- Check 9: eligibility-heuristic wording -----------------------------------
+# Reword the heuristic in one of the two commands that apply it. Both still read
+# sensibly on their own, which is exactly why a split would go unnoticed.
+fresh_sandbox
+sandbox_sed 's|If you can state the finished diff in one sentence|If the change is only a few lines|' \
+  "$CMDS/cdd-small-change.md"
+expect_fail "check 9 catches a command that reworded the lane heuristic" \
+  "it no longer states the lane heuristic verbatim"
 
 echo "prompt-seam contract: clean"

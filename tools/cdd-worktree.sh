@@ -159,6 +159,17 @@ cdd-worktree() {
       echo "This project uses the plan/implement split, but your cdd-state helper is" >&2
       echo "missing or predates it. Reinstall: ./tools/cdd-state.sh install" >&2
     fi
+    # Lane routing (§2.13): a task the human declared small at scoping replaces
+    # plan+implement with the single /cdd-small-change session. Every miss — no jq,
+    # no record, no marker, a project that ships no such command — leaves the
+    # /cdd-plan default, so a missing marker can never skip a gate. $handoff_dir is
+    # absolute, so it still resolves after the cd into the new worktree.
+    local lane=""
+    if command -v jq >/dev/null 2>&1 && [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
+      lane="$(jq -r '.lane // empty' "${handoff_dir}/${branch}.state.json" 2>/dev/null)"
+    fi
+    [[ "$lane" == "small" && -f .claude/commands/cdd-small-change.md ]] \
+      && launch=("/cdd-small-change")
   else
     # DEPRECATION SEAM: pre-split flow, whose checkpoint was plan mode. Remove once
     # every project is retrofitted (issue #90); needs `## Implementation prompt`.
@@ -686,13 +697,20 @@ cdd-worktree-resume() {
   # command. Read the record directly rather than shelling out to cdd-state: this
   # helper already derives the same path in cdd-worktree, and staying self-contained
   # keeps the two separately-installed helpers independent at runtime.
-  local stage="" repo_name_r state_r
+  local stage="" lane="" repo_name_r state_r
   repo_name_r="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   state_r="$HOME/.cdd/handoffs/${repo_name_r}/${branch}.state.json"
   if command -v jq >/dev/null 2>&1 && [[ -f "$state_r" ]]; then
     stage="$(jq -r '.stage // empty' "$state_r" 2>/dev/null)"
+    lane="$(jq -r '.lane // empty' "$state_r" 2>/dev/null)"
   fi
-  if [[ "$stage" == "plan_written" ]]; then
+  # The lane test comes first: a small-change task that has not been built yet sits at
+  # `scoped`, which would otherwise fall through to the review-side guidance and send
+  # the user to open a PR on a task with no work in it. A small task that took the
+  # off-ramp into /cdd-plan is at `plan_written` and falls through correctly.
+  if [[ "$lane" == "small" && "$stage" == "scoped" && -f .claude/commands/cdd-small-change.md ]]; then
+    echo "Next: start Claude Code here and run /cdd-small-change (this task is on the small-change lane)."
+  elif [[ "$stage" == "plan_written" ]]; then
     echo "Next: start Claude Code here and run /cdd-implement (the plan is approved and on disk)."
   else
     echo "Next: start Claude Code here and run /cdd-process-pr, /cdd-merge-base, or /cdd-pre-pr."
