@@ -28,9 +28,6 @@ One full turn around the cycle:
 2. **Write the handoff and create a git worktree** for the task, isolated from your main checkout.
 3. **Plan the task.** The worktree opens on `/cdd-plan`: it explores, shows you a short digest, and on your approval writes the plan to a file and stops. Read or edit that file if you want to.
 4. **Implement it.** Open a fresh session in the same worktree and run `/cdd-implement`. It builds from the plan — not from the exploration that produced it — so you know what to expect, because you approved the plan.
-
-   *For a change small enough to state in one sentence, steps 3 and 4 collapse into one:* the worktree opens on `/cdd-small-change`, which shows you the concrete change, takes your approval, and makes it. You pick the lane when you scope the task; everything else about the turn is the same.
-
 5. **Merge from the base branch if it moved** while you were working, approving the merge plan.
 6. **Let an agent review the code before the PR opens** — this is also where tests run and the docs are checked, linted, and formatted. It opens the PR at the end.
 7. **Review the PR** and ask the agent to address your feedback.

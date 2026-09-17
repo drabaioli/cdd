@@ -73,7 +73,7 @@ GATES=(
   "worktree-resume||worktree resume on an existing remote branch"
   "ref-sync|jq|refs/cdd/<branch> handoff + plan + state round-trip"
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
-  "base-branch|jq|per-task base branch + cdd-worktree's first-prompt probe"
+  "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
   "stage-render||render-only staging (--stage), no git tree"
@@ -143,8 +143,8 @@ gate_gc() {
   ./scripts/gc-assert.sh
 }
 
-gate_base_branch() {
-  ./scripts/base-branch-assert.sh
+gate_worktree_launch() {
+  ./scripts/worktree-launch-assert.sh
 }
 
 # The three gates that bootstrap a real tree (both of these plus demo-seed) run with a
