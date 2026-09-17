@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Smoke for the per-task base branch: capture, read-back, and branch-cut.
+# Smoke for the cdd-state record -> cdd-worktree launch seam: everything
+# /cdd-next-step records on a task (its base branch, its lane) and everything
+# cdd-worktree does with that record when it cuts the branch and picks the first
+# prompt. One expensive fixture, so every reader of the record is asserted here.
 #
 # Against a local bare `origin` with a default (`main`) and a `develop` branch,
 # it sources both helpers (tools/cdd-state.sh, tools/cdd-worktree.sh) in an
@@ -21,8 +24,13 @@
 #     naming the handoff. Plus the reverse
 #     skew — a retrofitted project against a cdd-state that predates `plan_written`
 #     prints one warning line and still launches
+#   - the small-change lane's routing marker: `cdd-state lane <branch> small` records
+#     it (and `standard` records null), `cdd-worktree` launches /cdd-small-change only
+#     when the marker AND the command file are both present, and every miss — no
+#     marker, no command file, an older cdd-state that rejects `lane` outright —
+#     degrades to /cdd-plan with the seeded record (base branch included) intact
 #
-# Usage: scripts/base-branch-assert.sh
+# Usage: scripts/worktree-launch-assert.sh
 # Takes no arguments; provisions and tears down its own temp tree. Requires jq
 # (base_branch lives under cdd-state's jq guard); without it the test skips.
 
@@ -255,4 +263,76 @@ grep -qx -- "claude /cdd-plan" "$CLAUDE_STUB_LOG"   || fail "skew must not stop 
 [[ "$(grep -c "plan/implement split" <<<"$err")" -eq 1 ]]   || fail "expected exactly one skew warning line. stderr: $err"
 pass "first prompt: an outdated cdd-state produces one visible skew warning, launch proceeds"
 
-echo "all base-branch smoke checks passed"
+# 9. The small-change lane's routing marker: recorded by cdd-state, read by
+#    cdd-worktree to pick the launch prompt — the same record-then-launch seam as the
+#    base branch and the first-prompt probe above, so it rides the same fixture. It
+#    routes only when the marker AND the command file are both present; every miss
+#    degrades to /cdd-plan, so a lost marker can never skip a gate.
+
+# Seed a task (marking its lane when $3 is given), launch it, and assert which first
+# prompt claude got. The routing cases below differ only in those three values.
+launch_task() {
+  local branch="$1" expect="$2" lane="${3:-}"
+  run_state seed "$branch" --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed $branch failed"
+  [[ -z "$lane" ]] || run_state lane "$branch" "$lane" >/dev/null 2>&1 \
+    || fail "cdd-state lane $branch $lane failed"
+  printf '# Task: %s\n\nbody\n' "$branch" > "$DIR/$branch.md"
+  : > "$CLAUDE_STUB_LOG"
+  run_worktree "$branch" >/dev/null 2>&1 || fail "cdd-worktree $branch failed"
+  grep -qx -- "claude $expect" "$CLAUDE_STUB_LOG" \
+    || fail "$branch: expected a launch on $expect alone. Log: $(cat "$CLAUDE_STUB_LOG")"
+}
+
+# 9a. The record: `small` writes the marker and nothing else, `standard` writes null
+#     (absent and standard are the same state), an unknown value is rejected outright.
+run_state seed feat_rec --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_rec failed"
+run_state lane feat_rec small >/dev/null 2>&1 || fail "cdd-state lane feat_rec small failed"
+[[ "$(jq -r '.lane' "$DIR/feat_rec.state.json")" == "small" ]] || fail "lane did not record small"
+[[ "$(jq -r '.base_branch' "$DIR/feat_rec.state.json")" == "$BASE_BRANCH" ]] \
+  || fail "cdd-state lane must leave base_branch untouched"
+run_state lane feat_rec standard >/dev/null 2>&1 || fail "cdd-state lane ... standard failed"
+[[ "$(jq -r '.lane' "$DIR/feat_rec.state.json")" == "null" ]] || fail "standard should record null"
+run_state lane feat_rec bogus >/dev/null 2>&1 && fail "lane must reject a value outside {small, standard}"
+pass "cdd-state lane records small / clears to null / rejects anything else"
+
+# 9b. Marker but no command file — cdd-small-change.md is not on develop yet, so the
+#     project cannot run the lane and the helper must stay on /cdd-plan.
+launch_task feat_lane /cdd-plan small
+pass "lane routing: the marker alone does not route — the command file must exist too"
+
+# 9c. Ship the command file, then both halves of the AND: marker + file routes, and
+#     the same project without a marker is untouched (9b's mirror). The lane's session
+#     is an ordinary one — its checkpoint is /cdd-small-change's own approval ask.
+(
+  cd "$WORK/machine"
+  printf 'Make a small, pre-stated change.\n' > .claude/commands/cdd-small-change.md
+  git add .claude/commands/cdd-small-change.md
+  git commit -q -m "ship cdd-small-change"
+  git push -q origin "$BASE_BRANCH"
+)
+launch_task feat_small /cdd-small-change small
+grep -qF -- "--permission-mode plan" "$CLAUDE_STUB_LOG" \
+  && fail "the small-change session must NOT be launched in plan mode. Log: $(cat "$CLAUDE_STUB_LOG")"
+pass "lane routing: marker + command file launches /cdd-small-change, not in plan mode"
+
+launch_task feat_nolane /cdd-plan
+pass "lane routing: no marker is the standard lane, exactly as before"
+
+# 9d. Skew: a cdd-state predating the lane rejects `lane` as an unknown subcommand —
+#     the reason it is a subcommand and not a `seed` flag. The failure must stay
+#     isolated to that one call, leaving a record 9b has already shown routes to
+#     /cdd-plan. The PATH stub is that older helper (it fails everything but `stages`).
+run_state seed feat_oldstate --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_oldstate failed"
+(
+  # shellcheck disable=SC2030,SC2031  # per-subshell HOME/PATH isolation is intended
+  export HOME="$HOME_DIR" PATH="$WORK/bin:$PATH"
+  cd "$WORK/machine" && cdd-state lane feat_oldstate small
+) >/dev/null 2>&1 \
+  && fail "the stubbed older cdd-state should have rejected the lane subcommand"
+[[ "$(jq -r '.base_branch' "$DIR/feat_oldstate.state.json")" == "$BASE_BRANCH" ]] \
+  || fail "a rejected lane call must leave the seeded record and its base branch intact"
+[[ "$(jq -r '.lane // "absent"' "$DIR/feat_oldstate.state.json")" == "absent" ]] \
+  || fail "a rejected lane call must not have written a marker"
+pass "lane routing: an older cdd-state rejects only the lane call, keeping the record"
+
+echo "all worktree-launch smoke checks passed"

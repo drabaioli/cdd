@@ -29,7 +29,9 @@ The rc `source` line only reaches interactive shells (`~/.bashrc` returns early 
 
 `cdd-worktree` is the one place where behaviour depends on the project's baseline: which prompt it hands the new session. It resolves that by **probing the ground truth** — whether the worktree it just created contains `.claude/commands/cdd-plan.md` — rather than by consulting a recorded version or marker, neither of which can be kept honest across a fleet. A retrofitted project is launched on `/cdd-plan`; one that is not gets the pre-split prose prompt naming the handoff's `## Implementation prompt` heading, which is why that heading is frozen. The `else` branch is the deprecation seam, removable once every project is retrofitted.
 
-The probe covers only the helper-newer-than-project direction. For the reverse — a retrofitted project meeting a `cdd-state` that predates `plan_written`, which would reject the write and stall the task invisibly — the helper asks `cdd-state stages` (a read-only accessor answered before `cdd-state`'s own `jq` guard, so a host without `jq` still gets the true answer) and prints one warning line if the stage is missing. One direction it cannot cover at all is an outdated `cdd-worktree` itself: it has no code with which to warn about its own age. Both cases are pinned by `scripts/base-branch-assert.sh`.
+The probe covers only the helper-newer-than-project direction. For the reverse — a retrofitted project meeting a `cdd-state` that predates `plan_written`, which would reject the write and stall the task invisibly — the helper asks `cdd-state stages` (a read-only accessor answered before `cdd-state`'s own `jq` guard, so a host without `jq` still gets the true answer) and prints one warning line if the stage is missing. One direction it cannot cover at all is an outdated `cdd-worktree` itself: it has no code with which to warn about its own age. Both cases are pinned by `scripts/worktree-launch-assert.sh`.
+
+Inside the retrofitted branch the helper makes a second, independent decision: which **lane** the task takes. It reads `.lane` from the state record with the same `jq` idiom it already uses for `base_branch`, and launches `/cdd-small-change` only when the marker says `small` *and* `.claude/commands/cdd-small-change.md` exists in the worktree it just created. The two conditions are deliberately both required — the marker crosses machines on the task ref, so it can arrive in a project that does not ship the command. Every other outcome (no `jq`, no record, no marker, an unrecognised value, a helper predating this code) leaves the `/cdd-plan` default: a lost marker costs a window and can never skip a gate. `$handoff_dir` is absolute, so the read still resolves after the `cd` into the new worktree. Pinned by `scripts/worktree-launch-assert.sh` in all four directions.
 
 ## Runtime derivation
 
@@ -43,6 +45,8 @@ Every write is atomic — rendered to a temp file in the destination directory, 
 
 `seed` also records the task's base branch when passed `--base <branch>` (`/cdd-next-step` supplies the branch it is standing on); without the flag the field is `null`. It is set once at seed and never mutated: `set` rewrites only `stage`/`pr`/`sessions`, so `base_branch` rides through every later write untouched (`jq` passes unreferenced fields through), and the whole-record materialize on resume carries it to other machines for free. A read accessor, `cdd-state get <field>`, prints `.<field>` from the cwd-derived record (empty on absent `jq`, absent record, or an absent/`null` field) — the resume-side commands read `base_branch` through it.
 
+`cdd-state lane <branch> <small|standard>` records the task's lane the same way — written once by `/cdd-next-step` immediately after `seed`, never mutated, and passed through untouched by every later `set`. It takes the branch positionally because that session runs on the default branch while the record belongs to the task branch, and it appends no session entry (it is the same session that just seeded). `standard` is written as `null`, so absent and standard are one state. It is a **separate subcommand rather than a flag on `seed`** on a failure-isolation argument: `seed`'s flag-parse loop returns before it writes, so a `--lane` an older helper did not recognise would take the whole record down with it — base branch included. As its own call it fails alone, and the task quietly runs the standard lane.
+
 ### Schema
 
 `schema_version` lets consumers version their parser:
@@ -54,11 +58,12 @@ Every write is atomic — rendered to a temp file in the destination directory, 
   "stage": "plan_written",
   "pr": null,
   "base_branch": "develop",
+  "lane": null,
   "sessions": [ { "id": "<uuid>", "stage": "plan_written", "dir": "<worktree-root>" } ]
 }
 ```
 
-`pr` is the integer PR number once a PR exists, else `null`. `base_branch` is the branch the task was cut from and merges back into, recorded once at seed and immutable thereafter; `null` (or absent, on records predating the field) means "no base recorded", and consumers fall back to the runtime-derived default branch. Like `dir`, it is additive and optional — not versioned by `schema_version`, so old and new records interoperate. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`, run from `dir`. `dir` is additive and optional — not versioned by `schema_version`, so old and new records interoperate; a consumer that finds it absent falls back to the branch's known worktree path.
+`pr` is the integer PR number once a PR exists, else `null`. `base_branch` is the branch the task was cut from and merges back into, recorded once at seed and immutable thereafter; `null` (or absent, on records predating the field) means "no base recorded", and consumers fall back to the runtime-derived default branch. Like `dir`, it is additive and optional — not versioned by `schema_version`, so old and new records interoperate. `lane` is `"small"` on the small-change lane and `null` (or absent, on records predating the field) on the standard one; it is additive and optional in the same way, and an unrecognised value is read as the standard lane. `sessions` is append-only; the last element is the most recent session, and a consumer derives the resume command as `claude --resume <id>`, run from `dir`. `dir` is additive and optional — not versioned by `schema_version`, so old and new records interoperate; a consumer that finds it absent falls back to the branch's known worktree path.
 
 ### Per-repo marker (`repo.json`)
 
@@ -90,13 +95,13 @@ It is **advisory** like the rest of the helper: a failing `rev-parse`, an unwrit
 | --------------------- | --------------------------------------------------- |
 | `scoped`              | `/cdd-next-step` — seeds the record and records itself as the first session `{id, stage: scoped, dir}` (empty `sessions` only when no session id is available); it runs on a different session, on the default branch |
 | `plan_written`        | `/cdd-plan` — after writing the plan file, on approval; this write is what carries it onto the task ref |
-| `implementation_done` | `/cdd-implement` — after its local commit           |
+| `implementation_done` | `/cdd-implement` — after its local commit; or `/cdd-small-change`, after its own, on the small-change lane |
 | `merged`              | `/cdd-merge-base` — after a successful merge         |
 | `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
 | `pr_open`             | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
 | `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
 
-Every stage is written by a command file; nothing rides on a standing instruction in the handoff any more. `/cdd-plan` writes once, not twice: approval and the plan file are a second apart with no gate between them, so a separate `plan_approved` would distinguish two states nothing acts on differently.
+The small-change lane never passes through `plan_written`: it writes no plan file, so there is no state to record. Nothing depends on the transition — every consumer compares stages by index, so a stage that was never written is simply one it never observes. Every stage is written by a command file; nothing rides on a standing instruction in the handoff any more. `/cdd-plan` writes once, not twice: approval and the plan file are a second apart with no gate between them, so a separate `plan_approved` would distinguish two states nothing acts on differently.
 
 ### Enumerating the handoff directory
 
@@ -106,7 +111,7 @@ So `cdd-worktree-handoff-branches` is the **one place** that reads the directory
 
 ## Resume discovery (`cdd-worktree-resume`)
 
-The closing "Next:" line branches on the resumed task's `stage`: a task parked at `plan_written` has an approved plan on disk and no code, so it is sent to `/cdd-implement`; anything else gets the review-side commands. The stage is read straight from the materialized record with `jq` rather than through `cdd-state`, keeping the two separately-installed helpers independent at runtime — the same derivation `cdd-worktree` already does for `base_branch`.
+The closing "Next:" line branches on the resumed task's **lane first, then its `stage`**. A small-change task that has not been built yet sits at `scoped`, which is not `plan_written` and would otherwise fall through to "open a PR" on a branch with no work in it; so `lane == small` plus `stage == scoped` plus the command file present sends it to `/cdd-small-change`. Otherwise a task parked at `plan_written` has an approved plan on disk and no code, so it is sent to `/cdd-implement`; anything else gets the review-side commands — including a small-change task that is already built, and one that took the off-ramp into `/cdd-plan`, which is at `plan_written` and falls through correctly. The stage is read straight from the materialized record with `jq` rather than through `cdd-state`, keeping the two separately-installed helpers independent at runtime — the same derivation `cdd-worktree` already does for `base_branch`.
 
 The no-argument discovery mode fetches with `--prune`, so remote-tracking refs for branches deleted on the remote (as GitHub does when a PR merges) drop out before the listing. What remains — the default branch plus the feature branches still live on the remote, minus those already checked out locally — is exactly the resumable set, whether or not a branch has a PR yet.
 

@@ -74,7 +74,7 @@ Schema:
 <exact checkbox line(s) from the roadmap being addressed>
 
 ## Requirements
-<observable acceptance criteria, as few as possible — typically 3-6, hard cap 10; no design>
+<observable acceptance criteria, as few as possible — minimum 1, typically 3-6, hard cap 10; no design>
 
 ## Implementation prompt
 <self-contained prompt for the plan session>
@@ -85,17 +85,20 @@ Schema:
 
 The implementation prompt is self-contained: it includes only context the plan session cannot recover from CLAUDE.md, the roadmap, or the architecture docs. Restating project conventions is forbidden; those are inferable from the repo. Open questions deferred to the plan session are listed in Notes so it can address them up front rather than mid-plan. The prompt carries no standing instructions about planning, committing, or advancing the state record: once the implementation cycle has command files of its own (§3.3, §3.4), those live there and are improved once rather than regenerated into every handoff.
 
-**Requirements** are the one artifact that survives *both* halves of the split implementation cycle and is checkable against each: `/cdd-plan` checks its plan against them, `/cdd-implement` treats them as the done-test, and `/cdd-pre-pr` reconciles the diff against them instead of inferring intent. They are observable acceptance criteria — what a reader could check on the finished change — never design. The **cap is load-bearing**: as few as possible, typically 3–6, and never more than 10. It is what stops the handoff session inflating into a requirements interview, which the cheap/expensive split (§3.1) exists to prevent; a criterion that cannot be stated cheaply here is a deferred question for the plan session, recorded in Notes.
+**Requirements** are the one artifact that survives *both* halves of the split implementation cycle and is checkable against each: `/cdd-plan` checks its plan against them, `/cdd-implement` treats them as the done-test, and `/cdd-pre-pr` reconciles the diff against them instead of inferring intent. They are observable acceptance criteria — what a reader could check on the finished change — never design. The **cap is load-bearing**: as few as possible, typically 3–6, and never more than 10. It is what stops the handoff session inflating into a requirements interview, which the cheap/expensive split (§3.1) exists to prevent; a criterion that cannot be stated cheaply here is a deferred question for the plan session, recorded in Notes. So is the **floor of 1**: `/cdd-pre-pr` reconciles the diff *against* this section, so an empty one leaves it inferring intent — exactly what the section exists to prevent. Even "tick one box" gets a criterion, and it is a real check rather than a restatement, because it says what must *not* also change. A small-change handoff (§3.2a) normally carries one or two.
+
+A **small-change handoff omits `## Implementation prompt` entirely**: on that lane the requirements already say everything a change whose diff fits in one sentence has to say, and a section restating them is a place for the two to drift apart. Frozen (below) means never renamed, not always present.
 
 The heading `## Implementation prompt` is **frozen**, even though its content is now a plain task spec. An older worktree helper's first prompt names that heading verbatim, so renaming it would dangle that prompt against a project that has been retrofitted; keeping it means an old helper meeting a new project degrades gracefully into the un-split flow (§2.8).
 
 ### 2.7 Slash commands (`.claude/commands/`)
 
-Project-level Claude Code slash commands. They are declarative — they describe what to do, not how to orchestrate it; orchestration (worktree creation, branch lifecycle) lives in the shell helpers (§2.8). CDD ships six commands in the per-task lifecycle:
+Project-level Claude Code slash commands. They are declarative — they describe what to do, not how to orchestrate it; orchestration (worktree creation, branch lifecycle) lives in the shell helpers (§2.8). CDD ships seven commands in the per-task lifecycle:
 
 - `/cdd-next-step`, exploratory session, run on main, produces a handoff.
 - `/cdd-plan`, plan session, auto-started in the feature worktree: explores, takes plan approval, writes the plan file (§2.15), and stops without touching the repo.
 - `/cdd-implement`, implementation session, started by hand in the same worktree: builds from the plan file, updates docs, commits locally.
+- `/cdd-small-change`, small-change session, auto-started in the feature worktree in place of the two above when the task was declared small at scoping (§3.2a): takes its own approval of the concrete change, builds it, updates docs, commits locally.
 - `/cdd-pre-pr`, verification session, run on the feature branch, runs the check runner (§2.14) and reconciles docs.
 - `/cdd-merge-base`, side-loop, run on a feature branch when main has advanced: conflict assessment, then merge.
 - `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed: reads the review comments, addresses them, posts replies, commits + pushes. (See §4.1 for the deliberate checkpoint exception it carries.)
@@ -151,7 +154,7 @@ Several sessions auto-commit at their gate so that a session never leaves a dirt
 4. **Each gate surfaces a short summary** of what it committed (subject and files).
 5. **An auto-commit is not a checkpoint.** Local and unpushed is reversible; the six checkpoints (§4) are unchanged by it.
 
-Which sessions auto-commit: `/cdd-implement` (§3.4) and `/cdd-pre-pr` (§3.6) commit locally; `/cdd-process-pr` (§3.8) commits and pushes; `/cdd-merge-base` (§3.5) produces a merge commit and enforces a clean tree before merging.
+Which sessions auto-commit: `/cdd-implement` (§3.4), `/cdd-small-change` (§3.2a) and `/cdd-pre-pr` (§3.6) commit locally; `/cdd-process-pr` (§3.8) commits and pushes; `/cdd-merge-base` (§3.5) produces a merge commit and enforces a clean tree before merging.
 
 ### 2.12 The engineering-practices contract (`doc/knowledge_base/engineering-practices.md`)
 
@@ -167,6 +170,8 @@ A practice moves from expected to enforced in the same change that lands its mec
 A small JSON sibling of the handoff (§2.6) — same directory, same `<branch>` basename, same branch-scoped ephemeral lifecycle as the handoff and the plan file (§2.15) — recording where a task sits in its lifecycle (`stage`), its PR number once one exists, the task's **base branch** (the one branch it was cut from and merges back into), and, append-only, the chain of Claude Code sessions that have worked it, so a session can be found and resumed (`claude --resume <id>`) without grepping shell history.
 
 The base branch encodes the invariant that **every branch has exactly one base**: `/cdd-next-step` records it when it seeds the record, defaulting to the branch then checked out (so gitflow and recursively stacked branches capture their real parent), and it never changes thereafter. `cdd-worktree` (§2.8) cuts the new branch from it; the resume-side commands `/cdd-merge-base` and `/cdd-pre-pr` (§3.5, §3.6) target it. It is an additive, optional field: a record without one — including every record predating the field — falls back to the platform default branch (`origin`'s HEAD, else `main`), so single-integration-branch projects are unaffected and need no configuration.
+
+The record also carries the task's **lane** — which of the two build paths it takes (§3). `/cdd-next-step` writes it once at scoping, on the human's decision, and it never changes thereafter; `cdd-worktree` and `cdd-worktree-resume` (§2.8) route on it. Like the base branch it is an additive, optional field: absent — including on every record predating it, and on every machine whose helper is too old to write it — means the standard lane, which is also what an unrecognised value means. The degrade is deliberately one-directional: a missing marker costs a window, while a marker fabricated by inference could skip a gate.
 
 Beside the per-task files, the same directory carries one **machine-local per-repo marker** (`repo.json`) naming the repo's main worktree. It is the only artifact there that is not task-scoped, so it outlives the reap of every task and keeps a repo locatable once its tasks are all merged; it is written by the same helper (and by the bootstrap script for a fresh project), advisory in exactly the same way, and never synced across machines. Its schema lives in `doc/architecture/shell-helpers.md`.
 
@@ -232,13 +237,14 @@ Two properties follow from the plan being a file rather than a transcript. It is
 
 ## 3. Lifecycle
 
-A task flows through CDD in up to six sessions, two of them optional side-loops (`/cdd-merge-base` before the PR, `/cdd-process-pr` after review). Each session type has a name, one command, and one job:
+A task flows through CDD in up to six sessions, two of them optional side-loops (`/cdd-merge-base` before the PR, `/cdd-process-pr` after review). The middle of that flow has **two lanes**: the standard lane plans and then implements, and the small-change lane (§3.2a) does both in one session for a task whose finished diff can be stated before any exploration. The lane is chosen once, at scoping; everything before it and everything after it is the same. Each session type has a name, one command, and one job:
 
 | Session              | Command                                       | Runs on                              | May edit (summary; see Section 5)          |
 | -------------------- | --------------------------------------------- | ------------------------------------ | ------------------------------------------ |
 | **Handoff**          | `/cdd-next-step`                              | main worktree                        | the handoff file only — repo is read-only  |
 | **Plan**             | `/cdd-plan`, auto-started by `cdd-worktree <branch>` | feature worktree | the plan file only — repo is read-only |
 | **Implementation**   | `/cdd-implement`, started by hand in the same worktree | feature worktree              | code, docs, roadmap                        |
+| **Small-change** (lane) | `/cdd-small-change`, auto-started by `cdd-worktree <branch>` in place of Plan + Implementation | feature worktree | code, docs, roadmap                        |
 | **Merge** (opt.)     | `/cdd-merge-base`                             | feature worktree                     | merge resolution, docs if needed           |
 | **Pre-PR**           | `/cdd-pre-pr`                                 | feature worktree                     | doc reconciliation, approved roadmap edits |
 | **PR-review** (opt.) | `/cdd-process-pr`                             | feature worktree                     | review-driven code and replies             |
@@ -264,32 +270,36 @@ Three further session types sit outside the per-task lifecycle, each run as a on
                             ▼
                        cdd-worktree <branch>
                             │
-                            ▼
-                       (on new worktree)
-            ┌──────────────────────────────────┐
-            │ Plan session: /cdd-plan          │
-            │                                  │
-            │ Read handoff + roadmap + docs.   │
-            │ Explore. Clarify expensive       │
-            │ requirements in a clean context. │
-            │ Print bounded digest. Human      │
-            │ approves. Write the plan file.   │
-            │ Stop.                            │
-            └──────────────────────────────────┘
-                            │
-                            │  plan file
-                            ▼
-                  human: fresh claude, same worktree
-                            │
-                            ▼
-            ┌──────────────────────────────────┐
-            │ Implementation session:          │
-            │ /cdd-implement                   │
-            │                                  │
-            │ Read the plan. Targeted re-reads.│
-            │ Implement. Update docs and       │
-            │ roadmap. Commit.                 │
-            └──────────────────────────────────┘
+                            ├────────────────────────────────────────┐
+                      standard lane                          small-change lane
+                            ▼                                        ▼
+                       (on new worktree)                      (on new worktree)
+            ┌──────────────────────────────────┐    ┌──────────────────────────────────┐
+            │ Plan session: /cdd-plan          │    │ Small-change session:            │
+            │                                  │    │ /cdd-small-change                │
+            │ Read handoff + roadmap + docs.   │    │                                  │
+            │ Explore. Clarify expensive       │    │ Read the thin handoff. Confirm   │
+            │ requirements in a clean context. │    │ the task is still small, or take │
+            │ Print bounded digest. Human      │    │ the off-ramp to /cdd-plan. State │
+            │ approves. Write the plan file.   │    │ the concrete change. Human       │
+            │ Stop.                            │    │ approves. Make it. Update docs   │
+            └──────────────────────────────────┘    │ and roadmap. Commit.             │
+                            │                       └──────────────────────────────────┘
+                            │  plan file                             │
+                            ▼                                        │
+                  human: fresh claude, same worktree                 │
+                            │                                        │
+                            ▼                                        │
+            ┌──────────────────────────────────┐                     │
+            │ Implementation session:          │                     │
+            │ /cdd-implement                   │                     │
+            │                                  │                     │
+            │ Read the plan. Targeted re-reads.│                     │
+            │ Implement. Update docs and       │                     │
+            │ roadmap. Commit.                 │                     │
+            └──────────────────────────────────┘                     │
+                            │                                        │
+                            ├────────────────────────────────────────┘
                             │
                             │  (optional, if main moved)
                             ▼
@@ -359,6 +369,24 @@ The human closes the handoff session and runs `cdd-worktree <branch>` from the m
 
 Which prompt it passes is decided by a **capability probe**, not a version: the helper checks whether the worktree it just created contains `.claude/commands/cdd-plan.md`. A project not yet retrofitted has no such file, so the helper falls back to the pre-split one-line prompt naming the handoff's `## Implementation prompt` heading (§2.6) — launched in the harness's plan mode, which was that flow's checkpoint — and that project keeps working exactly as before. This is the general rule from §2.8 in its concrete form — the machine-global helper stays compatible with every baseline on the machine, and the per-project artifact carries the switch. The fallback branch is a deprecation seam: it is removed once every project on every machine is retrofitted.
 
+The helper also reads the task's **lane** (§2.13) here, and opens the session on `/cdd-small-change` instead of `/cdd-plan` when the record marks the task small *and* the worktree carries that command. Every other case — no marker, no record, no `jq`, a project that ships no such command, a helper too old to look — leaves `/cdd-plan`, so a lost marker costs a window and can never skip a gate. Routing before the session starts is what keeps each command at one behaviour rather than giving one command a mode.
+
+### 3.2a Small-change lane: `/cdd-small-change` (on the new worktree)
+
+For a task whose finished diff can be stated before any exploration, the plan/implement pair is ceremony: there is nothing to explore, and no reasoning worth carrying between two windows. The small-change lane replaces both sessions with one that takes its own approval of the concrete change and then makes it. Everything around it is unchanged — the handoff, the worktree, the PR, the review round, the teardown — so this shortens the middle of the cycle, never the review.
+
+Which lane a task takes is decided once, by the human, at the end of the handoff session (§3.1, checkpoint 2). `/cdd-next-step` applies one heuristic and recommends:
+
+> If you can state the finished diff in one sentence, before any exploration, it's small. If in doubt, take the standard lane.
+
+Two bounds, and both must hold. **Discovery**: there is nothing to find out — that is the one-sentence test. **Durability**: there is no reasoning worth carrying into the next window, since this lane writes no plan file and only the requirements plus the diff reach `/cdd-pre-pr` and the reviewer. The bar is **not line count**. Qualifying work: ticking a roadmap box; a typo; adding a roadmap phase; adding a small utility script whose behaviour you can state in full; a mechanical rename across a few files. Not qualifying: a three-line change whose consequence you would want reasoned about; a multi-file change you can specify in a sentence but could not justify without explanation.
+
+The session **recommends and the human decides**, in either direction and unconditionally — including declaring small a task the heuristic did not. That is the same posture every other structural choice in CDD takes, and it is safe both ways: a task wrongly declared small takes the off-ramp below, at the cost of one session start, and one wrongly kept standard costs a window. Neither is destructive, which is why the heuristic is allowed to be this short.
+
+The **off-ramp** is what carries that weight. `/cdd-small-change` re-applies the heuristic once it has the handoff in front of it, and if the task is not small it stops, writes nothing, and hands to `/cdd-plan` in the same worktree. A small-change handoff is thin (§2.6) but not deficient: `/cdd-plan` reads `## Requirements` and `## Notes` and never needed an `## Implementation prompt`, so nothing has to be regenerated to escalate.
+
+Otherwise the session states the concrete change file by file, takes approval — this is checkpoint 3 in its lane form (§4) — makes it, updates the docs and the roadmap, runs the check runner whole (§2.14; no per-diff gate selection), commits locally per §2.11, and advances the state record to `implementation_done`. It never passes through `plan_written`, which is a non-event: consumers compare stages by index, so a stage that was never written is simply one they never observe. The routing mechanics live in `doc/architecture/shell-helpers.md`.
+
 ### 3.3 Plan session: `/cdd-plan` (on the new worktree)
 
 Reads the handoff and rebuilds its context from the roadmap and the architecture/feature docs. It then **explores** — reading the source it will change, searching the web, consulting vendor and library documentation as the task needs. Exploration is a named step rather than an implied one, because after the split its only output is the plan file: anything this session learns and does not write down is destroyed when it ends.
@@ -412,7 +440,7 @@ Six explicit checkpoints. The human is also free to interject at any other point
 
 1. **Task selection** (end of `/cdd-next-step`): the human chooses among proposed candidates.
 2. **Handoff approval** (end of `/cdd-next-step`): the human approves the drafted implementation prompt and notes.
-3. **Plan approval** (end of the plan session): the human approves the plan before any file is written.
+3. **Approval of the work** (end of the plan session, or mid-session on the small-change lane): the human approves the plan before any file is written — or, on the small-change lane where there is no plan, the concrete change itself, stated file by file, before the first edit.
 4. **Merge-base approval** (between dry run and merge in `/cdd-merge-base`) — *conditional*: the human approves after seeing conflict complexity, whenever there is complexity to see. Skipped only on the mechanically-trivial path (below).
 5. **Roadmap edit approval** (during `/cdd-pre-pr`): the human approves proposed add/modify/remove edits before they are applied.
 6. **PR merge** (after `/cdd-pre-pr`): standard GitHub PR review and merge.
@@ -420,6 +448,8 @@ Six explicit checkpoints. The human is also free to interject at any other point
 These six are the gates. The agent should never proceed past a gate without explicit human confirmation.
 
 Splitting the implementation cycle into a plan session and an implementation session (§3.3, §3.4) does not change this count either. Checkpoint 3 does not move: it is still plan approval, and the plan file is written *because* it was approved. The manual step between the two sessions — the human opening a fresh session and running `/cdd-implement` — is ceremony, and a place to read or edit the plan, but it is not a gate: nothing waits on a decision there.
+
+The **small-change lane (§3.2a) does not change this count either, and changes only checkpoint 3's form**. Checkpoints 1, 2, 4, 5 and 6 fire exactly as they do on the standard lane: `/cdd-next-step` and `/cdd-pre-pr` both still run, the PR is still opened and still reviewed. Checkpoint 2 in fact does one more thing — it is where the lane itself is chosen. Checkpoint 3 still fires, still before anything is written, and is still an explicit ask; what changes is what the human is approving, a stated diff rather than a plan file, because on that lane there is no plan file to approve. Say this plainly, because the next reader will otherwise read the lane as erosion: a lane that skipped a checkpoint would be a different proposal, and was not this one. Reasoning in `doc/architecture/adr/0006-small-change-lane.md` (CDD repo).
 
 The auto-commits some sessions make at their gates (§2.11) do not change this count. A local commit with no push is reversible from git history, so it adds no checkpoint and removes none — it is not a seventh gate. The only gate that pushes is `/cdd-process-pr`, and its single up-front checkpoint is described in §4.1.
 
@@ -435,21 +465,21 @@ Human-in-the-loop judgment is preserved where it matters: the plan is approved b
 
 The matrix below resolves any ambiguity about which session is allowed to touch which artifact. Columns are the session types named in Section 3.
 
-| Artifact                | Handoff      | Plan            | Implement          | Merge         | Pre-PR                 | PR-review              |
-| ----------------------- | ------------ | --------------- | ------------------ | ------------- | ---------------------- | ---------------------- |
-| Roadmap (tick)          | no           | no              | yes                | no            | yes                    | yes if review-driven   |
-| Roadmap (add/mod/rm)    | no           | no              | yes (pre-approved) | no            | yes (human-approved)   | no                     |
-| Architecture docs       | no           | no              | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
-| Feature docs            | no           | no              | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
-| CLAUDE.md               | no           | no              | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
-| README.md               | no           | no              | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
-| Knowledge base (other)  | no           | no              | yes if needed      | no            | yes if needed          | yes if review-driven   |
-| Code                    | no           | no              | yes                | yes (merge)   | yes (review-driven)    | yes (review-driven)    |
-| Handoff file            | yes (write)  | no (read-only)  | no (read-only)     | no            | no                     | no                     |
-| Plan file               | no           | yes (write)     | no (read-only)     | no            | no                     | no                     |
-| CI config               | no           | no              | yes if in scope    | no            | yes (human-approved)   | yes if review-driven   |
+| Artifact                | Handoff      | Plan            | Small-change       | Implement          | Merge         | Pre-PR                 | PR-review              |
+| ----------------------- | ------------ | --------------- | ------------------ | ------------------ | ------------- | ---------------------- | ---------------------- |
+| Roadmap (tick)          | no           | no              | yes                | yes                | no            | yes                    | yes if review-driven   |
+| Roadmap (add/mod/rm)    | no           | no              | yes (pre-approved) | yes (pre-approved) | no            | yes (human-approved)   | no                     |
+| Architecture docs       | no           | no              | yes                | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
+| Feature docs            | no           | no              | yes                | yes                | yes if needed | yes (reconcile)        | yes if review-driven   |
+| CLAUDE.md               | no           | no              | yes if needed      | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
+| README.md               | no           | no              | yes if needed      | yes if needed      | no            | yes (reconcile)        | yes if review-driven   |
+| Knowledge base (other)  | no           | no              | yes if needed      | yes if needed      | no            | yes if needed          | yes if review-driven   |
+| Code                    | no           | no              | yes                | yes                | yes (merge)   | yes (review-driven)    | yes (review-driven)    |
+| Handoff file            | yes (write)  | no (read-only)  | no (read-only)     | no (read-only)     | no            | no                     | no                     |
+| Plan file               | no           | yes (write)     | no (never written) | no (read-only)     | no            | no                     | no                     |
+| CI config               | no           | no              | yes if in scope    | yes if in scope    | no            | yes (human-approved)   | yes if review-driven   |
 
-The handoff and plan sessions are both read-only on the repo, and each produces exactly one artifact — the handoff file and the plan file respectively. This keeps their jobs narrow: read, discuss, write the one file. Everything else happens in the implementing and review-side sessions. "Review-driven" in the PR-review column means the edit was requested by a reviewer and covered by the approved triage plan (Section 3.8); the PR-review session initiates no edits of its own.
+The small-change column is the implementation column: the two sessions differ in what authorizes them, not in what they may touch. The handoff and plan sessions are both read-only on the repo, and each produces exactly one artifact — the handoff file and the plan file respectively. This keeps their jobs narrow: read, discuss, write the one file. Everything else happens in the implementing and review-side sessions. "Review-driven" in the PR-review column means the edit was requested by a reviewer and covered by the approved triage plan (Section 3.8); the PR-review session initiates no edits of its own.
 
 ## 6. Known gaps and deferred design
 
@@ -469,7 +499,7 @@ Still deferred:
 
 ## 7. The template
 
-The template ships as a directory (`template/`) copied into a new project root by `tools/bootstrap-cdd-project.sh`: the `CLAUDE.md` skeleton, the six lifecycle commands, the doc skeletons, `.claude/settings.json`, and the baseline marker written at render time. The full contents are enumerated in `doc/features/template.md`; the bootstrapped tree layout and the bootstrap procedure — including the one-time helper install — are in `template/BOOTSTRAP.md`. The bootstrapped tree ships no `tools/` directory: the shell helpers are machine-global installs (§2.8), not per-project files. `template/BOOTSTRAP.md` itself is meta-documentation and is not copied into the bootstrapped project.
+The template ships as a directory (`template/`) copied into a new project root by `tools/bootstrap-cdd-project.sh`: the `CLAUDE.md` skeleton, the seven lifecycle commands, the doc skeletons, `.claude/settings.json`, and the baseline marker written at render time. The full contents are enumerated in `doc/features/template.md`; the bootstrapped tree layout and the bootstrap procedure — including the one-time helper install — are in `template/BOOTSTRAP.md`. The bootstrapped tree ships no `tools/` directory: the shell helpers are machine-global installs (§2.8), not per-project files. `template/BOOTSTRAP.md` itself is meta-documentation and is not copied into the bootstrapped project.
 
 ### 7.1 The CDD repo as its own project
 

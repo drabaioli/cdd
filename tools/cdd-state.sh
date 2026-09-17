@@ -31,6 +31,14 @@
 #                                      $CLAUDE_CODE_SESSION_ID is set, so the handoff
 #                                      session is resumable too; otherwise seeds an
 #                                      empty `sessions` (older Claude Code — no id).
+#   cdd-state lane <branch> <lane>  Mark which lane the task takes, `small` or
+#                                      `standard` (`standard` renders null, i.e. the
+#                                      default). Used by /cdd-next-step right after
+#                                      `seed`, on the default branch, which is why the
+#                                      branch is positional. A separate subcommand
+#                                      rather than a `seed` flag so an older helper
+#                                      meeting a newer /cdd-next-step fails this one
+#                                      call and still keeps the seeded record.
 #   cdd-state set <stage> [--pr N] Advance an existing record to <stage> (and set
 #                                      the PR number with --pr). Derives repo/branch
 #                                      from the current worktree. Skips silently if
@@ -251,6 +259,47 @@ cdd-state() {
         cdd-state-push-ref "${dir}/${branch}.md" "${dir}/${branch}.state.json" "$branch"
       fi
       ;;
+    lane)
+      local branch="$1"; shift 2>/dev/null
+      # Positional branch, same trap as `seed`: an option-shaped value here would
+      # name a record after a flag.
+      case "$branch" in
+        -h|--help) echo "usage: cdd-state lane <branch> <small|standard>" >&2; return 0 ;;
+        -*) echo "cdd-state lane: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
+      esac
+      local lane="${1:-}"
+      if [[ -z "$branch" || -z "$lane" ]]; then
+        echo "usage: cdd-state lane <branch> <small|standard>" >&2
+        return 2
+      fi
+      case "$lane" in
+        small|standard) ;;
+        *) echo "cdd-state lane: invalid lane '$lane' (one of: small standard)" >&2; return 2 ;;
+      esac
+      # The branch is passed in rather than derived: /cdd-next-step runs on the
+      # default branch while the record belongs to the task branch.
+      local main_wt repo_name file
+      main_wt="$(cdd-state-main-worktree)" || return 1
+      repo_name="$(basename "$main_wt")"
+      file="$HOME/.cdd/handoffs/${repo_name}/${branch}.state.json"
+      # Writers never fabricate a record; only `seed` (i.e. /cdd-next-step) creates one.
+      if [[ ! -f "$file" ]]; then
+        echo "cdd-state: no record at $file; skipping (advisory)." >&2
+        return 0
+      fi
+      # Additive and optional, like base_branch: set once at scoping, never mutated,
+      # and `standard` is written as null so absent and standard are the same state.
+      # No session entry is appended — this is the same session that just seeded.
+      local content
+      # shellcheck disable=SC2016  # $lane is a jq variable, not a shell expansion
+      content="$(jq --arg lane "$lane" \
+        '.lane = ($lane | if . == "standard" then null else . end)' "$file")" \
+        || { echo "cdd-state: failed to update $file" >&2; return 1; }
+      if cdd-state-write "$file" "$content"; then
+        echo "Lane: $(basename "$file") -> $lane"
+        cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
+      fi
+      ;;
     set)
       local stage="$1"; shift 2>/dev/null
       local pr=""
@@ -322,10 +371,10 @@ cdd-state() {
       cdd-state-install "$@"
       ;;
     -h|--help|help)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | get <field> | stages | install}" >&2
       ;;
     *)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | set <stage> [--pr N] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | get <field> | stages | install}" >&2
       return 2
       ;;
   esac

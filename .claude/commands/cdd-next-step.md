@@ -129,17 +129,33 @@ Hard, open-ended technical questions are deferred to the **plan session** (`/cdd
 
 When you defer a question, list it explicitly in the handoff's Notes section so `/cdd-plan` addresses it up front.
 
+## 4b. Assess the lane
+
+Smallness is only answerable once the task is known, which is why there is no flag for it and why this step sits here rather than at §0. Judge it now, against the eligibility heuristic:
+
+> If you can state the finished diff in one sentence, before any exploration, it's small. If in doubt, take the standard lane.
+
+Two bounds, and both must hold. **Discovery**: there is nothing to find out — that is the one-sentence test. **Durability**: there is no reasoning worth carrying into the next window, because the small-change lane writes no plan file and only the requirements plus the diff reach `/cdd-pre-pr` and the reviewer. The bar is **not** line count.
+
+Qualifies: ticking a roadmap box; a typo; adding a roadmap phase; adding a small utility script whose behaviour you can state in full; a mechanical rename across a few files. Does not: a three-line change whose consequence you would want reasoned about; a multi-file change you can specify in a sentence but could not justify without explanation.
+
+**Recommend one lane in a single line**, naming which bound decided it — then do as the user says, in either direction, unconditionally. This is checkpoint 2, and the posture is the same as every other structural choice in CDD: surface the signals, recommend, and let the human decide. Do not refuse or re-argue a task the user declares small, and do not quietly take the small lane for a task they kept on the standard one. The override is safe both ways: a task wrongly declared small is recovered by `/cdd-small-change`'s off-ramp into `/cdd-plan`, at the cost of one session start, and a task wrongly kept standard just costs a window.
+
+The lane changes three things downstream, and nothing else: the handoff is thinner (§5), the state record carries a marker (§7), and `cdd-worktree` opens the worktree on `/cdd-small-change` instead of `/cdd-plan` (§8).
+
 ## 5. Draft the handoff
 
 When the user signals they're ready, draft:
 
 **Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: prefix the name with the fixed `gh_issue_NN_` token so the issue number is durable and groups cleanly — `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). This token is the sole mechanism threading the issue to its PR (`/cdd-pre-pr` turns it into `Closes #NN`).
 
-**Requirements**: the observable acceptance criteria — what "done" means for this task, checkable against the finished diff. **As few as possible: typically 3–6, hard cap 10.** Each is an observation, not a design decision ("the command prints its digest before the approval checkpoint", not "add a `print_digest()` helper").
+**Requirements**: the observable acceptance criteria — what "done" means for this task, checkable against the finished diff. **As few as possible: minimum 1, typically 3–6, hard cap 10.** Each is an observation, not a design decision ("the command prints its digest before the approval checkpoint", not "add a `print_digest()` helper").
 
 This section exists because the plan and the implementation run in separate windows: it is the one artifact that survives both and can be checked against each — `/cdd-plan` checks its plan against it, `/cdd-implement` treats it as the done-test, and `/cdd-pre-pr` reconciles the diff against it instead of inferring intent.
 
 The cap is what keeps this from turning the session into a requirements interview, which the cheap/expensive split in step 4 exists to prevent. A criterion you cannot state cheaply here is a **deferred question for `/cdd-plan`**, recorded in Notes — not grounds for an interview.
+
+The floor of 1 is load-bearing too, and it is why "tick one box" still gets a criterion: `/cdd-pre-pr` reconciles the diff *against* this section, so an empty one leaves it inferring intent — the exact thing the section prevents. A small-change handoff normally carries one or two ("the Phase 9 item is ticked, and nothing else in the roadmap changes" is a real check, not a restatement).
 
 **Implementation prompt**: a self-contained prompt for the new session. Critical rule, the new session will read `CLAUDE.md`, the roadmap, and the architecture/feature docs itself. Include only context that is **not** inferable from the repo:
 
@@ -154,6 +170,8 @@ Do **not** restate project conventions, coding style, build commands, or anythin
 
 The prompt is a plain task spec. It carries no standing instructions about planning, committing, or advancing the state record: those live in `/cdd-plan` and `/cdd-implement`, where they are improved once instead of regenerated into every handoff.
 
+**On the small-change lane, omit the `## Implementation prompt` section entirely.** The requirements already say everything there is to say about a change whose diff fits in a sentence, and a section restating them is the drift risk this lane exists to avoid. The heading itself stays frozen — frozen means never renamed, not always present.
+
 Show the draft to the user for approval, after the digest below. Iterate if needed.
 
 ## 5b. Print the bounded digest
@@ -162,7 +180,7 @@ Immediately before asking for approval, print a plainly-worded digest of the han
 
 Cover, in this order, skipping any that do not apply:
 
-1. The task, in one line.
+1. The task, in one line, and which lane it takes.
 2. Why now — the problem it addresses.
 3. What "done" means (the `## Requirements`, condensed).
 4. What rides along, or what this is coupled to.
@@ -190,7 +208,7 @@ On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
 <exact checkbox line(s) from the roadmap being addressed>
 
 ## Requirements
-<observable acceptance criteria, as few as possible — typically 3-6, hard cap 10; no design>
+<observable acceptance criteria, as few as possible — minimum 1, typically 3-6, hard cap 10; no design>
 
 ## Implementation prompt
 <the self-contained prompt from step 5>
@@ -211,6 +229,14 @@ Then seed the task **state record** beside the handoff — the slash commands ad
 cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"
 ```
 
+**On the small-change lane only**, mark the lane on the record — this is what `cdd-worktree` routes on:
+
+```bash
+cdd-state lane <branch> small
+```
+
+It is a separate call rather than a flag on `seed` so that a machine whose `cdd-state` predates the lane fails this one command and keeps the seeded record (base branch included); the task then simply runs the standard lane. On the standard lane, do not call it at all — an absent marker *is* the standard lane.
+
 ## 8. Print the next command
 
 After writing, print exactly (the install line is a static reminder — do **not** probe for the helper on every run; it's a once-per-machine setup the user ignores once done):
@@ -218,6 +244,7 @@ After writing, print exactly (the install line is a static reminder — do **not
 ```
 Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
 Next: cdd-worktree <branch>   (opens a plan session on /cdd-plan; /cdd-implement follows in a fresh session)
+                              (small-change lane: opens on /cdd-small-change, which does the whole build)
 
 If `cdd-worktree` or `cdd-state` is "command not found", install the shared helpers once (machine-global, like git/gh), then open a new shell:
   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
@@ -226,3 +253,5 @@ If `cdd-worktree` or `cdd-state` is "command not found", install the shared help
 ```
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with `/cdd-plan` already submitted. That session plans and stops; the user then opens another fresh session in the same worktree and runs `/cdd-implement`.
+
+On the small-change lane the helper reads the marker and opens that session on `/cdd-small-change` instead, which explores nothing, takes its own approval of the concrete change, builds it, and commits — one session in place of two. If the helper is older than the lane, or the project ships no `/cdd-small-change`, it opens `/cdd-plan` as usual and nothing is lost but a window.

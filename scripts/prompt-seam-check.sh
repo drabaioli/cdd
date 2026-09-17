@@ -29,6 +29,12 @@
 #   7. Plan-file section contract — every `## ` section cdd-plan.md writes into the plan
 #      file is still named in cdd-implement.md, which reads it. The plan file is the only
 #      thing crossing between the two sessions, so a one-sided rename would strand it.
+#   8. Lane-marker contract — the small-change lane's routing marker is written by
+#      cdd-next-step.md (`cdd-state lane`) and read by tools/cdd-worktree.sh (`.lane`),
+#      which must still name /cdd-small-change on both the launch and the resume path.
+#   9. Eligibility-heuristic wording — the one sentence that decides the lane is stated
+#      verbatim in the process doc and in both commands that apply it. The template
+#      ships no process doc to point at, so the wording is pinned instead of cited.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -36,6 +42,7 @@ cd "$REPO_ROOT"
 
 REPO_CMDS=".claude/commands"
 WHITELIST="scripts/prompt-seam-whitelist.txt"
+PROCESS_DOC_KB="doc/knowledge_base/claude-driven-development.md"
 
 fail=0
 note() { echo "  $*" >&2; fail=1; }
@@ -132,6 +139,11 @@ require_headings "$REPO_CMDS/cdd-implement.md" \
   '## 1. Read the plan' \
   '## 2. Deviation rule: stop and report, never improvise' \
   '## 6. Commit'
+require_headings "$REPO_CMDS/cdd-small-change.md" \
+  '## 2. Confirm the task is still small (the off-ramp)' \
+  '## 3. Checkpoint: approve the concrete change' \
+  '## 7. Commit' \
+  '## 8. Print the next command'
 
 # --- Check 5: gate-count contract --------------------------------------------
 # The runner's registry is the source of truth for how many gates there are; both
@@ -188,6 +200,47 @@ else
     grep -qF -- "${h#\#\# }" "$IMPL"       || note "plan-file consumer broken: section '${h#\#\# }' is written by $PLAN but no longer named in $IMPL"
   done
 fi
+
+# --- Check 8: lane-marker contract -------------------------------------------
+# The small-change lane is routed by one marker on the task state record. /cdd-next-step
+# is the sole producer and cdd-worktree.sh the sole consumer, on two separate paths
+# (launch and resume). A one-sided edit degrades silently to the standard lane — the safe
+# direction, and exactly why nothing else would ever notice. Same shape as check 2.
+WT_HELPER="tools/cdd-worktree.sh"
+grep -qF 'cdd-state lane' "$NEXT" \
+  || note "lane-marker producer broken: $NEXT no longer writes the lane with \`cdd-state lane\`"
+grep -qF "'.lane // empty'" "$WT_HELPER" \
+  || note "lane-marker consumer broken: $WT_HELPER no longer reads .lane from the state record"
+# Both routing paths live in their own function, so pin each one by name. Counting
+# occurrences would not do: a comment, or the `-f .claude/commands/cdd-small-change.md`
+# probe, satisfies a count while the route itself is gone. So: comment lines dropped,
+# and the trailing `.md` form excluded, leaving only the command named as a command.
+# The function header is matched as a literal string, not a regex: `awk -v` runs its own
+# escape processing over the value, and implementations disagree about what survives it
+# (mawk keeps `\(`, gawk strips it and warns), so a backslash here matches on one host
+# and silently stops matching on the next.
+lane_routes_in() {  # lane_routes_in <function-name>
+  awk -v fn="$1() {" '$0 == fn { inside = 1; next } inside && /^}/ { exit } inside' \
+    "$WT_HELPER" \
+    | grep -v '^[[:space:]]*#' \
+    | grep -q -- '/cdd-small-change\([^.]\|$\)'
+}
+lane_routes_in cdd-worktree \
+  || note "lane-marker consumer broken: cdd-worktree() in $WT_HELPER no longer launches /cdd-small-change"
+lane_routes_in cdd-worktree-resume \
+  || note "lane-marker consumer broken: cdd-worktree-resume() in $WT_HELPER no longer routes a resumed task to /cdd-small-change"
+
+# --- Check 9: eligibility-heuristic wording -----------------------------------
+# The heuristic decides which lane a task takes, and it is applied twice: once by
+# /cdd-next-step when it recommends, once by /cdd-small-change when it re-checks and
+# decides whether to take the off-ramp. Two commands applying two different sentences is
+# a silent split. It is restated rather than cited because the template ships no copy of
+# the process doc, so a pointer would dangle in every downstream project.
+HEURISTIC="If you can state the finished diff in one sentence, before any exploration, it's small. If in doubt, take the standard lane."
+for f in "$PROCESS_DOC_KB" "$NEXT" "$REPO_CMDS/cdd-small-change.md"; do
+  grep -qF -- "$HEURISTIC" "$f" \
+    || note "eligibility-heuristic drift in $f: it no longer states the lane heuristic verbatim"
+done
 
 if [[ "$fail" -ne 0 ]]; then
   echo "prompt-seam check: FAILED (see above)" >&2

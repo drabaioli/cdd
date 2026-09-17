@@ -3,7 +3,7 @@
 A copy-paste directory (`template/`) plus a non-interactive bootstrap script (`tools/bootstrap-cdd-project.sh`) that together start a new project on CDD. Template contents:
 
 - `CLAUDE.md` skeleton with placeholders for project-specific content.
-- `.claude/commands/cdd-{next-step,plan,implement,merge-base,pre-pr,process-pr}.md`: the six per-task lifecycle slash commands.
+- `.claude/commands/cdd-{next-step,plan,implement,small-change,merge-base,pre-pr,process-pr}.md`: the seven per-task lifecycle slash commands. `/cdd-small-change` is the small-change lane's single session, which replaces `/cdd-plan` + `/cdd-implement` for a task whose finished diff can be stated before any exploration; `cdd-worktree` routes to it on a marker the handoff session recorded.
 - `.claude/settings.json`: auto-allows worktree sessions to read their handoff file (`~/.cdd/handoffs/<PROJECT_DIR>/**`, substituted at bootstrap) and to run the `cdd-state` helper that maintains the colocated per-task state record.
 - `doc/index.md` plus `doc/{architecture,features,knowledge_base}/`: the documentation map and doc directory skeletons; the architecture and features skeletons follow the index-plus-per-topic-docs convention.
 - `doc/knowledge_base/project-overview.md`: the project-charter skeleton (what it is, goals, what it does and does not do, constraints, architecture intentions) — a living document, kept current. Filled by `/cdd-bootstrap` from discovery, or by hand otherwise.

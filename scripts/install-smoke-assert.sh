@@ -263,7 +263,7 @@ pass "dispatching shims exit 127 with a reinstall hint instead of recursing (hel
 
 # `stages` must answer BEFORE cdd-state's jq guard: behind it, a jq-less host reports an
 # empty enum, cdd-worktree's skew check fires on a current helper, and every run there
-# warns wrongly. base-branch-assert.sh stubs cdd-state, so only this — the real helper on
+# warns wrongly. worktree-launch-assert.sh stubs cdd-state, so only this — the real helper on
 # a jq-less PATH — pins the ordering. The PATH carries the shims plus bash and nothing
 # else; anything richer (/usr/bin) puts jq back and the case proves nothing.
 JQLESS_BIN="$FAKE_HOME/jqless-bin"

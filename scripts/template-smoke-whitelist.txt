@@ -27,7 +27,7 @@
 <N>
 <n>
 <new convention / new utility / refactored interface>
-<observable acceptance criteria, as few as possible — typically 3-6, hard cap 10; no design>
+<observable acceptance criteria, as few as possible — minimum 1, typically 3-6, hard cap 10; no design>
 <one paragraph, then the ordered steps; each step names the files it touches>
 <one-line description>
 <one-line description of what was adopted from main>
