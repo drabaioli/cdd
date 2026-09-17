@@ -215,8 +215,12 @@ grep -qF "'.lane // empty'" "$WT_HELPER" \
 # occurrences would not do: a comment, or the `-f .claude/commands/cdd-small-change.md`
 # probe, satisfies a count while the route itself is gone. So: comment lines dropped,
 # and the trailing `.md` form excluded, leaving only the command named as a command.
+# The function header is matched as a literal string, not a regex: `awk -v` runs its own
+# escape processing over the value, and implementations disagree about what survives it
+# (mawk keeps `\(`, gawk strips it and warns), so a backslash here matches on one host
+# and silently stops matching on the next.
 lane_routes_in() {  # lane_routes_in <function-name>
-  awk -v fn="^$1\\(\\) \\{$" '$0 ~ fn { inside = 1; next } inside && /^}/ { exit } inside' \
+  awk -v fn="$1() {" '$0 == fn { inside = 1; next } inside && /^}/ { exit } inside' \
     "$WT_HELPER" \
     | grep -v '^[[:space:]]*#' \
     | grep -q -- '/cdd-small-change\([^.]\|$\)'
