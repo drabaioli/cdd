@@ -12,8 +12,10 @@
 # Smoke-test temp dir (/tmp/cdd-demo-smoke in demo/README.md), not a command.
 # The check runner provisions its own scratch dir, so /tmp/cdd-smoke is gone.
 /cdd-demo-smoke
-# Retired command name, kept only in roadmap completion annotations that
-# document the /cdd-merge-main -> /cdd-merge-base rename (#31). Historical.
+# Retired command name, kept only where it is recorded rather than used: the
+# roadmap completion annotations documenting the /cdd-merge-main ->
+# /cdd-merge-base rename (#31), and the legacy-token table in
+# .claude/commands/cdd-retrofit.md section 4.5. Historical.
 /cdd-merge-main
 
 # --- Downstream paths absent from the CDD repo (check 3: path existence) ---
