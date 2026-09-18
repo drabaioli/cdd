@@ -37,7 +37,7 @@ The handoff is immutable, so a criterion the human agrees to amend or drop is **
 
 ## 4. Print the bounded digest
 
-Immediately before asking for approval, print a plainly-worded digest in chat: **at most 7 bullets, one per topic below, a sentence or two each**. The cap is the topic list, not a bullet budget — cover every topic that applies and nothing else. It is what the human approves against, so it has to carry the whole plan at high altitude: enough that approving it is a real decision, little enough that it is read rather than skimmed.
+Immediately before asking for approval, print a plainly-worded digest in chat: **at most 7 bullets, one per topic below, a sentence or two each** — cover every topic that applies and nothing else. It is what the human approves against, so it has to carry the whole plan at high altitude: enough that approving it is a real decision, little enough that it is read rather than skimmed.
 
 Cover, in this order, skipping any that do not apply:
 
