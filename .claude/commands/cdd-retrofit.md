@@ -189,18 +189,22 @@ Section 4.4 migrated the CDD-managed files. Anything **else** in the project tha
 | `/next-step`, `/pre-pr`, `/merge-main`, `/process-pr` | the `cdd-` prefixed names | #27 |
 | `/cdd-merge-main` | `/cdd-merge-base` | #31 |
 | a project-local `<slug>-worktree` / `-done` / `-list` function, or `tools/<slug>-worktree.sh` | the machine-global `cdd-worktree` | #24 |
-| `<PROJECT_SLUG>`, and the bare `PROJECT` placeholder | the two-identifier model | #24 |
+| `<PROJECT_SLUG>`, and the bare `PROJECT` substitution token (only ever seen as the `PROJECT-worktree` / `PROJECT-state` shell identifier) | the two-identifier model | #24 |
 
 The command list is the four the template actually shipped. `/bootstrap`, `/retrofit` and `/quick-create` were renamed by #27 too, but they have always been CDD-repo-only, so no downstream project ever referenced them — leaving them out is deliberate, not an oversight, and adding them would only match ordinary paths — a plain *./bootstrap.sh* in any project's root would trip the pattern (unbackticked here on purpose: `scripts/prompt-seam-check.sh`'s path linter reads a backticked `*.sh` path as one that must resolve). **When you land a rename or a path migration in CDD, add a row here**: this table is the whole of how that change reaches projects already bootstrapped.
 
 **Sweep.** Tracked files only, so `.git/` and anything gitignored are out of scope, and `-I` skips binaries:
 
 ```bash
-git -C "$WT" grep -nI -F -e '.claude-handoffs' -e 'PROJECT_SLUG'
+git -C "$WT" grep -nI -F -e '.claude-handoffs' -e 'PROJECT_SLUG' -e 'PROJECT-worktree' -e 'PROJECT-state'
 git -C "$WT" grep -nIE -e '(^|[^A-Za-z0-9_-])/(next-step|pre-pr|merge-main|process-pr|cdd-merge-main)([^A-Za-z0-9_/-]|$)'
 ```
 
-The boundaries on the second pattern matter: without them `css/bootstrap.min.css`-shaped paths match. Probe separately for the legacy helper, which may carry no token at all:
+The boundaries on the second pattern matter: without them `css/bootstrap.min.css`-shaped paths match. The bare `PROJECT` token is matched only in its identifier form: on its own it is an ordinary English word, and an unanchored sweep for it would drown the real hits.
+
+If `$WT` is **not a git repo** — section 2.5's fallback leaves upgrade mode writing in place, and a hand-copied CDD install can land there — `git grep` fails outright. Degrade rather than skip: rerun both patterns as plain `grep -rnI ... "$WT"`, and say in the section 5 report that the sweep covered the whole tree instead of the tracked set, so ignored and build-output paths may appear among the hits.
+
+Probe separately for the legacy helper, which may carry no token at all:
 
 ```bash
 ls "$WT"/tools/*-worktree.sh "$WT"/tools/*-state.sh 2>/dev/null
