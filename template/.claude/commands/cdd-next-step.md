@@ -176,19 +176,9 @@ Show the draft to the user for approval, after the digest below. Iterate if need
 
 ## 5b. Print the bounded digest
 
-Immediately before asking for approval, print a plainly-worded digest of the handoff in chat: **at most 7 bullets, one line each**. The cap is the feature — an uncapped digest is the wall of text the checkpoint gets skimmed for, and the human should be able to approve or push back without reading the artifact.
+Immediately before asking for approval, print a short summary of the handoff in chat: what the task is about, and the details that bear on approving it. Follow the rule in `CLAUDE.md` — short, plain, only what changes the answer. The human should be able to approve or push back on this alone, without opening the handoff.
 
-Cover, in this order, skipping any that do not apply:
-
-1. The task, in one line, and which lane it takes.
-2. Why now — the problem it addresses.
-3. What "done" means (the `## Requirements`, condensed).
-4. What rides along, or what this is coupled to.
-5. The mechanical surface — roughly what gets touched.
-6. What is explicitly out of scope.
-7. Questions deferred to `/cdd-plan`.
-
-(The cap is a starting point; tuning it, and generalizing this convention to the other commands, is tracked separately.)
+What usually earns a line: what the task is and which lane it takes, why it is worth doing now, what "done" means, anything deliberately out of scope, and any question being deferred to `/cdd-plan`. Say what applies and drop the rest — this is a summary, not a form to fill in.
 
 ## 6. Note any roadmap edits implied
 

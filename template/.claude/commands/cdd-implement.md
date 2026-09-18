@@ -59,7 +59,7 @@ cdd-state set implementation_done
 
 ## 7. Summary
 
-Print a short summary: what was implemented, which files changed, the verification verdict, any deviation from the plan and why, and any requirement from the handoff you could not satisfy.
+Print a short summary, per the rule in `CLAUDE.md`: what was implemented, whether the checks passed, any deviation from the plan and why, and anything from the handoff's `## Requirements` you could not satisfy.
 
 Then print:
 
