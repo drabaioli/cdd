@@ -37,19 +37,9 @@ The handoff is immutable, so a criterion the human agrees to amend or drop is **
 
 ## 4. Print the bounded digest
 
-Immediately before asking for approval, print a plainly-worded digest in chat: **at most 7 bullets, one per topic below, a sentence or two each** — cover every topic that applies and nothing else. It is what the human approves against, so it has to carry the whole plan at high altitude: enough that approving it is a real decision, little enough that it is read rather than skimmed.
+Immediately before asking for approval, print a short summary of the plan in chat: what you intend to do, and the details that bear on approving it. Follow the rule in `CLAUDE.md` — short, plain, only what changes the answer. The plan file itself is written for the next session, so this summary is the whole of what the human approves against; it has to carry the plan at high altitude without becoming the plan.
 
-Cover, in this order, skipping any that do not apply:
-
-1. The approach, in one line.
-2. Files touched.
-3. The riskiest step.
-4. Leads investigated and rejected.
-5. How it will be verified.
-6. Any deviation from the handoff's `## Requirements`.
-7. One slack bullet for whatever else the human needs to decide.
-
-No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file. Say it in ordinary words, and name a mechanism only when the human needs it to act. Correctness outranks the cap: if a point cannot be made both plainly and correctly inside it, say it correctly and note the overflow.
+What usually earns a line: the approach, roughly what it touches, the riskiest step, anything you investigated and rejected that the human might otherwise suggest, how it will be verified, and any deviation from the handoff's `## Requirements`. Say what applies and drop the rest. No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file.
 
 ## 5. Checkpoint: plan approval
 
