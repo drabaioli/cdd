@@ -176,7 +176,7 @@ Show the draft to the user for approval, after the digest below. Iterate if need
 
 ## 5b. Print the bounded digest
 
-Immediately before asking for approval, print a plainly-worded digest of the handoff in chat: **at most 7 bullets, one line each**. The cap is the feature — an uncapped digest is the wall of text the checkpoint gets skimmed for, and the human should be able to approve or push back without reading the artifact.
+Immediately before asking for approval, print a plainly-worded digest of the handoff in chat: **at most 7 bullets, one per topic below, a sentence or two each**. The cap is the feature — an uncapped digest is the wall of text the checkpoint gets skimmed for, and the human should be able to approve or push back without reading the artifact.
 
 Cover, in this order, skipping any that do not apply:
 
@@ -188,7 +188,7 @@ Cover, in this order, skipping any that do not apply:
 6. What is explicitly out of scope.
 7. Questions deferred to `/cdd-plan`.
 
-(The cap is a starting point; tuning it, and generalizing this convention to the other commands, is tracked separately.)
+Say it in ordinary words, and name a mechanism only when the human needs it to act. Correctness outranks the cap: if a point cannot be made both plainly and correctly inside it, say it correctly and note the overflow.
 
 ## 6. Note any roadmap edits implied
 

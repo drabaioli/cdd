@@ -33,7 +33,7 @@ Two cases must be handled explicitly, because both are expected rather than hypo
 - **The plan's anchors no longer match the tree.** The gap between planning and implementing is human-paced, so a `/cdd-merge-base` may have run in between and moved everything the plan's `file:line` pointers refer to. If the cited lines no longer say what the plan says they say, stop and report which anchors drifted; offer to re-run `/cdd-plan` against the merged tree.
 - **The plan file is not there.** A machine running an older worktree helper materializes only the handoff and the state record from the task's sync ref, so a plan written elsewhere may never have landed here. Say plainly that the plan was not materialized on this machine, and offer to re-run `/cdd-plan`. **Never improvise the work from the handoff alone** — that silently reverts the task to the un-split flow with no approved plan behind it.
 
-Anything smaller — a stale line number, a file renamed, a step that turns out to be a no-op — is a judgement call you may make and must mention in the final summary.
+Anything smaller — a stale line number, a file renamed, a step that turns out to be a no-op — is a judgement call you may make and must mention in the digest at step 7.
 
 ## 3. Implement
 
@@ -57,11 +57,23 @@ Then advance the task **state record** (advisory; it skips silently if the recor
 cdd-state set implementation_done
 ```
 
-## 7. Summary
+## 7. Print the bounded digest
 
-Print a short summary: what was implemented, which files changed, the verification verdict, any deviation from the plan and why, and any requirement from the handoff you could not satisfy.
+Print a plainly-worded digest of the session in chat: **at most 5 bullets, one per topic below, a sentence or two each**. There is no gate after this one, and it is the only account of the session the human gets before the PR — an unread report means they learn what happened at review time.
 
-Then print:
+Cover, in this order, skipping any that do not apply:
+
+1. What was built, in one line.
+2. Files touched.
+3. The verification verdict.
+4. Any deviation from the plan, and why.
+5. Any `## Requirements` criterion from the handoff you could not satisfy.
+
+Say it in ordinary words, and name a mechanism only when the human needs it to act. Correctness outranks the cap: if a point cannot be made both plainly and correctly inside it, say it correctly and note the overflow.
+
+## 8. Print the next command
+
+Print:
 
 ```
 Next: /cdd-merge-base if the base branch has moved, otherwise /cdd-pre-pr — each in a fresh session.

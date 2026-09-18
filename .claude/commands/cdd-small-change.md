@@ -34,7 +34,15 @@ The off-ramp costs one session start. It is the safety net that lets the heurist
 
 ## 3. Checkpoint: approve the concrete change
 
-This is checkpoint 3 in its small-change form: the human approves the actual change instead of a written plan. State it as the one-sentence diff, then file by file — path, what changes, and why in a clause — plus the doc and roadmap edits step 5 will apply. Keep it to what fits on a screen; if it does not fit, step 2's answer was wrong.
+This is checkpoint 3 in its small-change form: the human approves the actual change instead of a written plan, so what you print is a plainly-worded digest of the change itself: **at most 3 bullets, plus one line per file touched**.
+
+Cover, in this order:
+
+1. The change, in one sentence — the same one-sentence diff step 2 tested.
+2. The files, one line each: path, what changes, and why in a clause.
+3. The doc and roadmap edits step 5 will apply.
+
+Say it in ordinary words, and name a mechanism only when the human needs it to act. Correctness outranks the cap: if a point cannot be made both plainly and correctly inside it, say it correctly and note the overflow. If the file list runs long, step 2's answer was wrong.
 
 Then ask for approval, and iterate until you get it.
 
@@ -70,11 +78,22 @@ cdd-state set implementation_done
 
 This lane never passes through `plan_written`, and that is a non-event: consumers compare stages by index, so a stage that was never written is simply one they never observe.
 
-## 8. Print the next command
+## 8. Print the bounded digest
 
-Print a short summary first: what changed, which files, the verification verdict, and any requirement from the handoff you could not satisfy.
+Print a plainly-worded digest of the session in chat: **at most 4 bullets, one per topic below, a sentence or two each**. There is no gate after this one, and it is the only account of the session the human gets before the PR — an unread report means they learn what happened at review time.
 
-Then print:
+Cover, in this order, skipping any that do not apply:
+
+1. What changed, in one line.
+2. Files touched.
+3. The verification verdict.
+4. Any `## Requirements` criterion from the handoff you could not satisfy.
+
+Say it in ordinary words, and name a mechanism only when the human needs it to act. Correctness outranks the cap: if a point cannot be made both plainly and correctly inside it, say it correctly and note the overflow.
+
+## 9. Print the next command
+
+Print:
 
 ```
 Next: /cdd-merge-base if the base branch has moved, otherwise /cdd-pre-pr — each in a fresh session.

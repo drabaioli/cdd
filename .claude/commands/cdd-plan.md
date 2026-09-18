@@ -37,7 +37,7 @@ The handoff is immutable, so a criterion the human agrees to amend or drop is **
 
 ## 4. Print the bounded digest
 
-Immediately before asking for approval, print a plainly-worded digest in chat: **one bullet per topic below, each a sentence or two**. The cap is the topic list, not a bullet budget — cover every topic that applies and nothing else. It is what the human approves against, so it has to carry the whole plan at high altitude: enough that approving it is a real decision, little enough that it is read rather than skimmed.
+Immediately before asking for approval, print a plainly-worded digest in chat: **at most 7 bullets, one per topic below, a sentence or two each**. The cap is the topic list, not a bullet budget — cover every topic that applies and nothing else. It is what the human approves against, so it has to carry the whole plan at high altitude: enough that approving it is a real decision, little enough that it is read rather than skimmed.
 
 Cover, in this order, skipping any that do not apply:
 
@@ -49,7 +49,7 @@ Cover, in this order, skipping any that do not apply:
 6. Any deviation from the handoff's `## Requirements`.
 7. One slack bullet for whatever else the human needs to decide.
 
-No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file. (Generalizing this convention to the other commands is tracked separately.)
+No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file. Say it in ordinary words, and name a mechanism only when the human needs it to act. Correctness outranks the cap: if a point cannot be made both plainly and correctly inside it, say it correctly and note the overflow.
 
 ## 5. Checkpoint: plan approval
 
