@@ -34,7 +34,7 @@ The off-ramp costs one session start. It is the safety net that lets the heurist
 
 ## 3. Checkpoint: approve the concrete change
 
-This is checkpoint 3 in its small-change form: the human approves the actual change instead of a written plan. State the change in short — what it does and why — plus any doc or roadmap edit step 5 will apply, if there is one. Follow the rule in `CLAUDE.md`: short, plain, only what changes the answer. Leave out the file list; the human sees that at review time. If stating the change takes more than a few lines, step 2's answer was wrong.
+This is checkpoint 3 in its small-change form: the human approves the actual change instead of a written plan. State the change in short — what it does and why — plus any doc or roadmap edit step 5 will apply, if there is one. Follow the rule in `CLAUDE.md`: short, plain, only what changes the answer. If stating the change takes more than a few lines, step 2's answer was wrong.
 
 Then ask for approval, and iterate until you get it.
 
@@ -68,7 +68,7 @@ This lane never passes through `plan_written`, and that is a non-event: consumer
 
 ## 8. Print the next command
 
-Print a short summary first, per the rule in `CLAUDE.md`: what changed and why, whether the checks passed, and anything from the handoff's `## Requirements` you could not satisfy. No file list — that shows up at review time.
+Print a short summary first, per the rule in `CLAUDE.md`: what changed and why, whether the checks passed, and anything from the handoff's `## Requirements` you could not satisfy.
 
 Then print:
 
