@@ -177,11 +177,9 @@ Every application is per-file interactive: show the diff, get approval, write in
 
 ### 4.5 Legacy-token sweep and helper migration
 
-Section 4.4 migrated the CDD-managed files. Anything **else** in the project that still names a pre-migration path or command is now dangling, and nothing has looked at it — `tools/*.sh` is where this bites hardest, because the pre-#24 per-project worktree helper lives there. So this sweep covers every tracked text file, not just `*.md`.
+Section 4.4 migrated the CDD-managed files; anything **else** naming a pre-migration path or command is now dangling and unlooked-at. So this sweep covers every tracked text file, not just `*.md` — `tools/*.sh` bites hardest, because the pre-#24 per-project worktree helper lives there. **Upgrade mode only:** an install target carries no CDD-era tokens, and a hand-copied CDD install is detected as *upgrade* anyway (section 2 keys on `cdd-next-step.md` / `roadmap.md`; its manual override is the escape hatch).
 
-**Upgrade mode only.** An install target has no CDD, so it carries no CDD-era tokens. The one counterexample — a hand-copied CDD install — is detected as *upgrade* anyway (section 2 keys on `cdd-next-step.md` / `roadmap.md`), and section 2's manual mode override is the escape hatch for a half-finished install.
-
-**DEPRECATION SEAM — every row of the table below is transitional.** Retire a row once every project on every machine has been retrofitted past that migration; the step outlives its initial rows, because a future rename adds a row. Removal of these five is tracked by issue #93. The step *itself* is CDD's per-project migration mechanism until issue #80's fleet-versioning layer lands and subsumes it (process doc §6) — do not build version negotiation here.
+**DEPRECATION SEAM — every row below is transitional.** Retire a row once every project on every machine is past that migration; removal of these five is tracked by issue #93. The step outlives its rows — a future rename adds one — and stays CDD's per-project migration mechanism until issue #80's fleet-versioning layer subsumes it (process doc §6), so do not build version negotiation here. **Land a rename or a path migration in CDD, add a row**: this table is the whole of how that change reaches already-bootstrapped projects. (`/bootstrap`, `/retrofit` and `/quick-create` are deliberately absent: #27 renamed them too, but they have always been CDD-repo-only.)
 
 | Legacy token | Migrated to | Landed in |
 | --- | --- | --- |
@@ -191,35 +189,22 @@ Section 4.4 migrated the CDD-managed files. Anything **else** in the project tha
 | a project-local `<slug>-worktree` / `-done` / `-list` function, or `tools/<slug>-worktree.sh` | the machine-global `cdd-worktree` | #24 |
 | `<PROJECT_SLUG>`, and the bare `PROJECT` substitution token (only ever seen as the `PROJECT-worktree` / `PROJECT-state` shell identifier) | the two-identifier model | #24 |
 
-The command list is the four the template actually shipped. `/bootstrap`, `/retrofit` and `/quick-create` were renamed by #27 too, but they have always been CDD-repo-only, so no downstream project ever referenced them — leaving them out is deliberate, not an oversight, and adding them would only match ordinary paths — a plain *./bootstrap.sh* in any project's root would trip the pattern (unbackticked here on purpose: `scripts/prompt-seam-check.sh`'s path linter reads a backticked `*.sh` path as one that must resolve). **When you land a rename or a path migration in CDD, add a row here**: this table is the whole of how that change reaches projects already bootstrapped.
-
-**Sweep.** Tracked files only, so `.git/` and anything gitignored are out of scope, and `-I` skips binaries:
+**Sweep.** Tracked files only, so `.git/` and gitignored paths are out of scope; `-I` skips binaries:
 
 ```bash
 git -C "$WT" grep -nI -F -e '.claude-handoffs' -e 'PROJECT_SLUG' -e 'PROJECT-worktree' -e 'PROJECT-state'
 git -C "$WT" grep -nIE -e '(^|[^A-Za-z0-9_-])/(next-step|pre-pr|merge-main|process-pr|cdd-merge-main)([^A-Za-z0-9_/-]|$)'
+ls "$WT"/tools/*-worktree.sh "$WT"/tools/*-state.sh 2>/dev/null   # the legacy helper may carry no token at all
 ```
 
-The boundaries on the second pattern matter: without them `css/bootstrap.min.css`-shaped paths match. The bare `PROJECT` token is matched only in its identifier form: on its own it is an ordinary English word, and an unanchored sweep for it would drown the real hits.
+Both narrowings are load-bearing: unbounded, the second pattern matches `css/bootstrap.min.css`-shaped paths, and bare `PROJECT` is swept only as an identifier because alone it is an ordinary English word. If `$WT` is **not a git repo** (section 2.5's fallback, or a hand-copied install), `git grep` fails outright — degrade rather than skip: rerun both as `grep -rnI ... "$WT"`, and report in section 5 that the sweep covered the whole tree, so gitignored and build-output paths may appear among the hits.
 
-If `$WT` is **not a git repo** — section 2.5's fallback leaves upgrade mode writing in place, and a hand-copied CDD install can land there — `git grep` fails outright. Degrade rather than skip: rerun both patterns as plain `grep -rnI ... "$WT"`, and say in the section 5 report that the sweep covered the whole tree instead of the tracked set, so ignored and build-output paths may appear among the hits.
+**Classify every hit; suppress none** — a hit you decide not to act on is still reported, because a misclassification is only recoverable while it is visible. **Actionable** (a live reference a project-owned script, doc or `.claude/settings.json` actually follows) → propose the patch, per-file approval as everywhere in section 4. **Historical** (a changelog, ADR or roadmap line *recording* the old name rather than using it) → report it, propose nothing, let the human judge. **Surviving in a CDD-managed file** → say so plainly: 4.4 should have migrated it, so that is a defect in this command, not in the project.
 
-Probe separately for the legacy helper, which may carry no token at all:
+**The legacy worktree helper — the loudest hit.** If the `ls` probe finds one, the project predates the machine-global helper. State the recommendation, don't offer a neutral menu:
 
-```bash
-ls "$WT"/tools/*-worktree.sh "$WT"/tools/*-state.sh 2>/dev/null
-```
-
-**Classify every hit; suppress none.** A wrongly-classified hit is only recoverable if it is visible, so a hit you decide not to act on is still reported.
-
-- **Actionable** — a live reference in a project-owned file (a script, a doc, `.claude/settings.json`) that the project's workflow actually follows. Propose the patch, per-file approval as everywhere else in section 4.
-- **Historical** — a changelog entry, an ADR, a roadmap completion annotation: a line *recording* the old name rather than using it. Report it, propose nothing, let the human judge.
-- **In a CDD-managed file** — section 4.4 should have migrated these. If any survive, say so plainly: that is a defect in this command, not in the project.
-
-**The legacy worktree helper — the loudest hit.** If `tools/<slug>-worktree.sh` (or a `tools/<slug>-state.sh`) exists, the project predates the machine-global helper. Present the decision with the recommendation stated, not as a neutral menu:
-
-- **Recommended — retire it.** The helper is machine-global now: one install per machine, not one script per project. Propose deleting it from `$WT`, and tell the user to run `./tools/cdd-worktree.sh install` and `./tools/cdd-state.sh install` once from the CDD repo — the installer also copies any handoffs still sitting under the old location into `~/.cdd/handoffs/`, so retiring the script does not strand the project's in-flight tasks. The shell rc sourcing line is **outside the worktree and outside this command's write scope**: print the exact line to delete and let the user do it. Never edit a user's shell rc.
-- **Decline path — patch it in place.** If the user keeps the local helper, bring it back into agreement with the migrated scaffolding under the same per-file approval as every other write: the handoff directory, the command names it prints or hints at, and the `<branch>.state.json` sidecar the current helpers read and write beside the handoff (absent from any pre-#38 helper). Show the diff, apply on approval, and say plainly that this is now a maintained-by-hand path.
+- **Recommended — retire it.** One install per machine, not one script per project: propose deleting it from `$WT`, and tell the user to run `./tools/cdd-worktree.sh install` and `./tools/cdd-state.sh install` once from the CDD repo — the installer also moves handoffs out of the old location, so nothing in flight is stranded. The shell rc sourcing line is outside this command's write scope: print the exact line to delete and let the user do it. **Never edit a user's shell rc.**
+- **Decline path — patch it in place.** Under the usual per-file approval, reconcile the kept helper with the migrated scaffolding: the handoff directory, the command names it prints, and the `<branch>.state.json` sidecar beside the handoff (absent from any pre-#38 helper). Say plainly that it is now a maintained-by-hand path.
 
 Either way it is an outcome, not a silent success — section 5 reports it.
 
