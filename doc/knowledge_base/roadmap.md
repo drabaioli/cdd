@@ -135,7 +135,7 @@ Defects and gaps surfaced by retrofitting CDD onto real existing projects. Each 
 - [x] **Per-task base branch (gitflow: platform default ≠ integration branch).** Each task's base is captured on its state record, cut from by `cdd-worktree`, targeted by the resume-side commands.
 - [x] **Retrofit reconciles newly-added fill-in docs instead of shipping raw skeletons** (issue #41): upgrade mode only, per-file approval, residual placeholders flagged; install mode exempt
 - [x] **Retrofit doc-reconciliation playbook for common pre-existing layouts** (split architecture docs, a future-work/backlog doc, an oversized CLAUDE.md), in `/cdd-retrofit` and the process doc.
-- [ ] Retrofit upgrade mode sweeps project-owned scripts for legacy CDD tokens and migrates a project-local `tools/<slug>-worktree.sh` off the pre-global helper model (issue #44)
+- [x] Retrofit upgrade mode sweeps project-owned scripts for legacy CDD tokens and migrates a project-local `tools/<slug>-worktree.sh` off the pre-global helper model (issue #44)
 
 **Milestone:** CDD retrofits cleanly onto a project regardless of default-branch name, repo directory name/location, or pre-existing doc layout, without per-project manual fixes to the scaffolding.
 

@@ -78,8 +78,8 @@ repo — is bounded by the human gate and the roadmap fallback.
   are guarded by a mechanism rather than by intent.
 - The three channels are complementary, not duplicative: the pre-PR check fires at **discovery**
   time, the `/cdd-process-pr` route at **review** time on what someone else saw, and
-  `/cdd-retrofit`'s upstream-candidates step at **upgrade** time on the accumulated diff. A general improvement now has
-  three independent chances of reaching CDD.
+  `/cdd-retrofit`'s upstream-candidates step at **upgrade** time on the accumulated diff. A general
+  improvement now has three independent chances of reaching CDD.
 - Inserting step 7 renumbered steps 7–10 to 8–11, which propagates into
   `scripts/prompt-seam-check.sh`'s pinned heading list and the corresponding mutation case in
   `scripts/prompt-seam-assert.sh`. Future insertions carry the same cost; the seam checker makes
