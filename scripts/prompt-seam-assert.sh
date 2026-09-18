@@ -10,7 +10,7 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's ten checks gets at least one mutation:
+# checker's nine checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file.
@@ -25,9 +25,6 @@
 #      /cdd-small-change while still routing the launch path to it.
 #   9. Eligibility heuristic   — cdd-small-change.md restates the lane heuristic in
 #      words of its own instead of the pinned sentence.
-#  10. Bounded-digest convention — three ways one rots: cdd-implement.md loses its
-#      digest heading; cdd-small-change.md's checkpoint stops naming a cap; and
-#      cdd-next-step.md reasserts the plain-wording sentence in words of its own.
 #
 # Plus two control cases, which are what make the mutations above mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected"
@@ -196,33 +193,5 @@ sandbox_sed 's|If you can state the finished diff in one sentence|If the change 
   "$CMDS/cdd-small-change.md"
 expect_fail "check 9 catches a command that reworded the lane heuristic" \
   "it no longer states the lane heuristic verbatim"
-
-# --- Check 10: bounded-digest convention --------------------------------------
-# Three mutations, one per way the convention rots. Each command is a separate file
-# with no downstream consumer, so any of these would otherwise go unnoticed until a
-# human read a session's report and found it unreadable.
-
-# The heading itself dropped: /cdd-implement stops printing a digest at all.
-fresh_sandbox
-sandbox_sed '/^## 7\. Print the bounded digest$/d' "$CMDS/cdd-implement.md"
-expect_fail "check 10 catches a command that dropped its digest step" \
-  "no longer carries the digest step '## 7. Print the bounded digest'"
-
-# The cap softened into a judgement call, which is the realistic edit — the heading and
-# the topic list survive, so the step still looks like a digest step. Guarded, so a
-# reworded source turns this case red rather than silently into a no-op.
-fresh_sandbox
-sandbox_sed 's/at most 3 bullets/as few as sensible/' "$CMDS/cdd-small-change.md"
-grep -qF 'at most 3 bullets' "$SANDBOX/$CMDS/cdd-small-change.md" \
-  && fail "check 10 setup: cdd-small-change.md still states its checkpoint cap after mutation"
-expect_fail "check 10 catches a digest step that stopped stating its cap" \
-  "no longer states a cap"
-
-# The plain-wording sentence reasserted in the command's own words. It still reads
-# sensibly, which is exactly why a split across the four commands would go unnoticed.
-fresh_sandbox
-sandbox_sed 's|Say it in ordinary words|Use plain language|' "$CMDS/cdd-next-step.md"
-expect_fail "check 10 catches a command that reworded the plain-wording sentence" \
-  "it no longer states the plain-wording sentence verbatim"
 
 echo "prompt-seam contract: clean"

@@ -35,10 +35,6 @@
 #   9. Eligibility-heuristic wording — the one sentence that decides the lane is stated
 #      verbatim in the process doc and in both commands that apply it. The template
 #      ships no process doc to point at, so the wording is pinned instead of cited.
-#  10. Bounded-digest convention — each command that faces the human at a checkpoint or
-#      at the end of a session still carries its digest step, that step still states its
-#      own cap as a number, and the one sentence carrying the plain-wording half of the
-#      convention is still present verbatim (pinned, not cited, for check 9's reason).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -147,7 +143,7 @@ require_headings "$REPO_CMDS/cdd-small-change.md" \
   '## 2. Confirm the task is still small (the off-ramp)' \
   '## 3. Checkpoint: approve the concrete change' \
   '## 7. Commit' \
-  '## 9. Print the next command'
+  '## 8. Print the next command'
 
 # --- Check 5: gate-count contract --------------------------------------------
 # The runner's registry is the source of truth for how many gates there are; both
@@ -244,47 +240,6 @@ HEURISTIC="If you can state the finished diff in one sentence, before any explor
 for f in "$PROCESS_DOC_KB" "$NEXT" "$REPO_CMDS/cdd-small-change.md"; do
   grep -qF -- "$HEURISTIC" "$f" \
     || note "eligibility-heuristic drift in $f: it no longer states the lane heuristic verbatim"
-done
-
-# --- Check 10: bounded-digest convention --------------------------------------
-# Every session that faces the human prints a bounded digest (process doc 2.16): a
-# capped, plainly-worded summary in chat that a checkpoint is approved against, or that
-# stands as the session's only report before the PR. The convention rots the way issue
-# 76 predicted — one command at a time, silently, with nothing downstream to notice —
-# so each digest step is pinned twice: the heading is still there, and the section it
-# opens still states its own cap as a number. The sentence carrying the plain-wording
-# half is then pinned across all four commands and the process doc. Only that sentence's
-# *presence* is checkable; whether a digest obeys it is not, and per ADR 0002 that stays
-# out of this gate. Restated in the commands rather than cited, for check 9's reason:
-# the template ships no process doc for a pointer to resolve against.
-DIGEST_SENTENCE="Say it in ordinary words, and name a mechanism only when the human needs it to act."
-# Extract one `## ` section, so the cap is looked for *inside* the digest step. A
-# whole-file grep would not do — the same shortcut check 8 rejects: a number anywhere
-# else in the file satisfies it while the cap itself is gone. The heading is matched as
-# a literal string for the `awk -v` escape-processing reason recorded at check 8.
-digest_section() {  # digest_section <file> <heading>
-  awk -v h="$2" '$0 == h { inside = 1; next } inside && /^## / { exit } inside' "$1"
-}
-# (file, heading) pairs. cdd-small-change.md is pinned twice deliberately: step 8 is its
-# terminal report and step 3 *is* checkpoint 3 in that lane, so pinning only the report
-# would guard the weaker of the two.
-while IFS='|' read -r dfile dheading; do
-  f="$REPO_CMDS/$dfile"
-  grep -qxF -- "$dheading" "$f" \
-    || { note "bounded-digest seam broken: $f no longer carries the digest step '$dheading'"; continue; }
-  digest_section "$f" "$dheading" | grep -qE 'at most [0-9]+' \
-    || note "bounded-digest seam broken: '$dheading' in $f no longer states a cap (\`at most <n>\`)"
-done <<'PAIRS'
-cdd-next-step.md|## 5b. Print the bounded digest
-cdd-plan.md|## 4. Print the bounded digest
-cdd-implement.md|## 7. Print the bounded digest
-cdd-small-change.md|## 3. Checkpoint: approve the concrete change
-cdd-small-change.md|## 8. Print the bounded digest
-PAIRS
-for f in "$PROCESS_DOC_KB" "$NEXT" "$REPO_CMDS/cdd-plan.md" \
-         "$REPO_CMDS/cdd-implement.md" "$REPO_CMDS/cdd-small-change.md"; do
-  grep -qF -- "$DIGEST_SENTENCE" "$f" \
-    || note "bounded-digest drift in $f: it no longer states the plain-wording sentence verbatim"
 done
 
 if [[ "$fail" -ne 0 ]]; then

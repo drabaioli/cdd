@@ -235,31 +235,6 @@ The rule is what makes the split safe rather than lossy, and it usefully bounds 
 
 Two properties follow from the plan being a file rather than a transcript. It is **human-editable** before implementing — the reason the implementation session is started by hand rather than chained automatically. And it is **durable**: a session that dies after plan approval loses nothing, where before it lost all of the exploration. Unlike the handoff, it is mutable, so a machine picking the task up takes the plan whenever it takes the state record it travels with.
 
-### 2.16 Bounded digests
-
-The short summary a session prints **in chat** at the point the human reads it — immediately before an approval gate, or at the end of a session as its report. It is not an artifact on disk. It is the thing the human actually reads, and at a checkpoint it is what they approve against.
-
-It has two properties, and neither is optional.
-
-**It is capped.** A fixed, ordered topic list; at most one bullet per topic; a sentence or two a bullet; topics that do not apply are skipped, never padded. The number is stated in each command that prints one. The cap is the feature: a checkpoint long enough to skim is a checkpoint being rubber-stamped, and an uncapped digest is the wall of text that quietly turns a gate into a formality.
-
-**It is written in plain language.** Brevity is one way to make the human engage; ordinary words are the other, and the cap alone does not buy it — a digest that is seven lines of the project's own vocabulary is short and still unread. The standard is a rewrite, not a rule of thumb:
-
-- "the mutation gate over the seam checker's own contract is green" → "the checks that guard the checks passed"
-- "no drift between the rendered template and the repo's command set" → "the copies of the commands we ship match the ones we use"
-
-> Say it in ordinary words, and name a mechanism only when the human needs it to act.
-
-**Correctness outranks both.** A short plain bullet that misstates what happened is worse than a long precise one, because the human approves against the digest and has nothing else to approve against. If a point cannot be made both plainly and correctly inside the cap, the cap loses: say it correctly and note the overflow.
-
-Two kinds of session carry one, and the argument differs between them. **Checkpoint-facing digests** — `/cdd-next-step` before handoff approval (§3.1), `/cdd-plan` before plan approval (§3.3), `/cdd-small-change` at checkpoint 3 (§3.2a) — sit immediately before a gate, which is the cap's original argument. **Terminal reports** — `/cdd-implement` (§3.4), and `/cdd-small-change` at its end — have no gate after them, and the cap holds for a different reason: the report is the only account of the session the human gets before the PR, so one that goes unread means they learn what happened at review time.
-
-Three things are deliberately outside the convention, named here so the next reader does not apply it inconsistently. `/cdd-pre-pr`'s checklist (§3.6) and the fixed summary templates in `/cdd-merge-base` (§3.5) and `/cdd-process-pr` (§3.8) are already bounded by being fixed, and already do the job. Handoff files (§2.6) carry no `## Summary`: their `## Requirements` is the human-facing content, the schema is frozen, and the digest is printed in chat at the checkpoint — an in-file summary would only duplicate it.
-
-This is a property of the digest, not of the artifacts. Plan files stay written for the implementing session rather than for the human (§2.15) — that is a decided trade-off, and the digest is precisely what means the human never has to read one. It is not a repo-wide register or readability rule.
-
-The checkable half is checked. Each command's digest heading, the number it states, and the pinned sentence above are held in place by this repo's prompt-seam gate; mechanics in `doc/architecture/overview.md`. Whether a digest is actually written plainly is not machine-checkable, and per `doc/architecture/adr/0002-scope-prompt-seam-checks-deterministic-only.md` it stays out of the deterministic gate — so that half earns its force from this section instead.
-
 ## 3. Lifecycle
 
 A task flows through CDD in up to six sessions, two of them optional side-loops (`/cdd-merge-base` before the PR, `/cdd-process-pr` after review). The middle of that flow has **two lanes**: the standard lane plans and then implements, and the small-change lane (§3.2a) does both in one session for a task whose finished diff can be stated before any exploration. The lane is chosen once, at scoping; everything before it and everything after it is the same. Each session type has a name, one command, and one job:
@@ -386,7 +361,7 @@ Before reading any context, the session verifies its checkout is current: if the
 
 The session clarifies requirements that are cheap to resolve here and explicitly defers harder ones to the **plan session** (§3.3). Two rationales drive this split: context economy — this session's context is spent on cross-phase reasoning, while the plan session's is clean, dedicated to one task, and running in the real worktree — and structure — this session runs on main, which is protected from direct edits, so it cannot edit the roadmap even by accident; desired roadmap edits are recorded in the handoff instead. The split is also what keeps the handoff's `## Requirements` (§2.6) honest: criteria that are cheap to state belong here, and a criterion that is not is a deferred question, not a reason to hold a requirements interview.
 
-Before asking for approval the session prints a **bounded digest** of the handoff in chat (§2.16), so the human approves against something readable rather than skimming the artifact. It ends by writing the handoff file and printing the `cdd-worktree <branch>` command.
+Before asking for approval the session prints a **bounded digest** of the handoff in chat — a hard-capped bullet list, one line each — so the human approves against something readable rather than skimming the artifact. The cap is the feature. It ends by writing the handoff file and printing the `cdd-worktree <branch>` command.
 
 ### 3.2 Worktree creation
 
@@ -410,13 +385,13 @@ The session **recommends and the human decides**, in either direction and uncond
 
 The **off-ramp** is what carries that weight. `/cdd-small-change` re-applies the heuristic once it has the handoff in front of it, and if the task is not small it stops, writes nothing, and hands to `/cdd-plan` in the same worktree. A small-change handoff is thin (§2.6) but not deficient: `/cdd-plan` reads `## Requirements` and `## Notes` and never needed an `## Implementation prompt`, so nothing has to be regenerated to escalate.
 
-Otherwise the session states the concrete change file by file as a **bounded digest** (§2.16), takes approval — this is checkpoint 3 in its lane form (§4) — makes it, updates the docs and the roadmap, runs the check runner whole (§2.14; no per-diff gate selection), commits locally per §2.11, advances the state record to `implementation_done`, and ends with a second bounded digest as its report. It never passes through `plan_written`, which is a non-event: consumers compare stages by index, so a stage that was never written is simply one they never observe. The routing mechanics live in `doc/architecture/shell-helpers.md`.
+Otherwise the session states the concrete change file by file, takes approval — this is checkpoint 3 in its lane form (§4) — makes it, updates the docs and the roadmap, runs the check runner whole (§2.14; no per-diff gate selection), commits locally per §2.11, and advances the state record to `implementation_done`. It never passes through `plan_written`, which is a non-event: consumers compare stages by index, so a stage that was never written is simply one they never observe. The routing mechanics live in `doc/architecture/shell-helpers.md`.
 
 ### 3.3 Plan session: `/cdd-plan` (on the new worktree)
 
 Reads the handoff and rebuilds its context from the roadmap and the architecture/feature docs. It then **explores** — reading the source it will change, searching the web, consulting vendor and library documentation as the task needs. Exploration is a named step rather than an implied one, because after the split its only output is the plan file: anything this session learns and does not write down is destroyed when it ends.
 
-It surfaces deferred or freshly-discovered open questions, confirms scope, checks its plan against the handoff's `## Requirements`, and prints a **bounded digest** (§2.16) in chat immediately before asking for approval. Here the digest carries weight it carries nowhere else: the plan file itself is written for the next session rather than for the human, so the digest is the whole of what the human approves against, and asking them to approve a document written for a machine would weaken the very checkpoint the workflow leans on hardest.
+It surfaces deferred or freshly-discovered open questions, confirms scope, checks its plan against the handoff's `## Requirements`, and prints a **bounded digest** in chat — one short bullet per fixed topic — immediately before asking for approval. That digest exists so the checkpoint stays a real gate: the plan file itself is written for the next session rather than for the human, and asking a human to approve a document written for a machine would weaken the very checkpoint the workflow leans on hardest.
 
 The handoff is immutable (§2.6), so a `## Requirements` criterion the human agrees to amend or drop here is recorded in the plan instead. That record is the channel to `/cdd-pre-pr` (§3.6), which otherwise re-checks the diff against wording nobody stands behind any more and reports the amendment as a miss.
 
@@ -426,7 +401,7 @@ Approval is the load-bearing checkpoint, and it is an **explicit ask** — the s
 
 The human opens a fresh Claude Code session in the same worktree and runs `/cdd-implement`. There is no helper for this step and that is deliberate: the manual gap is where the plan file can be read or edited before anything is built.
 
-The session reads the plan, re-reads the files the plan's file map names, implements the task, updates the architecture and feature docs and the roadmap (ticking the completed checkbox; applying pre-approved edits), commits its own changes locally per §2.11, advances the state record to `implementation_done`, and ends with a **bounded digest** (§2.16) as its report — the only account of the session the human gets before the PR. The handoff's `## Requirements` remain its done-test — the one thing that survives both windows and catches a plan that misread the intent.
+The session reads the plan, re-reads the files the plan's file map names, implements the task, updates the architecture and feature docs and the roadmap (ticking the completed checkbox; applying pre-approved edits), commits its own changes locally per §2.11, and advances the state record to `implementation_done`. The handoff's `## Requirements` remain its done-test — the one thing that survives both windows and catches a plan that misread the intent.
 
 This session is **unsupervised**: plan approval was the implementation cycle's only checkpoint, and it has already passed. So it carries one hard rule — **if reality contradicts the plan, stop and report; never improvise.** Two cases are expected rather than hypothetical, and are called out explicitly in the command: a `/cdd-merge-base` ran in the (human-paced, possibly overnight) gap and moved everything the plan's `file:line` anchors point at; and the plan file was never materialized on this machine, which an older worktree helper's narrower ref sync can cause. Neither is a licence to rebuild the task from the handoff alone.
 
