@@ -83,7 +83,9 @@ repo — is bounded by the human gate and the roadmap fallback.
 - Inserting step 7 renumbered steps 7–10 to 8–11, which propagates into
   `scripts/prompt-seam-check.sh`'s pinned heading list and the corresponding mutation case in
   `scripts/prompt-seam-assert.sh`. Future insertions carry the same cost; the seam checker makes
-  it a loud failure rather than a silent one.
+  it a loud failure rather than a silent one. Since removed (issue #64): the checker matches
+  headings by title, stripping the `## <N>. ` step prefix from both sides, so a pure renumbering
+  is a no-op while a dropped heading still fails loudly.
 - The step has **no mechanical guard**, so its discipline rests entirely on the trigger list
   staying concrete. If it starts firing every run, the fix is to tighten the triggers, not to
   add a gate.
