@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "branch": "gh_issue_86_extensibility_roadmap_phase",
+  "stage": "pr_open",
+  "pr": 100,
+  "base_branch": "main",
+  "sessions": [
+    {
+      "id": "2addfca5-23b0-44be-a5c2-e8cb5d5d224c",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    },
+    {
+      "id": "68d09179-4f9d-4c92-801e-2b6b2636b73a",
+      "stage": "implementation_done",
+      "dir": "/home/diego/Code/cdd-gh_issue_86_extensibility_roadmap_phase"
+    },
+    {
+      "id": "d1418f8e-71a0-457c-a2b1-f395d989f220",
+      "stage": "checks_passed",
+      "dir": "/home/diego/Code/cdd-gh_issue_86_extensibility_roadmap_phase"
+    }
+  ],
+  "lane": "small"
+}
