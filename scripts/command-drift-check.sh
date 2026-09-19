@@ -23,6 +23,8 @@
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
 #     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
 #     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
+#   - both settings.json files parse as JSON (when jq is present) — the template's copy
+#     is generated into every bootstrapped project, so a syntax error ships silently.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -76,6 +78,18 @@ for name in "${names[@]}"; do
     fail=1
   fi
 done
+
+# The shipped settings file must parse: it is generated into every bootstrapped project,
+# where a stray comma silently costs the project its permissions. Opportunistic — a host
+# without jq keeps the diff below rather than turning this whole gate into a SKIP.
+if command -v jq >/dev/null 2>&1; then
+  for f in .claude/settings.json template/.claude/settings.json; do
+    if ! jq empty "$f" 2>&1; then
+      echo "ERROR: $f is not valid JSON (see above)" >&2
+      fail=1
+    fi
+  done
+fi
 
 # The shipped settings file: same render-then-diff, minus the cdd-only fence, which JSON
 # cannot carry. A CDD-only entry would therefore need a whitelist line for the whole file.
