@@ -107,6 +107,9 @@ why the first entry above is a sentence and not a design, and why none of these 
   needed has no counterpart here, because nothing stalls.
 - The prompt-seam count moves from seven to nine, and the count is prose in four places rather than
   mechanically derived — a known soft spot, unchanged by this ADR but now carrying two more checks.
+  Actioned since (issue #92): the checker's `CHECKS` registry is the source, `prompt-seam-check.sh
+  list` exposes it, and a tenth check pins the four prose restatements against it. The four sites
+  stay, as the gate count's did — each is read by a different audience.
 - A small-change task produces no plan file, so `/cdd-pre-pr` and the reviewer see the requirements
   and the diff and nothing else. That is the durability bound stated as a cost: if the reasoning
   behind a change would have been worth reading later, the task was never eligible.
