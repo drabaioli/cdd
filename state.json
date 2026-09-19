@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "branch": "trim_next_step_install_reminder",
+  "stage": "pr_open",
+  "pr": 99,
+  "base_branch": "main",
+  "sessions": [
+    {
+      "id": "2addfca5-23b0-44be-a5c2-e8cb5d5d224c",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    },
+    {
+      "id": "b7b0fb92-4a67-468c-81c5-ed8e5764d0c1",
+      "stage": "implementation_done",
+      "dir": "/home/diego/Code/cdd-trim_next_step_install_reminder"
+    },
+    {
+      "id": "625aa88f-70e8-427e-bd97-80b258c555ca",
+      "stage": "checks_passed",
+      "dir": "/home/diego/Code/cdd-trim_next_step_install_reminder"
+    }
+  ],
+  "lane": "small"
+}
