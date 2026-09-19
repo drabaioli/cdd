@@ -10,7 +10,7 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's nine checks gets at least one mutation:
+# checker's 10 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file.
@@ -25,12 +25,21 @@
 #      /cdd-small-change while still routing the launch path to it.
 #   9. Eligibility heuristic   — cdd-small-change.md restates the lane heuristic in
 #      words of its own instead of the pinned sentence.
+#  10. Seam-check count       — a check is added to the checker's own registry without
+#      updating the prose that restates how many checks there are. Self-referential, so
+#      the mutation has to add a registry entry AND a check function, not just a number.
 #
-# Plus two control cases, which are what make the mutations above mean anything:
+# Plus three control cases, which are what make the mutations above mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected"
 #     by a checker that is simply broken and fails on everything.
 #   - A dangling reference that is whitelisted must PASS, pinning the documented
 #     escape hatch so it cannot rot into a check that can never be silenced.
+#   - A *renumbered* load-bearing heading must PASS, pinning the title-matching
+#     tolerance so it cannot quietly regress into the old double edit.
+#
+# Plus one structural assertion, which is not a mutation: the check registry and the
+# check functions must pair up in both directions. A check function nobody registered
+# never runs, and nothing else would ever say so.
 #
 # The copy is of the working tree, not HEAD, so this gate tests the checker as it is
 # right now rather than as it was last committed. The real tree is never mutated.
@@ -97,6 +106,31 @@ sandbox_sed() {  # sandbox_sed <expr> <repo-relative path>
 }
 
 CMDS=".claude/commands"
+CHECKER="scripts/prompt-seam-check.sh"
+
+# --- Structural: the registry and the check functions agree -------------------
+# The registry is only load-bearing if it is exhaustive both ways: a slug with no body
+# is a check that cannot run, and a body with no slug is a check that silently never
+# runs — the second being the failure that would leave the seam-count check passing on
+# a checker that quietly stopped doing something. Same idiom as ci-runner-assert.sh's
+# gate pairing, against the real checker rather than the sandbox.
+mapfile -t slugs < <("./$CHECKER" list)
+[[ ${#slugs[@]} -gt 0 ]] || fail "$CHECKER list printed no checks"
+
+for slug in "${slugs[@]}"; do
+  fn="check_${slug//-/_}"
+  grep -qE "^${fn}\(\) \{" "$CHECKER" \
+    || fail "check '$slug' has no ${fn}() function in $CHECKER"
+done
+pass "${#slugs[@]} checks listed, each with a matching check function"
+
+while IFS= read -r fn; do
+  slug="${fn#check_}"
+  slug="${slug//_/-}"
+  printf '%s\n' "${slugs[@]}" | grep -qxF -- "$slug" \
+    || fail "orphan function ${fn}() in $CHECKER: '$slug' is not in the check registry"
+done < <(grep -oE '^check_[a-z_]+\(\)' "$CHECKER" | sed 's/()$//')
+pass "no orphan check functions"
 
 # --- Control: an unmutated copy passes ----------------------------------------
 # Establishes that the sandbox faithfully reproduces a green run. Every expect_fail
@@ -134,14 +168,25 @@ expect_fail "check 3 catches a backticked path to a missing file" \
 fresh_sandbox
 sandbox_sed '/^## 10\. Commit reconciliation edits$/d' "$CMDS/cdd-pre-pr.md"
 expect_fail "check 4 catches a dropped load-bearing heading" \
-  "missing required heading in $CMDS/cdd-pre-pr.md: ## 10. Commit reconciliation edits"
+  "missing required heading in $CMDS/cdd-pre-pr.md: Commit reconciliation edits"
 
 # The freshness precondition is a stop-the-session gate with no downstream artifact of its
 # own, so nothing else in the workflow would notice its removal — hence its own case.
 fresh_sandbox
 sandbox_sed '/^## 0a\. Verify the checkout is current$/d' "$CMDS/cdd-next-step.md"
 expect_fail "check 4 catches a dropped checkout-freshness precondition" \
-  "missing required heading in $CMDS/cdd-next-step.md: ## 0a. Verify the checkout is current"
+  "missing required heading in $CMDS/cdd-next-step.md: Verify the checkout is current"
+
+# --- Control: a renumbered heading still passes --------------------------------
+# Headings are pinned by title, not by step number (issue #64), so inserting a step
+# above a load-bearing one must be a no-op. Without this control the tolerance could
+# regress to number matching and nothing would notice until the next renumbering.
+fresh_sandbox
+sandbox_sed 's/^## 10\. Commit reconciliation edits$/## 12. Commit reconciliation edits/' \
+  "$CMDS/cdd-pre-pr.md"
+grep -qF '## 12. Commit reconciliation edits' "$SANDBOX/$CMDS/cdd-pre-pr.md" \
+  || fail "renumber control setup: cdd-pre-pr.md was not renumbered in the sandbox"
+expect_pass "control: a renumbered load-bearing heading still passes"
 
 # --- Check 5: gate-count contract ---------------------------------------------
 # Derive the true count from the registry rather than hardcoding it, so adding a
@@ -193,5 +238,29 @@ sandbox_sed 's|If you can state the finished diff in one sentence|If the change 
   "$CMDS/cdd-small-change.md"
 expect_fail "check 9 catches a command that reworded the lane heuristic" \
   "it no longer states the lane heuristic verbatim"
+
+# --- Check 10: seam-check count ------------------------------------------------
+# Self-referential, so the mutation is a real check rather than an edited number: give
+# the sandbox checker one more registry entry and a matching no-op body, and the four
+# prose sites (this file among them) are now one short. Two insertion points, hence awk
+# and not sandbox_sed: the function has to land *before* `main "$@"`, since a definition
+# after it is parsed too late to run, and a `\n` in a sed replacement is GNU-only.
+sandbox_add_probe_check() {
+  local path="$SANDBOX/scripts/prompt-seam-check.sh"
+  awk '
+    /^CHECKS=\(/ && !entry { print; print "  \"seam-probe|assert-only probe check\""; entry = 1; next }
+    /^main / && !body { print "check_seam_probe() { :; }"; print ""; body = 1 }
+    { print }
+  ' "$path" > "$path.new" || fail "could not add the probe check to the sandbox checker"
+  mv "$path.new" "$path" || fail "could not replace the sandbox checker"
+  chmod +x "$path" || fail "could not restore the sandbox checker's exec bit"
+}
+
+fresh_sandbox
+sandbox_add_probe_check
+"$SANDBOX/scripts/prompt-seam-check.sh" list | grep -qxF seam-probe \
+  || fail "check 10 setup: the probe check is not in the sandbox registry"
+expect_fail "check 10 catches a check added without updating the prose" \
+  "seam-count drift in"
 
 echo "prompt-seam contract: clean"
