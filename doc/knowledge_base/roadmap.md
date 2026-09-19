@@ -192,6 +192,26 @@ Give each task a machine-readable record of where it sits in its lifecycle and w
 
 **Milestone:** a task's lifecycle stage and its working sessions are recorded as data and surfaced by CDD tooling, not reconstructed by inference.
 
+## Phase 14: Extensibility — capability adapters
+
+Make CDD adaptable to a project's tracker, forge, and doc system without editing a shipped prompt: a fixed `.cdd/` namespace of capability adapters, resolved project → machine → built-in and degrading loudly to today's behaviour. The design detail — namespace, verb contracts, JSON shapes, exit codes, and the replace-vs-mirror rule that bounds what an extension may substitute — lives in GitHub issue #86.
+
+- [ ] Decide the near-term extension shortlist and its order: Jira, Confluence, GitLab, Linear, Slack; record the verdict in the ADR.
+- [ ] ADR + process-doc section: the `.cdd/` namespace, capability adapters, replace-vs-mirror, CLI-first; spec only, no adapter shipped.
+- [ ] `cdd-state set-field` plus the `x-` extension-field convention, with a gate asserting unknown top-level keys survive a write.
+- [ ] Pin the tracker verb contract: 6 verbs, `describe`, JSON shapes, exit codes, plus an adapter-conformance gate.
+- [ ] GitHub reference tracker adapter wrapping today's `gh` calls, verified to leave `/cdd-next-step` behaviour unchanged.
+- [ ] Teach `/cdd-next-step` the resolution ladder and `ref_pattern` dispatch, replacing the hardcoded `#NN` front-end; `gh` stays the fallback.
+- [ ] Generalize the branch token to `<backend>_<ref>_<slug>`, keeping `gh_issue_NN_` readable; update prompt-seam check 2 for both forms.
+- [ ] Jira tracker adapter, validated end-to-end on a real project.
+- [ ] Docs capability: verbs, shapes, and context-cost caps for read-only backend docs, callable from every session type.
+- [ ] Confluence docs adapter, validated on a real project.
+- [ ] Forge verb contract + GitHub reference adapter; `pr-merged` and `default-branch` move behind it.
+- [ ] GitLab forge adapter, validated on a real project.
+- [ ] Teach `/cdd-bootstrap` and `/cdd-retrofit` to detect and install adapters; retrofit gains a migrate-into-`.cdd/` verdict.
+
+**Milestone:** a project can run CDD with Jira as its tracker and Confluence as a doc source without editing a single shipped prompt, and `/cdd-retrofit` can migrate an existing project's local prompt edits onto the extension points.
+
 ## Annotation conventions
 
 **Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included, and it is enforced mechanically by `scripts/roadmap-length-check.sh` (the `roadmap-length` gate), so it is not a matter of judgement. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else.
