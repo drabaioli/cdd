@@ -13,7 +13,7 @@ After bootstrap, the new project directory contains:
 ├── CLAUDE.md                                 # entry point Claude Code reads
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
-│   ├── settings.json                         # auto-allows sessions to read the handoff, write the plan file, run cdd-state
+│   ├── settings.json                         # auto-allows sessions to read the handoff, write the plan file, run cdd-state, and run read-only shell commands
 │   └── commands/
 │       ├── cdd-next-step.md                      # handoff session
 │       ├── cdd-plan.md                           # plan session (explore, approve, write the plan file)
@@ -29,7 +29,7 @@ After bootstrap, the new project directory contains:
 │   └── knowledge_base/
 │       ├── project-overview.md               # project charter skeleton (what it is, goals, non-goals)
 │       ├── roadmap.md                        # central workflow artifact, Phase 1 pre-filled
-│       └── README.md                         # explains the knowledge base
+│       └── index.md                          # explains the knowledge base
 ```
 
 (No `tools/` directory: the worktree helper is a single project-independent script you install once — see below — not a per-project file.)

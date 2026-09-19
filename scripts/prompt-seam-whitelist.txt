@@ -22,3 +22,9 @@
 # Produced by /cdd-bootstrap in a downstream project; the CDD repo's own
 # overview lives at doc/architecture/overview.md instead.
 doc/knowledge_base/project-overview.md
+
+# The pre-#73 knowledge-base index path, recorded in cdd-retrofit.md's section 4.4
+# rename table and section 4.5 legacy-token table so already-bootstrapped projects
+# are carried across the rename. Historical: the repo's own copy is
+# doc/knowledge_base/index.md.
+doc/knowledge_base/README.md

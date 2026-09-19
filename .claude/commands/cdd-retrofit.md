@@ -151,9 +151,22 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 
 ### 4.4 Three-way comparison, per CDD-managed file
 
-The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/README.md`. (The worktree helper is no longer part of this set — it is a single project-independent script installed once, not a per-project template file. `CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
+The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/index.md`. (The worktree helper is no longer part of this set — it is a single project-independent script installed once, not a per-project template file. `CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
 
 **DEPRECATION SEAM — the plan/implement split is exactly such a structural change, so the exception applies; do not skip it. Delete this paragraph once every project has been retrofitted past the split — issue #90, which also covers the matching fallback in `cdd-worktree.sh`.** The upgrade adds `cdd-plan.md` and `cdd-implement.md` to `.claude/commands/` for free (they are absent from any older baseline render, so the "file absent in old render" row below covers them), but the procedure change is not a file change: a project whose `CLAUDE.md` Workflow section still describes a single implementation session ends up with the commands installed and nothing telling anyone to use them. So when the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — propose the `CLAUDE.md` Workflow edit too, with its own diff and its own approval: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Take the current template's `CLAUDE.md` Workflow bullets as the wording to adapt.
+
+**Template path renames.** A file the template renamed between the baseline and now is a rename, not a delete plus an add, but the table below has no rename row: run untreated, it asks whether the project deliberately deleted the old path, and offers the new one as a file a project that already renamed it by hand has. So resolve each row below against the target *first*, then compare on the new path only.
+
+| Old path | New path | Landed in |
+| --- | --- | --- |
+| `doc/knowledge_base/README.md` | `doc/knowledge_base/index.md` | #73 |
+
+- **old present, new absent** → propose `git -C "$WT" mv <old> <new>` under the usual per-file approval, then compare the new path.
+- **new present, old absent** → the project already renamed it; say so and compare the new path.
+- **both present** → do not guess: report both and ask which to keep.
+- **neither present** → fall through to the table's "file absent in target" row on the new path.
+
+**Land a rename in the template, add a row** — the same rule §4.5 states for path tokens. Like §4.5's rows these are transitional; retire a row once every project is past it (#93 tracks the reaping).
 
 For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file **read from `$WT`** (the section 2.5 worktree, which mirrors HEAD; this is why section 1 warns when CDD-managed files have uncommitted edits — those won't be reflected here):
 
@@ -188,11 +201,12 @@ Section 4.4 migrated the CDD-managed files; anything **else** naming a pre-migra
 | `/cdd-merge-main` | `/cdd-merge-base` | #31 |
 | a project-local `<slug>-worktree` / `-done` / `-list` function, or `tools/<slug>-worktree.sh` | the machine-global `cdd-worktree` | #24 |
 | `<PROJECT_SLUG>`, and the bare `PROJECT` substitution token (only ever seen as the `PROJECT-worktree` / `PROJECT-state` shell identifier) | the two-identifier model | #24 |
+| `doc/knowledge_base/README.md` | `doc/knowledge_base/index.md` | #73 |
 
 **Sweep.** Tracked files only, so `.git/` and gitignored paths are out of scope; `-I` skips binaries:
 
 ```bash
-git -C "$WT" grep -nI -F -e '.claude-handoffs' -e 'PROJECT_SLUG' -e 'PROJECT-worktree' -e 'PROJECT-state'
+git -C "$WT" grep -nI -F -e '.claude-handoffs' -e 'PROJECT_SLUG' -e 'PROJECT-worktree' -e 'PROJECT-state' -e 'knowledge_base/README.md'
 git -C "$WT" grep -nIE -e '(^|[^A-Za-z0-9_-])/(next-step|pre-pr|merge-main|process-pr|cdd-merge-main)([^A-Za-z0-9_/-]|$)'
 ls "$WT"/tools/*-worktree.sh "$WT"/tools/*-state.sh 2>/dev/null   # the legacy helper may carry no token at all
 ```
