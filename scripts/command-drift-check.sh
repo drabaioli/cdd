@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Render-then-diff drift check between the CDD repo's own .claude/commands/ and the
-# template/.claude/commands/ it ships.
+# Render-then-diff drift check between the CDD repo's own .claude/commands/ and
+# .claude/settings.json and the template/.claude/ copies it ships.
 #
 # The template is rendered via tools/bootstrap-cdd-project.sh --stage with this repo's own
 # identifier (dir "cdd"), so expected substitution drift cancels out mechanically
@@ -20,6 +20,11 @@
 #   - no cdd-only markers appear in template/.claude/commands/ — they belong in the
 #     repo copies only; a marker in the template would be stripped from both sides
 #     of the comparison above and hide real drift.
+#   - .claude/settings.json matches the rendered template/.claude/settings.json.
+#     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
+#     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
+#   - both settings.json files parse as JSON (when jq is present) — the template's copy
+#     is generated into every bootstrapped project, so a syntax error ships silently.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -73,6 +78,29 @@ for name in "${names[@]}"; do
     fail=1
   fi
 done
+
+# The shipped settings file must parse: it is generated into every bootstrapped project,
+# where a stray comma silently costs the project its permissions. Opportunistic — a host
+# without jq keeps the diff below rather than turning this whole gate into a SKIP.
+if command -v jq >/dev/null 2>&1; then
+  for f in .claude/settings.json template/.claude/settings.json; do
+    if ! jq empty "$f" 2>&1; then
+      echo "ERROR: $f is not valid JSON (see above)" >&2
+      fail=1
+    fi
+  done
+fi
+
+# The shipped settings file: same render-then-diff, minus the cdd-only fence, which JSON
+# cannot carry. A CDD-only entry would therefore need a whitelist line for the whole file.
+if ! whitelisted ".claude/settings.json"; then
+  if ! diff -u \
+      --label ".claude/settings.json" \
+      --label "template/.claude/settings.json (rendered)" \
+      .claude/settings.json "$TMP/render/.claude/settings.json"; then
+    fail=1
+  fi
+fi
 
 # cdd-only fences belong in the repo copies only; strip_cdd_only runs on both sides,
 # so a marker in the template would silently hide the fenced content from the diff.

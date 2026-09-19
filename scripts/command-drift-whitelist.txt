@@ -1,6 +1,9 @@
-# Files allowed to exist on only one side of the .claude/commands/ ↔
-# template/.claude/commands/ comparison (see scripts/command-drift-check.sh).
-# One file name per line; lines starting with # and blank lines are ignored.
+# Files exempted from the .claude/ ↔ template/.claude/ comparison (see
+# scripts/command-drift-check.sh): a command allowed to exist on only one side,
+# or the whole settings file, written as the repo-relative path
+# .claude/settings.json (JSON carries no cdd-only fence, so an exception there
+# covers the file, not a section).
+# One entry per line; lines starting with # and blank lines are ignored.
 
 # CDD-repo-only: operates *on* target projects from a CDD session (process doc §2.7).
 cdd-retrofit.md
