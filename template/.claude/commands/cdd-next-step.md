@@ -229,17 +229,12 @@ It is a separate call rather than a flag on `seed` so that a machine whose `cdd-
 
 ## 8. Print the next command
 
-After writing, print exactly (the install line is a static reminder — do **not** probe for the helper on every run; it's a once-per-machine setup the user ignores once done):
+After writing, print exactly:
 
 ```
 Handoff written: ~/.cdd/handoffs/<PROJECT_DIR>/<branch>.md
 Next: cdd-worktree <branch>   (opens a plan session on /cdd-plan; /cdd-implement follows in a fresh session)
                               (small-change lane: opens on /cdd-small-change, which does the whole build)
-
-If `cdd-worktree` or `cdd-state` is "command not found", install the shared helpers once (machine-global, like git/gh), then open a new shell:
-  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh install
-  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-state.sh --create-dirs -o ~/.cdd/tools/cdd-state.sh && bash ~/.cdd/tools/cdd-state.sh install
-  (Or, from a CDD repo checkout: ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install)
 ```
 
 The user will close this session, run `cdd-worktree <branch>` from the main worktree, and a fresh Claude session will open in the new worktree with `/cdd-plan` already submitted. That session plans and stops; the user then opens another fresh session in the same worktree and runs `/cdd-implement`.
