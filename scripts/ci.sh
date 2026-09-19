@@ -66,6 +66,7 @@ GATES=(
   "syntax||bash -n over every shell script"
   "shellcheck|shellcheck|shellcheck over every shell script"
   "drift||command-set drift: repo commands vs the rendered template"
+  "drift-contract||the drift checker's own contract (mutation-tested)"
   "seams||prompt-seam contracts between the repo's own prompts"
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "roadmap-length||roadmap item length: the 200-char cap"
@@ -113,6 +114,10 @@ gate_shellcheck() {
 
 gate_drift() {
   ./scripts/command-drift-check.sh
+}
+
+gate_drift_contract() {
+  ./scripts/command-drift-assert.sh
 }
 
 gate_seams() {
