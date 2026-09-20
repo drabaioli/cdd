@@ -79,7 +79,22 @@ apply() {  # apply <label> <awk arg>...
   return 0
 }
 
+# An anchor rides into awk through `-v`, and a `-v` assignment undergoes ESCAPE
+# PROCESSING before the value is ever read as a regex. The implementations disagree
+# about what that does to a backslash: gawk strips `\(` to a bare `(` — which is then
+# the grouping metacharacter, matching nothing here — while mawk leaves it literal. An
+# anchor that works on one host silently matches nothing on the other, and the only
+# reason that surfaces at all is the changed-nothing assertion in apply(). So anchors
+# use BRACKET EXPRESSIONS for literal metacharacters (`[(]`, `[{]`, `[[]`, `[$]`) and
+# carry no backslash at all; this guard is what keeps the next one from creeping back.
+assert_anchor() {  # assert_anchor <label> <line regex>
+  [[ "$2" != *\\* ]] ||
+    fail "$1: anchor '$2' contains a backslash; use a bracket expression instead — \
+a -v assignment is escape-processed, and gawk and mawk disagree about the result"
+}
+
 mutate_replace_line() {  # mutate_replace_line <label> <line regex> <replacement>
+  assert_anchor "$1" "$2"
   # SC2016: single quotes are deliberate — $0 is awk's whole-line variable, not a shell
   # positional. The shell values ride in on -v, which is what keeps them unexpanded here.
   # shellcheck disable=SC2016
@@ -87,6 +102,7 @@ mutate_replace_line() {  # mutate_replace_line <label> <line regex> <replacement
 }
 
 mutate_insert_after() {  # mutate_insert_after <label> <line regex> <inserted line>
+  assert_anchor "$1" "$2"
   # SC2016: as above — $0 is awk's, and the shell values arrive through -v.
   # shellcheck disable=SC2016
   apply "$1" -v "ins=$3" -v "pat=$2" '{ print } $0 ~ pat && !done { print ins; done = 1 }'
@@ -123,10 +139,10 @@ cp "$MASTER" "$SUBJECT"; chmod 755 "$SUBJECT"
 expect_pass "control: an unmutated copy of the adapter passes"
 
 # --- Check 1: describe is hermetic --------------------------------------------
-mutate_insert_after "describe authenticates" '^verb_describe\(\) \{' '  require_gh'
+mutate_insert_after "describe authenticates" '^verb_describe[(][)] [{]' '  require_gh'
 expect_fail "describe that authenticates is caught" "describe with gh absent from PATH"
 
-mutate_insert_after "describe emits non-JSON" '^verb_describe\(\) \{' '  echo "not json"'
+mutate_insert_after "describe emits non-JSON" '^verb_describe[(][)] [{]' '  echo "not json"'
 expect_fail "describe that emits non-JSON is caught" "did not emit parseable JSON"
 
 # --- Check 2: describe is contract-shaped -------------------------------------
@@ -189,7 +205,7 @@ SECRETS
 # SC2016: the regex matches the adapter's literal `$target` text; expanding it here
 # would look for this script's own (unset) variable instead.
 # shellcheck disable=SC2016
-mutate_replace_line "create_target omitted" '^  if \[\[ -n "\$target" \]\]; then' '  if false; then'
+mutate_replace_line "create_target omitted" '^  if [[][[] -n "[$]target" []][]]; then' '  if false; then'
 expect_pass "control: an adapter omitting the optional create_target passes"
 
 echo "adapter-conformance checker contract: clean (13 mutations, 2 controls)"
