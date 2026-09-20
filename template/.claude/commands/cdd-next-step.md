@@ -38,6 +38,7 @@ Every mode first runs §0a (checkout freshness), §1 (read context) and §2 (sta
 - **Issue-driven**: a thin front-end onto intent-driven mode — the intent text comes from a tracker item instead of being typed. §0b resolves the item, then the flow is exactly intent-driven (§1 adaptive load, §3-intent, §4 onward).
 
 All modes converge on the same machinery from §4 onward (stale-handoff sweep in §2 runs in all of them). Do not fork the flow beyond what §0b, §1, and §3 describe.
+
 ## 0a. Verify the checkout is current
 
 Scoping work from a stale checkout can hand off a task that is already merged, so before reading any context, confirm this checkout is not behind its upstream. Compare the **checked-out** branch — the branch a task cut here would be based on (§4) — against its upstream, not the platform default branch:
@@ -91,6 +92,7 @@ With an adapter, `<adapter> issue-list` replaces the first line; the other two s
 Present the filtered list (number + title) and let the user pick one; then fetch its detail as above.
 
 Use the item's title + body + comments as the **intent text**, and continue with §1, then §3-intent. The issue number is carried forward only via the branch name in §5 (`gh_issue_NN_<slug>`) — there is no commit trailer, and no downstream session is required to re-read the issue.
+
 ## 1. Read context
 
 Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the plan session will rebuild detailed context.

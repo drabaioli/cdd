@@ -180,7 +180,9 @@ verb_issue_create() {
     err "could not create the GitHub issue (no access, or the request failed)"
     exit 1
   fi
-  url="$(printf '%s' "$out" | grep -oE 'https://[^[:space:]]+/issues/[0-9]+' | tail -1)"
+  # `|| true`: under `set -e` + `pipefail` a grep that matches nothing would abort the
+  # script at the assignment, taking the actionable message below with it.
+  url="$(printf '%s' "$out" | grep -oE 'https://[^[:space:]]+/issues/[0-9]+' | tail -1 || true)"
   if [[ -z "$url" ]]; then
     err "the GitHub CLI created something but printed no issue URL; check the repository manually"
     exit 1
