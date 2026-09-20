@@ -77,6 +77,7 @@ GATES=(
   "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
   "state-extension|jq|extension fields on the state record: unknown top-level keys survive every write"
   "adapter-conformance|jq|the shipped tracker adapter against the capability contract (offline)"
+  "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
   "stage-render||render-only staging (--stage), no git tree"
@@ -160,6 +161,10 @@ gate_state_extension() {
 
 gate_adapter_conformance() {
   ./scripts/adapter-conformance-check.sh
+}
+
+gate_adapter_conformance_contract() {
+  ./scripts/adapter-conformance-assert.sh
 }
 
 # The three gates that bootstrap a real tree (both of these plus demo-seed) run with a

@@ -181,7 +181,9 @@ secret_patterns=(
   '(password|passwd|secret|token|api[_-]?key)[[:space:]]*=[[:space:]]*.[^"'"'"']{8,}'
 )
 for pattern in "${secret_patterns[@]}"; do
-  if grep -nEI "$pattern" "${scan_targets[@]}" >"$WORK/hits" 2>/dev/null; then
+  # `-e` is load-bearing: the PEM pattern starts with `-----`, which grep would
+  # otherwise parse as a bundle of options and then match nothing at all.
+  if grep -nEI -e "$pattern" "${scan_targets[@]}" >"$WORK/hits" 2>/dev/null; then
     cat "$WORK/hits" >&2
     fail "secret-shaped string in an adapter or under .cdd/ (pattern: $pattern)"
   fi

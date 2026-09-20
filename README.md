@@ -76,7 +76,7 @@ CDD ships ten slash commands, all prefixed `cdd-` so they autocomplete as a grou
 
 | Command | What it does |
 | --- | --- |
-| `/cdd‑next‑step` | Scope the next task and write a handoff for a fresh plan session. Three front-ends: the next roadmap item, a typed task prompt (off-roadmap), or a GitHub issue (`#NN` / a bare integer / the `issue` keyword). |
+| `/cdd‑next‑step` | Scope the next task and write a handoff for a fresh plan session. Three front-ends: the next roadmap item, a typed task prompt (off-roadmap), or a tracker issue — whatever matches the resolved adapter's `ref_pattern`, `#NN` or a bare integer on the built-in `gh` rung, plus the `issue` keyword to browse. |
 | `/cdd‑plan` | Auto-started by `cdd-worktree`: explore, take plan approval, write the plan file, stop. Touches nothing in the repo. |
 | `/cdd‑implement` | Started by hand in the same worktree: build from the plan file, update the docs, commit locally. Stops and reports rather than improvising when reality contradicts the plan. |
 | `/cdd‑small‑change` | The small-change lane, in place of plan + implement: for a task whose finished diff you can state in one sentence. Takes its own approval of the concrete change, makes it, commits — or hands back to `/cdd‑plan` if the task turns out not to be small. |
