@@ -235,6 +235,26 @@ The rule is what makes the split safe rather than lossy, and it usefully bounds 
 
 Two properties follow from the plan being a file rather than a transcript. It is **human-editable** before implementing — the reason the implementation session is started by hand rather than chained automatically. And it is **durable**: a session that dies after plan approval loses nothing, where before it lost all of the exploration. Unlike the handoff, it is mutable, so a machine picking the task up takes the plan whenever it takes the state record it travels with.
 
+### 2.16 Capability adapters (`.cdd/`)
+
+An executable the project commits that stands in for an external service CDD talks to — a tracker, a forge, a doc system, a notification channel — so that a project whose tracker is Jira or whose forge is GitLab adapts CDD by adding a file rather than by editing a shipped prompt. Every such binding is otherwise hardcoded in a command or a shell helper, and the only way to change one is a local edit to a file CDD ships, which is a fork in slow motion. An adapter is the place to put that adaptation instead.
+
+The namespace is **fixed**: `.cdd/`, one executable per capability, each named for the role it fills, and discovery is simply whether that file exists and is executable. There is no config format, no parser and no registry. The path is fixed rather than project-chosen because an adapter must resolve identically from a prompt and from a shell helper, and a helper has no LLM to read `CLAUDE.md` with — the check runner (§2.14) can live wherever a project likes because every one of its invokers is project-owned: the project's own CI config, and a prompt that reads `CLAUDE.md`. `.cdd/` also mirrors the machine-level `~/.cdd/`, and is not `.claude/`, which belongs to Claude Code.
+
+Every adapter answers one mandatory **`describe`** verb. That is what makes the binding introspectable without inventing a configuration format: the same trick the check runner uses when it makes itself the sole source of its own gate sequence. `describe` is what a conformance gate checks an adapter against, and what an external consumer reads to see which backend a repo is bound to.
+
+Resolution is a ladder — **project (`.cdd/`) → machine (`~/.cdd/adapters/`) → built-in behaviour** — and it **degrades loudly and never fails**. An absent adapter yields today's behaviour with a line saying so, which is §2.14's per-gate skip rule applied to a different artifact: a weaker binding, announced, rather than a broken session. The machine tier exists because one Jira shop has many repos; its half of an adapter installs machine-globally under §2.8's rules, additive and never pinned per project.
+
+CDD **never stores, reads or proxies a secret**. Authentication is whatever the underlying tool already does, and the committed file carries coordinates only — it may name an environment variable, never contain one.
+
+What an extension is allowed to substitute is bounded by one rule:
+
+> An extension may **replace** anything CDD already treats as external — issues, PRs, CI, notifications, review. It may only **mirror** what CDD treats as in-repo substrate — roadmap, architecture/feature docs, ADRs, handoff.
+
+The rule falls out of invariants already stated rather than out of taste. Issues are an external inbox feeding the roadmap (§3.1), so swapping one tracker for another changes nothing structural. The roadmap is in-repo because the implementation session ticks it in the same commit as the change (§5), `/cdd-pre-pr` reconciles it against the diff (§3.6), and a structural edit to it takes its human gate as a PR — relocating it breaks all three, and offline reads and `git blame` attribution with them. So a roadmap mirrored into a doc backend is fine; a roadmap sourced from one is not.
+
+The mechanism is specified but not yet built: no adapter ships, and every binding is still the built-in one. The decision and its reasoning are recorded in `doc/architecture/adr/0007-extend-cdd-through-capability-adapters.md`; the verb contracts, JSON shapes and exit codes are pinned by a later roadmap item and detailed meanwhile in GitHub issue #86.
+
 ## 3. Lifecycle
 
 A task flows through CDD in up to six sessions, two of them optional side-loops (`/cdd-merge-base` before the PR, `/cdd-process-pr` after review). The middle of that flow has **two lanes**: the standard lane plans and then implements, and the small-change lane (§3.2a) does both in one session for a task whose finished diff can be stated before any exploration. The lane is chosen once, at scoping; everything before it and everything after it is the same. Each session type has a name, one command, and one job:

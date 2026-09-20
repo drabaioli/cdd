@@ -196,11 +196,10 @@ Give each task a machine-readable record of where it sits in its lifecycle and w
 
 Make CDD adaptable to a project's tracker, forge, and doc system without editing a shipped prompt: a fixed `.cdd/` namespace of capability adapters, resolved project → machine → built-in and degrading loudly to today's behaviour. The design detail — namespace, verb contracts, JSON shapes, exit codes, and the replace-vs-mirror rule that bounds what an extension may substitute — lives in GitHub issue #86.
 
-- [ ] Decide the near-term extension shortlist and its order: Jira, Confluence, GitLab, Linear, Slack; record the verdict in the ADR.
-- [ ] ADR + process-doc section: the `.cdd/` namespace, capability adapters, replace-vs-mirror, CLI-first; spec only, no adapter shipped.
+- [x] Decide the near-term extension shortlist and its order: Jira, Confluence, GitLab, Linear, Slack; record the verdict in the ADR.
+- [x] ADR + process-doc section: the `.cdd/` namespace, capability adapters, replace-vs-mirror, CLI-first; spec only, no adapter shipped.
 - [ ] `cdd-state set-field` plus the `x-` extension-field convention, with a gate asserting unknown top-level keys survive a write.
-- [ ] Pin the tracker verb contract: 6 verbs, `describe`, JSON shapes, exit codes, plus an adapter-conformance gate.
-- [ ] GitHub reference tracker adapter wrapping today's `gh` calls, verified to leave `/cdd-next-step` behaviour unchanged.
+- [ ] Tracker verb contract + GitHub reference adapter; 6 verbs, `describe`, JSON shapes, exit codes, plus a conformance gate.
 - [ ] Teach `/cdd-next-step` the resolution ladder and `ref_pattern` dispatch, replacing the hardcoded `#NN` front-end; `gh` stays the fallback.
 - [ ] Generalize the branch token to `<backend>_<ref>_<slug>`, keeping `gh_issue_NN_` readable; update prompt-seam check 2 for both forms.
 - [ ] Jira tracker adapter, validated end-to-end on a real project.

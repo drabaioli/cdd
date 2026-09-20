@@ -87,9 +87,11 @@ check_branch_token() {
 # --- Check: path-existence linter ---------------------------------------------
 # Backticked tokens that look like a repo-relative path (contain '/', end in a known
 # extension, no placeholders/globs/home/vars/brace-expansion) must resolve to a real file.
+# The process doc is in scope alongside the prompts and the two root indexes: it cites ADRs
+# and architecture docs by path, and a rename on either side would otherwise strand them.
 check_paths() {
   local f p
-  for f in "$REPO_CMDS"/cdd-*.md CLAUDE.md README.md; do
+  for f in "$REPO_CMDS"/cdd-*.md CLAUDE.md README.md "$PROCESS_DOC_KB"; do
     # SC2016: the single quotes below are deliberate — the grep/sed patterns match
     # literal backtick characters in the markdown; no shell expansion is wanted.
     # shellcheck disable=SC2016
