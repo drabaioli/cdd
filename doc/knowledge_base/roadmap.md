@@ -198,7 +198,7 @@ Make CDD adaptable to a project's tracker, forge, and doc system without editing
 
 - [x] Decide the near-term extension shortlist and its order: Jira, Confluence, GitLab, Linear, Slack; record the verdict in the ADR.
 - [x] ADR + process-doc section: the `.cdd/` namespace, capability adapters, replace-vs-mirror, CLI-first; spec only, no adapter shipped.
-- [ ] `cdd-state set-field` plus the `x-` extension-field convention, with a gate asserting unknown top-level keys survive a write.
+- [x] `cdd-state set-field` plus the `x-` extension-field convention, with a gate asserting unknown top-level keys survive a write.
 - [ ] Tracker verb contract + GitHub reference adapter; 6 verbs, `describe`, JSON shapes, exit codes, plus a conformance gate.
 - [ ] Teach `/cdd-next-step` the resolution ladder and `ref_pattern` dispatch, replacing the hardcoded `#NN` front-end; `gh` stays the fallback.
 - [ ] Generalize the branch token to `<backend>_<ref>_<slug>`, keeping `gh_issue_NN_` readable; update prompt-seam check 2 for both forms.

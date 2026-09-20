@@ -46,6 +46,19 @@
 #                                      one). Appends a {id, stage, dir} entry for
 #                                      $CLAUDE_CODE_SESSION_ID unless it is empty or
 #                                      already the last entry's id.
+#   cdd-state set-field <x-key> <json-value> [--branch <branch>]
+#                                  Set one extension field on an existing record.
+#                                      The key must start with `x-`: that namespace is
+#                                      reserved for extensions, and CDD's own logic
+#                                      never reads it (process doc 2.13). The value is
+#                                      JSON — an object, array or scalar — and an
+#                                      invalid one exits 2 without writing. Defaults to
+#                                      the cwd-derived record; --branch names another,
+#                                      for a caller standing on the default branch. Like
+#                                      `lane` it appends no session entry and writes no
+#                                      per-repo marker: it annotates a task rather than
+#                                      advancing it. Adding a field needs no
+#                                      schema_version bump.
 #   cdd-state stages               Print the lifecycle enum, least -> most advanced,
 #                                      one stage per line. Read-only, needs no record
 #                                      and no jq; it is the capability probe an older
@@ -54,11 +67,12 @@
 # `dir` on a session entry is the worktree root the session ran in (from
 # `git rev-parse --show-toplevel`): the natural `cd` target for `claude --resume`.
 #
-# Both `seed` and `set` also sync the handoff + plan file + record to a per-task ref
-# `refs/cdd/<branch>` on origin (best-effort, advisory), so a resume on another
-# machine can materialize them; see cdd-worktree-resume and shell-helpers.md.
+# Every verb that writes the record (`seed`, `lane`, `set`, `set-field`) also syncs
+# the handoff + plan file + record to a per-task ref `refs/cdd/<branch>` on origin
+# (best-effort, advisory), so a resume on another machine can materialize them; see
+# cdd-worktree-resume and shell-helpers.md.
 #
-# Both also refresh the per-repo marker `~/.cdd/handoffs/<repo>/repo.json`, which
+# `seed` and `set` also refresh the per-repo marker `~/.cdd/handoffs/<repo>/repo.json`, which
 # records this repo's main worktree and is the one artifact in that directory that
 # survives task GC (see cdd-state-write-repo-marker). It is machine-local and is
 # never carried on the task ref.
@@ -300,6 +314,75 @@ cdd-state() {
         cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
       fi
       ;;
+    set-field)
+      # `${1:-}` rather than `$1`: a caller running under `set -u` (the assertions do)
+      # would die on an unbound argument before reaching the usage line below.
+      local key="${1:-}"; shift 2>/dev/null
+      # The key is positional, so it carries the same trap `seed` and `lane` guard:
+      # an option-shaped value here would write a field literally named `--help`.
+      case "$key" in
+        -h|--help) echo "usage: cdd-state set-field <x-key> <json-value> [--branch <branch>]" >&2; return 0 ;;
+        -*) echo "cdd-state set-field: '$key' looks like an option, not a field name." >&2; return 2 ;;
+      esac
+      local value="${1:-}"; shift 2>/dev/null
+      local branch=""
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --branch) branch="$2"; shift 2 ;;
+          *) echo "cdd-state set-field: unknown arg '$1'" >&2; return 2 ;;
+        esac
+      done
+      if [[ -z "$key" || -z "$value" ]]; then
+        echo "usage: cdd-state set-field <x-key> <json-value> [--branch <branch>]" >&2
+        return 2
+      fi
+      # The `x-` prefix is enforced, not merely conventional: without it this verb is a
+      # backdoor around `set`'s stage-enum validation (`set-field stage merged`). CDD's
+      # own future fields get their own subcommand, the way `lane` did, so nothing is
+      # lost. Relaxing this later is additive; tightening it later would break extensions.
+      case "$key" in
+        x-*) ;;
+        *) echo "cdd-state set-field: '$key' is outside the extension namespace; keys must start with 'x-'." >&2
+           return 2 ;;
+      esac
+      # Validate BEFORE touching the file, so a malformed value cannot leave a partial
+      # record. `jq empty` and not `jq -e .`: -e reports null and false as failures, and
+      # both are legitimate values here.
+      if ! jq empty <<<"$value" 2>/dev/null; then
+        echo "cdd-state set-field: value is not valid JSON: $value" >&2
+        return 2
+      fi
+      # Default to the cwd-derived record (as `set` does); --branch names another one,
+      # for a caller standing on the default branch (as /cdd-next-step does). The branch
+      # is a flag rather than positional because the derived case is the common one.
+      local file
+      if [[ -n "$branch" ]]; then
+        local main_wt repo_name
+        main_wt="$(cdd-state-main-worktree)" || return 1
+        repo_name="$(basename "$main_wt")"
+        file="$HOME/.cdd/handoffs/${repo_name}/${branch}.state.json"
+      else
+        file="$(cdd-state-file)" || return 1
+        branch="$(basename "${file%.state.json}")"
+      fi
+      # Writers never fabricate a record; only `seed` (i.e. /cdd-next-step) creates one.
+      if [[ ! -f "$file" ]]; then
+        echo "cdd-state: no record at $file; skipping (advisory)." >&2
+        return 0
+      fi
+      # One field assignment over the existing record, so every other key — CDD's own
+      # and any other extension's — rides through untouched. No session entry is
+      # appended and no per-repo marker is written: this is a task-scoped annotation,
+      # like `lane`, not a lifecycle transition.
+      local content
+      # shellcheck disable=SC2016  # $k/$v are jq variables, not shell expansions
+      content="$(jq --arg k "$key" --argjson v "$value" '.[$k] = $v' "$file")" \
+        || { echo "cdd-state: failed to update $file" >&2; return 1; }
+      if cdd-state-write "$file" "$content"; then
+        echo "Field: $(basename "$file") -> $key"
+        cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
+      fi
+      ;;
     set)
       local stage="$1"; shift 2>/dev/null
       local pr=""
@@ -371,10 +454,10 @@ cdd-state() {
       cdd-state-install "$@"
       ;;
     -h|--help|help)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       ;;
     *)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       return 2
       ;;
   esac
