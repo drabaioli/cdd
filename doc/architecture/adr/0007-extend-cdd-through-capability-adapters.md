@@ -148,6 +148,6 @@ introducing one.
 - Every adapter is optional and absence degrades to today's behaviour, so the whole mechanism is
   inert on a project that installs none — the same additive shape as §2.8's machine-global rule.
 - GitHub issue #86 stays the living detail record for the deferred surfaces (session hooks, helper
-  lifecycle hooks, publish/mirror, multi-backend routing, the `x-` schema convention, declaring
+  lifecycle hooks, publish/mirror, multi-backend routing, declaring
   `~/.cdd` a public API). The repo deliberately carries no copy of that list, so there is one place
   for it to be wrong.
