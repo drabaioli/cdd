@@ -13,7 +13,8 @@
 # checker's 10 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
-#   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file.
+#   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file; and,
+#      separately, the process doc does, since it is in scope for the same check.
 #   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading; and,
 #      separately, cdd-next-step.md loses its checkout-freshness precondition.
 #   5. Gate-count contract     — CLAUDE.md's stated gate count stops matching `ci.sh list`.
@@ -163,6 +164,16 @@ fresh_sandbox
 printf '\nSee `scripts/definitely-not-here.sh` for details.\n' >> "$SANDBOX/CLAUDE.md"
 expect_fail "check 3 catches a backticked path to a missing file" \
   "broken path reference in CLAUDE.md"
+
+# The process doc cites ADRs and architecture docs by path and is in scope for the same
+# check, so its half gets its own case: dropping it from the file list would otherwise
+# leave the CLAUDE.md mutation above still passing.
+fresh_sandbox
+# shellcheck disable=SC2016
+printf '\nSee `doc/architecture/adr/9999-not-a-real-adr.md` for details.\n' \
+  >> "$SANDBOX/doc/knowledge_base/claude-driven-development.md"
+expect_fail "check 3 covers the process doc, not just the prompts and root indexes" \
+  "broken path reference in doc/knowledge_base/claude-driven-development.md"
 
 # --- Check 4: required-section presence ---------------------------------------
 fresh_sandbox

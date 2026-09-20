@@ -38,9 +38,9 @@ namespace, one per capability, named for the role it fills** — `.cdd/tracker`,
 parser and no registry.
 
 **The path is fixed, not project-chosen.** `ci.sh` gets away with a project-chosen location because
-only a prompt invokes it, and a prompt can read `CLAUDE.md`. A shell helper resolving an adapter has
-no LLM, so the path has to be conventional — it must resolve identically from a prompt and from
-`cdd-worktree`. `.cdd/` also sidesteps the `scripts/` vs `tools/` split already live across this
+every one of its invokers is project-owned — the project's CI config, and a prompt that can read
+`CLAUDE.md`. A shell helper resolving an adapter has no LLM, so the path has to be conventional — it
+must resolve identically from a prompt and from `cdd-worktree`. `.cdd/` also sidesteps the `scripts/` vs `tools/` split already live across this
 repo and Colibri, and mirrors `~/.cdd/`. Not `.claude/` — that directory belongs to Claude Code.
 
 **The config is a function, not a file.** One mandatory `describe` verb makes the binding

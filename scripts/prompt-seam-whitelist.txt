@@ -23,6 +23,11 @@
 # overview lives at doc/architecture/overview.md instead.
 doc/knowledge_base/project-overview.md
 
+# The ADR filename *pattern* the process doc states (doc/architecture/adr/NNNN-short-title.md),
+# not a file. NNNN is a placeholder the check's own placeholder filter cannot see, since it
+# rejects <>*~${} and not bare uppercase.
+doc/architecture/adr/NNNN-short-title.md
+
 # The pre-#73 knowledge-base index path, recorded in cdd-retrofit.md's section 4.4
 # rename table and section 4.5 legacy-token table so already-bootstrapped projects
 # are carried across the rename. Historical: the repo's own copy is
