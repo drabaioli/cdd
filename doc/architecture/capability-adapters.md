@@ -104,10 +104,10 @@ Open items only. Empty is `[]`, not an error.
 ### `issue-create --title T --body B` → object
 
 ```json
-{"ref":"42","id":"I_kwDO…","url":"https://…","backend":"github"}
+{"ref":"42","url":"https://…","backend":"github"}
 ```
 
-`id` follows the same omit-when-equal rule as `issue-read`.
+`id` follows `issue-read`'s omit rule and one more: it is emitted only when it differs from `ref` **and the backend reports it on a create**. GitHub's `gh issue create` prints the new issue's URL and nothing else, so the shipped adapter omits `id` here while `issue-read` carries it — which is the omit-don't-null rule doing its job, not an inconsistency.
 
 ### `issue-transition <ref> <state>` → object
 
