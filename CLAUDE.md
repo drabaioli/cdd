@@ -11,6 +11,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Engineering practices (enforced vs expected)         | `doc/knowledge_base/engineering-practices.md`     |
 | Documentation map                                    | `doc/index.md`                                    |
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
+| Capability adapter contract (tracker verbs, shapes)  | `doc/architecture/capability-adapters.md`         |
 | Architecture decision records                        | `doc/architecture/adr/` (Nygard style)            |
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
@@ -46,7 +47,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 
 `scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14) — the gate registry at the top of the script is the list, and there is no second copy. `.github/workflows/template-smoke.yml` holds no gate list at all: it checks out and calls the runner, so CI and a local run cannot drift. `/cdd-pre-pr` invokes the same command, so a green local run means a green CI run.
 
-The 19 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` and `.claude/settings.json` vs the rendered template) and `drift-contract` (the drift checker's own contract, mutation-tested), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension` (extension fields survive every write); the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
+The 20 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` and `.claude/settings.json` vs the rendered template) and `drift-contract` (the drift checker's own contract, mutation-tested), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension` (extension fields survive every write), `adapter-conformance` (the shipped tracker adapter against the capability contract, offline); the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
 
 Two behaviours worth knowing: a gate whose tool is missing (`shellcheck`, `jq`) is reported **SKIPPED — loudly and non-fatally**, so a host without it gets a weaker verdict, not a wrong one; and the run is **not fail-fast**, so one invocation surfaces every problem. The runner provisions its own scratch dir and a throwaway git identity, so it needs no host setup and is unaffected by your git signing config.
 
@@ -64,13 +65,14 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
 | `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
+| `tools/cdd-tracker-github.sh`      | Tracker capability adapter, GitHub backend (the reference implementation) |
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists) |
+| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
-| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) |
+| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) + the GitHub tracker adapter (`cdd-tracker-github.sh`, not self-installing) |
 
 ## Architecture
 
@@ -92,7 +94,7 @@ Correctness outranks brevity — if a point cannot be made both plainly and corr
 
 This project uses CDD on itself. Every CDD session is a fresh context doing exactly one job (see process doc section 3 for the session taxonomy).
 
-- **To start a new task** (handoff session): run `/cdd-next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the task worktree. `/cdd-next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and `#NN` / a bare integer / the `issue`/`issues` keyword sources the task from a GitHub issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
+- **To start a new task** (handoff session): run `/cdd-next-step` from the main worktree to produce a handoff, then run `cdd-worktree <branch>` to spin up the task worktree. `/cdd-next-step` has three front-ends: no argument picks the next roadmap item; a task prompt starts off-roadmap work (intent-driven); and an argument matching the resolved tracker's `ref_pattern` — `#NN` or a bare integer on the built-in `gh` rung — or the `issue`/`issues` keyword sources the task from an issue (issue-driven), naming the branch `gh_issue_NN_<slug>`.
 - **To build the task** (plan session, then implementation session): `cdd-worktree <branch>` opens a session on `/cdd-plan`, which explores, takes plan approval, writes the plan file to `~/.cdd/handoffs/cdd/<branch>.plan.md`, and stops without touching the repo. Then open a **fresh** `claude` in that same worktree and run `/cdd-implement`, which builds from the plan file, updates the docs, and commits locally. The manual step between them is deliberate: it is where you read or edit the plan.
 - **When the task is small enough to state in one sentence** (small-change lane): `/cdd-next-step` recommends the lane and records it, and `cdd-worktree <branch>` then opens the worktree on `/cdd-small-change` instead — one session that takes its own approval of the concrete change, makes it, updates the docs, and commits. It hands back to `/cdd-plan` in the same worktree if the task turns out not to be small. Anything missing (an old helper, no marker) falls back to the standard lane.
 - **To pick up a task started on another machine** (resume): run `cdd-worktree-resume [<branch>]` from the main worktree. It recreates the worktree on the existing remote branch (no handoff needed) and `cd`s into it, then tells you what to run next based on the task's lane and stage: a small-change task not yet built resumes into `/cdd-small-change`; a task sitting at `plan_written` resumes into `/cdd-implement` (its plan rides the task ref along with the handoff and state record); anything else into `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`. With no argument it lists resumable remote branches.

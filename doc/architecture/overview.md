@@ -29,12 +29,13 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 │   ├── architecture/                         # how this repo is structured
 │   ├── features/                             # what this repo provides
 │   └── knowledge_base/                       # process doc, roadmap, engineering practices, decisions
-├── scripts/                                  # ci.sh (the check runner) + the gate scripts it calls: smoke assertions, drift check, prompt-seam check, roadmap-length check (with whitelists)
+├── scripts/                                  # ci.sh (the check runner) + the gate scripts it calls: smoke assertions, drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check
 ├── template/                                 # copy-paste material for new projects
 └── tools/
     ├── bootstrap-cdd-project.sh              # non-interactive bootstrap for new projects
     ├── cdd-worktree.sh                       # shared worktree helper (self-installing)
-    └── cdd-state.sh                          # shared task-state helper (self-installing)
+    ├── cdd-state.sh                          # shared task-state helper (self-installing)
+    └── cdd-tracker-github.sh                 # tracker capability adapter, GitHub backend (not self-installing)
 ```
 
 ## Layer relationships
@@ -52,6 +53,8 @@ The seam checker is itself guarded, by `scripts/prompt-seam-assert.sh` (the `sea
 The drift checker is guarded the same way, by `scripts/command-drift-assert.sh` (the `drift-contract` gate), for the same reason and with the same shape: a sandbox copy of the working tree, one mutation at a time, and a requirement that the checker fail *and name what it caught*. Each of its six checks gets a mutation — a diverging command copy, a one-sided command, a settings file that diverges, a settings syntax error planted identically in both copies so that only the `jq` parse can catch it, a `cdd-only` marker in the template, and a schema heading dropped from the process doc. Four controls pin the other direction: an unmutated copy passes, a whitelisted one-sided command passes, a whitelisted settings divergence passes (the escape hatch for the file that has no fence available to it), and a `cdd-only` fence in the repo copy passes. The `jq` mutation is skipped loudly when `jq` is absent, matching the runner's posture for a gate whose tool is missing. Unlike the seam checker this one keeps no check registry, so there is no registry-to-function pairing to assert.
 
 A third guard of the same family, `scripts/roadmap-length-check.sh` (the `roadmap-length` gate), holds every checkbox item in all three roadmaps the repo ships — its own, the template's skeleton, and the demo seed's — to 200 characters, pending items as much as completed ones. The roadmap is loaded by every session, so an over-long item is a context cost paid forever, and the bar had been convention-only, with an escape clause grandfathering existing violations. It covers all three roadmaps because each states this convention, and a file stating it has to obey it. Rather than a sibling mutation harness it carries an **inline self-check**: three fixtures, one multibyte, must yield exactly one hit before the real scan runs. See ADR 0005 for the decision and for where the trimmed detail goes.
+
+A fourth guard, `scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate), holds a capability adapter to the wire contract in [Capability adapters](capability-adapters.md) — today the shipped tracker adapter, `tools/cdd-tracker-github.sh`, though it takes a path so a project can point it at its own `.cdd/tracker`. Unlike the three above it guards an *executable* rather than agreement between two documents, so it works by running the subject: under a scratch `PATH` carrying a stub `gh`, which makes it offline by construction and needs no cooperation from the adapter — no probe-mode flag has to exist in the contract purely for a gate's benefit. It checks that `describe` is hermetic and contract-shaped, that every verb the adapter declares dispatches to a real implementation, that an undeclared verb exits 3, a usage error exits 2 and a missing backend exits 4, and that nothing secret-shaped is committed beside it (process doc §2.16). The verb probe is a floor, not a proof: it shows dispatch *reaches* an implementation, not that the implementation is correct — correctness needs a live call, and a gate that SKIPs on most hosts is one nobody can rely on.
 
 ## The check runner (`scripts/ci.sh`)
 
