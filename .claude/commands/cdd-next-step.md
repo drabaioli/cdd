@@ -10,10 +10,12 @@ This command has one optional argument. Dispatch on its shape, trying the rows i
 | ----------------------------------- | ----------------------------- | ----------- |
 | empty                               | **roadmap-driven**            | §3          |
 | `issue` or `issues`                 | **issue-driven**, browse      | §0b         |
-| matches the tracker's `ref_pattern` | **issue-driven**, direct      | §0b         |
+| every whitespace-separated token matches the tracker's `ref_pattern` | **issue-driven**, direct | §0b |
 | anything else                       | **intent-driven**             | §3-intent   |
 
 `issue` / `issues` is a fixed keyword and is checked before the pattern, so browsing stays available whatever the backend calls its references.
+
+The argument splits on whitespace, and the direct row matches only when **every** token matches — one task may be sourced from several issues (`/cdd-next-step 97 12`). A single token is the common case and behaves exactly as before; a mixed argument (one token matching, one not) is not issue-driven and falls to intent-driven, where the whole string is read as a task prompt.
 
 **What a reference looks like is the tracker's decision, not this command's.** Resolve the tracker down the ladder — project, then machine, then built-in — and take the first executable:
 
@@ -73,11 +75,13 @@ If `gh` is missing/unauthenticated or `origin` is not a GitHub remote, print a o
 
 **Announce the rung in one line** before the first call — `.cdd/tracker`, `~/.cdd/adapters/tracker`, or "no tracker adapter installed; using the built-in `gh` path". This is the one place the ladder is visible to the user, and where a wrong binding would otherwise stay silent.
 
-**Direct** (`$ARGUMENTS` matched the `ref_pattern`): read the item (read-only — never assign, comment, or relabel). With an adapter, that is `<adapter> issue-read <ref>`, passing `$ARGUMENTS` through unchanged — normalizing a reference is the adapter's job, not this command's. Otherwise strip any leading `#` and use the built-in:
+**Direct** (every token of `$ARGUMENTS` matched the `ref_pattern`): read each item, in the order given (read-only — never assign, comment, or relabel). With an adapter, that is one `<adapter> issue-read <ref>` per token, passing each through unchanged — normalizing a reference is the adapter's job, not this command's. Otherwise strip any leading `#` and use the built-in, once per reference:
 
 ```bash
 gh issue view <N> --json number,title,body,url,comments
 ```
+
+Several references mean one task sourced from several issues, not several tasks. If the items turn out to describe unrelated work, say so and ask which to scope — do not fold unrelated work into one handoff silently.
 
 **Browse** (`issue` / `issues`): list open issues, then exclude any that already have a local branch or an open PR on a `gh_issue_<n>_*` branch, so the user only sees unstarted work:
 
@@ -89,9 +93,11 @@ gh pr list --state open --json number,headRefName        # already-started issue
 
 With an adapter, `<adapter> issue-list` replaces the first line; the other two stay as they are, since a local branch and an open PR are facts about this checkout and its forge, not about the tracker.
 
-Present the filtered list (number + title) and let the user pick one; then fetch its detail as above.
+Present the filtered list (number + title) and let the user pick **one or more**; then fetch each one's detail as above.
 
-Use the item's title + body + comments as the **intent text**, and continue with §1, then §3-intent. The issue number is carried forward only via the branch name in §5 (`gh_issue_NN_<slug>`) — there is no commit trailer, and no downstream session is required to re-read the issue.
+The two filter lines above find already-started issues by the `gh_issue_NN_` branch token, so a task sourced from several issues — which carries no token (§5) — is not filtered out and its issues still appear as unstarted. Reading the state records for `issue_refs` would close that gap; until then, a listed issue may already be in flight on a multi-ref branch.
+
+Use the items' titles + bodies + comments as the **intent text**, and continue with §1, then §3-intent. The references are carried forward on the task's **state record** (§7), which is what `/cdd-pre-pr` reads to emit one close line per reference; the `gh_issue_NN_` branch token (§5) survives for a single GitHub-backed numeric reference as a fallback, not as the mechanism. There is no commit trailer, and no downstream session is required to re-read the issue.
 
 ## 1. Read context
 
@@ -173,7 +179,7 @@ The lane changes three things downstream, and nothing else: the handoff is thinn
 
 When the user signals they're ready, draft:
 
-**Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: prefix the name with the fixed `gh_issue_NN_` token so the issue number is durable and groups cleanly — `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). This token is the sole mechanism threading the issue to its PR (`/cdd-pre-pr` turns it into `Closes #NN`).
+**Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: with a **single** reference on the built-in `gh` rung — a numeric ref, `#NN` or `NN` — prefix the name with the fixed `gh_issue_NN_` token, so the issue number is durable and groups cleanly: `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). With several references, or with a backend whose references are not GitHub issue numbers, use a plain descriptive slug and **no token**: the references ride the state record (§7), and no ref-encoding scheme is introduced into branch names. Where the token is present it is a fallback `/cdd-pre-pr` parses when the record is unusable — not the mechanism.
 
 **Requirements**: the observable acceptance criteria — what "done" means for this task, checkable against the finished diff. **As few as possible: minimum 1, typically 3–6, hard cap 10.** Each is an observation, not a design decision ("the command prints its digest before the approval checkpoint", not "add a `print_digest()` helper").
 
@@ -252,6 +258,14 @@ cdd-state lane <branch> small
 ```
 
 It is a separate call rather than a flag on `seed` so that a machine whose `cdd-state` predates the lane fails this one command and keeps the seeded record (base branch included); the task then simply runs the standard lane. On the standard lane, do not call it at all — an absent marker *is* the standard lane.
+
+**Issue-driven mode only**, record the reference(s) the task was sourced from, in the order they were given:
+
+```bash
+cdd-state issue-refs <branch> <ref> [<ref>...]
+```
+
+Pass each reference exactly as the tracker reports it — the adapter's `.ref`, or the argument as typed on the built-in `gh` rung. `/cdd-pre-pr` reads this list back and emits one close line per entry. It is its own subcommand for the same reason `lane` is: a machine whose `cdd-state` predates it fails this one call and keeps the seeded record. If it fails, say so in one line — the task still runs, but only the `gh_issue_NN_` branch token carries an issue forward, so a multi-reference task would close its first issue alone.
 
 ## 8. Print the next command
 

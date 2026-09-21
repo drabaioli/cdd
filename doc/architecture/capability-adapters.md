@@ -73,7 +73,7 @@ Six verbs, of which one (`describe`) is mandatory and the other five are declare
 | `issue-list`                        | `gh issue list` (`/cdd-next-step` §0b)      | open items only                |
 | `issue-create --title T --body B`   | `/cdd-pre-pr`'s improvement channel         |                                |
 | `issue-transition <ref> <state>`    | —                                           | unsupported on GitHub          |
-| `issue-close-token <ref>`           | the hardcoded `Closes #NN`                  | `Closes #42` / a Jira smart commit |
+| `issue-close-token <ref>`           | `/cdd-pre-pr` §11, once per recorded ref    | `Closes #42` / a Jira smart commit |
 
 ### `issue-read <ref>` → object
 
@@ -124,6 +124,8 @@ Open items only. Empty is `[]`, not an error.
 ```
 
 The string a commit message or PR description carries so the backend auto-closes the item on merge. GitHub yields `Closes #42`; Jira yields a smart commit. A backend with no such mechanism does not declare the verb, and the caller simply writes no token.
+
+Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the references recorded on the task's state record (`cdd-state get issue_refs`, process doc §2.13), calls this verb once per reference, and appends each `.token` to the PR body. The rung is announced **once**, before the first of those calls, rather than once per call — N identical lines is noise, and the announcement rule exists to be read. An adapter that does not declare the verb yields no close lines at all, said in one line and never guessed at; and when no reference was recorded, the command never reaches the ladder — it falls back to the `gh_issue_NN` branch token and the hardcoded `Closes #NN`, which is the behaviour that predates adapters.
 
 ## The GitHub reference adapter
 

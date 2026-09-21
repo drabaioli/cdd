@@ -3,7 +3,8 @@
 #
 # The point is NOT that `cdd-state set-field` works — it is that a foreign top-level
 # key survives every verb that rewrites the record. That property is free today,
-# because `set`, `lane` and `set-field` all build a jq filter of field *assignments*
+# because `set`, `lane`, `issue-refs` and `set-field` all build a jq filter of field
+# *assignments*
 # over the existing file; it would be silently lost the day one of them is refactored
 # into a rebuild-from-scratch form. So the assertions below are written against
 # behaviour ("both foreign keys are still byte-identical after this write"), never
@@ -17,6 +18,12 @@
 # field), CDD's own fields untouched, every rejection leaving the file byte-identical,
 # never fabricating an absent record, --branch vs cwd-derivation targeting different
 # records, and the write reaching refs/cdd/<branch> on origin.
+#
+# `issue-refs` gets its own block on top of the passthrough sequence, because two of its
+# properties are contracts other code depends on and neither is visible from the record
+# alone: `cdd-state get` flattens the array to one ref per line (what /cdd-pre-pr loops
+# over), and a second call REPLACES the list rather than appending to it (the field is
+# amendable, unlike base_branch and lane) — a property a refactor could silently invert.
 #
 # Usage: scripts/state-extension-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. Requires jq
@@ -150,15 +157,17 @@ run_state set pr_open --pr 42 >/dev/null 2>&1 || fail "cdd-state set --pr failed
 assert_survives "set <stage> --pr"
 run_state set-field x-second '"another"' >/dev/null 2>&1 || fail "second set-field failed"
 assert_survives "a second set-field"
-pass "both foreign keys survived lane, set, set --pr and a second set-field"
+run_state issue-refs "$FEATURE" '#97' '12' >/dev/null 2>&1 || fail "cdd-state issue-refs failed"
+assert_survives "issue-refs"
+pass "both foreign keys survived lane, set, set --pr, a second set-field and issue-refs"
 
 # 4. CDD's own fields are untouched by set-field.
-own_fields() { jq -S -c '{schema_version, branch, stage, pr, base_branch, lane, sessions}' "$FILE"; }
+own_fields() { jq -S -c '{schema_version, branch, stage, pr, base_branch, lane, issue_refs, sessions}' "$FILE"; }
 before="$(own_fields)"
 run_state set-field x-third '[1,2,3]' >/dev/null 2>&1 || fail "set-field x-third failed"
 [[ "$(own_fields)" == "$before" ]] \
   || fail "set-field changed CDD's own fields: $before -> $(own_fields)"
-pass "set-field left schema_version/branch/stage/pr/base_branch/lane/sessions untouched"
+pass "set-field left schema_version/branch/stage/pr/base_branch/lane/issue_refs/sessions untouched"
 
 # 5. Value round-trip by JSON type. `null` lands as a PRESENT null-valued field —
 #    absent and null carry distinct meaning in this record (`pr`, `lane`), so removal
@@ -173,6 +182,30 @@ done
 [[ "$(jq 'has("x-nul")' "$FILE")" == "true" ]] \
   || fail "set-field <key> null must leave a present null-valued field, not an absent one"
 pass "object, array, string, number, boolean and null values all round-trip (null stays present)"
+
+# 5b. The issue-refs list: stored as written, flattened one-per-line by `get`, and
+#     REPLACED (not appended to) by a second call.
+[[ "$(field_of "$FILE" issue_refs)" == '["#97","12"]' ]] \
+  || fail "issue-refs did not store the refs as a JSON array of strings: $(field_of "$FILE" issue_refs)"
+got="$(run_state get issue_refs 2>/dev/null)"
+[[ "$got" == $'#97\n12' ]] \
+  || fail "cdd-state get issue_refs must print one ref per line, in order; got: $(printf %q "$got")"
+[[ "$(run_state get base_branch 2>/dev/null)" == "$DEFAULT_BRANCH" ]] \
+  || fail "cdd-state get on a scalar field changed shape"
+pass "issue-refs round-trips and get flattens the array one ref per line"
+
+run_state issue-refs "$FEATURE" 'PROJ-114' >/dev/null 2>&1 || fail "second issue-refs failed"
+[[ "$(field_of "$FILE" issue_refs)" == '["PROJ-114"]' ]] \
+  || fail "a second issue-refs must REPLACE the list, not append: $(field_of "$FILE" issue_refs)"
+assert_survives "a second issue-refs"
+run_state issue-refs "$FEATURE" '#97' '12' >/dev/null 2>&1 || fail "restoring the refs failed"
+pass "issue-refs replaces the whole list (the field is amendable)"
+
+rc="$(status_of issue-refs "$ABSENT" '#1')"
+[[ "$rc" == "0" ]] || fail "issue-refs on an absent record should exit 0 (advisory), got $rc"
+[[ ! -f "$DIR/$ABSENT.state.json" ]] \
+  || fail "issue-refs fabricated a record at $DIR/$ABSENT.state.json"
+pass "issue-refs never fabricates an absent record"
 
 # 6. Rejections, each leaving the record byte-identical.
 BEFORE="$WORK/before.json"
@@ -192,6 +225,11 @@ assert_rejected 2 "a missing key" set-field
 assert_rejected 2 "an option-shaped key" set-field --branch "$FEATURE"
 assert_rejected 2 "an unknown flag" set-field x-ok '1' --nope v
 assert_rejected 0 "--help" set-field --help
+assert_rejected 2 "issue-refs with no refs" issue-refs "$FEATURE"
+assert_rejected 2 "issue-refs with no arguments at all" issue-refs
+assert_rejected 2 "issue-refs with an option-shaped branch" issue-refs --branch "$FEATURE"
+assert_rejected 2 "issue-refs with an option-shaped ref" issue-refs "$FEATURE" --help
+assert_rejected 0 "issue-refs --help" issue-refs --help
 pass "every rejection exits as documented and leaves the record byte-identical"
 [[ "$(jq 'has("stage") and .stage == "pr_open"' "$FILE")" == "true" ]] \
   || fail 'a rejected "set-field stage merged" must not have touched .stage'

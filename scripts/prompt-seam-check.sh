@@ -33,7 +33,7 @@ PRE="$REPO_CMDS/cdd-pre-pr.md"
 # check function nobody registered would never run, and would never be missed.
 CHECKS=(
   "command-refs|every /cdd-* reference resolves to a command file or is whitelisted"
-  "branch-token|the gh_issue_NN token is produced and consumed in agreement"
+  "branch-token|the recorded issue refs and the gh_issue_NN token are produced and consumed in agreement"
   "paths|backticked repo-relative file paths resolve to real files"
   "headings|each cdd-*.md still carries its load-bearing headings"
   "gate-count|the gate count stated in prose matches ci.sh's registry"
@@ -71,10 +71,21 @@ check_command_refs() {
   return 0
 }
 
-# --- Check: branch-token / issue-token contract -------------------------------
-# The gh_issue_NN token produced in cdd-next-step.md is consumed (-> Closes #NN) in
-# cdd-pre-pr.md; both sides must still name it.
+# --- Check: issue-ref / branch-token contract ---------------------------------
+# Two seams, one contract: which issues a task closes.
+#   1. The issue refs cdd-next-step.md records on the state record (cdd-state issue-refs)
+#      are read back (cdd-state get issue_refs) and turned into close lines through the
+#      adapter's issue-close-token in cdd-pre-pr.md. This is the mechanism.
+#   2. The legacy gh_issue_NN token is still produced in cdd-next-step.md and still
+#      consumed (-> Closes #NN) in cdd-pre-pr.md. This is the fallback for an unusable
+#      record, and losing it would silently drop the close line on that path.
 check_branch_token() {
+  grep -qF 'cdd-state issue-refs' "$NEXT" \
+    || note "issue-ref producer broken: $NEXT no longer records the refs with cdd-state issue-refs"
+  grep -qF 'cdd-state get issue_refs' "$PRE" \
+    || note "issue-ref consumer broken: $PRE no longer reads the refs back with cdd-state get issue_refs"
+  grep -qF 'issue-close-token' "$PRE" \
+    || note "issue-ref consumer broken: $PRE no longer derives close lines via issue-close-token"
   grep -qF 'gh_issue_NN_' "$NEXT" \
     || note "branch-token producer broken: $NEXT no longer names the gh_issue_NN_<slug> token"
   grep -qF 'gh_issue_NN' "$PRE" \

@@ -39,6 +39,17 @@
 #                                      rather than a `seed` flag so an older helper
 #                                      meeting a newer /cdd-next-step fails this one
 #                                      call and still keeps the seeded record.
+#   cdd-state issue-refs <branch> <ref>...
+#                                  Record the issue reference(s) the task was sourced
+#                                      from, as a JSON array of strings, on an existing
+#                                      record. Used by /cdd-next-step in issue-driven
+#                                      mode, on the default branch (hence the positional
+#                                      branch), and read back by /cdd-pre-pr to emit one
+#                                      close line per ref. Its own subcommand, like
+#                                      `lane`, so an older helper fails this one call.
+#                                      AMENDABLE, unlike base_branch and lane: each call
+#                                      replaces the whole list, so a task that grows a
+#                                      second issue re-runs the verb with the full set.
 #   cdd-state set <stage> [--pr N] Advance an existing record to <stage> (and set
 #                                      the PR number with --pr). Derives repo/branch
 #                                      from the current worktree. Skips silently if
@@ -67,7 +78,7 @@
 # `dir` on a session entry is the worktree root the session ran in (from
 # `git rev-parse --show-toplevel`): the natural `cd` target for `claude --resume`.
 #
-# Every verb that writes the record (`seed`, `lane`, `set`, `set-field`) also syncs
+# Every verb that writes the record (`seed`, `lane`, `issue-refs`, `set`, `set-field`) also syncs
 # the handoff + plan file + record to a per-task ref `refs/cdd/<branch>` on origin
 # (best-effort, advisory), so a resume on another machine can materialize them; see
 # cdd-worktree-resume and shell-helpers.md.
@@ -314,6 +325,52 @@ cdd-state() {
         cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
       fi
       ;;
+    issue-refs)
+      # `${1:-}` rather than `$1`, as `set-field` does: a caller running under `set -u`
+      # (the assertions do) would die on an unbound argument before the usage line.
+      local branch="${1:-}"; shift 2>/dev/null
+      # Positional branch, same trap as `seed` and `lane`.
+      case "$branch" in
+        -h|--help) echo "usage: cdd-state issue-refs <branch> <ref>..." >&2; return 0 ;;
+        -*) echo "cdd-state issue-refs: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
+      esac
+      if [[ -z "$branch" || $# -eq 0 ]]; then
+        echo "usage: cdd-state issue-refs <branch> <ref>..." >&2
+        return 2
+      fi
+      local r
+      for r in "$@"; do
+        case "$r" in
+          -*) echo "cdd-state issue-refs: '$r' looks like an option, not a ref." >&2; return 2 ;;
+          "") echo "cdd-state issue-refs: empty ref." >&2; return 2 ;;
+        esac
+      done
+      # The branch is passed in rather than derived, as for `lane`: /cdd-next-step runs
+      # on the default branch while the record belongs to the task branch.
+      local main_wt repo_name file
+      main_wt="$(cdd-state-main-worktree)" || return 1
+      repo_name="$(basename "$main_wt")"
+      file="$HOME/.cdd/handoffs/${repo_name}/${branch}.state.json"
+      # Writers never fabricate a record; only `seed` (i.e. /cdd-next-step) creates one.
+      if [[ ! -f "$file" ]]; then
+        echo "cdd-state: no record at $file; skipping (advisory)." >&2
+        return 0
+      fi
+      # Unlike base_branch and lane, this field is AMENDABLE: the call replaces the
+      # whole list, so a task that grows a second issue is recorded by re-running the
+      # verb with the full set. One verb shape, no separate "add". No session entry is
+      # appended and no per-repo marker written — an annotation, like `lane`.
+      local content
+      # shellcheck disable=SC2016  # $ARGS.positional is jq's own, not a shell expansion
+      # The record comes in on stdin: under --args every remaining argument is a
+      # positional string, so naming the file would make it a ref rather than input.
+      content="$(jq --args '.issue_refs = $ARGS.positional' -- "$@" <"$file")" \
+        || { echo "cdd-state: failed to update $file" >&2; return 1; }
+      if cdd-state-write "$file" "$content"; then
+        echo "Issue refs: $(basename "$file") -> $*"
+        cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
+      fi
+      ;;
     set-field)
       # `${1:-}` rather than `$1`: a caller running under `set -u` (the assertions do)
       # would die on an unbound argument before reaching the usage line below.
@@ -438,8 +495,10 @@ cdd-state() {
       ;;
     get)
       # Read accessor for the cwd-derived record: print .<field>, empty on an
-      # absent record or an absent/null field. Advisory and read-only; the jq
-      # guard at the top already handles a machine without jq.
+      # absent record or an absent/null field. An array field prints one element
+      # per line, so a consumer can loop over it without a second tool; a scalar
+      # prints as before. Advisory and read-only; the jq guard at the top already
+      # handles a machine without jq.
       local field="$1"
       if [[ -z "$field" ]]; then
         echo "usage: cdd-state get <field>" >&2
@@ -448,16 +507,17 @@ cdd-state() {
       local file
       file="$(cdd-state-file)" || return 0
       [[ -f "$file" ]] || return 0
-      jq -r --arg f "$field" '.[$f] // empty' "$file" 2>/dev/null || return 0
+      jq -r --arg f "$field" '.[$f] // empty | if type == "array" then .[] else . end' \
+        "$file" 2>/dev/null || return 0
       ;;
     install|"")
       cdd-state-install "$@"
       ;;
     -h|--help|help)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       ;;
     *)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       return 2
       ;;
   esac

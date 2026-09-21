@@ -12,7 +12,10 @@
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
 # checker's 10 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
-#   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
+#   2. Issue-ref contract      — three cases, one per half of the seam: cdd-next-step.md
+#      stops recording the refs with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving
+#      close lines through `issue-close-token`; and, for the legacy fallback,
+#      cdd-pre-pr.md stops turning the branch token into `Closes #NN`.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file; and,
 #      separately, the process doc does, since it is in scope for the same check.
 #   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading; and,
@@ -150,7 +153,21 @@ printf 'Run /cdd-totally-bogus to do the thing.\n' > "$SANDBOX/seam-probe.md"
 printf '# Assert-only probe token.\n/cdd-totally-bogus\n' >> "$SANDBOX/scripts/prompt-seam-whitelist.txt"
 expect_pass "control: a whitelisted dangling reference is silenced"
 
-# --- Check 2: branch-token contract -------------------------------------------
+# --- Check 2: issue-ref and branch-token contract ------------------------------
+# Each half gets its own case, so a checker that kept only one of the needles is caught.
+# Every mutation is global (/g) on purpose: cdd-pre-pr.md's own cdd-only triage prose
+# names the same tokens, and a first-match-only rewrite would leave a needle standing
+# and the case would pass on a tree whose seam is genuinely broken.
+fresh_sandbox
+sandbox_sed 's/cdd-state issue-refs/cdd-state note-refs/g' "$CMDS/cdd-next-step.md"
+expect_fail "check 2 catches a producer that stops recording the issue refs" \
+  "no longer records the refs with cdd-state issue-refs"
+
+fresh_sandbox
+sandbox_sed 's/issue-close-token/issue-closing-phrase/g' "$CMDS/cdd-pre-pr.md"
+expect_fail "check 2 catches a consumer that stops deriving close lines" \
+  "no longer derives close lines via issue-close-token"
+
 fresh_sandbox
 sandbox_sed 's/Closes #NN/Closes the issue/g' "$CMDS/cdd-pre-pr.md"
 expect_fail "check 2 catches a severed gh_issue_NN -> Closes #NN seam" \
