@@ -3,6 +3,7 @@
 #
 # If you add a new <...> placeholder to a template slash command, add it here
 # too. The template-smoke CI workflow fails otherwise.
+<adapter>
 <architecture/feature/CLAUDE.md edits and roadmap ticks the implementation must apply>
 <body>
 <branch>
@@ -35,6 +36,7 @@
 <one-line implication>
 <one of:>
 <path → what changes, plus the distilled fact: `file:line` + your one-line conclusion>
+<ref>
 <repo-name>
 <repo>
 <REPO_ROOT>

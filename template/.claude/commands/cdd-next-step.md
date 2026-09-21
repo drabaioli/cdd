@@ -4,20 +4,38 @@ This is the exploratory-session command. Run on the main worktree. Output is a h
 
 ## 0. Mode: roadmap-driven, intent-driven, or issue-driven
 
-This command has one optional argument. Dispatch on its shape:
+This command has one optional argument. Dispatch on its shape, trying the rows in order:
 
 | `$ARGUMENTS`                        | Mode                          | Branches at |
 | ----------------------------------- | ----------------------------- | ----------- |
 | empty                               | **roadmap-driven**            | §3          |
-| `#123` or a bare integer `123`      | **issue-driven**, direct      | §0b         |
 | `issue` or `issues`                 | **issue-driven**, browse      | §0b         |
+| matches the tracker's `ref_pattern` | **issue-driven**, direct      | §0b         |
 | anything else                       | **intent-driven**             | §3-intent   |
+
+`issue` / `issues` is a fixed keyword and is checked before the pattern, so browsing stays available whatever the backend calls its references.
+
+**What a reference looks like is the tracker's decision, not this command's.** Resolve the tracker down the ladder — project, then machine, then built-in — and take the first executable:
+
+```bash
+for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -x "$c" ] && { echo "$c"; break; }; done
+```
+
+If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the shape of a reference:
+
+```bash
+<adapter> describe    # JSON on stdout; hermetic, so it needs no network and no credentials
+```
+
+Use it only if `describe` exits 0, parses as JSON, and reports a `contract` this CDD supports (currently `1`). Otherwise — unparseable, wrong version, or a non-zero exit — say so in **one line** and fall through to the next rung; that line is unconditional, because the user installed something that is not working and silence there is indistinguishable from it working. With nothing resolved, the built-in rung serves and its `ref_pattern` is the constant `^#?[0-9]+$` — `#123` or a bare `123`, exactly as before adapters existed.
+
+Resolution done only to classify the argument is otherwise **silent**. The line naming which rung served is printed in §0b, where a tracker call is actually made: a fallback line in every session in every repo is noise, and noise is how a load-bearing line stops being read.
 
 Every mode first runs §0a (checkout freshness), §1 (read context) and §2 (stale-handoff sweep); the "Branches at" column is only where the mode-specific path begins after that.
 
 - **Roadmap-driven**: pick the next item off the roadmap. Run §1–§8 as written.
 - **Intent-driven**: the task is already chosen by the user, so skip candidate proposal (§3 is replaced by §3-intent below). Use this when the user wants to start something off-roadmap rather than picking the next checkbox.
-- **Issue-driven**: a thin front-end onto intent-driven mode — the intent text comes from a GitHub issue instead of being typed. §0b resolves the issue, then the flow is exactly intent-driven (§1 adaptive load, §3-intent, §4 onward).
+- **Issue-driven**: a thin front-end onto intent-driven mode — the intent text comes from a tracker item instead of being typed. §0b resolves the item, then the flow is exactly intent-driven (§1 adaptive load, §3-intent, §4 onward).
 
 All modes converge on the same machinery from §4 onward (stale-handoff sweep in §2 runs in all of them). Do not fork the flow beyond what §0b, §1, and §3 describe.
 
@@ -41,7 +59,11 @@ Then continue with §0b (issue-driven mode) or §1.
 
 ## 0b. Resolve the issue (issue-driven mode)
 
-**Preconditions.** This mode needs the `gh` CLI authenticated and a GitHub `origin`:
+**Preconditions.** This mode needs a tracker that can serve the call — the verb is `issue-read` for direct, `issue-list` for browse.
+
+*With an adapter resolved* (§0), that verb must appear in its `describe.verbs`; if it does not, say which verb the adapter is missing and stop. A call that exits **4** (not configured / auth missing) prints an actionable line on stderr — show that line and stop, rather than reinterpreting it.
+
+*With nothing resolved*, the built-in rung serves, and it needs the `gh` CLI authenticated and a GitHub `origin`:
 
 ```bash
 gh auth status && git remote get-url origin   # origin should be a github.com URL
@@ -49,7 +71,9 @@ gh auth status && git remote get-url origin   # origin should be a github.com UR
 
 If `gh` is missing/unauthenticated or `origin` is not a GitHub remote, print a one-line explanation (e.g. "Issue mode needs the `gh` CLI and a GitHub origin; neither roadmap nor intent mode does — pass a task prompt or no argument instead.") and stop. Do not crash; roadmap- and intent-driven modes never reach this step.
 
-**Direct** (`#N` or bare `N`): strip any leading `#`, then read the issue (read-only — never assign, comment, or relabel):
+**Announce the rung in one line** before the first call — `.cdd/tracker`, `~/.cdd/adapters/tracker`, or "no tracker adapter installed; using the built-in `gh` path". This is the one place the ladder is visible to the user, and where a wrong binding would otherwise stay silent.
+
+**Direct** (`$ARGUMENTS` matched the `ref_pattern`): read the item (read-only — never assign, comment, or relabel). With an adapter, that is `<adapter> issue-read <ref>`, passing `$ARGUMENTS` through unchanged — normalizing a reference is the adapter's job, not this command's. Otherwise strip any leading `#` and use the built-in:
 
 ```bash
 gh issue view <N> --json number,title,body,url,comments
@@ -63,9 +87,11 @@ git branch --list 'gh_issue_*'                          # already-started issues
 gh pr list --state open --json number,headRefName        # already-started issues, by PR
 ```
 
-Present the filtered list (number + title) and let the user pick one; then fetch its detail with `gh issue view` as above.
+With an adapter, `<adapter> issue-list` replaces the first line; the other two stay as they are, since a local branch and an open PR are facts about this checkout and its forge, not about the tracker.
 
-Use the issue's title + body + comments as the **intent text**, and continue with §1, then §3-intent. The issue number is carried forward only via the branch name in §5 (`gh_issue_NN_<slug>`) — there is no commit trailer, and no downstream session is required to re-read the issue.
+Present the filtered list (number + title) and let the user pick one; then fetch its detail as above.
+
+Use the item's title + body + comments as the **intent text**, and continue with §1, then §3-intent. The issue number is carried forward only via the branch name in §5 (`gh_issue_NN_<slug>`) — there is no commit trailer, and no downstream session is required to re-read the issue.
 
 ## 1. Read context
 
