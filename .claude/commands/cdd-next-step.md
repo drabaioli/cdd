@@ -89,13 +89,14 @@ Several references mean one task sourced from several issues, not several tasks.
 gh issue list --state open --json number,title,labels
 git branch --list 'gh_issue_*'                          # already-started issues, by branch
 gh pr list --state open --json number,headRefName        # already-started issues, by PR
+jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/cdd/*.state.json 2>/dev/null   # ...by state record
 ```
 
-With an adapter, `<adapter> issue-list` replaces the first line; the other two stay as they are, since a local branch and an open PR are facts about this checkout and its forge, not about the tracker.
+With an adapter, `<adapter> issue-list` replaces the first line; the other three stay as they are, since a local branch, an open PR and a task's own state record are facts about this checkout, not about the tracker.
+
+The first two exclusion lines find already-started issues by the `gh_issue_NN_` branch token, which a multi-ref or non-GitHub task does not carry (§5) — the fourth line covers those, since their references live on the state record instead. Compare after stripping any leading `#`, as a reference is recorded exactly as the tracker reports it. The records are local to this machine and advisory (absent without `jq`, reaped once a PR merges), so this narrows the blind spot rather than closing it: a reference found there means "already in flight", while finding none is not proof the issue is unstarted.
 
 Present the filtered list (number + title) and let the user pick **one or more**; then fetch each one's detail as above.
-
-The two filter lines above find already-started issues by the `gh_issue_NN_` branch token, so a task sourced from several issues — which carries no token (§5) — is not filtered out and its issues still appear as unstarted. Reading the state records for `issue_refs` would close that gap; until then, a listed issue may already be in flight on a multi-ref branch.
 
 Use the items' titles + bodies + comments as the **intent text**, and continue with §1, then §3-intent. The references are carried forward on the task's **state record** (§7), which is what `/cdd-pre-pr` reads to emit one close line per reference; the `gh_issue_NN_` branch token (§5) survives for a single GitHub-backed numeric reference as a fallback, not as the mechanism. There is no commit trailer, and no downstream session is required to re-read the issue.
 

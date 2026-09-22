@@ -51,6 +51,15 @@ whitelisted() {
   grep -vE '^[[:space:]]*(#|$)' "$WHITELIST" | grep -qxF -- "$1"
 }
 
+# A command file with its `cdd-only` regions removed — the same stripper, and the same
+# marker pair, as command-drift-check.sh. A check whose needles are also named in a
+# CDD-meta section must grep the stripped text: cdd-pre-pr.md's triage prose *describes*
+# the seam checks and quotes their tokens verbatim, so an unstripped grep would be
+# satisfied by the documentation of a seam rather than by the seam itself.
+strip_cdd_only() {
+  sed '/<!-- cdd-only-begin -->/,/<!-- cdd-only-end -->/d' "$1"
+}
+
 # --- Check: command-name resolution -------------------------------------------
 # Every `/cdd-*` reference across the repo's markdown resolves to an existing
 # .claude/commands/cdd-*.md, or is a whitelisted non-command (shell helper, marker
@@ -79,18 +88,25 @@ check_command_refs() {
 #   2. The legacy gh_issue_NN token is still produced in cdd-next-step.md and still
 #      consumed (-> Closes #NN) in cdd-pre-pr.md. This is the fallback for an unusable
 #      record, and losing it would silently drop the close line on that path.
+# Both files are read with their `cdd-only` regions stripped. cdd-pre-pr.md's own triage
+# section names all six tokens below while explaining this very check, so grepping the
+# raw file would let the §11 block that *does* the work be deleted outright and still
+# report clean — the check would be pinned to its own documentation.
 check_branch_token() {
-  grep -qF 'cdd-state issue-refs' "$NEXT" \
+  local next pre
+  next="$(strip_cdd_only "$NEXT")"
+  pre="$(strip_cdd_only "$PRE")"
+  grep -qF 'cdd-state issue-refs' <<<"$next" \
     || note "issue-ref producer broken: $NEXT no longer records the refs with cdd-state issue-refs"
-  grep -qF 'cdd-state get issue_refs' "$PRE" \
+  grep -qF 'cdd-state get issue_refs' <<<"$pre" \
     || note "issue-ref consumer broken: $PRE no longer reads the refs back with cdd-state get issue_refs"
-  grep -qF 'issue-close-token' "$PRE" \
+  grep -qF 'issue-close-token' <<<"$pre" \
     || note "issue-ref consumer broken: $PRE no longer derives close lines via issue-close-token"
-  grep -qF 'gh_issue_NN_' "$NEXT" \
+  grep -qF 'gh_issue_NN_' <<<"$next" \
     || note "branch-token producer broken: $NEXT no longer names the gh_issue_NN_<slug> token"
-  grep -qF 'gh_issue_NN' "$PRE" \
+  grep -qF 'gh_issue_NN' <<<"$pre" \
     || note "branch-token consumer broken: $PRE no longer matches the gh_issue_NN branch token"
-  grep -qF 'Closes #NN' "$PRE" \
+  grep -qF 'Closes #NN' <<<"$pre" \
     || note "branch-token consumer broken: $PRE no longer turns the token into a Closes #NN line"
   return 0
 }
