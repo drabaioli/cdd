@@ -201,7 +201,8 @@ Make CDD adaptable to a project's tracker, forge, and doc system without editing
 - [x] `cdd-state set-field` plus the `x-` extension-field convention, with a gate asserting unknown top-level keys survive a write.
 - [x] Tracker verb contract + GitHub reference adapter; 6 verbs, `describe`, JSON shapes, exit codes, plus a conformance gate.
 - [x] Teach `/cdd-next-step` the resolution ladder and `ref_pattern` dispatch, replacing the hardcoded `#NN` front-end; `gh` stays the fallback.
-- [x] Move issue refs from the branch name onto the state record (multi-ref, any backend); `/cdd-pre-pr` emits one close line per ref via `issue-close-token`, `gh_issue_NN_` kept as fallback (#97).
+- [x] Move issue refs from the branch name onto the state record (multi-ref, any backend); `/cdd-pre-pr` emits one close line per ref via `issue-close-token` (#97).
+- [x] Drop the `gh_issue_NN_` branch token; the state record is the only carrier, and an unusable record means no close lines, said out loud (ADR 0008).
 - [ ] Jira tracker adapter, validated end-to-end on a real project.
 - [ ] Docs capability: verbs, shapes, and context-cost caps for read-only backend docs, callable from every session type.
 - [ ] Confluence docs adapter, validated on a real project.

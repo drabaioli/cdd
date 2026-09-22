@@ -83,22 +83,20 @@ gh issue view <N> --json number,title,body,url,comments
 
 Several references mean one task sourced from several issues, not several tasks. If the items turn out to describe unrelated work, say so and ask which to scope — do not fold unrelated work into one handoff silently.
 
-**Browse** (`issue` / `issues`): list open issues, then exclude any that already have a local branch or an open PR on a `gh_issue_<n>_*` branch, so the user only sees unstarted work:
+**Browse** (`issue` / `issues`): list open issues, then exclude any already in flight, so the user only sees unstarted work:
 
 ```bash
 gh issue list --state open --json number,title,labels
-git branch --list 'gh_issue_*'                          # already-started issues, by branch
-gh pr list --state open --json number,headRefName        # already-started issues, by PR
-jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/cdd/*.state.json 2>/dev/null   # ...by state record
+jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/cdd/*.state.json 2>/dev/null   # already-started issues, by state record
 ```
 
-With an adapter, `<adapter> issue-list` replaces the first line; the other three stay as they are, since a local branch, an open PR and a task's own state record are facts about this checkout, not about the tracker.
+With an adapter, `<adapter> issue-list` replaces the first line; the second stays as it is, since a task's own state record is a fact about this checkout, not about the tracker.
 
-The first two exclusion lines find already-started issues by the `gh_issue_NN_` branch token, which a multi-ref or non-GitHub task does not carry (§5) — the fourth line covers those, since their references live on the state record instead. Compare after stripping any leading `#`, as a reference is recorded exactly as the tracker reports it. The records are local to this machine and advisory (absent without `jq`, reaped once a PR merges), so this narrows the blind spot rather than closing it: a reference found there means "already in flight", while finding none is not proof the issue is unstarted.
+The state records are the only exclusion source. Compare after stripping any leading `#`, as a reference is recorded exactly as the tracker reports it. They are advisory — local to this machine, absent without `jq`, reaped once a PR merges — so this narrows the blind spot rather than closing it: a reference found there means "already in flight", while finding none is not proof the issue is unstarted. Say that in one line when presenting the list, since an issue started on another machine will not be filtered out here.
 
 Present the filtered list (number + title) and let the user pick **one or more**; then fetch each one's detail as above.
 
-Use the items' titles + bodies + comments as the **intent text**, and continue with §1, then §3-intent. The references are carried forward on the task's **state record** (§7), which is what `/cdd-pre-pr` reads to emit one close line per reference; the `gh_issue_NN_` branch token (§5) survives for a single GitHub-backed numeric reference as a fallback, not as the mechanism. There is no commit trailer, and no downstream session is required to re-read the issue.
+Use the items' titles + bodies + comments as the **intent text**, and continue with §1, then §3-intent. The references are carried forward on the task's **state record** (§7), which is what `/cdd-pre-pr` reads to emit one close line per reference. That record is the only carrier: no branch-name token, no commit trailer, and no downstream session is required to re-read the issue.
 
 ## 1. Read context
 
@@ -180,7 +178,7 @@ The lane changes three things downstream, and nothing else: the handoff is thinn
 
 When the user signals they're ready, draft:
 
-**Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). **Issue-driven mode**: with a **single** reference on the built-in `gh` rung — a numeric ref, `#NN` or `NN` — prefix the name with the fixed `gh_issue_NN_` token, so the issue number is durable and groups cleanly: `gh_issue_NN_<descriptive_slug>` (e.g. `gh_issue_42_dark_mode`). With several references, or with a backend whose references are not GitHub issue numbers, use a plain descriptive slug and **no token**: the references ride the state record (§7), and no ref-encoding scheme is introduced into branch names. Where the token is present it is a fallback `/cdd-pre-pr` parses when the record is unusable — not the mechanism.
+**Branch name**: short, lowercase, underscore-separated. No `fix/` / `feature/` prefix. Derive from the task (e.g. `imu_calibration_wiring`, `setpoint_timeout_handling`). This holds in every mode, issue-driven included — a branch name describes the work, and the references the task was sourced from ride the state record (§7). No reference-encoding scheme goes into branch names: it would have to be sanitized to git's rules per backend, which makes it lossy to parse back, and a multi-reference task has no non-arbitrary way to spell itself at all.
 
 **Requirements**: the observable acceptance criteria — what "done" means for this task, checkable against the finished diff. **As few as possible: minimum 1, typically 3–6, hard cap 10.** Each is an observation, not a design decision ("the command prints its digest before the approval checkpoint", not "add a `print_digest()` helper").
 
@@ -266,7 +264,7 @@ It is a separate call rather than a flag on `seed` so that a machine whose `cdd-
 cdd-state issue-refs <branch> <ref> [<ref>...]
 ```
 
-Pass each reference exactly as the tracker reports it — the adapter's `.ref`, or the argument as typed on the built-in `gh` rung. `/cdd-pre-pr` reads this list back and emits one close line per entry. It is its own subcommand for the same reason `lane` is: a machine whose `cdd-state` predates it fails this one call and keeps the seeded record. If it fails, say so in one line — the task still runs, but only the `gh_issue_NN_` branch token carries an issue forward, so a multi-reference task would close its first issue alone.
+Pass each reference exactly as the tracker reports it — the adapter's `.ref`, or the argument as typed on the built-in `gh` rung. `/cdd-pre-pr` reads this list back and emits one close line per entry. It is its own subcommand for the same reason `lane` is: a machine whose `cdd-state` predates it fails this one call and keeps the seeded record. If it fails, say so in one line — the task still runs, but nothing carries its issues forward, so `/cdd-pre-pr` will open the PR with no close lines and the issues stay open.
 
 ## 8. Print the next command
 
