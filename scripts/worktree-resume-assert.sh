@@ -56,12 +56,12 @@ EOF
 mkdir -p "$WORK/home"
 
 DEFAULT_BRANCH="main"
-FEATURE_A="gh_issue_99_demo"
-FEATURE_B="gh_issue_100_other"
+FEATURE_A="gamma_demo"
+FEATURE_B="alpha_other"
 # A branch that gets deleted on the remote (as GitHub does when a PR merges).
 # Discovery's `git fetch --prune` must drop it, and explicit resume must refuse
 # it. Sorts before A/B so it would be candidate 1 if pruning were missing.
-FEATURE_C="gh_issue_50_gone"
+FEATURE_C="beta_gone"
 
 # Stub `claude` on PATH as a negative guard: the helper must never invoke it, so
 # any output here (a non-empty log) is a regression.
@@ -144,8 +144,8 @@ pass "already-exists resume returns 0 without launching claude"
 
 # 4. Discovery mode (no argument): pick the first listed branch via stdin.
 #    for-each-ref sorts refnames, so candidate 1 is the lexicographically first
-#    feature branch ($FEATURE_B = gh_issue_100_other sorts before $FEATURE_A;
-#    $FEATURE_C = gh_issue_50_gone sorts first but is not selected here).
+#    feature branch ($FEATURE_B = alpha_other sorts before both others;
+#    $FEATURE_C = beta_gone would sort second but was pruned above).
 git clone -q "$WORK/origin.git" "$WORK/repoB"
 : > "$CLAUDE_STUB_LOG"
 set +e

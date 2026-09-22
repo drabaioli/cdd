@@ -73,7 +73,7 @@ Six verbs, of which one (`describe`) is mandatory and the other five are declare
 | `issue-list`                        | `gh issue list` (`/cdd-next-step` §0b)      | open items only                |
 | `issue-create --title T --body B`   | `/cdd-pre-pr`'s improvement channel         |                                |
 | `issue-transition <ref> <state>`    | —                                           | unsupported on GitHub          |
-| `issue-close-token <ref>`           | the hardcoded `Closes #NN`                  | `Closes #42` / a Jira smart commit |
+| `issue-close-token <ref>`           | `/cdd-pre-pr` §11, once per recorded ref    | `Closes #42` / a Jira smart commit |
 
 ### `issue-read <ref>` → object
 
@@ -124,6 +124,34 @@ Open items only. Empty is `[]`, not an error.
 ```
 
 The string a commit message or PR description carries so the backend auto-closes the item on merge. GitHub yields `Closes #42`; Jira yields a smart commit. A backend with no such mechanism does not declare the verb, and the caller simply writes no token.
+
+Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the references recorded on the task's state record (`cdd-state get issue_refs`, process doc §2.13), calls this verb once per reference, and appends each `.token` to the PR body. The rung is announced **once**, before the first of those calls, rather than once per call — N identical lines is noise, and the announcement rule exists to be read. An adapter that does not declare the verb yields no close lines at all, said in one line and never guessed at; and when no reference was recorded, the command never reaches the ladder and emits no close lines either. The state record is the only carrier — there is no branch-name fallback behind it ([ADR 0008](adr/0008-drop-the-issue-ref-branch-token.md)).
+
+**What the token can and cannot promise.** Emitting a close line is not the same as closing the
+item, and the contract deliberately does not claim otherwise. Three cases:
+
+- **Tracker and forge are the same backend** (a GitHub PR closing a GitHub issue, a GitLab MR
+  closing a GitLab issue). The forge parses its own PR body and closes the item on merge. This is
+  the *forge's* feature, not the tracker's, and it is the only case CDD can rely on.
+- **Different backends, with an integration** (a GitHub PR closing a Jira issue). Still a string in
+  text, but the party acting on it is a tracker-side integration — Jira's DVCS connector or the
+  GitHub-for-Jira app — which must be installed and watching the repo. Where it is, a smart commit
+  like `PROJ-114 #close` transitions the issue; where it is not, nothing happens.
+- **No integration at all.** The line is inert prose.
+
+The verb is the adapter's because only the adapter knows its backend's syntax and whether such a
+mechanism exists at all — which is why it is optional, and why an adapter that declares it not
+yields no line rather than a guessed one. But a declared token proves the *syntax* exists, never
+that anything is listening, and an adapter cannot check the latter offline. So `/cdd-pre-pr` states
+which of the three cases applies when it offers to open the PR, rather than letting a line that
+does nothing look like one that does.
+
+**A close that is guaranteed across backends needs `issue-transition` called after the merge**, by
+an actor CDD does not have today: `/cdd-pre-pr` runs pre-merge, and `cdd-worktree-gc` — the only
+thing that runs post-merge — is local maintenance whose merge check is hardcoded to `gh`. The
+natural home is gc once the forge capability puts `pr-merged` behind an adapter, opt-in and
+reporting each transition, which is where the roadmap sequences it. Until then, cross-backend
+closing is the tracker integration's job and CDD's contribution is emitting the token it reads.
 
 ## The GitHub reference adapter
 

@@ -33,7 +33,7 @@ PRE="$REPO_CMDS/cdd-pre-pr.md"
 # check function nobody registered would never run, and would never be missed.
 CHECKS=(
   "command-refs|every /cdd-* reference resolves to a command file or is whitelisted"
-  "branch-token|the gh_issue_NN token is produced and consumed in agreement"
+  "issue-refs|the issue refs recorded on the state record are read back and turned into close lines"
   "paths|backticked repo-relative file paths resolve to real files"
   "headings|each cdd-*.md still carries its load-bearing headings"
   "gate-count|the gate count stated in prose matches ci.sh's registry"
@@ -49,6 +49,15 @@ note() { echo "  $*" >&2; fail=1; }
 
 whitelisted() {
   grep -vE '^[[:space:]]*(#|$)' "$WHITELIST" | grep -qxF -- "$1"
+}
+
+# A command file with its `cdd-only` regions removed — the same stripper, and the same
+# marker pair, as command-drift-check.sh. A check whose needles are also named in a
+# CDD-meta section must grep the stripped text: cdd-pre-pr.md's triage prose *describes*
+# the seam checks and quotes their tokens verbatim, so an unstripped grep would be
+# satisfied by the documentation of a seam rather than by the seam itself.
+strip_cdd_only() {
+  sed '/<!-- cdd-only-begin -->/,/<!-- cdd-only-end -->/d' "$1"
 }
 
 # --- Check: command-name resolution -------------------------------------------
@@ -71,16 +80,26 @@ check_command_refs() {
   return 0
 }
 
-# --- Check: branch-token / issue-token contract -------------------------------
-# The gh_issue_NN token produced in cdd-next-step.md is consumed (-> Closes #NN) in
-# cdd-pre-pr.md; both sides must still name it.
-check_branch_token() {
-  grep -qF 'gh_issue_NN_' "$NEXT" \
-    || note "branch-token producer broken: $NEXT no longer names the gh_issue_NN_<slug> token"
-  grep -qF 'gh_issue_NN' "$PRE" \
-    || note "branch-token consumer broken: $PRE no longer matches the gh_issue_NN branch token"
-  grep -qF 'Closes #NN' "$PRE" \
-    || note "branch-token consumer broken: $PRE no longer turns the token into a Closes #NN line"
+# --- Check: issue-ref contract ------------------------------------------------
+# One seam, one contract: which issues a task closes. The issue refs cdd-next-step.md
+# records on the state record (cdd-state issue-refs) are read back (cdd-state get
+# issue_refs) and turned into close lines through the adapter's issue-close-token in
+# cdd-pre-pr.md. The state record is the only carrier — there is no branch-name token
+# and no commit trailer — so a one-sided edit here loses the close lines outright.
+# Both files are read with their `cdd-only` regions stripped. cdd-pre-pr.md's own triage
+# section names all three tokens below while explaining this very check, so grepping the
+# raw file would let the §11 block that *does* the work be deleted outright and still
+# report clean — the check would be pinned to its own documentation.
+check_issue_refs() {
+  local next pre
+  next="$(strip_cdd_only "$NEXT")"
+  pre="$(strip_cdd_only "$PRE")"
+  grep -qF 'cdd-state issue-refs' <<<"$next" \
+    || note "issue-ref producer broken: $NEXT no longer records the refs with cdd-state issue-refs"
+  grep -qF 'cdd-state get issue_refs' <<<"$pre" \
+    || note "issue-ref consumer broken: $PRE no longer reads the refs back with cdd-state get issue_refs"
+  grep -qF 'issue-close-token' <<<"$pre" \
+    || note "issue-ref consumer broken: $PRE no longer derives close lines via issue-close-token"
   return 0
 }
 
@@ -200,7 +219,7 @@ check_gate_count() {
 # to prevent. Negotiable means "status not plainly Enforced": a row marked `— Enforced`
 # outright (documentation) is not up for discussion, and a heading with no `— <status>`
 # suffix at all ("How this list grows") is not a practice row. Both sides must name the
-# row identically, exactly as with the gh_issue_NN token — no mapping table here, which
+# row identically, exactly as with the issue-ref tokens — no mapping table here, which
 # would be a third copy free to drift from both.
 check_engineering_floor() {
   local contract="template/doc/knowledge_base/engineering-practices.md"
@@ -251,7 +270,7 @@ check_plan_sections() {
 # is the sole producer and cdd-worktree.sh the sole consumer, on two separate paths
 # (launch and resume). A one-sided edit degrades silently to the standard lane — the safe
 # direction, and exactly why nothing else would ever notice. Same shape as the
-# branch-token check.
+# issue-ref check.
 #
 # Both routing paths live in their own function, so pin each one by name. Counting
 # occurrences would not do: a comment, or the `-f .claude/commands/cdd-small-change.md`

@@ -12,7 +12,11 @@
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
 # checker's 10 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
-#   2. Branch-token contract   — cdd-pre-pr.md stops turning the token into `Closes #NN`.
+#   2. Issue-ref contract      — three cases, one per half of the seam: cdd-next-step.md
+#      stops recording the refs with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving
+#      close lines through `issue-close-token`; and cdd-pre-pr.md loses its §11 close-line
+#      block while keeping the cdd-only prose that quotes the same tokens, which catches
+#      a checker pinned to its own documentation rather than to the seam.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file; and,
 #      separately, the process doc does, since it is in scope for the same check.
 #   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading; and,
@@ -150,11 +154,31 @@ printf 'Run /cdd-totally-bogus to do the thing.\n' > "$SANDBOX/seam-probe.md"
 printf '# Assert-only probe token.\n/cdd-totally-bogus\n' >> "$SANDBOX/scripts/prompt-seam-whitelist.txt"
 expect_pass "control: a whitelisted dangling reference is silenced"
 
-# --- Check 2: branch-token contract -------------------------------------------
+# --- Check 2: issue-ref contract -----------------------------------------------
+# Each half gets its own case, so a checker that kept only one of the needles is caught.
+# The rewrites are global (/g) because cdd-pre-pr.md names each token more than once;
+# the checker strips `cdd-only` regions before grepping, so the triage prose that
+# describes this check is out of scope either way — which the last case below pins.
 fresh_sandbox
-sandbox_sed 's/Closes #NN/Closes the issue/g' "$CMDS/cdd-pre-pr.md"
-expect_fail "check 2 catches a severed gh_issue_NN -> Closes #NN seam" \
-  "no longer turns the token into a Closes #NN line"
+sandbox_sed 's/cdd-state issue-refs/cdd-state note-refs/g' "$CMDS/cdd-next-step.md"
+expect_fail "check 2 catches a producer that stops recording the issue refs" \
+  "no longer records the refs with cdd-state issue-refs"
+
+fresh_sandbox
+sandbox_sed 's/issue-close-token/issue-closing-phrase/g' "$CMDS/cdd-pre-pr.md"
+expect_fail "check 2 catches a consumer that stops deriving close lines" \
+  "no longer derives close lines via issue-close-token"
+
+# The consumer half must be pinned to the §11 block that does the work, not to the
+# cdd-only triage prose that merely quotes the same three tokens while describing this
+# check. Deleting §11 outright, leaving that prose untouched, is the mutation that
+# tells the two apart: a checker grepping the raw file would report clean.
+fresh_sandbox
+# shellcheck disable=SC2016  # `$d` is sed's last-line address, not a shell expansion
+sandbox_sed '/^\*\*Close lines\.\*\* The body carries one close line per reference/,$d' \
+  "$CMDS/cdd-pre-pr.md"
+expect_fail "check 2 is not satisfied by its own cdd-only documentation" \
+  "no longer reads the refs back with cdd-state get issue_refs"
 
 # --- Check 3: path-existence linter -------------------------------------------
 fresh_sandbox
