@@ -207,6 +207,7 @@ Make CDD adaptable to a project's tracker, forge, and doc system without editing
 - [ ] Docs capability: verbs, shapes, and context-cost caps for read-only backend docs, callable from every session type.
 - [ ] Confluence docs adapter, validated on a real project.
 - [ ] Forge verb contract + GitHub reference adapter; `pr-merged` and `default-branch` move behind it.
+- [ ] Close issues post-merge via `issue-transition` from `cdd-worktree-gc`, opt-in and reported per ref; needs the forge adapter's `pr-merged` first.
 - [ ] GitLab forge adapter, validated on a real project.
 - [ ] Teach `/cdd-bootstrap` and `/cdd-retrofit` to detect and install adapters; retrofit gains a migrate-into-`.cdd/` verdict.
 
