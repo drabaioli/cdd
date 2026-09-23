@@ -20,7 +20,7 @@ Documentation gets the same care, and not just for your benefit. A structured kn
 
 ## How it works
 
-![CDD task cycle: start a session and run /cdd-next-step to queue a task, spin up an isolated worktree, plan and build, optionally /cdd-merge-base, run /cdd-pre-pr to self-review and open the PR, review on GitHub, optionally /cdd-process-pr for review feedback, merge, then clean up and repeat, with locked human gates down the left.](doc/assets/task-cycle.png)
+![CDD task cycle: /cdd-next-step, then a git worktree, then either /cdd-plan followed by /cdd-implement or a single /cdd-small-change; both paths rejoin at an optional /cdd-merge-base, then /cdd-pre-pr and PR review, looping through an optional /cdd-process-pr back to review, then merge the PR and repeat.](doc/assets/task-cycle.png)
 
 One full turn around the cycle:
 
