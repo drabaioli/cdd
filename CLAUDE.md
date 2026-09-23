@@ -47,7 +47,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 
 `scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14) — the gate registry at the top of the script is the list, and there is no second copy. `.github/workflows/template-smoke.yml` holds no gate list at all: it checks out and calls the runner, so CI and a local run cannot drift. `/cdd-pre-pr` invokes the same command, so a green local run means a green CI run.
 
-The 21 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` and `.claude/settings.json` vs the rendered template) and `drift-contract` (the drift checker's own contract, mutation-tested), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension` (extension fields survive every write), `adapter-conformance` (the shipped tracker adapter against the capability contract, offline) and `adapter-conformance-contract` (that checker's own contract, mutation-tested); the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
+The 21 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` and `.claude/settings.json` vs the rendered template) and `drift-contract` (the drift checker's own contract, mutation-tested), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension` (extension fields survive every write), `adapter-conformance` (the shipped tracker adapters against the capability contract, offline) and `adapter-conformance-contract` (that checker's own contract, mutation-tested); the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
 
 Two behaviours worth knowing: a gate whose tool is missing (`shellcheck`, `jq`) is reported **SKIPPED — loudly and non-fatally**, so a host without it gets a weaker verdict, not a wrong one; and the run is **not fail-fast**, so one invocation surfaces every problem. The runner provisions its own scratch dir and a throwaway git identity, so it needs no host setup and is unaffected by your git signing config.
 
@@ -65,14 +65,15 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
 | `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
-| `tools/cdd-tracker-github.sh`      | Tracker capability adapter, GitHub backend (the reference implementation) |
+| `tools/adapters/tracker/github.sh` | Tracker capability adapter, GitHub backend (the reference implementation) |
+| `tools/adapters/tracker/jira.sh`   | Tracker capability adapter, Jira Cloud backend (curl + jq, env-configured; not self-installing) |
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
 | `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
-| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) + the GitHub tracker adapter (`cdd-tracker-github.sh`, not self-installing) |
+| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) + the capability adapters under `adapters/<capability>/<backend>.sh` (mirroring `~/.cdd/adapters/<capability>`; none self-installing) |
 
 ## Architecture
 

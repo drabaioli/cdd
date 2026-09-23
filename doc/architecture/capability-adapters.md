@@ -1,6 +1,6 @@
 # Capability adapters: the tracker contract
 
-The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/cdd-tracker-github.sh`).
+The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/adapters/tracker/github.sh`) and, alongside it, a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`).
 
 The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives. This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
@@ -155,13 +155,46 @@ closing is the tracker integration's job and CDD's contribution is emitting the 
 
 ## The GitHub reference adapter
 
-`tools/cdd-tracker-github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
+Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new tracker backend is one new file, which the lint and conformance gates pick up by glob.
+
+`tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
 It **declares four verbs**: `issue-read`, `issue-list`, `issue-create`, `issue-close-token`. It **does not declare `issue-transition`** — issue #86 settles that verb as "unsupported on GitHub" — so calling it exits 3. That is the contract's only live exit-3 case on a shipped adapter, and the conformance gate asserts it.
 
 Its `ref_pattern` is `^#?[0-9]+$`, which is exactly the shape `/cdd-next-step` hardcoded before the ladder existed. `create_target` is derived from `git remote get-url origin` parsed to `owner/repo` — local, no network — and omitted when it cannot be derived.
 
 Authentication is `gh`'s own, untouched: `gh` absent from `PATH`, or `gh auth status` failing, is exit 4 with an actionable line on stderr. CDD stores, reads and proxies no secret (§2.16).
+
+## The Jira adapter
+
+`tools/adapters/tracker/jira.sh` answers the same contract against **Jira Cloud** through its REST API v3, with `curl` and `jq` — no Jira CLI. Data Center / Server (personal access tokens, API v2) is out of scope. Like the GitHub adapter it **does not self-install**, for a different reason: a Jira binding is per-project by nature (a site and a project key), so a machine-global install has nothing sensible to point at. A project binds it through `.cdd/tracker`, which may export the non-secret coordinates:
+
+```bash
+#!/usr/bin/env bash
+export JIRA_BASE_URL=https://<site>.atlassian.net JIRA_PROJECT_KEY=ABC
+exec /path/to/cdd/tools/adapters/tracker/jira.sh "$@"
+```
+
+**Configuration is environment variables only** — no config file, nothing read from disk:
+
+| Variable                | Needed by                                              | Meaning |
+| ----------------------- | ------------------------------------------------------ | ------- |
+| `JIRA_BASE_URL`         | every verb but `describe` / `issue-close-token`        | The site, `https://<site>.atlassian.net`; a bare host gets `https://` added |
+| `JIRA_EMAIL`            | same                                                   | The Atlassian account the token belongs to |
+| `JIRA_API_TOKEN`        | same                                                   | An Atlassian API token. Lives in the user's shell; never in `.cdd/tracker` or any file |
+| `JIRA_PROJECT_KEY`      | `issue-list`, `issue-create`                           | The project, e.g. `ABC` |
+| `JIRA_ISSUE_TYPE`       | `issue-create`, optional                               | Default: `Task` if the project has it, else its first standard type (one extra read) |
+| `JIRA_CREATE_FIELDS`    | `issue-create`, optional                               | A JSON object of extra fields, for a project that requires custom fields (`{"customfield_10042":{"value":"Backend"}}`). It cannot override project, type, title or body; malformed is exit 4 |
+| `JIRA_CLOSE_TRANSITION` | `issue-close-token`, optional                          | Default `done` |
+
+A missing variable is exit 4 with one stderr line per variable, naming it — after argument validation, so a usage error is still 2 on an unconfigured machine. The token reaches `curl` through `--config -` on stdin, never on the command line (where `ps` would show it), and is never written to a file. Rejected credentials are exit 1 ("auth rejected", per the exit-code table) and said as such — including the case Jira Cloud does not answer with a 401: a bad token is served anonymously and gets a 404, with the failed login flagged only in the `X-Seraph-LoginReason` response header, which the adapter checks first. A 404 and every other non-2xx are exit 1 with Jira's own error messages on stderr — a project's required custom fields, for instance, surface here by name.
+
+It **declares all five verbs**, so `issue-transition` is the contract's live exit-0 case that GitHub lacks. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` — a Jira key, which never overlaps the built-in `^#?[0-9]+$`. `describe` needs neither network nor `jq`; `create_target` is `<JIRA_PROJECT_KEY> @ <site host>` when both variables are set, and omitted otherwise.
+
+- **State.** `closed` is the status *category* `done`; `open` is anything else. `state_raw` is the status name (`In Review`). `issue-list` is the project's items whose category is not Done, one page of up to 100 (the GitHub adapter's cap), through `/rest/api/3/search/jql` — the older `/search` endpoint has been removed from Jira Cloud. Search reads Jira's index, which trails a write by a second or two, so an item transitioned a moment ago can still appear; `issue-read` is always current.
+- **`issue-transition`.** Workflows are per project, so it asks Jira which transitions are available from the current status and takes the first that lands in the target category — for `open`, preferring a To Do-category status. Already there is a no-op, exit 0. No fitting transition is exit 1, listing the transitions that do exist. A transition that needs a screen field fails with Jira's 400 message, also exit 1.
+- **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the forge with smart commits enabled — the second of the three cases above.
+- **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
 ## Resolution and the announcement rule
 
@@ -175,17 +208,17 @@ Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machi
 
 ## The conformance gate
 
-`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document. It defaults to `tools/cdd-tracker-github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker`.
+`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker`; `scripts/ci.sh` runs it over every `tools/adapters/tracker/*.sh`, so both shipped adapters are checked and a new one is covered without editing the runner.
 
-It is **offline by construction**: it prepends a scratch directory holding a stub `gh` to `PATH`, so nothing it runs can reach the network or authenticate. No environment variable, no probe mode, no dry-run flag — an adapter is checked exactly as a caller would invoke it. What it asserts:
+It is **offline by construction**, and backend-neutral: every probe runs with the environment scrubbed (`env -i`, so a credential or coordinate the caller happens to have exported never reaches the subject), under either a scratch `PATH` holding stub backend tools — a `gh` that is authenticated and useless, a `curl` that always fails as if the host were unreachable — or a minimal `PATH` with no backend tooling at all. Nothing it runs can reach the network or authenticate. No probe mode, no dry-run flag — an adapter is checked exactly as a caller would invoke it. What it asserts:
 
-1. `describe` exits 0 with `gh` absent from `PATH` entirely, and its stdout parses as JSON (hermeticity).
+1. `describe` exits 0 with backend tooling absent from `PATH` and the environment scrubbed, and its stdout parses as JSON (hermeticity).
 2. `describe` is contract-shaped: `capability` is `tracker`; `contract` is an integer ≥ 1; `backend` is a non-empty string; `ref_pattern` is a non-empty string that `grep -E` accepts as a valid ERE; `verbs` is a non-empty array of strings; `describe` is **not** among them; every declared verb is one of the five non-`describe` verbs above; and no `null` appears anywhere in the output.
 3. Every verb in `describe.verbs`, invoked with **no arguments**, exits something other than 3 — i.e. dispatch reaches a real implementation rather than the unsupported-verb branch.
-4. `issue-transition` exits 3, and so does a nonsense verb.
+4. Every contract verb the adapter does not declare exits 3 (`issue-transition`, on GitHub), and so does a nonsense verb.
 5. `issue-read` with no arguments exits 2.
-6. `issue-list` with `gh` absent from `PATH` exits 4.
-7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.
+6. `issue-list` with backend tooling absent and the environment scrubbed exits 4 with a line on stderr — missing tooling for a `gh`-based adapter, missing configuration for an env-configured one.
+7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, an Atlassian API token prefix, a hardcoded basic-auth header, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.
 
 **Its stated limit:** check 3 proves that dispatch *reaches* an implementation, not that the implementation is *correct*. Correctness needs a live call against a real backend, which the offline-only decision rules out on purpose — a gate that SKIPs on most hosts is a gate whose verdict nobody can rely on. Checks 1, 2 and 4–7 are exact; check 3 is a floor.
 

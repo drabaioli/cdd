@@ -9,7 +9,7 @@
 #
 # So this script mutation-tests it: break one thing at a time in a throwaway copy of the
 # adapter and require the checker to notice, naming what it noticed. Each of the
-# checker's seven checks gets at least one mutation:
+# checker's seven checks gets at least one mutation, against the GitHub adapter:
 #   1. describe is hermetic      — describe authenticates; describe emits non-JSON.
 #   2. describe is contract-shaped — describe lists itself in verbs; it emits a null;
 #      its ref_pattern is not a valid ERE.
@@ -18,15 +18,23 @@
 #   5. Usage error -> 2          — a missing argument exits 1 instead.
 #   6. Missing backend -> 4      — an absent `gh` exits 1 instead.
 #   7. Secret scan               — one planted secret per pattern the scan carries (a
-#      token prefix, a fine-grained PAT, a PEM header, a secret-shaped assignment),
-#      because the patterns are independent greps and one plant would leave three free
-#      to rot unnoticed.
+#      GitHub token prefix, a fine-grained PAT, an Atlassian token prefix, a hardcoded
+#      basic-auth header, a PEM header, a secret-shaped assignment), because the
+#      patterns are independent greps and one plant would leave the rest free to rot
+#      unnoticed.
 #
-# Plus two controls, which are what make the mutations mean anything:
+# And against the Jira adapter, whose failure modes are configuration rather than tooling:
+#   1. The scrub                 — describe requires credentials, with fake JIRA_* values
+#      exported in THIS script's environment. Only the checker's `env -i` keeps them from
+#      reaching the subject; without it, this mutation passes on any host that has them set.
+#   6. Missing config -> 4       — unset configuration exits 1 instead.
+#
+# Plus three controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
 #     checker that is simply broken and fails on everything.
 #   - An adapter that omits the optional `create_target` must PASS, pinning the other
 #     direction: the checker must not have quietly started requiring an optional field.
+#   - An unmutated copy of the Jira adapter must PASS, for the same reason as the first.
 #
 # Every mutation is verified to have actually CHANGED the file before the checker runs.
 # A mutation whose anchor has rotted away applies nothing, and a checker "detecting" an
@@ -43,13 +51,15 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 CHECKER="./scripts/adapter-conformance-check.sh"
-ADAPTER="tools/cdd-tracker-github.sh"
+ADAPTER="tools/adapters/tracker/github.sh"
+JIRA_ADAPTER="tools/adapters/tracker/jira.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
 [[ -x "$CHECKER" ]] || fail "checker not found or not executable: $CHECKER"
 [[ -x "$ADAPTER" ]] || fail "adapter not found or not executable: $ADAPTER"
+[[ -x "$JIRA_ADAPTER" ]] || fail "adapter not found or not executable: $JIRA_ADAPTER"
 
 # The checker skips without jq, so every expect_fail below would see a clean exit 0 and
 # report a checker that has stopped firing. Skip loudly instead — the runner's posture
@@ -140,7 +150,7 @@ expect_pass "control: an unmutated copy of the adapter passes"
 
 # --- Check 1: describe is hermetic --------------------------------------------
 mutate_insert_after "describe authenticates" '^verb_describe[(][)] [{]' '  require_gh'
-expect_fail "describe that authenticates is caught" "describe with gh absent from PATH"
+expect_fail "describe that authenticates is caught" "describe with backend tooling absent"
 
 mutate_insert_after "describe emits non-JSON" '^verb_describe[(][)] [{]' '  echo "not json"'
 expect_fail "describe that emits non-JSON is caught" "did not emit parseable JSON"
@@ -184,8 +194,8 @@ expect_fail "a missing backend exiting 1 instead of 4 is caught" "expected exit 
 
 # --- Check 7: the secret scan -------------------------------------------------
 # One mutation per pattern the scan carries, not one for the scan as a whole: the
-# patterns are independent greps, so a single planted secret leaves the other three free
-# to rot unnoticed. Each is planted inside a comment so the adapter still runs and the
+# patterns are independent greps, so a single planted secret leaves the others free to
+# rot unnoticed. Each is planted inside a comment so the adapter still runs and the
 # earlier checks stay green, leaving the scan as the thing that fires. The values are
 # deliberately well-formed but worthless.
 while IFS='|' read -r what literal; do
@@ -194,6 +204,8 @@ while IFS='|' read -r what literal; do
 done <<'SECRETS'
 a GitHub token prefix|ghp_000000000000000000000000000000000000
 a GitHub fine-grained PAT prefix|github_pat_00000000000000000000_0000000000
+an Atlassian API token prefix|ATATT3000000000000000000000000000000000000000000000000000000000000
+a hardcoded basic-auth header|Authorization: Basic ZmFrZTpmYWtlZmFrZWZha2U=
 a PEM private-key header|-----BEGIN RSA PRIVATE KEY-----
 a secret-shaped assignment|api_key = "not-a-real-secret-but-shaped-like-one"
 SECRETS
@@ -208,4 +220,28 @@ SECRETS
 mutate_replace_line "create_target omitted" '^  if [[][[] -n "[$]target" []][]]; then' '  if false; then'
 expect_pass "control: an adapter omitting the optional create_target passes"
 
-echo "adapter-conformance checker contract: clean (13 mutations, 2 controls)"
+# --- The Jira adapter ---------------------------------------------------------
+# From here on the helpers rewrite a copy of the Jira adapter instead.
+ADAPTER="$JIRA_ADAPTER"
+cp "$ADAPTER" "$MASTER" || fail "could not copy $ADAPTER into the sandbox"
+
+cp "$MASTER" "$SUBJECT"; chmod 755 "$SUBJECT"
+expect_pass "control: an unmutated copy of the Jira adapter passes"
+
+# Check 1, through the scrub. The fake values are exported here, in the checker's own
+# environment, so the checker's `env -i` is the only thing standing between them and a
+# describe that needs them.
+mutate_insert_after "describe requires credentials" '^verb_describe[(][)] [{]' \
+  '  require_config JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN'
+export JIRA_BASE_URL="https://example.invalid" JIRA_EMAIL="nobody@example.invalid" \
+       JIRA_API_TOKEN="not-a-real-credential" JIRA_PROJECT_KEY="ABC"
+expect_fail "describe that needs credentials is caught despite them being exported" \
+  "describe with backend tooling absent and the environment scrubbed"
+unset JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN JIRA_PROJECT_KEY
+
+# Check 6: missing configuration must be 4 (not configured), not 1 (operation failed).
+mutate_prog "missing config exits 1" \
+  '/^require_config\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
+expect_fail "missing configuration exiting 1 instead of 4 is caught" "expected exit 4, got 1"
+
+echo "adapter-conformance checker contract: clean (17 mutations, 3 controls)"
