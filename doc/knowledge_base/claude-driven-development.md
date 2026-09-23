@@ -259,7 +259,7 @@ The rule falls out of invariants already stated rather than out of taste. Issues
 
 The one piece that does ship ahead of the adapters is the **`x-` extension namespace** on the per-task state record, so an extension has somewhere to keep what only it knows — a notification's message id, a requirements-tracker link — that is neither derivable from the repo nor re-fetchable from the backend. It is specified in §2.13, which owns the record's schema.
 
-The first capability is live: the **tracker**, with a GitHub reference adapter and a conformance gate; every other binding is still the built-in one. The decision and its reasoning are recorded in `doc/architecture/adr/0007-extend-cdd-through-capability-adapters.md`; the verb contracts, JSON shapes and exit codes are pinned in `doc/architecture/capability-adapters.md`, which is what an adapter author reads.
+The first capability is live: the **tracker**, with a GitHub reference adapter, a Jira adapter and a conformance gate; every other binding is still the built-in one. The decision and its reasoning are recorded in `doc/architecture/adr/0007-extend-cdd-through-capability-adapters.md`; the verb contracts, JSON shapes and exit codes are pinned in `doc/architecture/capability-adapters.md`, which is what an adapter author reads.
 
 ## 3. Lifecycle
 

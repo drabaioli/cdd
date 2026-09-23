@@ -76,7 +76,7 @@ GATES=(
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
   "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
   "state-extension|jq|extension fields on the state record: unknown top-level keys survive every write"
-  "adapter-conformance|jq|the shipped tracker adapter against the capability contract (offline)"
+  "adapter-conformance|jq|the shipped tracker adapters against the capability contract (offline)"
   "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
@@ -159,8 +159,17 @@ gate_state_extension() {
   ./scripts/state-extension-assert.sh
 }
 
+# Every shipped adapter, found by glob so a new one is covered without editing this
+# file. Not fail-fast within the gate either: each adapter is checked and reported.
 gate_adapter_conformance() {
-  ./scripts/adapter-conformance-check.sh
+  local adapter n=0 rc=0
+  for adapter in tools/cdd-tracker-*.sh; do
+    [[ -e "$adapter" ]] || continue
+    n=$((n + 1))
+    ./scripts/adapter-conformance-check.sh "$adapter" || rc=1
+  done
+  [[ $n -gt 0 ]] || { echo "FAIL: no tools/cdd-tracker-*.sh adapter found"; return 1; }
+  return "$rc"
 }
 
 gate_adapter_conformance_contract() {

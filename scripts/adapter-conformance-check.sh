@@ -3,13 +3,16 @@
 #
 # Checks an adapter against the contract in doc/architecture/capability-adapters.md:
 # `describe` is hermetic and contract-shaped, every verb it declares dispatches to a
-# real implementation, an undeclared verb exits 3, a usage error exits 2, a missing
-# backend exits 4, and nothing secret-shaped is committed alongside it (process doc
-# §2.16: CDD never stores, reads or proxies a secret).
+# real implementation, an undeclared verb exits 3, a usage error exits 2, missing
+# backend tooling or configuration exits 4, and nothing secret-shaped is committed
+# alongside it (process doc §2.16: CDD never stores, reads or proxies a secret).
 #
 # It is OFFLINE BY CONSTRUCTION, with no cooperation from the adapter: it runs the
-# subject under a scratch PATH holding a stub `gh`, so nothing it invokes can reach
-# the network or authenticate. A probe-mode environment variable was the alternative
+# subject with a scrubbed environment (`env -i`, so no exported credential or backend
+# coordinate reaches it) under a scratch PATH holding stub backend tools (`gh`, `curl`)
+# or none at all, so nothing it invokes can reach the network or authenticate. The
+# checks are backend-neutral: a `gh`-based and a curl-based adapter pass or fail them
+# for the same reasons. A probe-mode environment variable was the alternative
 # and was rejected — it would add permanent surface to the contract that every future
 # adapter has to implement, purely to serve one gate, and it would test a code path no
 # real caller ever takes.
@@ -49,10 +52,11 @@ WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
 # --- The two scratch PATHs ----------------------------------------------------
-# Pass A: a stub `gh` first on PATH. `auth status` succeeds so the adapter proceeds
-# past its auth gate; every other invocation fails, standing in for a backend that
-# cannot be reached. Nothing here touches the network.
-mkdir -p "$WORK/stub"
+# Pass A: stub backend tools first on PATH. The stub `gh`'s `auth status` succeeds so
+# a gh-based adapter proceeds past its auth gate; every other invocation fails, and
+# the stub `curl` always fails with curl's own couldn't-connect code, standing in for
+# a backend that cannot be reached. Nothing here touches the network.
+mkdir -p "$WORK/stub" "$WORK/home"
 cat > "$WORK/stub/gh" <<'STUB'
 #!/usr/bin/env bash
 # Stub GitHub CLI. Authenticated, and useless for anything else.
@@ -62,29 +66,40 @@ fi
 echo "stub gh: refusing to contact the network" >&2
 exit 1
 STUB
-chmod 755 "$WORK/stub/gh"
+cat > "$WORK/stub/curl" <<'STUB'
+#!/usr/bin/env bash
+# Stub curl. Every request fails as if the host were unreachable.
+echo "stub curl: refusing to contact the network" >&2
+exit 7
+STUB
+chmod 755 "$WORK/stub/gh" "$WORK/stub/curl"
 STUB_PATH="$WORK/stub:$PATH"
 
-# Pass B: `gh` genuinely absent. Built as a minimal bin directory rather than by
-# filtering the caller's PATH, because `gh` lives in /usr/bin on a GitHub Actions
-# runner — dropping the directory that holds it would take git, sed and grep with it.
-mkdir -p "$WORK/nogh"
+# Pass B: backend tooling genuinely absent. Built as a minimal bin directory rather
+# than by filtering the caller's PATH, because `gh` and `curl` live in /usr/bin on a
+# GitHub Actions runner — dropping that directory would take git, sed and grep with it.
+mkdir -p "$WORK/nobackend"
 for tool in bash sh env git sed grep basename dirname head tail cat tr cut printf; do
   src="$(command -v "$tool" 2>/dev/null || true)"
   # Absolute paths only: a shell that resolves a name to itself (an alias, a function)
   # would otherwise produce a self-referential symlink that silently resolves to nothing.
-  [[ "$src" == /* ]] && ln -sf "$src" "$WORK/nogh/$tool"
+  [[ "$src" == /* ]] && ln -sf "$src" "$WORK/nobackend/$tool"
 done
-NOGH_PATH="$WORK/nogh"
-PATH="$NOGH_PATH" command -v gh >/dev/null 2>&1 &&
-  fail "the no-gh scratch PATH still resolves \`gh\`; the exit-4 assertions would be vacuous"
+NOBACKEND_PATH="$WORK/nobackend"
+for tool in gh curl wget; do
+  PATH="$NOBACKEND_PATH" command -v "$tool" >/dev/null 2>&1 &&
+    fail "the no-backend scratch PATH still resolves \`$tool\`; the exit-4 assertions would be vacuous"
+done
 
-# Run the subject with a given PATH; echo its exit code. Never lets a non-zero exit
-# abort this script — the exit code IS the observation.
+# Run the subject with a given PATH and an otherwise EMPTY environment; echo its exit
+# code. The scrub is what keeps the verdict host-independent: without it, a caller who
+# happens to have JIRA_API_TOKEN or GH_TOKEN exported would hand the subject exactly
+# the configuration the exit-4 and hermeticity checks assume is absent. Never lets a
+# non-zero exit abort this script — the exit code IS the observation.
 probe() {  # probe <path> <arg>...
   local path="$1"; shift
   local rc=0
-  PATH="$path" "$SUBJECT" "$@" >"$WORK/out" 2>"$WORK/err" || rc=$?
+  env -i PATH="$path" HOME="$WORK/home" "$SUBJECT" "$@" >"$WORK/out" 2>"$WORK/err" || rc=$?
   printf '%s' "$rc"
 }
 
@@ -99,13 +114,14 @@ expect_exit() {  # expect_exit <want> <path> <label> <arg>...
 }
 
 # --- 1. describe is hermetic --------------------------------------------------
-# No network, no auth, always exit 0 — checked with `gh` absent entirely, which is the
-# strongest available form of "it needed nothing from the backend".
-expect_exit 0 "$NOGH_PATH" "describe with gh absent from PATH" describe
+# No network, no auth, always exit 0 — checked with backend tooling absent entirely and
+# the environment scrubbed, which is the strongest available form of "it needed nothing
+# from the backend".
+expect_exit 0 "$NOBACKEND_PATH" "describe with backend tooling absent and the environment scrubbed" describe
 cp "$WORK/out" "$WORK/describe.json"
 jq -e . "$WORK/describe.json" >/dev/null 2>&1 ||
   fail "describe did not emit parseable JSON on stdout: $(head -c 200 "$WORK/describe.json")"
-pass "describe is hermetic: exit 0 and parseable JSON with gh absent from PATH"
+pass "describe is hermetic: exit 0 and parseable JSON with backend tooling absent and the environment scrubbed"
 
 # --- 2. describe is contract-shaped -------------------------------------------
 jq -e --argjson contract_verbs "$CONTRACT_VERBS" '
@@ -159,11 +175,13 @@ pass "an unknown verb exits 3"
 # --- 5. a usage error exits 2 -------------------------------------------------
 # Distinct from 3 (wrong verb) and from 4 (no credentials), and reached without either.
 expect_exit 2 "$STUB_PATH" "issue-read with no reference" issue-read
-expect_exit 2 "$NOGH_PATH" "issue-read with no reference and gh absent" issue-read
+expect_exit 2 "$NOBACKEND_PATH" "issue-read with no reference and backend tooling absent" issue-read
 pass "a usage error exits 2, before any backend contact"
 
 # --- 6. a missing backend exits 4 with an actionable line ---------------------
-expect_exit 4 "$NOGH_PATH" "issue-list with gh absent from PATH" issue-list
+# Missing tooling (a gh-based adapter) or missing configuration (an env-configured
+# one): with both absent, either reason must surface as 4, never as 1.
+expect_exit 4 "$NOBACKEND_PATH" "issue-list with backend tooling absent and the environment scrubbed" issue-list
 [[ -s "$WORK/err" ]] || fail "exit 4 carried no message on stderr; the contract requires an actionable one"
 pass "a missing backend exits 4: $(head -1 "$WORK/err")"
 
@@ -177,6 +195,8 @@ fi
 secret_patterns=(
   'gh[pousr]_[A-Za-z0-9]{16,}'
   'github_pat_[A-Za-z0-9_]{20,}'
+  'AT[AC]TT[A-Za-z0-9_=-]{40,}'
+  'Authorization:[[:space:]]*Basic[[:space:]]+[A-Za-z0-9+/=]{16,}'
   '-----BEGIN [A-Z ]*PRIVATE KEY'
   '(password|passwd|secret|token|api[_-]?key)[[:space:]]*=[[:space:]]*.[^"'"'"']{8,}'
 )
