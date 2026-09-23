@@ -5,16 +5,16 @@
 # doc §2.16. Nothing here re-decides either; this file implements them against `gh`.
 #
 # Usage:
-#   cdd-tracker-github.sh describe
-#   cdd-tracker-github.sh issue-read <ref>
-#   cdd-tracker-github.sh issue-list
-#   cdd-tracker-github.sh issue-create --title <title> --body <body>
-#   cdd-tracker-github.sh issue-close-token <ref>
+#   tools/adapters/tracker/github.sh describe
+#   tools/adapters/tracker/github.sh issue-read <ref>
+#   tools/adapters/tracker/github.sh issue-list
+#   tools/adapters/tracker/github.sh issue-create --title <title> --body <body>
+#   tools/adapters/tracker/github.sh issue-close-token <ref>
 #
 # A project binds to it by making `.cdd/tracker` an executable that execs this file:
 #
 #   #!/usr/bin/env bash
-#   exec /path/to/cdd-tracker-github.sh "$@"
+#   exec /path/to/cdd/tools/adapters/tracker/github.sh "$@"
 #
 # It deliberately does NOT self-install (unlike cdd-worktree.sh / cdd-state.sh, which
 # are sourced shell libraries): the built-in rung of the resolution ladder already IS

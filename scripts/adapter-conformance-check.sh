@@ -31,7 +31,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SUBJECT="${1:-$REPO_ROOT/tools/cdd-tracker-github.sh}"
+SUBJECT="${1:-$REPO_ROOT/tools/adapters/tracker/github.sh}"
 
 # The five non-`describe` verbs of the tracker contract. `describe` is excluded
 # because it is mandatory for every adapter and is checked separately.

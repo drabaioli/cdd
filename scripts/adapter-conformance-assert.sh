@@ -51,8 +51,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 CHECKER="./scripts/adapter-conformance-check.sh"
-ADAPTER="tools/cdd-tracker-github.sh"
-JIRA_ADAPTER="tools/cdd-tracker-jira.sh"
+ADAPTER="tools/adapters/tracker/github.sh"
+JIRA_ADAPTER="tools/adapters/tracker/jira.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }

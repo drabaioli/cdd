@@ -1,6 +1,6 @@
 # Capability adapters: the tracker contract
 
-The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/cdd-tracker-github.sh`) and, alongside it, a Jira Cloud adapter (`tools/cdd-tracker-jira.sh`).
+The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/adapters/tracker/github.sh`) and, alongside it, a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`).
 
 The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives. This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
@@ -155,7 +155,9 @@ closing is the tracker integration's job and CDD's contribution is emitting the 
 
 ## The GitHub reference adapter
 
-`tools/cdd-tracker-github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
+Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new tracker backend is one new file, which the lint and conformance gates pick up by glob.
+
+`tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
 It **declares four verbs**: `issue-read`, `issue-list`, `issue-create`, `issue-close-token`. It **does not declare `issue-transition`** — issue #86 settles that verb as "unsupported on GitHub" — so calling it exits 3. That is the contract's only live exit-3 case on a shipped adapter, and the conformance gate asserts it.
 
@@ -165,12 +167,12 @@ Authentication is `gh`'s own, untouched: `gh` absent from `PATH`, or `gh auth st
 
 ## The Jira adapter
 
-`tools/cdd-tracker-jira.sh` answers the same contract against **Jira Cloud** through its REST API v3, with `curl` and `jq` — no Jira CLI. Data Center / Server (personal access tokens, API v2) is out of scope. Like the GitHub adapter it **does not self-install**, for a different reason: a Jira binding is per-project by nature (a site and a project key), so a machine-global install has nothing sensible to point at. A project binds it through `.cdd/tracker`, which may export the non-secret coordinates:
+`tools/adapters/tracker/jira.sh` answers the same contract against **Jira Cloud** through its REST API v3, with `curl` and `jq` — no Jira CLI. Data Center / Server (personal access tokens, API v2) is out of scope. Like the GitHub adapter it **does not self-install**, for a different reason: a Jira binding is per-project by nature (a site and a project key), so a machine-global install has nothing sensible to point at. A project binds it through `.cdd/tracker`, which may export the non-secret coordinates:
 
 ```bash
 #!/usr/bin/env bash
 export JIRA_BASE_URL=https://<site>.atlassian.net JIRA_PROJECT_KEY=ABC
-exec /path/to/cdd-tracker-jira.sh "$@"
+exec /path/to/cdd/tools/adapters/tracker/jira.sh "$@"
 ```
 
 **Configuration is environment variables only** — no config file, nothing read from disk:
@@ -206,7 +208,7 @@ Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machi
 
 ## The conformance gate
 
-`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document. It defaults to `tools/cdd-tracker-github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker`; `scripts/ci.sh` runs it over every `tools/cdd-tracker-*.sh`, so both shipped adapters are checked and a new one is covered without editing the runner.
+`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker`; `scripts/ci.sh` runs it over every `tools/adapters/tracker/*.sh`, so both shipped adapters are checked and a new one is covered without editing the runner.
 
 It is **offline by construction**, and backend-neutral: every probe runs with the environment scrubbed (`env -i`, so a credential or coordinate the caller happens to have exported never reaches the subject), under either a scratch `PATH` holding stub backend tools — a `gh` that is authenticated and useless, a `curl` that always fails as if the host were unreachable — or a minimal `PATH` with no backend tooling at all. Nothing it runs can reach the network or authenticate. No probe mode, no dry-run flag — an adapter is checked exactly as a caller would invoke it. What it asserts:
 

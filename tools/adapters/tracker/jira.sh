@@ -5,12 +5,12 @@
 # doc §2.16. Nothing here re-decides either; this file implements them against Jira.
 #
 # Usage:
-#   cdd-tracker-jira.sh describe
-#   cdd-tracker-jira.sh issue-read <ref>
-#   cdd-tracker-jira.sh issue-list
-#   cdd-tracker-jira.sh issue-create --title <title> --body <body>
-#   cdd-tracker-jira.sh issue-transition <ref> <open|closed>
-#   cdd-tracker-jira.sh issue-close-token <ref>
+#   tools/adapters/tracker/jira.sh describe
+#   tools/adapters/tracker/jira.sh issue-read <ref>
+#   tools/adapters/tracker/jira.sh issue-list
+#   tools/adapters/tracker/jira.sh issue-create --title <title> --body <body>
+#   tools/adapters/tracker/jira.sh issue-transition <ref> <open|closed>
+#   tools/adapters/tracker/jira.sh issue-close-token <ref>
 #
 # Configuration is environment variables only — no config file, nothing read from disk:
 #   JIRA_BASE_URL          the site, e.g. https://<site>.atlassian.net (https:// may be left off)
@@ -30,7 +30,7 @@
 #
 #   #!/usr/bin/env bash
 #   export JIRA_BASE_URL=https://<site>.atlassian.net JIRA_PROJECT_KEY=ABC
-#   exec /path/to/cdd-tracker-jira.sh "$@"
+#   exec /path/to/cdd/tools/adapters/tracker/jira.sh "$@"
 #
 # It does NOT self-install: a Jira binding is per-project by nature (a site and a
 # project key), so a machine-global install has nothing sensible to point at.

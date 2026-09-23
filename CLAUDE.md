@@ -65,15 +65,15 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
 | `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
-| `tools/cdd-tracker-github.sh`      | Tracker capability adapter, GitHub backend (the reference implementation) |
-| `tools/cdd-tracker-jira.sh`        | Tracker capability adapter, Jira Cloud backend (curl + jq, env-configured; not self-installing) |
+| `tools/adapters/tracker/github.sh` | Tracker capability adapter, GitHub backend (the reference implementation) |
+| `tools/adapters/tracker/jira.sh`   | Tracker capability adapter, Jira Cloud backend (curl + jq, env-configured; not self-installing) |
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
 | `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
-| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) + the tracker adapters (`cdd-tracker-github.sh`, `cdd-tracker-jira.sh`; neither self-installing) |
+| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) + the capability adapters under `adapters/<capability>/<backend>.sh` (mirroring `~/.cdd/adapters/<capability>`; none self-installing) |
 
 ## Architecture
 

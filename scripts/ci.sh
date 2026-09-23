@@ -89,7 +89,7 @@ GATES=(
 # The lint scope, one path per line. Globs, so it stays self-including: a newly
 # added script is covered without editing this file.
 lint_targets() {
-  printf '%s\n' tools/*.sh scripts/*.sh demo/*.sh
+  printf '%s\n' tools/*.sh tools/adapters/*/*.sh scripts/*.sh demo/*.sh
 }
 
 # --- Gates -------------------------------------------------------------------
@@ -163,12 +163,12 @@ gate_state_extension() {
 # file. Not fail-fast within the gate either: each adapter is checked and reported.
 gate_adapter_conformance() {
   local adapter n=0 rc=0
-  for adapter in tools/cdd-tracker-*.sh; do
+  for adapter in tools/adapters/tracker/*.sh; do
     [[ -e "$adapter" ]] || continue
     n=$((n + 1))
     ./scripts/adapter-conformance-check.sh "$adapter" || rc=1
   done
-  [[ $n -gt 0 ]] || { echo "FAIL: no tools/cdd-tracker-*.sh adapter found"; return 1; }
+  [[ $n -gt 0 ]] || { echo "FAIL: no tools/adapters/tracker/*.sh adapter found"; return 1; }
   return "$rc"
 }
 

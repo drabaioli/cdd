@@ -7,12 +7,6 @@
 # written without a leading slash precisely because they are not slash commands.
 /cdd-worktree
 /cdd-state
-# The tracker capability adapters (tools/cdd-tracker-github.sh, tools/cdd-tracker-jira.sh),
-# and the tools/cdd-tracker-*.sh glob the conformance gate runs over (the scan reads it
-# as the bare prefix). Same case as the two helpers above: script paths, not slash commands.
-/cdd-tracker-github
-/cdd-tracker-jira
-/cdd-tracker-
 # Baseline marker file path (.claude/cdd-baseline), not a command.
 /cdd-baseline
 # Smoke-test temp dir (/tmp/cdd-demo-smoke in demo/README.md), not a command.
