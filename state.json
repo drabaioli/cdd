@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "branch": "docs_capability_confluence_adapter",
+  "stage": "pr_open",
+  "pr": 112,
+  "base_branch": "main",
+  "sessions": [
+    {
+      "id": "3088f05a-b396-4eb6-806c-5546586bd868",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    },
+    {
+      "id": "bc2e3b8b-8374-4a4c-be0d-8b93f47d62e3",
+      "stage": "plan_written",
+      "dir": "/home/diego/Code/cdd-docs_capability_confluence_adapter"
+    },
+    {
+      "id": "b3446cdf-3bb3-478c-b752-2b6910d9aca2",
+      "stage": "implementation_done",
+      "dir": "/home/diego/Code/cdd-docs_capability_confluence_adapter"
+    },
+    {
+      "id": "eaeeee74-a196-4dcd-babb-e5cef732697a",
+      "stage": "checks_passed",
+      "dir": "/home/diego/Code/cdd-docs_capability_confluence_adapter"
+    }
+  ]
+}
