@@ -231,7 +231,7 @@ No body is fetched. It is the cheap way to ask "has this page changed since the 
 
 ### When a session calls the docs adapter
 
-Five commands can read through a docs adapter — `/cdd-next-step`, `/cdd-plan`, `/cdd-implement`, `/cdd-pre-pr` and `/cdd-process-pr` — and the cost of that to a project with no docs store has to be zero. So each command's existing opening shell block carries one extra line, which prints only when an adapter resolves (project `.cdd/docs`, then machine `~/.cdd/adapters/docs`; there is no built-in rung) and never fails the block:
+Six commands can read through a docs adapter — `/cdd-next-step`, `/cdd-plan`, `/cdd-implement`, `/cdd-small-change`, `/cdd-pre-pr` and `/cdd-process-pr` — and the cost of that to a project with no docs store has to be zero. So each command's existing opening shell block carries one extra line, which prints only when an adapter resolves (project `.cdd/docs`, then machine `~/.cdd/adapters/docs`; there is no built-in rung) and never fails the block:
 
 ```bash
 for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
@@ -244,6 +244,10 @@ It printed nothing → the session makes no call and prints no line. An installe
 3. The task depends on an external system the repo does not document.
 
 No trigger, no lookup. When one fires, `describe` is run first and accepted on the tracker's terms (exit 0, parses, a supported `contract`; otherwise one line and carry on without it), the adapter that served is announced **once**, `doc-search` then `doc-read --section` is preferred to whole pages, and `truncated` is checked. What a session reads stays in its own artifacts — a handoff's notes, a plan's external findings — and is never copied into the repo's docs.
+
+`/cdd-merge-base` is deliberately not wired: it reconciles two versions of the repo's own code and has no use for outside context.
+
+The second trigger depends on a line a project writes, so the commands that set a project up ask for it: `/cdd-bootstrap` during discovery, `/cdd-retrofit` on install — and on upgrade when the baseline predates the docs capability — each ask whether the project refers to an external docs store and what lives there, and record the answer as one line in `CLAUDE.md` (the template ships it as an optional fill-in). Binding the adapter itself (`.cdd/docs`) is offered with confirmation, never done silently; detecting and installing adapters generally is a later roadmap item.
 
 ## The GitHub reference adapter
 

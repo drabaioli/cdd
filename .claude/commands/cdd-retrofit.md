@@ -94,6 +94,10 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
   - Anything else: show both versions and propose the merge; the user decides per file.
 - Never delete or move existing files.
 
+### 3.3a Ask about a docs store
+
+Ask the user one question: does the project refer to documentation kept outside the repo — a Confluence space, a wiki — that sessions should consult, and if so, what lives there? Most projects have none; take "none" and move on. The answer fills the optional docs-store line in the installed `CLAUDE.md` (the template ships it as a `<…>` fill-in): one line, in the user's words ("platform integration specs live in Confluence space XYZ"), or the line deleted when there is none. Show the edit and apply it on approval, as for any `CLAUDE.md` merge above. It is what lets a session match a task against the store, so a named store is worth the line even before an adapter is bound.
+
 ### 3.4 Finish
 
 - Remove `$STAGE`.
@@ -188,6 +192,8 @@ Every application is per-file interactive: show the diff, get approval, write in
 - **Worked example — `engineering-practices.md`.** Fill `<test command>` / `<integration test command>` / `<lint command>` / `<format check command>` / `<ci workflow / command>` from the commands you can detect (a `Makefile`/`pyproject.toml`/`package.json` test or lint target, a test-runner or linter config), and flip each provisional status marker to **Enforced** or **Expected** according to whether that gate actually exists — CI judged by a `.github/workflows/*.yml`, tests/lint by the presence of the corresponding runner or linter config. Apply the same shape to any other added fill-in doc.
 - Anything left unreconciled after the approved edit still counts as residual and is carried into the section 5 summary flag.
 
+**Docs store, for a baseline older than the docs capability.** `CLAUDE.md` is outside the managed set, so the template's optional docs-store line never arrives by comparison. When the target's old render has no `.cdd/docs` line in `.claude/commands/cdd-next-step.md` (the upgrade is bringing the docs capability in) and the target's `CLAUDE.md` says nothing about an external docs store, ask §3.3a's question, and on a named store propose the one-line `CLAUDE.md` addition with its own diff and its own approval. "None" adds nothing.
+
 ### 4.5 Legacy-token sweep and helper migration
 
 Section 4.4 migrated the CDD-managed files; anything **else** naming a pre-migration path or command is now dangling and unlooked-at. So this sweep covers every tracked text file, not just `*.md` — `tools/*.sh` bites hardest, because the pre-#24 per-project worktree helper lives there. **Upgrade mode only:** an install target carries no CDD-era tokens, and a hand-copied CDD install is detected as *upgrade* anyway (section 2 keys on `cdd-next-step.md` / `roadmap.md`; its manual override is the escape hatch).
@@ -254,5 +260,6 @@ Report, in both modes:
 - **Legacy migration** (upgrade mode): the sweep's outcome as a distinct category — *swept* (what was found, including the historical hits deliberately left alone), *patched* (files brought back into agreement, listed), and *recommended for removal* (a project-local worktree/state helper, with the exact shell rc line the user still has to delete by hand). An empty sweep says so in one line. Keep it separate from the file lists above: a legacy hit the user declined is an action item they carry away, not a closed row.
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), with a pointer to file them as a roadmap item in the CDD repo.
+- The docs store, if the user named one (§3.3a, or its upgrade-mode counterpart in §4.4). Sessions consult the store only once a docs adapter is bound: a `.cdd/docs` executable in the project that execs one of this repo's docs adapters (today `tools/adapters/docs/confluence.sh`), exporting only non-secret coordinates such as the site and space keys — credentials stay in the user's shell. `doc/architecture/capability-adapters.md` ("The Confluence adapter") has the three-line binding and the variables. Offer to write that `.cdd/docs` only when the user names a backend this repo has an adapter for, and confirm first — the `exec` line carries this machine's path to the CDD checkout, which the user may prefer to point elsewhere.
 - Any gitignore warnings from step 1.
 - The next steps for the user: review the retrofit branch, then — before opening the PR — `cd "$WT"` and run `/cdd-pre-pr` from a fresh Claude session there (its reconciliation + review pass catches doc inconsistencies the retrofit introduced, in both modes); then open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/cdd-next-step` for fresh installs — noting that for a first-time install without prior doc discipline that first `/cdd-next-step` is a doc reconciliation that may be slow and span several early PRs (expected, not a fault).
