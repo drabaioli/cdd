@@ -13,6 +13,7 @@ repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common
 branch="$(git rev-parse --abbrev-ref HEAD)"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
 echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
 ```
 
 Read the handoff. Its `## Requirements` section is the done-test for this task: your plan must satisfy every criterion, and you check it against them in step 3. Its `## Notes` section lists open questions deferred to you — address them up front rather than mid-plan.
@@ -26,6 +27,8 @@ If the plan file already exists, this task has already been planned. Say so, sho
 Exploration is a named step, not an implied one. Read the source you will change, search the web, consult vendor and library documentation — whatever the task needs. Dead ends are expected and are not waste; they are findings.
 
 **Record conclusions as you go.** After this session ends there is no transcript for the implementing session to consult, so an unrecorded finding is re-derived at full cost or simply lost.
+
+**Docs store.** The `docs adapter:` line from step 1 names the project's docs adapter, if one is installed; if it printed nothing, skip this paragraph — no call, no line. An installed adapter is still not called by default, only on a trigger, strongest first: (1) a page reference in the handoff or the user's message — text matching the `link_pattern` its `describe` reports; (2) a line in the project's `CLAUDE.md` saying what lives in the docs store, matching this task; (3) the task depends on an external system the repo does not document. No trigger, no lookup. Here the usual reason is an integration contract the task codes against; record what you read under `## External findings`, with the page reference and version. Before the first call run `<adapter> describe` (hermetic: no network, no credentials) and use the adapter only if it exits 0, parses as JSON and reports `contract` 1 — otherwise say so in one line and carry on without it. Say once which adapter served; prefer `doc-search <query>` then `doc-read <ref> --section <heading>` to whole pages, and check `truncated` in what comes back. It is read-only, and the repo stays the source: never copy page content into the repo's docs.
 
 ## 3. Confirm scope, then check against the requirements
 

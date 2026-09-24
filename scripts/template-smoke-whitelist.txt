@@ -20,6 +20,7 @@
 <file>
 <files reconciled in steps 3–8>
 <format check command>
+<heading>
 <integration test cmd>
 <lint command>
 <M>
@@ -36,6 +37,7 @@
 <one-line implication>
 <one of:>
 <path → what changes, plus the distilled fact: `file:line` + your one-line conclusion>
+<query>
 <ref>
 <repo-name>
 <repo>

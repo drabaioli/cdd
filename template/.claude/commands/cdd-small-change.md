@@ -14,11 +14,14 @@ Derive the task's paths from git — no argument is passed:
 repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
 ```
 
 Read it in full. A small-change handoff is deliberately thin: its `## Requirements` are the done-test (normally one or two criteria), and `## Notes` carries any caveat or roadmap edit agreed at scoping. It carries no `## Implementation prompt` — on this lane there is nothing to say that the requirements do not already say.
 
 Then read only what the change itself touches. Do not rebuild the project's full context: a task that needs it is not small, which is what step 2 is for.
+
+**Docs store.** The `docs adapter:` line above names the project's docs adapter, if one is installed; if it printed nothing, skip this paragraph — no call, no line. An installed adapter is still not called by default, only on a trigger, strongest first: (1) a page reference in the handoff or the user's message — text matching the `link_pattern` its `describe` reports; (2) a line in the project's `CLAUDE.md` saying what lives in the docs store, matching this task; (3) the task depends on an external system the repo does not document. No trigger, no lookup. Here the usual reason is a spec page the handoff links; if the change needs more than a lookup to state, that is step 2's off-ramp, not a reason to read on. Before the first call run `<adapter> describe` (hermetic: no network, no credentials) and use the adapter only if it exits 0, parses as JSON and reports `contract` 1 — otherwise say so in one line and carry on without it. Say once which adapter served; prefer `doc-search <query>` then `doc-read <ref> --section <heading>` to whole pages, and check `truncated` in what comes back. It is read-only, and the repo stays the source: never copy page content into the repo's docs.
 
 ## 2. Confirm the task is still small (the off-ramp)
 

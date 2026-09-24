@@ -20,6 +20,7 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
 - **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch: nothing exists yet to detect, so the answers are commitments, and most of them will honestly be *expected*.
+- **External docs store** — whether the project will refer to documentation kept outside the repo (a Confluence space, a wiki) and, if so, what lives there, in one line ("platform integration specs live in Confluence space XYZ"). Most projects have none; take "none" and move on.
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
@@ -74,7 +75,7 @@ Write, into `$OVERLAY`:
 - `doc/knowledge_base/project-overview.md` — the project charter, filled from the discovery summary (the section structure ships in the template skeleton: what it is / goals / what it does / what it explicitly does not do / constraints / architecture intentions / audience).
 - `doc/knowledge_base/roadmap.md` — the roadmap approved in step 2.
 - `doc/knowledge_base/engineering-practices.md` — every row marked **Enforced** or **Expected** from the engineering-floor answers, with no `<…>` status marker left standing. Documentation is enforced from day one; fill a command placeholder only where a command was actually chosen, never to clear the placeholder.
-- `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (build/test commands as settled in the contract; leave unchosen ones as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
+- `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (build/test commands as settled in the contract; leave unchosen ones as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section. Fill the template's optional docs-store line from the discovery answer, or delete it when there is none.
 - *Optionally* `doc/architecture/overview.md` — only if discovery produced enough concrete structural intent to be worth committing; otherwise leave the template's architecture index pointing at a doc the project writes in its first phase.
 
 Author the identifiers as placeholders (`<PROJECT_NAME>`, `<PROJECT_DIR>`) wherever they appear; the bootstrap script substitutes overlaid files too, so this keeps them consistent. Use concrete prose for everything else. Do not leave either reserved token (`<PROJECT_NAME>`, `<PROJECT_DIR>`) standing in for content you meant to write — only as genuine identifier placeholders.
@@ -113,6 +114,7 @@ Report:
 - What was written into the scaffold commit: project overview, roadmap (real first phase, no survey phase), `CLAUDE.md`, and whether an architecture overview was included.
 - The baseline marker value and that the "Initial CDD scaffold" commit was created.
 - The GitHub repo, if one was created (step 7).
+- The docs store, if discovery named one: it is recorded in `CLAUDE.md`. Sessions consult the store only once a docs adapter is bound: a `.cdd/docs` executable in the project that execs one of this repo's docs adapters (today `tools/adapters/docs/confluence.sh`), exporting only non-secret coordinates such as the site and space keys — credentials stay in the user's shell. `doc/architecture/capability-adapters.md` ("The Confluence adapter") has the three-line binding and the variables. Offer to write that `.cdd/docs` only when the user names a backend this repo has an adapter for, and confirm first — the `exec` line carries this machine's path to the CDD checkout, which the user may prefer to point elsewhere.
 - The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project.
 
   ```bash

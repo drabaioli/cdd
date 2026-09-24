@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Conformance guard for a CDD tracker capability adapter.
+# Conformance guard for a CDD capability adapter — any capability with a published
+# contract (today: tracker and docs).
 #
 # Checks an adapter against the contract in doc/architecture/capability-adapters.md:
 # `describe` is hermetic and contract-shaped, every verb it declares dispatches to a
@@ -23,19 +24,41 @@
 # rules out on purpose — a gate that SKIPs on most hosts is a gate nobody can rely on.
 # Every other check here is exact; the verb probe is a floor.
 #
+# The capability is read from the subject's own `describe` and selects a row of the
+# per-capability table below: that capability's contract verbs, the usage-error probe
+# (check 5) and the missing-backend probe (check 6). Every other check is shared.
+#
 # Usage: scripts/adapter-conformance-check.sh [<adapter path>]
-# Defaults to the shipped reference adapter. Takes an explicit path so a project can
-# point it at its own .cdd/tracker. Requires jq; without it the check skips (advisory),
-# matching the runner's posture for a gate whose tool is absent.
+# Defaults to the shipped tracker reference adapter. Takes an explicit path so a project
+# can point it at its own .cdd/tracker or .cdd/docs. Requires jq; without it the check
+# skips (advisory), matching the runner's posture for a gate whose tool is absent.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SUBJECT="${1:-$REPO_ROOT/tools/adapters/tracker/github.sh}"
 
-# The five non-`describe` verbs of the tracker contract. `describe` is excluded
-# because it is mandatory for every adapter and is checked separately.
-CONTRACT_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'
+# Per capability: the non-`describe` contract verbs (`describe` is excluded because it
+# is mandatory for every adapter and is checked separately), then the check-5 probe — a
+# verb that needs an argument, called without one — then the check-6 probe: a call that
+# is well-formed, so it gets past argument validation and has to stop at the missing
+# backend. Set by select_capability once describe has named the capability.
+CONTRACT_VERBS='' USAGE_PROBE=() BACKEND_PROBE=()
+select_capability() {  # select_capability <capability>
+  case "$1" in
+    tracker)
+      CONTRACT_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'
+      USAGE_PROBE=(issue-read)
+      BACKEND_PROBE=(issue-list)
+      ;;
+    docs)
+      CONTRACT_VERBS='["doc-search","doc-read","doc-stat"]'
+      USAGE_PROBE=(doc-read)
+      BACKEND_PROBE=(doc-stat 12345)
+      ;;
+    *) return 1 ;;
+  esac
+}
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
@@ -124,14 +147,17 @@ jq -e . "$WORK/describe.json" >/dev/null 2>&1 ||
 pass "describe is hermetic: exit 0 and parseable JSON with backend tooling absent and the environment scrubbed"
 
 # --- 2. describe is contract-shaped -------------------------------------------
+CAPABILITY="$(jq -r '.capability | if type == "string" then . else "" end' "$WORK/describe.json")"
+select_capability "$CAPABILITY" ||
+  fail "describe.capability is '$CAPABILITY', not a capability with a published contract (tracker, docs); describe is not contract-shaped"
 jq -e --argjson contract_verbs "$CONTRACT_VERBS" '
-  (.capability == "tracker")
-  and (.contract | type == "number" and . == floor and . >= 1)
+  (.contract | type == "number" and . == floor and . >= 1)
   and (.backend | type == "string" and length > 0)
   and (.ref_pattern | type == "string" and length > 0)
   and (.verbs | type == "array" and length > 0 and all(type == "string"))
   and (.verbs | index("describe") == null)
   and ((.verbs - $contract_verbs) | length == 0)
+  and ((has("link_pattern") | not) or (.link_pattern | type == "string" and length > 0))
 ' "$WORK/describe.json" >/dev/null || {
   jq -c . "$WORK/describe.json" >&2
   fail "describe is not contract-shaped (see doc/architecture/capability-adapters.md)"
@@ -147,7 +173,14 @@ REF_PATTERN="$(jq -r '.ref_pattern' "$WORK/describe.json")"
 grep_rc=0
 printf '' | grep -E "$REF_PATTERN" >/dev/null 2>&1 || grep_rc=$?
 [[ "$grep_rc" -le 1 ]] || fail "describe.ref_pattern is not a valid ERE: $REF_PATTERN"
-pass "describe is contract-shaped (ref_pattern $REF_PATTERN, $(jq -r '.verbs | length' "$WORK/describe.json") verbs declared, no nulls)"
+# link_pattern is optional (docs only today); when present it gets the same test.
+if [[ "$(jq -r 'has("link_pattern")' "$WORK/describe.json")" == true ]]; then
+  LINK_PATTERN="$(jq -r '.link_pattern' "$WORK/describe.json")"
+  grep_rc=0
+  printf '' | grep -E "$LINK_PATTERN" >/dev/null 2>&1 || grep_rc=$?
+  [[ "$grep_rc" -le 1 ]] || fail "describe.link_pattern is not a valid ERE: $LINK_PATTERN"
+fi
+pass "describe is contract-shaped ($CAPABILITY, ref_pattern $REF_PATTERN, $(jq -r '.verbs | length' "$WORK/describe.json") verbs declared, no nulls)"
 
 # --- 3. every declared verb dispatches to an implementation -------------------
 # Invoked with no arguments under the stub, each must exit something other than 3.
@@ -174,14 +207,14 @@ pass "an unknown verb exits 3"
 
 # --- 5. a usage error exits 2 -------------------------------------------------
 # Distinct from 3 (wrong verb) and from 4 (no credentials), and reached without either.
-expect_exit 2 "$STUB_PATH" "issue-read with no reference" issue-read
-expect_exit 2 "$NOBACKEND_PATH" "issue-read with no reference and backend tooling absent" issue-read
+expect_exit 2 "$STUB_PATH" "${USAGE_PROBE[*]} with no argument" "${USAGE_PROBE[@]}"
+expect_exit 2 "$NOBACKEND_PATH" "${USAGE_PROBE[*]} with no argument and backend tooling absent" "${USAGE_PROBE[@]}"
 pass "a usage error exits 2, before any backend contact"
 
 # --- 6. a missing backend exits 4 with an actionable line ---------------------
 # Missing tooling (a gh-based adapter) or missing configuration (an env-configured
 # one): with both absent, either reason must surface as 4, never as 1.
-expect_exit 4 "$NOBACKEND_PATH" "issue-list with backend tooling absent and the environment scrubbed" issue-list
+expect_exit 4 "$NOBACKEND_PATH" "${BACKEND_PROBE[*]} with backend tooling absent and the environment scrubbed" "${BACKEND_PROBE[@]}"
 [[ -s "$WORK/err" ]] || fail "exit 4 carried no message on stderr; the contract requires an actionable one"
 pass "a missing backend exits 4: $(head -1 "$WORK/err")"
 
@@ -210,4 +243,4 @@ for pattern in "${secret_patterns[@]}"; do
 done
 pass "no secret-shaped strings in ${#scan_targets[@]} scanned file(s)"
 
-echo "adapter conformance: $SUBJECT satisfies the tracker contract (offline)"
+echo "adapter conformance: $SUBJECT satisfies the $CAPABILITY contract (offline)"

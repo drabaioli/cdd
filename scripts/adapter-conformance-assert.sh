@@ -29,12 +29,24 @@
 #      reaching the subject; without it, this mutation passes on any host that has them set.
 #   6. Missing config -> 4       — unset configuration exits 1 instead.
 #
-# Plus three controls, which are what make the mutations mean anything:
+# And against the Confluence docs adapter, which exercises the checker's per-capability
+# table and the optional link_pattern:
+#   1. The scrub                 — describe requires credentials, with fake CONFLUENCE_*
+#      and JIRA_* values exported (the adapter falls back to the Jira pair, so both sets
+#      must be kept out by `env -i`).
+#   2. Contract-shaped           — link_pattern is not a valid ERE; a verb outside the
+#      docs contract (`doc-publish`) is declared.
+#   6. Missing config -> 4       — unset configuration exits 1 instead.
+#
+# Plus five controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
 #     checker that is simply broken and fails on everything.
 #   - An adapter that omits the optional `create_target` must PASS, pinning the other
 #     direction: the checker must not have quietly started requiring an optional field.
 #   - An unmutated copy of the Jira adapter must PASS, for the same reason as the first.
+#   - An unmutated copy of the Confluence adapter must PASS, likewise.
+#   - A Confluence adapter that omits the optional `link_pattern` must PASS, as for
+#     `create_target`.
 #
 # Every mutation is verified to have actually CHANGED the file before the checker runs.
 # A mutation whose anchor has rotted away applies nothing, and a checker "detecting" an
@@ -53,6 +65,7 @@ cd "$REPO_ROOT" || exit 1
 CHECKER="./scripts/adapter-conformance-check.sh"
 ADAPTER="tools/adapters/tracker/github.sh"
 JIRA_ADAPTER="tools/adapters/tracker/jira.sh"
+CONFLUENCE_ADAPTER="tools/adapters/docs/confluence.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
@@ -60,6 +73,7 @@ pass() { echo "ok: $*"; }
 [[ -x "$CHECKER" ]] || fail "checker not found or not executable: $CHECKER"
 [[ -x "$ADAPTER" ]] || fail "adapter not found or not executable: $ADAPTER"
 [[ -x "$JIRA_ADAPTER" ]] || fail "adapter not found or not executable: $JIRA_ADAPTER"
+[[ -x "$CONFLUENCE_ADAPTER" ]] || fail "adapter not found or not executable: $CONFLUENCE_ADAPTER"
 
 # The checker skips without jq, so every expect_fail below would see a clean exit 0 and
 # report a checker that has stopped firing. Skip loudly instead — the runner's posture
@@ -244,4 +258,45 @@ mutate_prog "missing config exits 1" \
   '/^require_config\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
 expect_fail "missing configuration exiting 1 instead of 4 is caught" "expected exit 4, got 1"
 
-echo "adapter-conformance checker contract: clean (17 mutations, 3 controls)"
+# --- The Confluence docs adapter ----------------------------------------------
+# A different capability: the checker must pick the docs row of its table from describe.
+ADAPTER="$CONFLUENCE_ADAPTER"
+cp "$ADAPTER" "$MASTER" || fail "could not copy $ADAPTER into the sandbox"
+
+cp "$MASTER" "$SUBJECT"; chmod 755 "$SUBJECT"
+expect_pass "control: an unmutated copy of the Confluence adapter passes"
+
+# Check 1, through the scrub — both credential sets, since the adapter falls back to Jira's.
+mutate_insert_after "docs describe requires credentials" '^verb_describe[(][)] [{]' '  require_config'
+export CONFLUENCE_BASE_URL="https://example.invalid" CONFLUENCE_EMAIL="nobody@example.invalid" \
+       CONFLUENCE_API_TOKEN="not-a-real-credential" JIRA_BASE_URL="https://example.invalid" \
+       JIRA_EMAIL="nobody@example.invalid" JIRA_API_TOKEN="not-a-real-credential"
+expect_fail "docs describe that needs credentials is caught despite them being exported" \
+  "describe with backend tooling absent and the environment scrubbed"
+unset CONFLUENCE_BASE_URL CONFLUENCE_EMAIL CONFLUENCE_API_TOKEN JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN
+
+# Check 2: the optional field, when present, must still be a usable ERE.
+mutate_replace_line "link_pattern is not a valid ERE" '^  link="https' \
+  '  link="https?://(pages/[0-9]+"'
+expect_fail "an unparseable link_pattern is caught" "link_pattern is not a valid ERE"
+
+# Check 2: a verb that is not in the docs contract — the checker must be using the docs
+# row, not accepting any verb because some capability has it.
+mutate_replace_line "declares a non-contract docs verb" '^DECLARED_VERBS=' \
+  'DECLARED_VERBS='"'"'["doc-search","doc-read","doc-stat","doc-publish"]'"'"''
+expect_fail "a verb outside the docs contract is caught" "not contract-shaped"
+
+# Check 6: missing configuration must be 4, not 1.
+mutate_prog "docs missing config exits 1" \
+  '/^require_config\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
+expect_fail "docs missing configuration exiting 1 instead of 4 is caught" "expected exit 4, got 1"
+
+# Control: link_pattern is optional — an adapter that never emits it is conformant. The
+# printf keeps its argument list (continued on the next line); `%.0s` swallows the
+# link_pattern argument unprinted. The doubled trailing backslash is the line
+# continuation: the -v assignment's escape processing turns it into one.
+mutate_replace_line "link_pattern omitted" "^  printf '[{]\"capability" \
+  '  printf '"'"'{"capability":"docs","contract":%s,"backend":"%s","ref_pattern":"%s"%.0s,"verbs":%s'"'"' '"\\\\"
+expect_pass "control: a docs adapter omitting the optional link_pattern passes"
+
+echo "adapter-conformance checker contract: clean (21 mutations, 5 controls)"

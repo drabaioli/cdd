@@ -76,8 +76,9 @@ GATES=(
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
   "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
   "state-extension|jq|extension fields on the state record: unknown top-level keys survive every write"
-  "adapter-conformance|jq|the shipped tracker adapters against the capability contract (offline)"
+  "adapter-conformance|jq|the shipped capability adapters against their contracts (offline)"
   "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
+  "docs-adapter|jq|the Confluence docs adapter against canned pages: conversion, sections, truncation (offline)"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
   "stage-render||render-only staging (--stage), no git tree"
@@ -163,17 +164,21 @@ gate_state_extension() {
 # file. Not fail-fast within the gate either: each adapter is checked and reported.
 gate_adapter_conformance() {
   local adapter n=0 rc=0
-  for adapter in tools/adapters/tracker/*.sh; do
+  for adapter in tools/adapters/*/*.sh; do
     [[ -e "$adapter" ]] || continue
     n=$((n + 1))
     ./scripts/adapter-conformance-check.sh "$adapter" || rc=1
   done
-  [[ $n -gt 0 ]] || { echo "FAIL: no tools/adapters/tracker/*.sh adapter found"; return 1; }
+  [[ $n -gt 0 ]] || { echo "FAIL: no tools/adapters/*/*.sh adapter found"; return 1; }
   return "$rc"
 }
 
 gate_adapter_conformance_contract() {
   ./scripts/adapter-conformance-assert.sh
+}
+
+gate_docs_adapter() {
+  ./scripts/docs-adapter-assert.sh
 }
 
 # The three gates that bootstrap a real tree (both of these plus demo-seed) run with a
