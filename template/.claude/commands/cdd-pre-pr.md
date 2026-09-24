@@ -7,9 +7,12 @@ This session is **fresh and separate** from the implementation session by design
 ```bash
 BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
 BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)}
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
 ```
 
 This reads the task's recorded base branch — the branch it was cut from and merges back into — and falls back to the hosting platform's default branch when none was recorded (unchanged behaviour for single-integration-branch projects). Use `$BASE_BRANCH` wherever `main`/`origin/main` appears in git commands below.
+
+**Docs store.** The `docs adapter:` line above names the project's docs adapter, if one is installed; if it printed nothing, skip this paragraph — no call, no line. An installed adapter is still not called by default, only on a trigger, strongest first: (1) a page reference in the handoff, the diff or the user's message — text matching the `link_pattern` its `describe` reports; (2) a line in the project's `CLAUDE.md` saying what lives in the docs store, matching this task; (3) the task depends on an external system the repo does not document. No trigger, no lookup. Here the usual reason is checking the change against an external standard or spec the task names. Before the first call run `<adapter> describe` (hermetic: no network, no credentials) and use the adapter only if it exits 0, parses as JSON and reports `contract` 1 — otherwise say so in one line and carry on without it. Say once which adapter served; prefer `doc-search <query>` then `doc-read <ref> --section <heading>` to whole pages, and check `truncated` in what comes back. It is read-only, and the repo stays the source: never copy page content into the repo's docs.
 
 ## 1. Identify changes
 

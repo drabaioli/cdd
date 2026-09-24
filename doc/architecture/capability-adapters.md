@@ -1,6 +1,6 @@
-# Capability adapters: the tracker contract
+# Capability adapters: the tracker and docs contracts
 
-The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/adapters/tracker/github.sh`) and, alongside it, a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`).
+The wire contract every capability adapter answers, pinned for two capabilities: the **tracker** — reference implementation `tools/adapters/tracker/github.sh`, alongside a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`) — and **docs**, read-only, whose reference implementation is the Confluence Cloud adapter `tools/adapters/docs/confluence.sh`.
 
 The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives. This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
@@ -49,12 +49,14 @@ $ .cdd/tracker describe
 
 | Field           | Required | Meaning                                                                        |
 | --------------- | -------- | ------------------------------------------------------------------------------ |
-| `capability`    | yes      | The role this adapter fills — `tracker` here. Matches the file name under `.cdd/`. |
+| `capability`    | yes      | The role this adapter fills — `tracker` or `docs`. Matches the file name under `.cdd/`. |
 | `contract`      | yes      | Integer contract version; see below.                                            |
 | `backend`       | yes      | Non-empty string naming the service (`github`, `jira`, …). Free-form; nothing branches on it. |
 | `ref_pattern`   | yes      | An **ERE** that matches a reference this backend accepts. CDD dispatches on it instead of hardcoding a shape. |
 | `verbs`         | yes      | Non-empty array of the verbs this adapter implements, **excluding `describe`**. |
-| `create_target` | no       | Human-readable coordinates a created item would land in (`owner/repo`, `XYZ / board 42`). Shown to a human before a write; nothing parses it. Omitted when it cannot be derived locally. |
+| `create_target` | no       | Tracker. Human-readable coordinates a created item would land in (`owner/repo`, `XYZ / board 42`). Shown to a human before a write; nothing parses it. Omitted when it cannot be derived locally. |
+| `link_pattern`  | no       | Docs. An unanchored **ERE** that finds a reference *inside prose* — a handoff, a review comment. See [Two reference patterns](#two-reference-patterns). Omitted when the backend has no unambiguous form. |
+| `search_scope`  | no       | Docs. Human-readable coordinates `doc-search` is restricted to (`TT @ <site>`); nothing parses it. Omitted when the search is unrestricted or the coordinates cannot be derived locally. |
 
 **`describe` excludes itself from `verbs`.** It is mandatory for every adapter, so listing it is redundant, and the conformance gate checks it separately. Issue #86's Jira example must not be read the other way.
 
@@ -153,9 +155,99 @@ natural home is gc once the forge capability puts `pr-merged` behind an adapter,
 reporting each transition, which is where the roadmap sequences it. Until then, cross-backend
 closing is the tracker integration's job and CDD's contribution is emitting the token it reads.
 
+## The docs verbs
+
+Four verbs, **all read-only**: `describe`, mandatory, and three declared per backend. There is no write verb. The docs capability sits on the *mirror* side of §2.16's replace-vs-mirror rule: a session reads a page for context the repo does not hold — an integration contract, a platform spec — and the repo stays the source for its own docs. Publishing repo docs to a backend is out of scope, and a sync verb was considered and dropped.
+
+| Verb                                                    | Returns | Notes                          |
+| ------------------------------------------------------- | ------- | ------------------------------ |
+| `describe`                                              | object  | mandatory                      |
+| `doc-search <query> [--limit N]`                        | array   | excerpts, never page bodies    |
+| `doc-read <ref> [--section <heading>] [--max-chars N]`  | object  | capped; says when it truncated |
+| `doc-stat <ref>`                                        | object  | version and freshness only     |
+
+```console
+$ .cdd/docs describe
+{"capability":"docs","contract":1,"backend":"confluence",
+ "ref_pattern":"^([0-9]+|https?://…/wiki/…pages/[0-9]+…|https?://…/wiki/…[?&]pageId=[0-9]+…)$",
+ "link_pattern":"https?://example[.]atlassian[.]net/wiki/[^[:space:])>\"]*(pages/[0-9]+|pageId=[0-9]+)[^[:space:])>\"]*",
+ "verbs":["doc-search","doc-read","doc-stat"],
+ "search_scope":"TT @ example.atlassian.net"}
+```
+
+### Two reference patterns
+
+A docs adapter reports two patterns, because it has two different questions to answer.
+
+- **`ref_pattern`** (required, anchored) — what `doc-read` and `doc-stat` accept, exactly as for the tracker. For Confluence: a numeric page id, or a page URL.
+- **`link_pattern`** (optional, unanchored) — how a session spots a page reference *in prose*, which is what fires the first trigger below. It must match only unambiguous forms. A bare page id is a valid `ref_pattern` match but must never be a `link_pattern` match: a bare number is exactly the built-in tracker's `^#?[0-9]+$`, so a pattern that fired on it would treat every issue number in a handoff as a page. For Confluence it matches page URLs only, narrowed to the configured site when one is set. With no `link_pattern`, the first trigger simply never fires.
+
+### Context-cost caps
+
+A tracker item is small; a page can be arbitrarily large, and a session's context is the budget it comes out of. So the docs verbs are capped, and the caps are part of the contract, not a backend's choice:
+
+| What                          | Default     | Maximum                        | Outside the bounds |
+| ----------------------------- | ----------- | ------------------------------ | ------------------ |
+| `doc-search` results          | 10          | 25, via `--limit`              | exit 2             |
+| `doc-search` excerpt          | 300 chars   | —                              | cut, ending in `…` |
+| `doc-read` content            | 24,000 chars | 100,000, via `--max-chars`    | exit 2             |
+| `doc-read` `sections` entries | 100         | —                              | the rest omitted   |
+
+"Characters" are Unicode code points. Excerpts are whitespace-collapsed, with the backend's highlight markup removed and HTML entities decoded.
+
+**The truncation signal.** `doc-read` content beyond the cap is **cut, not summarized**, and nothing is appended inside `content` — the flag is the signal. `truncated` is **always present**, `true` or `false` (it is not an optional field: the concept always exists). `content_chars` is the length of the full content, or of the full section, before the cut. `sections` lists every heading of the page, so a caller that hit the cap can re-ask for just the part it needs. A truncated read also prints one line on stderr saying how to narrow it.
+
+### `doc-search <query> [--limit N]` → array
+
+```json
+[ {"ref":"2808119297","title":"…","url":"https://…","excerpt":"…",
+   "updated_at":"2026-06-02T09:14:03Z","space":"Team Tech"} ]
+```
+
+Pages only. `ref` is what `doc-read` accepts; `space` is the container's display name, omitted when the backend does not report one. Empty is `[]`, not an error. A missing query is exit 2.
+
+### `doc-read <ref> [--section <heading>] [--max-chars N]` → object
+
+```json
+{ "ref":"2808119297", "title":"…", "url":"https://…",
+  "version":17, "updated_at":"2026-06-02T09:14:03Z",
+  "format":"markdown", "content":"## CCA3\n\n8. …",
+  "truncated":false, "content_chars":412,
+  "sections":["System Minimum Requirements","Pre-requisites","…"],
+  "section":"CCA3" }
+```
+
+- **`format`** names the representation of `content`: `markdown` (a subset — headings, lists, fenced code, links; see the backend's section) or `text`. A caller reads it rather than assuming.
+- **A section** runs from the heading that matches the request up to, not including, the next heading of the **same or a higher** level — so an `h3` stops at the next `h3` or `h2`, and an `h2` runs past its `h3`s. Matching is on a normalized form — lowercase, every non-alphanumeric character dropped — so `Installation procedure steps`, `installation-procedure-steps` and a URL fragment `#Installation-procedure-steps` are the same heading; the first match wins. The request comes from `--section`, else from the ref's URL fragment, else the whole page is read. A heading that is not there is **exit 1**, with the page's headings listed on stderr. `section` echoes the matched heading and is present only when a section was read.
+- `version` is the backend's page version; `updated_at` is when that version was made.
+
+### `doc-stat <ref>` → object
+
+```json
+{"ref":"2808119297","title":"…","url":"https://…","version":17,"updated_at":"2026-06-02T09:14:03Z"}
+```
+
+No body is fetched. It is the cheap way to ask "has this page changed since the version I recorded?".
+
+### When a session calls the docs adapter
+
+Five commands can read through a docs adapter — `/cdd-next-step`, `/cdd-plan`, `/cdd-implement`, `/cdd-pre-pr` and `/cdd-process-pr` — and the cost of that to a project with no docs store has to be zero. So each command's existing opening shell block carries one extra line, which prints only when an adapter resolves (project `.cdd/docs`, then machine `~/.cdd/adapters/docs`; there is no built-in rung) and never fails the block:
+
+```bash
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
+```
+
+It printed nothing → the session makes no call and prints no line. An installed adapter is **still not called by default**; it is called only on a trigger, strongest first:
+
+1. A page reference — text matching `describe.link_pattern` — in the handoff, the issue, a review comment or the user's message.
+2. A line in the project's `CLAUDE.md` saying what lives in the docs store ("platform integration specs live in Confluence space TT"), matching the task.
+3. The task depends on an external system the repo does not document.
+
+No trigger, no lookup. When one fires, `describe` is run first and accepted on the tracker's terms (exit 0, parses, a supported `contract`; otherwise one line and carry on without it), the adapter that served is announced **once**, `doc-search` then `doc-read --section` is preferred to whole pages, and `truncated` is checked. What a session reads stays in its own artifacts — a handoff's notes, a plan's external findings — and is never copied into the repo's docs.
+
 ## The GitHub reference adapter
 
-Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new tracker backend is one new file, which the lint and conformance gates pick up by glob.
+Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new backend is one new file, which the lint and conformance gates pick up by glob.
 
 `tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
@@ -196,6 +288,39 @@ It **declares all five verbs**, so `issue-transition` is the contract's live exi
 - **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the forge with smart commits enabled — the second of the three cases above.
 - **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
+## The Confluence adapter
+
+`tools/adapters/docs/confluence.sh` is the docs capability's reference implementation: **Confluence Cloud**, through its REST API with `curl` and `jq`, read-only. Data Center / Server is out of scope. Like the Jira adapter it **does not self-install** — a binding is per-project by nature (a site, and the spaces worth searching) — and a project binds it through `.cdd/docs`, which may export the non-secret coordinates:
+
+```bash
+#!/usr/bin/env bash
+export CONFLUENCE_BASE_URL=https://<site>.atlassian.net CONFLUENCE_SPACE_KEYS=TT
+exec /path/to/cdd/tools/adapters/docs/confluence.sh "$@"
+```
+
+**Configuration is environment variables only:**
+
+| Variable                 | Meaning |
+| ------------------------ | ------- |
+| `CONFLUENCE_BASE_URL`    | The site, `https://<site>.atlassian.net`; a bare host gets `https://`, a trailing `/wiki` is dropped. Falls back to `JIRA_BASE_URL` |
+| `CONFLUENCE_EMAIL`       | The Atlassian account the token belongs to |
+| `CONFLUENCE_API_TOKEN`   | An Atlassian API token. Lives in the user's shell; never in `.cdd/docs` or any file |
+| `CONFLUENCE_SPACE_KEYS`  | Optional. Comma-separated space keys `doc-search` is restricted to; unset, the search is site-wide. A malformed key is exit 4 |
+
+**The Jira fallback.** Jira and Confluence often share one Atlassian account, and sometimes do not (they can live on different sites). So the adapter has its own settings, and falls back to the Jira adapter's where they are unset:
+
+- **Credentials fall back as a pair or not at all.** When *both* `CONFLUENCE_EMAIL` and `CONFLUENCE_API_TOKEN` are unset and both `JIRA_EMAIL` and `JIRA_API_TOKEN` are set, the Jira pair is used, and stderr says so once. Exactly one Confluence variable set is exit 4 naming the missing one — one variable from each set is never mixed.
+- **The site falls back on its own**, to `JIRA_BASE_URL`. Atlassian API tokens belong to the account, not the site, so a Jira pair works on a different site of the same account.
+
+A missing variable is exit 4 with one line per variable — after argument validation, so a usage error is still 2 on an unconfigured machine. The token reaches `curl` through `--config -` on stdin, never on the command line, and is never written to a file. Rejected credentials are exit 1 and said as such — which takes one extra step on Confluence Cloud: a bad token is not refused but served anonymously, so a page answers 404 and a search 403, with no failed-login header at all (checked live). On a 403 or 404 the adapter therefore asks who the credential authenticates as (`/wiki/rest/api/user/current`); an anonymous answer is reported as rejected credentials, a known user as "no such page, or no access". Both are exit 1; the extra request is paid only on failure.
+
+It **declares all three verbs**. `describe` needs neither network nor `jq`; `link_pattern` matches page URLs on the configured site (or on any `*.atlassian.net` site when none is set), and `search_scope` is `<CONFLUENCE_SPACE_KEYS> @ <site host>` when both are set.
+
+- **References.** A numeric page id; a page URL, `…/wiki/spaces/<KEY>/pages/<id>/…`; or a `…/wiki/…?pageId=<id>` URL. A URL's `#fragment` selects a section — in the current editor's form (`#CCA3`) and the older `#PageTitle-Heading` form alike. A URL on a different host than the configured site is exit 1, naming both, before any request: the credential goes only to the configured site. Tiny links (`/wiki/x/…`) are not accepted — resolving one needs an extra redirect-following request.
+- **`doc-read` and `doc-stat`** use the v2 page endpoint, `GET /wiki/api/v2/pages/<id>` — `doc-read` with `body-format=atlas_doc_format`, `doc-stat` without a body. `version` is the page's version number and `updated_at` that version's creation time; `url` is the page's web link.
+- **The body** arrives as Atlassian Document Format, serialized into a JSON string, and is flattened to Markdown with `jq` — the same approach as the Jira adapter's plain-text flattener, but keeping structure a reader and a section cut need: headings with their level, paragraphs, nested bullet and ordered lists (with their start number), task lists, fenced code with its language, inline code, links as `[text](href)`, inline cards as their URL, block quotes, rules, and tables as ` | `-joined rows. Emphasis, colours, layout and media are dropped. Storage format (XHTML) was rejected: stripping HTML with regexes in `jq` is lossy and leaves no reliable heading structure to cut sections on. Sections are cut on the page's top-level headings, which is where the editor puts them.
+- **`doc-search`** uses v1 CQL search, `GET /wiki/rest/api/search` (v2 has no CQL search), with `type = page AND text ~ "<query>"`, plus `AND space in (…)` when `CONFLUENCE_SPACE_KEYS` is set.
+
 ## Resolution and the announcement rule
 
 Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machine `~/.cdd/adapters/<capability>`, then built-in behaviour — first executable wins, and it degrades loudly rather than failing.
@@ -203,23 +328,25 @@ Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machi
 "Loudly" is scoped **to the point of use, not to the session**:
 
 - Resolution performed merely to **classify** something — deciding whether `$ARGUMENTS` looks like an issue reference, say — is **silent**. Taken literally, "an absent adapter yields today's behaviour with a line saying so" would print a fallback line in every session in every repo, since no project has an adapter; that is noise, and noise is how a load-bearing line stops being read.
-- When a tracker call is **actually made**, the caller announces in one line which rung served it — including the "no adapter installed, using built-in `gh`" case.
+- When a tracker call is **actually made**, the caller announces in one line which rung served it — including the "no adapter installed, using built-in `gh`" case. The docs capability has no built-in rung: with no adapter there is no call to announce, and nothing is printed.
 - **One exception, unconditional:** an adapter that is **present but rejected** — unparseable `describe`, an unsupported `contract` version, or a non-zero exit from `describe` — is announced **always**, even during silent classification. The user installed something that is not working, and silence there is indistinguishable from it working.
 
 ## The conformance gate
 
-`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker`; `scripts/ci.sh` runs it over every `tools/adapters/tracker/*.sh`, so both shipped adapters are checked and a new one is covered without editing the runner.
+`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document, whatever its capability. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker` or `.cdd/docs`; `scripts/ci.sh` runs it over every `tools/adapters/*/*.sh`, so every shipped adapter is checked and a new one is covered without editing the runner. The subject's own `describe` names its capability, which picks a row of the checker's table: that capability's contract verbs, the check-5 probe and the check-6 probe.
 
 It is **offline by construction**, and backend-neutral: every probe runs with the environment scrubbed (`env -i`, so a credential or coordinate the caller happens to have exported never reaches the subject), under either a scratch `PATH` holding stub backend tools — a `gh` that is authenticated and useless, a `curl` that always fails as if the host were unreachable — or a minimal `PATH` with no backend tooling at all. Nothing it runs can reach the network or authenticate. No probe mode, no dry-run flag — an adapter is checked exactly as a caller would invoke it. What it asserts:
 
 1. `describe` exits 0 with backend tooling absent from `PATH` and the environment scrubbed, and its stdout parses as JSON (hermeticity).
-2. `describe` is contract-shaped: `capability` is `tracker`; `contract` is an integer ≥ 1; `backend` is a non-empty string; `ref_pattern` is a non-empty string that `grep -E` accepts as a valid ERE; `verbs` is a non-empty array of strings; `describe` is **not** among them; every declared verb is one of the five non-`describe` verbs above; and no `null` appears anywhere in the output.
+2. `describe` is contract-shaped: `capability` is one with a published contract (`tracker`, `docs`); `contract` is an integer ≥ 1; `backend` is a non-empty string; `ref_pattern` is a non-empty string that `grep -E` accepts as a valid ERE, and so is `link_pattern` when present; `verbs` is a non-empty array of strings; `describe` is **not** among them; every declared verb is one of that capability's non-`describe` verbs above; and no `null` appears anywhere in the output.
 3. Every verb in `describe.verbs`, invoked with **no arguments**, exits something other than 3 — i.e. dispatch reaches a real implementation rather than the unsupported-verb branch.
 4. Every contract verb the adapter does not declare exits 3 (`issue-transition`, on GitHub), and so does a nonsense verb.
-5. `issue-read` with no arguments exits 2.
-6. `issue-list` with backend tooling absent and the environment scrubbed exits 4 with a line on stderr — missing tooling for a `gh`-based adapter, missing configuration for an env-configured one.
+5. A verb that needs an argument, called without one, exits 2: `issue-read` for a tracker, `doc-read` for docs.
+6. A well-formed call with backend tooling absent and the environment scrubbed exits 4 with a line on stderr — missing tooling for a `gh`-based adapter, missing configuration for an env-configured one: `issue-list` for a tracker, `doc-stat 12345` for docs.
 7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, an Atlassian API token prefix, a hardcoded basic-auth header, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.
 
 **Its stated limit:** check 3 proves that dispatch *reaches* an implementation, not that the implementation is *correct*. Correctness needs a live call against a real backend, which the offline-only decision rules out on purpose — a gate that SKIPs on most hosts is a gate whose verdict nobody can rely on. Checks 1, 2 and 4–7 are exact; check 3 is a floor.
 
 Check 3 is only meaningful because of the dispatch-order rule above: an adapter that authenticated before parsing its arguments would exit 4 here for reasons that say nothing about dispatch. Such an adapter is non-conformant by construction, which is why the rule is stated as a rule and not as a hint.
+
+**The docs adapter goes one step further offline.** Most of what it does is transformation, not transport — a page body flattened to Markdown, a section cut, a cap applied — and that is testable with no backend at all. `scripts/docs-adapter-assert.sh` (the `docs-adapter` gate, `needs: jq`) runs the real Confluence adapter against a stub `curl` that serves canned payloads by request path, and checks what comes out: the Markdown conversion, where section cuts start and stop (by `--section` and by URL fragment), the truncation cap and its flag, `doc-stat`'s shape, excerpt cleaning and the CQL `doc-search` sends, the credential and site fallbacks, the foreign-site refusal — and, inside the stub, that the API token never appears on `curl`'s command line. What it cannot prove is that the canned payloads still match what Confluence sends; that is the live test's job, done once against a real page when the adapter shipped.

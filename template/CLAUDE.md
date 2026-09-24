@@ -17,6 +17,8 @@
 
 Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need. **`index.md` files are pointer lists only — content belongs in named subdocuments, not in the index itself.**
 
+<Optional — only if the project keeps docs in an external store it reads through a `.cdd/docs` adapter: one line saying what lives there, e.g. "Platform integration specs live in Confluence space XYZ." Sessions consult the store only when a task matches that line, links a page, or depends on an undocumented external system. Delete this line otherwise.>
+
 **Read `doc/architecture/index.md` (and the linked docs you need) before planning any feature or structural change.**
 **Read `doc/features/index.md` (and the relevant feature docs) before changing user-visible behaviour.**
 Keep architecture and feature docs — and their indexes — current as part of every change.

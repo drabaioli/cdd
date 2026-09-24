@@ -10,6 +10,7 @@ Confirm the current branch is not `main`:
 
 ```bash
 git rev-parse --abbrev-ref HEAD
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
 ```
 
 Resolve the open PR for the current branch:
@@ -23,6 +24,8 @@ gh repo view --json owner,name -q '.owner.login + "/" + .name'
 - If `gh` reports more than one candidate PR, stop and ask the user which PR number to process.
 
 Hold the owner, repo, and PR number; the steps below refer to them as OWNER, REPO, and NUMBER.
+
+**Docs store.** The `docs adapter:` line from the branch check above names the project's docs adapter, if one is installed; if it printed nothing, skip this paragraph — no call, no line. An installed adapter is still not called by default, only on a trigger, strongest first: (1) a page reference in a review comment or the user's message — text matching the `link_pattern` its `describe` reports; (2) a line in the project's `CLAUDE.md` saying what lives in the docs store, matching this task; (3) the task depends on an external system the repo does not document. No trigger, no lookup. Here the usual reason is a page a reviewer cites. Before the first call run `<adapter> describe` (hermetic: no network, no credentials) and use the adapter only if it exits 0, parses as JSON and reports `contract` 1 — otherwise say so in one line and carry on without it. Say once which adapter served; prefer `doc-search <query>` then `doc-read <ref> --section <heading>` to whole pages, and check `truncated` in what comes back. It is read-only, and the repo stays the source: never copy page content into the repo's docs.
 
 ## 2. Read all three comment surfaces
 

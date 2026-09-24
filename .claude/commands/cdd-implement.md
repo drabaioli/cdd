@@ -11,6 +11,7 @@ repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common
 branch="$(git rev-parse --abbrev-ref HEAD)"
 echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
 ```
 
 Read the plan first, in full. Its `## Summary` is your orientation; the rest is the detail.
@@ -23,6 +24,8 @@ The plan's sections carry different weights, by design:
 - `## External findings` is quoted verbatim because it **cannot** be re-derived here. Trust it; do not go re-run the searches.
 - `## Dead ends` records approaches already tried and rejected. Do not re-explore them.
 - `## Open questions resolved` records what the handoff deferred and what was agreed. Those answers are settled; do not reopen them unilaterally.
+
+**Docs store.** The `docs adapter:` line above names the project's docs adapter, if one is installed; if it printed nothing, skip this paragraph — no call, no line. An installed adapter is still not called by default, only on a trigger, strongest first: (1) a page reference in the plan, the handoff or the user's message — text matching the `link_pattern` its `describe` reports; (2) a line in the project's `CLAUDE.md` saying what lives in the docs store, matching this task; (3) the task depends on an external system the repo does not document. No trigger, no lookup. Here the usual reason is the contract the code is written against, when the plan's `## External findings` does not already carry it — never to re-run a lookup the plan recorded. Before the first call run `<adapter> describe` (hermetic: no network, no credentials) and use the adapter only if it exits 0, parses as JSON and reports `contract` 1 — otherwise say so in one line and carry on without it. Say once which adapter served; prefer `doc-search <query>` then `doc-read <ref> --section <heading>` to whole pages, and check `truncated` in what comes back. It is read-only, and the repo stays the source: never copy page content into the repo's docs.
 
 ## 2. Deviation rule: stop and report, never improvise
 

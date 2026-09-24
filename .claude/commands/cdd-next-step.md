@@ -49,9 +49,10 @@ Scoping work from a stale checkout can hand off a task that is already merged, s
 BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || echo "origin/$BRANCH")"
 git fetch --quiet origin "$BRANCH" && git rev-list --left-right --count "HEAD...$UPSTREAM"
+for c in .cdd/docs ~/.cdd/adapters/docs; do [ -x "$c" ] && { echo "docs adapter: $c"; break; }; done; true
 ```
 
-The count prints two numbers, ahead then behind. The fetch updates remote-tracking refs only — it never touches the working tree, so this session still modifies no file in the repo.
+The count prints two numbers, ahead then behind; the last line is used in §1 and prints nothing unless a docs adapter is installed. The fetch updates remote-tracking refs only — it never touches the working tree, so this session still modifies no file in the repo.
 
 - **Behind** (second number non-zero): **stop**. Say how many commits behind the upstream this checkout is, and tell the user to run `git pull --ff-only` here and re-run the command. Do not pull, and do not offer to.
 - **Ahead or diverged**: report it in one line and continue. Never a block.
@@ -103,6 +104,8 @@ Use the items' titles + bodies + comments as the **intent text**, and continue w
 Read `doc/knowledge_base/roadmap.md` in full. Also skim `doc/architecture/index.md` and `doc/features/index.md` for current state, but do not read them exhaustively, the plan session will rebuild detailed context.
 
 **Intent-driven and issue-driven modes**, load context adaptively to preserve context economy: after the roadmap and the two indexes above, selectively open only the docs the described task (or the resolved issue) actually touches — enough to scope it and detect overlap with existing work, not an exhaustive read.
+
+**Docs store.** The `docs adapter:` line from §0a names the project's docs adapter, if one is installed; if it printed nothing, skip this paragraph — no call, no line. An installed adapter is still not called by default, only on a trigger, strongest first: (1) a page reference in the task prompt, the issue or the user's message — text matching the `link_pattern` its `describe` reports; (2) a line in the project's `CLAUDE.md` saying what lives in the docs store, matching this task; (3) the task depends on an external system the repo does not document. No trigger, no lookup. Here the usual reason is platform context needed to scope the task; a page central to it may be excerpted, with its reference, into the handoff's `## Notes`. Before the first call run `<adapter> describe` (hermetic: no network, no credentials) and use the adapter only if it exits 0, parses as JSON and reports `contract` 1 — otherwise say so in one line and carry on without it. Say once which adapter served; prefer `doc-search <query>` then `doc-read <ref> --section <heading>` to whole pages, and check `truncated` in what comes back. It is read-only, and the repo stays the source: never copy page content into the repo's docs.
 
 ## 2. Check for stale handoffs
 
