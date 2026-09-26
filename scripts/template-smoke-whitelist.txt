@@ -16,7 +16,7 @@
 <deferred open questions for /cdd-plan, proposed roadmap edits, caveats — or "None" if clean>
 <descriptive_slug>
 <exact checkbox line(s) from the roadmap being addressed>
-<facts from outside the repo, quoted verbatim, each with its source — or "None">
+<facts from outside the repo, quoted verbatim, each with its source and version (release, page version, or retrieval date) — or "None">
 <file>
 <files reconciled in steps 3–8>
 <format check command>

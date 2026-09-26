@@ -216,7 +216,7 @@ Schema:
 <path -> what changes, plus the distilled fact: file:line + the one-line conclusion>
 
 ## External findings
-<facts from outside the repo, quoted verbatim, each with its source — or "None">
+<facts from outside the repo, quoted verbatim, each with its source and version (release, page version, or retrieval date) — or "None">
 
 ## Dead ends
 <what was tried and why it failed, so it is not re-explored — or "None">
@@ -241,7 +241,9 @@ Two properties follow from the plan being a file rather than a transcript. It is
 
 ### 2.16 Capability adapters (`.cdd/`)
 
-An executable the project commits that stands in for an external service CDD talks to — a tracker, a forge, a doc system, a notification channel — so that a project whose tracker is Jira or whose forge is GitLab adapts CDD by adding a file rather than by editing a shipped prompt. Every such binding is otherwise hardcoded in a command or a shell helper, and the only way to change one is a local edit to a file CDD ships, which is a fork in slow motion. An adapter is the place to put that adaptation instead.
+An executable the project commits that stands in for an external service CDD talks to — a tracker, a forge, a notification channel — so that a project whose tracker is Jira or whose forge is GitLab adapts CDD by adding a file rather than by editing a shipped prompt. Every such binding is otherwise hardcoded in a command or a shell helper, and the only way to change one is a local edit to a file CDD ships, which is a fork in slow motion. An adapter is the place to put that adaptation instead.
+
+An adapter is justified only when a CDD script or structured workflow step consumes the backend's output. A backend that only Claude reads, as prose — reference docs — is not a capability: it is served by the project's own MCP server plus a `CLAUDE.md` line saying what lives there and when to look (`doc/architecture/adr/0009-drop-the-docs-capability.md`).
 
 The namespace is **fixed**: `.cdd/`, one executable per capability, each named for the role it fills, and discovery is simply whether that file exists and is executable. There is no config format, no parser and no registry. The path is fixed rather than project-chosen because an adapter must resolve identically from a prompt and from a shell helper, and a helper has no LLM to read `CLAUDE.md` with — the check runner (§2.14) can live wherever a project likes because every one of its invokers is project-owned: the project's own CI config, and a prompt that reads `CLAUDE.md`. `.cdd/` also mirrors the machine-level `~/.cdd/`, and is not `.claude/`, which belongs to Claude Code.
 
@@ -259,7 +261,7 @@ The rule falls out of invariants already stated rather than out of taste. Issues
 
 The one piece that does ship ahead of the adapters is the **`x-` extension namespace** on the per-task state record, so an extension has somewhere to keep what only it knows — a notification's message id, a requirements-tracker link — that is neither derivable from the repo nor re-fetchable from the backend. It is specified in §2.13, which owns the record's schema.
 
-The first capability is live: the **tracker**, with a GitHub reference adapter, a Jira adapter and a conformance gate; every other binding is still the built-in one. The decision and its reasoning are recorded in `doc/architecture/adr/0007-extend-cdd-through-capability-adapters.md`; the verb contracts, JSON shapes and exit codes are pinned in `doc/architecture/capability-adapters.md`, which is what an adapter author reads.
+The first capability is live: the **tracker**, with a GitHub reference adapter, a Jira adapter and a conformance gate; every other binding is still the built-in one. The decision and its reasoning are recorded in `doc/architecture/adr/0007-extend-cdd-through-capability-adapters.md`; the verb contracts, JSON shapes and exit codes are pinned in `doc/architecture/capability-adapters.md`, which is what an adapter author reads, and which also carries the recipe for serving docs over MCP.
 
 ## 3. Lifecycle
 

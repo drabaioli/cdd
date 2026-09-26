@@ -2,7 +2,7 @@
 
 The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/adapters/tracker/github.sh`) and, alongside it, a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`).
 
-The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives. This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
+The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives (`adr/0009-drop-the-docs-capability.md` narrows it: docs is not a capability). This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
 Nothing here ships to downstream projects. The CDD repo is the canonical reference for adapter authors, exactly as it is for the process doc, and the template ships no copy of either.
 
@@ -195,6 +195,16 @@ It **declares all five verbs**, so `issue-transition` is the contract's live exi
 - **`issue-transition`.** Workflows are per project, so it asks Jira which transitions are available from the current status and takes the first that lands in the target category — for `open`, preferring a To Do-category status. Already there is a no-op, exit 0. No fitting transition is exit 1, listing the transitions that do exist. A transition that needs a screen field fails with Jira's 400 message, also exit 1.
 - **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the forge with smart commits enabled — the second of the three cases above.
 - **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
+
+## Docs: not a capability
+
+There is no `.cdd/docs`. An adapter is justified only when a CDD script or structured workflow step consumes its output, and a docs lookup is read only by Claude, as prose (`adr/0009-drop-the-docs-capability.md`). A project whose reference docs live in an external store — Confluence, Notion, a wiki — serves them this way instead:
+
+1. **The store's MCP server** goes in the project's `.mcp.json`. Authentication is that server's own; CDD holds no credential for it.
+2. **One `CLAUDE.md` paragraph** says what lives in the store and when to look: the task links a page, or the work codes against one of the integrations the store documents.
+3. **A subagent reads the page** and returns only the relevant section, so a long page never lands whole in the session's context.
+4. **What was used is recorded** under the plan's `## External findings`, with the page link and its version.
+5. **Page content is never copied** into the repo's docs. The repo stays the source of its own docs (replace-vs-mirror).
 
 ## Resolution and the announcement rule
 

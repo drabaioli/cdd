@@ -70,7 +70,7 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 <path → what changes, plus the distilled fact: `file:line` + your one-line conclusion>
 
 ## External findings
-<facts from outside the repo, quoted verbatim, each with its source — or "None">
+<facts from outside the repo, quoted verbatim, each with its source and version (release, page version, or retrieval date) — or "None">
 
 ## Dead ends
 <what was tried and why it failed, so it is not re-explored — or "None">
