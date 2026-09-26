@@ -204,7 +204,6 @@ Make CDD adaptable to a project's tracker and forge without editing a shipped pr
 - [x] Move issue refs from the branch name onto the state record (multi-ref, any backend); `/cdd-pre-pr` emits one close line per ref via `issue-close-token` (#97).
 - [x] Drop the `gh_issue_NN_` branch token; the state record is the only carrier, and an unusable record means no close lines, said out loud (ADR 0008).
 - [x] Jira tracker adapter, validated end-to-end on a real project.
-- [x] Withdraw the docs capability: docs come from each project's MCP server; an adapter needs a CDD step that consumes its output (ADR 0009).
 - [ ] Forge verb contract + GitHub reference adapter; `pr-merged` and `default-branch` move behind it.
 - [ ] Close issues post-merge via `issue-transition` from `cdd-worktree-gc`, opt-in and reported per ref; needs the forge adapter's `pr-merged` first.
 - [ ] GitLab forge adapter, validated on a real project.
