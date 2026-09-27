@@ -41,6 +41,7 @@ CHECKS=(
   "plan-sections|every plan-file section cdd-plan.md writes is named in cdd-implement.md"
   "lane-marker|the small-change lane's routing marker is written and read"
   "heuristic|the lane eligibility heuristic is stated verbatim everywhere"
+  "code-host-callers|the commands routed through the code host still name the verbs they call"
   "check-count|the seam-check count stated in prose matches this registry"
 )
 
@@ -311,6 +312,27 @@ check_heuristic() {
   for f in "$PROCESS_DOC_KB" "$NEXT" "$REPO_CMDS/cdd-small-change.md"; do
     grep -qF -- "$heuristic" "$f" \
       || note "eligibility-heuristic drift in $f: it no longer states the lane heuristic verbatim"
+  done
+  return 0
+}
+
+# --- Check: code-host callers ------------------------------------------------
+# /cdd-pre-pr opens the PR and /cdd-process-pr finds, reads and answers it through the
+# resolved code-host adapter, with the built-in `gh` path as the fallback. A one-sided
+# edit that drops the adapter path would still work here, on GitHub, and silently leave
+# a project on any other code host unable to open or process a PR — the same class as
+# the issue-refs seam. Both files are read stripped, as there: cdd-pre-pr.md's triage
+# prose names these verbs while describing this check. Captured into variables, as
+# there, rather than piped: under pipefail, `grep -q` exiting early SIGPIPEs the sed.
+check_code_host_callers() {
+  local pre process verb
+  pre="$(strip_cdd_only "$PRE")"
+  process="$(strip_cdd_only "$REPO_CMDS/cdd-process-pr.md")"
+  grep -qF -- 'pr-create' <<<"$pre" \
+    || note "code-host caller broken: $PRE no longer opens the PR through \`pr-create\`"
+  for verb in pr-for-branch pr-comments pr-reply; do
+    grep -qF -- "$verb" <<<"$process" \
+      || note "code-host caller broken: $REPO_CMDS/cdd-process-pr.md no longer calls \`$verb\`"
   done
   return 0
 }

@@ -10,7 +10,7 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's 10 checks gets at least one mutation:
+# checker's 11 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Issue-ref contract      — three cases, one per half of the seam: cdd-next-step.md
 #      stops recording the refs with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving
@@ -30,7 +30,9 @@
 #      /cdd-small-change while still routing the launch path to it.
 #   9. Eligibility heuristic   — cdd-small-change.md restates the lane heuristic in
 #      words of its own instead of the pinned sentence.
-#  10. Seam-check count       — a check is added to the checker's own registry without
+#  10. Code-host callers     — cdd-process-pr.md stops naming `pr-comments`, as an edit
+#      that dropped the adapter path and kept only the built-in `gh` one would.
+#  11. Seam-check count       — a check is added to the checker's own registry without
 #      updating the prose that restates how many checks there are. Self-referential, so
 #      the mutation has to add a registry entry AND a check function, not just a number.
 #
@@ -274,7 +276,15 @@ sandbox_sed 's|If you can state the finished diff in one sentence|If the change 
 expect_fail "check 9 catches a command that reworded the lane heuristic" \
   "it no longer states the lane heuristic verbatim"
 
-# --- Check 10: seam-check count ------------------------------------------------
+# --- Check 10: code-host callers -----------------------------------------------
+# Drop the adapter's feedback read from cdd-process-pr.md, leaving the built-in `gh` reads
+# in place: the command still works on GitHub, which is why nothing else would notice.
+fresh_sandbox
+sandbox_sed 's/pr-comments/pr-xomments/g' "$CMDS/cdd-process-pr.md"
+expect_fail "check 10 catches a code-host caller that stopped naming its verb" \
+  "no longer calls \`pr-comments\`"
+
+# --- Check 11: seam-check count ------------------------------------------------
 # Self-referential, so the mutation is a real check rather than an edited number: give
 # the sandbox checker one more registry entry and a matching no-op body, and the four
 # prose sites (this file among them) are now one short. Two insertion points, hence awk
@@ -294,8 +304,8 @@ sandbox_add_probe_check() {
 fresh_sandbox
 sandbox_add_probe_check
 "$SANDBOX/scripts/prompt-seam-check.sh" list | grep -qxF seam-probe \
-  || fail "check 10 setup: the probe check is not in the sandbox registry"
-expect_fail "check 10 catches a check added without updating the prose" \
+  || fail "check 11 setup: the probe check is not in the sandbox registry"
+expect_fail "check 11 catches a check added without updating the prose" \
   "seam-count drift in"
 
 echo "prompt-seam contract: clean"

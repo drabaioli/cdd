@@ -179,14 +179,16 @@ $ .cdd/code-host describe
 | Verb                                         | Replaces today                                               | Caller today                                   |
 | -------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------- |
 | `describe`                                   | —                                                            | mandatory                                      |
-| `pr-create --title T --body B [--base B]`    | `/cdd-pre-pr`'s `gh pr create`                               | none yet                                       |
-| `pr-for-branch <branch>`                     | `gh pr list --head B --state all`                            | `cdd-worktree-list`, the `cdd-worktree-resume` picker |
-| `pr-comments <pr>`                           | `/cdd-process-pr` §2's GraphQL and REST reads                | none yet                                       |
-| `pr-reply <pr> [--to <thread-id>] --body B`  | `/cdd-process-pr` §6's replies and `gh pr comment`           | none yet                                       |
+| `pr-create --title T --body B [--base B]`    | `/cdd-pre-pr`'s `gh pr create`                               | `/cdd-pre-pr` §11                              |
+| `pr-for-branch <branch>`                     | `gh pr list --head B --state all`, `/cdd-process-pr` §1's `gh pr view` | `cdd-worktree-list`, the `cdd-worktree-resume` picker, `/cdd-process-pr` §1 |
+| `pr-comments <pr>`                           | `/cdd-process-pr` §2's GraphQL and REST reads                | `/cdd-process-pr` §2–3                         |
+| `pr-reply <pr> [--to <thread-id>] --body B`  | `/cdd-process-pr` §6's replies and `gh pr comment`           | `/cdd-process-pr` §6                           |
 | `pr-merged <branch> [--base B]`              | `gh pr list --state merged` (done), `state == MERGED` (gc)   | `cdd-worktree-done`, `cdd-worktree-gc`         |
 | `default-branch`                             | `git symbolic-ref refs/remotes/origin/HEAD`                  | `cdd-worktree-default-branch`, `/cdd-pre-pr` §0, `/cdd-merge-base` §0 |
 
-"None yet" is deliberate: those verbs are pinned so an adapter author writes them once, but their callers still call `gh` directly. Until they move, a project on a non-GitHub code host can use the helpers and the base-branch lookup through its adapter, and **cannot open or process a PR through CDD**.
+Every pinned verb has a caller, so a project on a non-GitHub code host can open and process a PR through CDD via its adapter; the built-in `gh` path serves only when no adapter is installed. `/cdd-process-pr` takes the newest **open** entry of `pr-for-branch`, and when `pr-comments` omits `viewer` it filters nothing on authorship and leaves already-answered threads for its triage checkpoint to drop, rather than asking `gh` who the user is on a system that may not be GitHub.
+
+One `gh` call stays direct on purpose: the "file an issue on the CDD repo" offer in `/cdd-pre-pr` §7 and `/cdd-process-pr` §5 is `gh issue create --repo drabaioli/cdd`, because it always targets CDD upstream on GitHub — routing it through the project's tracker adapter would file a CDD bug in the project's own tracker (its Jira, say).
 
 `state` on a PR is normalized to **`open`, `closed` or `merged`** — three values, not the tracker's two, because merged is the fact CDD branches on — and `state_raw` keeps the backend's own value. A PR's `ref` is the human handle as a string (`"42"` on GitHub).
 
@@ -245,6 +247,8 @@ A bare branch name, never `origin/main`.
 ## The GitHub code-host adapter
 
 `tools/adapters/code-host/github.sh` is the reference implementation and the code-host conformance subject. It follows the tracker adapter line for line — dispatch before any backend work, `gh`'s own authentication (absent or unauthenticated is exit 4), no JSON dependency beyond `gh --jq`, and **no self-install**, for the same reason: the built-in rung already is GitHub. A project binds to it by making `.cdd/code-host` an executable that `exec`s it.
+
+This repo binds both GitHub adapters to itself by committing `.cdd/code-host` and `.cdd/tracker` as relative symlinks into `tools/adapters/` — dogfooding, and a symlink cannot drift from its target. A downstream project has no `tools/adapters/` of its own, so it binds by exec-wrapper. The cost is that this repo no longer exercises the built-in `gh` rung day to day; the `code-host-ladder` gate still covers it.
 
 It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline and exactly as the built-in does, and asks `gh repo view` only when `origin/HEAD` is unset — where the built-in would guess `main`.
 
@@ -308,6 +312,8 @@ How far "no lower rung" reaches is set per call site, by what the caller would d
 | `cdd-worktree` (code host)                         | stops before cutting the branch — only when no base was recorded |
 | `cdd-worktree-done`, `-gc`, `-resume` (code host)  | stops before doing anything                                  |
 | `cdd-worktree-list` (code host)                    | prints the line and shows `-` for every PR                   |
+| `/cdd-pre-pr` §11 (code host)                      | does not open the PR; the checklist still stands             |
+| `/cdd-process-pr` (code host)                      | stops the command                                            |
 
 The helpers' side is detailed in [Shell helpers](shell-helpers.md#code-host-resolution).
 
