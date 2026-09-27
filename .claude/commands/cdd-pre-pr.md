@@ -6,10 +6,24 @@ This session is **fresh and separate** from the implementation session by design
 
 ```bash
 BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
-BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)}
+# With no base recorded, look for a code-host adapter: project, then machine; the first file present wins.
+[ -z "$BASE_BRANCH" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-This reads the task's recorded base branch — the branch it was cut from and merges back into — and falls back to the hosting platform's default branch when none was recorded (unchanged behaviour for single-integration-branch projects). Use `$BASE_BRANCH` wherever `main`/`origin/main` appears in git commands below.
+If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not fall back to git, because an installed adapter declares which code host this project uses. If it is usable, say in one line which adapter serves, then take its answer:
+
+```bash
+BASE_BRANCH=$("$CODE_HOST" default-branch | jq -r '.branch // empty')   # exit 3 (unsupported) or a failure leaves it empty
+```
+
+Whatever is still empty falls back to git, as a bare branch name:
+
+```bash
+BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')}
+BASE_BRANCH=${BASE_BRANCH:-main}
+```
+
+This reads the task's recorded base branch — the branch it was cut from and merges back into — and falls back to the code host's default branch when none was recorded — through the code-host adapter when one is installed, else from git (unchanged behaviour for single-integration-branch projects). Use `$BASE_BRANCH` wherever `main`/`origin/main` appears in git commands below.
 
 ## 1. Identify changes
 
@@ -43,7 +57,7 @@ If the project has no single runner yet, run each gate command in sequence inste
 ```
 <!-- cdd-only-begin -->
 
-**In this repo the runner is `./scripts/ci.sh`** — 21 gates: shell syntax and shellcheck, the command-set drift and prompt-seam checks plus each checker's own contract, the roadmap item-length cap, the helper install / worktree-resume / ref-sync / GC / worktree-launch / state-extension assertions, the tracker adapters' offline conformance check plus that checker's own contract, the four bootstrap-and-render smokes, the demo seed overlay, and the runner's own contract. `./scripts/ci.sh list` names them; `./scripts/ci.sh <gate>` reruns one while iterating on a failure. It is not fail-fast — every gate runs, so one invocation surfaces every problem. Two of its gates need interpretation rather than a rerun; see the sections below.
+**In this repo the runner is `./scripts/ci.sh`** — 22 gates: shell syntax and shellcheck, the command-set drift and prompt-seam checks plus each checker's own contract, the roadmap item-length cap, the helper install / worktree-resume / ref-sync / GC / worktree-launch / state-extension assertions, the capability adapters' (tracker, code-host) offline conformance check plus that checker's own contract, the code-host resolution ladder, the four bootstrap-and-render smokes, the demo seed overlay, and the runner's own contract. `./scripts/ci.sh list` names them; `./scripts/ci.sh <gate>` reruns one while iterating on a failure. It is not fail-fast — every gate runs, so one invocation surfaces every problem. Two of its gates need interpretation rather than a rerun; see the sections below.
 <!-- cdd-only-end -->
 
 ## 3. Code review
@@ -216,7 +230,7 @@ If §8 found upstream drift, restate the recommendation to run `/cdd-merge-base`
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. Derive the body's close lines as described under **Close lines** below, so every issue the task was sourced from auto-closes on merge. Then advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
+- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##'`, a bare name like `$BASE_BRANCH`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. Derive the body's close lines as described under **Close lines** below, so every issue the task was sourced from auto-closes on merge. Then advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist above already stands on its own.
 
 **Close lines.** The body carries one close line per reference the task was sourced from. Read the recorded references first:
@@ -225,13 +239,15 @@ Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manu
 cdd-state get issue_refs    # one reference per line; empty when none were recorded
 ```
 
-- **Non-empty**: resolve the tracker down the ladder — project, then machine, then built-in — and take the first executable:
+- **Non-empty**: resolve the tracker down the ladder — project, then machine, then built-in — and take the first file present:
 
   ```bash
-  for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -x "$c" ] && { echo "$c"; break; }; done
+  for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
   ```
+
+  If one resolved but is broken — not executable, or its `describe` exits non-zero, does not parse, or reports another `capability` or an unsupported `contract` — say so in one line naming it and emit **no close lines**; do not fall back to the built-in `Closes #` syntax, which would be the wrong tracker's. The PR itself can still be opened.
 
   **Announce the rung in one line, once**, before the first call: the announcement rule is per call, but N identical lines is noise, and noise is how a load-bearing line stops being read. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved the built-in `gh` rung serves: strip any leading `#` and append `Closes #<ref>`. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line and leave them out rather than guessing a syntax for it.
 
-  **Then say what those lines will actually do**, once, before asking to open the PR. A close line is a string in the PR body, and who acts on it depends on where the issue lives. When the tracker is the built-in `gh` rung, or an adapter whose `describe.backend` is `github`, the forge hosting the PR also hosts the issue and closes it on merge — say that plainly. Otherwise the line fires only if the tracker's own forge integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close. CDD emits the token and has no way to check that anything is listening, so the one thing it can honestly do is not overstate it.
+  **Then say what those lines will actually do**, once, before asking to open the PR. A close line is a string in the PR body, and who acts on it depends on where the issue lives. When the tracker is the built-in `gh` rung, or an adapter whose `describe.backend` is `github`, the code host that hosts the PR also hosts the issue and closes it on merge — say that plainly. Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close. CDD emits the token and has no way to check that anything is listening, so the one thing it can honestly do is not overstate it.
 - **Empty** (no record, an unsynced or reaped one, or no `jq`): **no close lines.** The record is the only place a reference is kept, and a branch name is not a second one. Say so in one line at the confirmation step rather than opening a silently incomplete PR — the PR itself is fine, and the issues simply stay open for someone to close by hand.

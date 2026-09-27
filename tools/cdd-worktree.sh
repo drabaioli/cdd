@@ -46,7 +46,7 @@
 #                               root-owned build artefacts via sudo, with
 #                               confirmation), resolve the branch (safe-delete
 #                               if merged, force-delete if squash-merged on
-#                               GitHub, otherwise prompt), and delete the
+#                               the code host, otherwise prompt), and delete the
 #                               handoff file iff the branch was deleted.
 #
 #   cdd-worktree-list       List all active handoffs in ~/.cdd/handoffs/<repo-name>/
@@ -71,12 +71,113 @@
 #                               (refs/cdd/<branch>) for any task whose PR has
 #                               merged. Conservative — reaps only merged tasks
 #                               (never a scoped-but-unstarted or open-PR one) and
-#                               is dry-run unless --force. Needs gh.
+#                               is dry-run unless --force. Needs gh, or a
+#                               code-host adapter declaring pr-merged.
+#
+# PR lookups and the default branch go through a code-host capability adapter when
+# one is installed (.cdd/code-host, then ~/.cdd/adapters/code-host), and through
+# gh / git otherwise. An installed-but-broken adapter stops the command that needs
+# it rather than falling back (ADR 0010). See shell-helpers.md, "Code-host resolution".
 
-# Resolve the repo's default branch from origin's HEAD, falling back to "main".
-# The remote is assumed to be named "origin" (see template/BOOTSTRAP.md).
+# Resolve the capability adapter for <capability> down the ladder: the project's
+# .cdd/<capability>, then the machine's ~/.cdd/adapters/<capability>; the first FILE
+# present wins, so a broken project adapter never falls through to a machine one.
+# Capability-generic, so a later tracker call from these helpers can reuse it.
+#
+# Publishes into the caller's scope (callers declare these `local`, and bash's dynamic
+# scoping hands them to every function they call): CDD_ADAPTER (the path, empty when
+# none) and CDD_ADAPTER_DESCRIBE (its describe JSON). Globals rather than stdout
+# because a command substitution's subshell could not publish the describe as well.
+# Returns 0 when a valid adapter serves (announcing it in one stderr line), 1 when none
+# is installed (the built-in rung; silent), 2 when one is installed but broken (after
+# printing exactly one stderr line naming it and why).
+cdd-worktree-adapter() {
+  local cap="$1" top c path="" why="" desc="" rc=0 got
+  CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE=""
+  # The worktree's top level, not $PWD: `done` may run from a subdirectory.
+  top="$(git rev-parse --show-toplevel 2>/dev/null)"
+  for c in ${top:+"$top/.cdd/$cap"} "$HOME/.cdd/adapters/$cap"; do
+    [[ -e "$c" ]] && { path="$c"; break; }
+  done
+  [[ -z "$path" ]] && return 1
+
+  if [[ ! -x "$path" ]]; then
+    why="it is not executable"
+  elif ! command -v jq >/dev/null 2>&1; then
+    why="reading its describe needs jq, which is not installed"
+  else
+    desc="$("$path" describe 2>/dev/null)" || rc=$?
+    got="$(jq -r '.capability // empty' <<<"$desc" 2>/dev/null)"
+    if (( rc != 0 )); then
+      why="describe exited $rc"
+    elif ! jq -e . >/dev/null 2>&1 <<<"$desc"; then
+      why="describe did not print JSON"
+    elif [[ "$got" != "$cap" ]]; then
+      why="describe reports capability '${got:-none}', not '$cap'"
+    elif ! jq -e '.contract == 1' >/dev/null 2>&1 <<<"$desc"; then
+      why="describe reports contract $(jq -c '.contract' <<<"$desc" 2>/dev/null), and only 1 is supported"
+    fi
+  fi
+  local shown="$path"
+  [[ -n "$top" ]] && shown="${path#"$top"/}"
+  if [[ -n "$why" ]]; then
+    echo "$cap adapter $shown is unusable: $why; fix or remove it." >&2
+    return 2
+  fi
+  CDD_ADAPTER="$path" CDD_ADAPTER_DESCRIBE="$desc"
+  echo "$cap: using adapter $shown ($(jq -r '.backend // "?"' <<<"$desc"))" >&2
+  return 0
+}
+
+# Does the resolved adapter declare <verb> in describe.verbs?
+cdd-worktree-adapter-has() {
+  jq -e --arg v "$1" '.verbs | index($v)' >/dev/null 2>&1 <<<"${CDD_ADAPTER_DESCRIBE:-}"
+}
+
+# Run <verb> <arg>... on the resolved adapter ($CDD_ADAPTER). Its stdout lands in
+# CDD_ADAPTER_OUT and its first stderr line in CDD_ADAPTER_ERR (globals, as above, so
+# the call needs no subshell). Returns 0 ok; 3 when the verb is unsupported (absent
+# from describe.verbs, or the adapter said 3), which callers treat as "no answer",
+# silently; anything else is the adapter's failure code, for cdd-worktree-adapter-warn.
+cdd-worktree-adapter-call() {
+  local errf rc=0
+  CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR=""
+  cdd-worktree-adapter-has "$1" || return 3
+  errf="$(mktemp)" || return 1
+  CDD_ADAPTER_OUT="$("$CDD_ADAPTER" "$@" 2>"$errf")" || rc=$?
+  CDD_ADAPTER_ERR="$(head -1 "$errf")"
+  rm -f "$errf"
+  return "$rc"
+}
+
+cdd-worktree-adapter-warn() {  # cdd-worktree-adapter-warn <verb> <exit code>
+  echo "warning: $1 failed (exit $2) via ${CDD_ADAPTER}${CDD_ADAPTER_ERR:+: $CDD_ADAPTER_ERR}; treating it as no answer." >&2
+}
+
+# Resolve the repo's default branch: the code-host adapter's `default-branch` when one
+# serves, else origin's HEAD, falling back to "main". The remote is assumed to be
+# named "origin" (see template/BOOTSTRAP.md). With --resolved, reuse the caller's
+# already-resolved adapter (CDD_ADAPTER, possibly empty) instead of resolving again,
+# so a command announces its adapter once. Returns 1 when the adapter is broken.
 cdd-worktree-default-branch() {
-  local ref
+  local ref rc=0 branch=""
+  if [[ "${1:-}" != "--resolved" ]]; then
+    local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR=""
+    cdd-worktree-adapter code-host || rc=$?
+    if (( rc == 2 )); then return 1; fi
+  fi
+  if [[ -n "${CDD_ADAPTER:-}" ]]; then
+    # Git is the repository itself, not a lower backend rung: an adapter with no
+    # answer (unsupported, failed) still leaves origin/HEAD as the honest fallback.
+    rc=0
+    cdd-worktree-adapter-call default-branch || rc=$?
+    if (( rc == 0 )); then
+      branch="$(jq -r '.branch // empty' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)"
+    elif (( rc != 3 )); then
+      cdd-worktree-adapter-warn default-branch "$rc"
+    fi
+    [[ -n "$branch" ]] && { printf '%s\n' "$branch"; return 0; }
+  fi
   if ref="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
     printf '%s\n' "${ref#origin/}"
   else
@@ -129,7 +230,11 @@ cdd-worktree() {
   if command -v jq >/dev/null 2>&1 && [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
     base_branch="$(jq -r '.base_branch // empty' "${handoff_dir}/${branch}.state.json" 2>/dev/null)"
   fi
-  [[ -z "$base_branch" ]] && base_branch="$(cdd-worktree-default-branch)"
+  # Only here does the code-host adapter get resolved, and only when no base was
+  # recorded; a broken one stops before any branch or worktree is created.
+  if [[ -z "$base_branch" ]]; then
+    base_branch="$(cdd-worktree-default-branch)" || return 1
+  fi
   if git show-ref --verify --quiet "refs/heads/$base_branch"; then
     start_point="$base_branch"
   else
@@ -179,8 +284,13 @@ cdd-worktree() {
 }
 
 cdd-worktree-done() {
+  # Resolve the code-host adapter before anything else: a broken one must stop the
+  # command before the cd, the pull, or the worktree removal below.
+  local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
+  cdd-worktree-adapter code-host || rc=$?
+  if (( rc == 2 )); then return 1; fi
   local default_branch
-  default_branch="$(cdd-worktree-default-branch)"
+  default_branch="$(cdd-worktree-default-branch --resolved)"
   local branch
   branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
   if [[ -z "$branch" || "$branch" == "$default_branch" || "$branch" == "HEAD" ]]; then
@@ -243,7 +353,18 @@ cdd-worktree-done() {
     git branch -d "$branch" && branch_deleted=1
   else
     local pr_num=""
-    if command -v gh >/dev/null 2>&1; then
+    if [[ -n "$CDD_ADAPTER" ]]; then
+      # Never falls back to gh once an adapter resolved: it names the backend.
+      rc=0
+      cdd-worktree-adapter-call pr-merged "$branch" --base "$default_branch" || rc=$?
+      if (( rc == 0 )); then
+        if [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]]; then
+          pr_num="$(jq -r '.ref // "?"' <<<"$CDD_ADAPTER_OUT")"
+        fi
+      elif (( rc != 3 )); then
+        cdd-worktree-adapter-warn pr-merged "$rc"
+      fi
+    elif command -v gh >/dev/null 2>&1; then
       pr_num="$(gh pr list --state merged --base "$default_branch" --head "$branch" \
                   --json number --jq '.[0].number' 2>/dev/null)"
     fi
@@ -325,8 +446,15 @@ cdd-worktree-list() {
     return 0
   fi
 
+  # A broken code-host adapter is reported (by the resolver) but does not stop a
+  # read-only listing: its PR column just shows "-", never a gh fallback.
+  local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR=""
+  local adapter_rc=0 use_adapter=0 warned=0 crc
+  cdd-worktree-adapter code-host || adapter_rc=$?
+  (( adapter_rc == 0 )) && use_adapter=1
+
   local have_gh=0
-  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  if (( adapter_rc == 1 )) && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     have_gh=1
   fi
 
@@ -355,15 +483,26 @@ cdd-worktree-list() {
     fi
 
     pr="-"
-    if (( have_gh )); then
-      local pr_line
+    local pr_line=""
+    if (( use_adapter )); then
+      crc=0
+      cdd-worktree-adapter-call pr-for-branch "$branch" || crc=$?
+      if (( crc == 0 )); then
+        # Upcased NORMALIZED state, so the *MERGED* status test below holds for any backend.
+        pr_line="$(jq -r '.[0] | select(.) | "#\(.ref) \(.state|ascii_upcase)"' \
+                     <<<"$CDD_ADAPTER_OUT" 2>/dev/null)"
+      elif (( crc == 3 )); then
+        use_adapter=0
+      elif (( ! warned )); then
+        cdd-worktree-adapter-warn pr-for-branch "$crc"
+        warned=1
+      fi
+    elif (( have_gh )); then
       pr_line="$(gh pr list --head "$branch" --state all \
                    --json number,state \
                    --jq '.[0] | select(.) | "#\(.number) \(.state)"' 2>/dev/null)"
-      if [[ -n "$pr_line" ]]; then
-        pr="$pr_line"
-      fi
     fi
+    [[ -n "$pr_line" ]] && pr="$pr_line"
 
     if [[ "$wt" == "no" && "$br" == "no" ]]; then
       status="STALE, safe to remove handoff"
@@ -399,7 +538,19 @@ cdd-worktree-gc() {
     *) echo "usage: cdd-worktree-gc [--force]" >&2; return 2 ;;
   esac
 
-  if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+  # A broken code-host adapter stops GC outright: it deletes things, and without the
+  # adapter's answer it cannot tell a merged task from a scoped one.
+  local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
+  cdd-worktree-adapter code-host || rc=$?
+  if (( rc == 2 )); then return 1; fi
+
+  if [[ -n "$CDD_ADAPTER" ]]; then
+    if ! cdd-worktree-adapter-has pr-merged; then
+      echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
+      echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
+      return 0
+    fi
+  elif ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
     echo "cdd-worktree-gc needs an authenticated gh to tell a merged task from a" >&2
     echo "just-scoped one; without it nothing can be safely reaped. Skipping (advisory)." >&2
     return 0
@@ -434,8 +585,31 @@ cdd-worktree-gc() {
 
   local reaped=0 kept=0 pr_state handoff plan state items joined
   for branch in "${!seen[@]}"; do
-    pr_state="$(gh pr list --head "$branch" --state all --json state \
-                  --jq '.[0].state // empty' 2>/dev/null)"
+    if [[ -n "$CDD_ADAPTER" ]]; then
+      rc=0
+      cdd-worktree-adapter-call pr-merged "$branch" || rc=$?
+      if (( rc == 0 )); then
+        pr_state="not merged"
+        [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]] && pr_state="MERGED"
+      elif (( rc == 3 && reaped + kept == 0 )); then
+        # Declared but unsupported at runtime, on the first call: nothing has been
+        # reaped yet, so skipping the whole run is still honest.
+        echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
+        echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
+        return 0
+      elif (( rc == 3 )); then
+        # Unsupported only after earlier calls answered: some tasks may already be
+        # reaped, so keep this one and let the run finish with its summary.
+        echo "warning: pr-merged unsupported for $branch via ${CDD_ADAPTER}; keeping it." >&2
+        pr_state="PR state unknown"
+      else
+        cdd-worktree-adapter-warn pr-merged "$rc"
+        pr_state="PR state unknown"
+      fi
+    else
+      pr_state="$(gh pr list --head "$branch" --state all --json state \
+                    --jq '.[0].state // empty' 2>/dev/null)"
+    fi
     if [[ "$pr_state" != "MERGED" ]]; then
       kept=$(( kept + 1 ))
       echo "keep  $branch (${pr_state:-no PR yet} — in-flight or scoped, not reaped)"
@@ -584,10 +758,15 @@ cdd-worktree-resume() {
     -?*) echo "cdd-worktree-resume: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
   esac
 
+  # A broken code-host adapter stops the resume before anything is fetched or created.
+  local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
+  cdd-worktree-adapter code-host || rc=$?
+  if (( rc == 2 )); then return 1; fi
+
   # Same guard as cdd-worktree: the sibling worktree name is derived from $PWD, so
   # insist on the main worktree to avoid nesting names.
   local default_branch current_branch
-  default_branch="$(cdd-worktree-default-branch)"
+  default_branch="$(cdd-worktree-default-branch --resolved)"
   current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" || return 1
   if [[ "$current_branch" != "$default_branch" ]]; then
     echo "Run this from the main worktree on '$default_branch' (current: '$current_branch')." >&2
@@ -611,8 +790,10 @@ cdd-worktree-resume() {
     # Discovery: remote feature branches (exclude default + HEAD) not already
     # checked out as a local worktree. The fetch above pruned merged-and-deleted
     # branches, so what remains is the set of live branches shown on GitHub.
-    local have_gh=0
-    if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    local have_gh=0 use_adapter=0 crc
+    if [[ -n "$CDD_ADAPTER" ]]; then
+      use_adapter=1
+    elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
       have_gh=1
     fi
 
@@ -637,7 +818,17 @@ cdd-worktree-resume() {
     local i pr_line
     for i in "${!candidates[@]}"; do
       pr_line=""
-      if (( have_gh )); then
+      if (( use_adapter )); then
+        crc=0
+        cdd-worktree-adapter-call pr-for-branch "${candidates[$i]}" || crc=$?
+        if (( crc == 0 )); then
+          pr_line="$(jq -r '.[0] | select(.) | " (PR #\(.ref) \(.state|ascii_upcase))"' \
+                       <<<"$CDD_ADAPTER_OUT" 2>/dev/null)"
+        else
+          (( crc == 3 )) || cdd-worktree-adapter-warn pr-for-branch "$crc"
+          use_adapter=0
+        fi
+      elif (( have_gh )); then
         pr_line="$(gh pr list --head "${candidates[$i]}" --state all \
                      --json number,state \
                      --jq '.[0] | select(.) | " (PR #\(.number) \(.state))"' 2>/dev/null)"

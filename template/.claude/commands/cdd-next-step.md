@@ -17,10 +17,10 @@ This command has one optional argument. Dispatch on its shape, trying the rows i
 
 The argument splits on whitespace, and the direct row matches only when **every** token matches — one task may be sourced from several issues (`/cdd-next-step 97 12`). A single token is the common case and behaves exactly as before; a mixed argument (one token matching, one not) is not issue-driven and falls to intent-driven, where the whole string is read as a task prompt.
 
-**What a reference looks like is the tracker's decision, not this command's.** Resolve the tracker down the ladder — project, then machine, then built-in — and take the first executable:
+**What a reference looks like is the tracker's decision, not this command's.** Resolve the tracker down the ladder — project, then machine, then built-in — and take the first file present:
 
 ```bash
-for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -x "$c" ] && { echo "$c"; break; }; done
+for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
 ```
 
 If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the shape of a reference:
@@ -29,7 +29,7 @@ If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the sh
 <adapter> describe    # JSON on stdout; hermetic, so it needs no network and no credentials
 ```
 
-Use it only if `describe` exits 0, parses as JSON, and reports a `contract` this CDD supports (currently `1`). Otherwise — unparseable, wrong version, or a non-zero exit — say so in **one line** and fall through to the next rung; that line is unconditional, because the user installed something that is not working and silence there is indistinguishable from it working. With nothing resolved, the built-in rung serves and its `ref_pattern` is the constant `^#?[0-9]+$` — `#123` or a bare `123`, exactly as before adapters existed.
+Use it only if the file is executable and `describe` exits 0, parses as JSON, reports `capability` `tracker`, and reports a `contract` this CDD supports (currently `1`). Otherwise — not executable, a non-zero exit, unparseable, another capability, or wrong version — the adapter is **installed but broken**: say so in **one line** naming its path, and **stop the command**. Do not try a lower rung: an installed adapter declares which tracker this project uses, so a lower rung would answer from the wrong system. With nothing resolved, the built-in rung serves and its `ref_pattern` is the constant `^#?[0-9]+$` — `#123` or a bare `123`, exactly as before adapters existed.
 
 Resolution done only to classify the argument is otherwise **silent**. The line naming which rung served is printed in §0b, where a tracker call is actually made: a fallback line in every session in every repo is noise, and noise is how a load-bearing line stops being read.
 

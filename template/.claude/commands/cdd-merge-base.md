@@ -9,10 +9,24 @@ Run this command on the feature branch (not on the base branch). Use it when:
 
 ```bash
 BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
-BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || echo main)}
+# With no base recorded, look for a code-host adapter: project, then machine; the first file present wins.
+[ -z "$BASE_BRANCH" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-This reads the task's recorded base branch — the branch it was cut from and merges back into. When no base was recorded (every single-integration-branch project), it falls back to the hosting platform's default branch, so behaviour is unchanged there. Use `$BASE_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
+If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not fall back to git, because an installed adapter declares which code host this project uses. If it is usable, say in one line which adapter serves, then take its answer:
+
+```bash
+BASE_BRANCH=$("$CODE_HOST" default-branch | jq -r '.branch // empty')   # exit 3 (unsupported) or a failure leaves it empty
+```
+
+Whatever is still empty falls back to git, as a bare branch name:
+
+```bash
+BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')}
+BASE_BRANCH=${BASE_BRANCH:-main}
+```
+
+This reads the task's recorded base branch — the branch it was cut from and merges back into. When no base was recorded (every single-integration-branch project), it falls back to the code host's default branch — through the code-host adapter when one is installed, else from git — so behaviour is unchanged there. Use `$BASE_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
 
 ## 1. Sanity check
 

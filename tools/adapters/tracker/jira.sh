@@ -367,7 +367,7 @@ verb_issue_transition() {
 
 # --- issue-close-token --------------------------------------------------------
 # Purely local: a smart commit, `<KEY> #<transition>`. It only acts where Jira is
-# connected to the forge with smart commits enabled (the contract doc's three cases).
+# connected to the code host with smart commits enabled (the contract doc's three cases).
 # Smart commits name a transition hyphenated and lowercase (`Start Progress` ->
 # `#start-progress`), so the override is normalized to that form.
 verb_issue_close_token() {
