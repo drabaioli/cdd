@@ -1,14 +1,14 @@
-# Capability adapters: the tracker contract
+# Capability adapters: the tracker and code-host contracts
 
-The wire contract every capability adapter answers, pinned for the **tracker** capability — the first one with a shipped reference implementation (`tools/adapters/tracker/github.sh`) and, alongside it, a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`).
+The wire contract every capability adapter answers, pinned for two capabilities: the **tracker**, with a GitHub reference implementation (`tools/adapters/tracker/github.sh`) and a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`), and the **code host** — where PRs and merge state live — with a GitHub reference implementation (`tools/adapters/code-host/github.sh`).
 
-The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives (`adr/0009-drop-the-docs-capability.md` narrows it: docs is not a capability). This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
+The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives (`adr/0009-drop-the-docs-capability.md` narrows it: docs is not a capability; `adr/0010-code-host-rename-and-broken-adapter-rule.md` names the code host and replaces the ladder's fall-through for a broken adapter). This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
 Nothing here ships to downstream projects. The CDD repo is the canonical reference for adapter authors, exactly as it is for the process doc, and the template ships no copy of either.
 
 ## What an adapter is
 
-An executable — any language — at a fixed path, invoked as `<adapter> <verb> [args...]`. It is not a library, not a config file, and not a service. CDD discovers it by testing that the path exists and is executable, and learns what it can do by running `describe`.
+An executable — any language — at a fixed path, invoked as `<adapter> <verb> [args...]`. It is not a library, not a config file, and not a service. CDD discovers it by testing that the path exists — a file that exists but is not executable is broken, not absent — and learns what it can do by running `describe`.
 
 Three rules hold for every verb of every capability:
 
@@ -49,16 +49,16 @@ $ .cdd/tracker describe
 
 | Field           | Required | Meaning                                                                        |
 | --------------- | -------- | ------------------------------------------------------------------------------ |
-| `capability`    | yes      | The role this adapter fills — `tracker` here. Matches the file name under `.cdd/`. |
+| `capability`    | yes      | The role this adapter fills — `tracker` or `code-host`. Matches the file name under `.cdd/`. |
 | `contract`      | yes      | Integer contract version; see below.                                            |
 | `backend`       | yes      | Non-empty string naming the service (`github`, `jira`, …). Free-form; nothing branches on it. |
-| `ref_pattern`   | yes      | An **ERE** that matches a reference this backend accepts. CDD dispatches on it instead of hardcoding a shape. |
+| `ref_pattern`   | tracker  | An **ERE** that matches a reference this backend accepts. CDD dispatches on it instead of hardcoding a shape. Required of a tracker; not part of the code-host contract, where every PR ref a caller holds is one the adapter itself emitted, so nothing dispatches on its shape. |
 | `verbs`         | yes      | Non-empty array of the verbs this adapter implements, **excluding `describe`**. |
-| `create_target` | no       | Human-readable coordinates a created item would land in (`owner/repo`, `XYZ / board 42`). Shown to a human before a write; nothing parses it. Omitted when it cannot be derived locally. |
+| `create_target` | no (tracker) | Human-readable coordinates a created item would land in (`owner/repo`, `XYZ / board 42`). Shown to a human before a write; nothing parses it. Omitted when it cannot be derived locally. |
 
 **`describe` excludes itself from `verbs`.** It is mandatory for every adapter, so listing it is redundant, and the conformance gate checks it separately. Issue #86's Jira example must not be read the other way.
 
-**Versioning: `describe.contract` is an integer, and CDD supports N and N-1.** An adapter declaring an older-than-N-1 or newer-than-N version is ignored with a line saying so, not an error. **No `describe`, or an unparseable one, means "not an adapter"** — also ignored, also announced. The current contract version is **1**.
+**Versioning: `describe.contract` is an integer, and CDD supports N and N-1.** The current contract version is **1**, for both capabilities. An adapter declaring an older-than-N-1 or newer-than-N version, a `describe` that exits non-zero or does not parse, or one reporting another `capability`, is **installed but broken**: the caller says so in one line and does not try a lower rung (see [Resolution](#resolution-the-broken-adapter-rule-and-the-announcement-rule)).
 
 `ref_pattern` is what makes the ladder work in the direction issue #86 requires: a prompt must **not** learn to recognize `XYZ-123`. It resolves the adapter, reads `ref_pattern`, and lets the adapter decide what a valid reference looks like. The built-in (no-adapter) tracker behaves as though `ref_pattern` were `^#?[0-9]+$`.
 
@@ -130,9 +130,9 @@ Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the reference
 **What the token can and cannot promise.** Emitting a close line is not the same as closing the
 item, and the contract deliberately does not claim otherwise. Three cases:
 
-- **Tracker and forge are the same backend** (a GitHub PR closing a GitHub issue, a GitLab MR
-  closing a GitLab issue). The forge parses its own PR body and closes the item on merge. This is
-  the *forge's* feature, not the tracker's, and it is the only case CDD can rely on.
+- **Tracker and code host are the same backend** (a GitHub PR closing a GitHub issue, a GitLab MR
+  closing a GitLab issue). The code host parses its own PR body and closes the item on merge. This
+  is the *code host's* feature, not the tracker's, and it is the only case CDD can rely on.
 - **Different backends, with an integration** (a GitHub PR closing a Jira issue). Still a string in
   text, but the party acting on it is a tracker-side integration — Jira's DVCS connector or the
   GitHub-for-Jira app — which must be installed and watching the repo. Where it is, a smart commit
@@ -148,14 +148,15 @@ does nothing look like one that does.
 
 **A close that is guaranteed across backends needs `issue-transition` called after the merge**, by
 an actor CDD does not have today: `/cdd-pre-pr` runs pre-merge, and `cdd-worktree-gc` — the only
-thing that runs post-merge — is local maintenance whose merge check is hardcoded to `gh`. The
-natural home is gc once the forge capability puts `pr-merged` behind an adapter, opt-in and
-reporting each transition, which is where the roadmap sequences it. Until then, cross-backend
-closing is the tracker integration's job and CDD's contribution is emitting the token it reads.
+thing that runs post-merge — is local maintenance. Its merge check now goes through the code
+host's `pr-merged` when an adapter serves, so the prerequisite is in place; the natural home is gc,
+opt-in and reporting each transition, which is where the roadmap sequences it. Until then,
+cross-backend closing is the tracker integration's job and CDD's contribution is emitting the
+token it reads.
 
 ## The GitHub reference adapter
 
-Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new tracker backend is one new file, which the lint and conformance gates pick up by glob.
+Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new backend is one new file, which the lint and conformance gates pick up by glob.
 
 `tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
@@ -164,6 +165,88 @@ It **declares four verbs**: `issue-read`, `issue-list`, `issue-create`, `issue-c
 Its `ref_pattern` is `^#?[0-9]+$`, which is exactly the shape `/cdd-next-step` hardcoded before the ladder existed. `create_target` is derived from `git remote get-url origin` parsed to `owner/repo` — local, no network — and omitted when it cannot be derived.
 
 Authentication is `gh`'s own, untouched: `gh` absent from `PATH`, or `gh auth status` failing, is exit 4 with an actionable line on stderr. CDD stores, reads and proxies no secret (§2.16).
+
+## The code-host verbs
+
+Seven verbs, of which one (`describe`) is mandatory and the other six are declared per backend. The code host is where PRs and merge state live; its `describe` carries no `ref_pattern` and no `create_target`:
+
+```console
+$ .cdd/code-host describe
+{"capability":"code-host","contract":1,"backend":"github",
+ "verbs":["pr-create","pr-for-branch","pr-comments","pr-reply","pr-merged","default-branch"]}
+```
+
+| Verb                                         | Replaces today                                               | Caller today                                   |
+| -------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------- |
+| `describe`                                   | —                                                            | mandatory                                      |
+| `pr-create --title T --body B [--base B]`    | `/cdd-pre-pr`'s `gh pr create`                               | none yet                                       |
+| `pr-for-branch <branch>`                     | `gh pr list --head B --state all`                            | `cdd-worktree-list`, the `cdd-worktree-resume` picker |
+| `pr-comments <pr>`                           | `/cdd-process-pr` §2's GraphQL and REST reads                | none yet                                       |
+| `pr-reply <pr> [--to <thread-id>] --body B`  | `/cdd-process-pr` §6's replies and `gh pr comment`           | none yet                                       |
+| `pr-merged <branch> [--base B]`              | `gh pr list --state merged` (done), `state == MERGED` (gc)   | `cdd-worktree-done`, `cdd-worktree-gc`         |
+| `default-branch`                             | `git symbolic-ref refs/remotes/origin/HEAD`                  | `cdd-worktree-default-branch`, `/cdd-pre-pr` §0, `/cdd-merge-base` §0 |
+
+"None yet" is deliberate: those verbs are pinned so an adapter author writes them once, but their callers still call `gh` directly. Until they move, a project on a non-GitHub code host can use the helpers and the base-branch lookup through its adapter, and **cannot open or process a PR through CDD**.
+
+`state` on a PR is normalized to **`open`, `closed` or `merged`** — three values, not the tracker's two, because merged is the fact CDD branches on — and `state_raw` keeps the backend's own value. A PR's `ref` is the human handle as a string (`"42"` on GitHub).
+
+### `pr-create --title T --body B [--base B]` → object
+
+```json
+{"ref":"42","url":"https://…"}
+```
+
+Without `--base`, the backend's default branch is the target.
+
+### `pr-for-branch <branch>` → array
+
+```json
+[ {"ref":"42","state":"merged","state_raw":"MERGED","url":"https://…","head":"my_branch","base":"main"} ]
+```
+
+Every PR whose head is the branch, **newest first**; `[]` when there is none, as with `issue-list`.
+
+### `pr-merged <branch> [--base B]` → object
+
+```json
+{"branch":"my_branch","merged":true,"ref":"42"}
+```
+
+**Whether the branch's most recent PR** (into `--base`, if given) **has merged.** It takes a branch because both of its callers start from one. `ref` is present only when `merged` is true. This is slightly more conservative than the built-in `done` check it replaces, which accepted *any* merged PR into the base: a branch with an older merged PR and a newer open one reads as not merged, so `done` prompts instead of force-deleting.
+
+### `pr-comments <pr>` → object
+
+```json
+{"ref":"42","viewer":"octocat",
+ "threads":[{"id":"123456","resolved":false,"outdated":false,"path":"a.sh","line":12,
+             "comments":[{"id":"123456","author":"rev","created_at":"…Z","body":"…"}]}],
+ "reviews":[{"id":"…","author":"rev","state_raw":"CHANGES_REQUESTED","created_at":"…Z","body":"…"}],
+ "comments":[{"id":"…","author":"rev","created_at":"…Z","body":"…"}]}
+```
+
+Everything `/cdd-process-pr` reads today, in one call. `threads` are inline review threads with their resolution state; a thread's `id` is the reply target for `pr-reply --to`, and `line` is omitted when the backend reports none (an outdated thread). `reviews` holds only reviews with a non-empty body. `comments` are top-level PR comments. `viewer` is the authenticated account, so "skip a thread whose latest comment is mine" works on any backend; it is omitted when it cannot be derived.
+
+### `pr-reply <pr> [--to <thread-id>] --body B` → object
+
+```json
+{"ref":"42","url":"https://…"}
+```
+
+With `--to`, a reply in that review thread; without, a top-level PR comment. `url` is the new comment's.
+
+### `default-branch` → object
+
+```json
+{"branch":"main"}
+```
+
+A bare branch name, never `origin/main`.
+
+## The GitHub code-host adapter
+
+`tools/adapters/code-host/github.sh` is the reference implementation and the code-host conformance subject. It follows the tracker adapter line for line — dispatch before any backend work, `gh`'s own authentication (absent or unauthenticated is exit 4), no JSON dependency beyond `gh --jq`, and **no self-install**, for the same reason: the built-in rung already is GitHub. A project binds to it by making `.cdd/code-host` an executable that `exec`s it.
+
+It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline and exactly as the built-in does, and asks `gh repo view` only when `origin/HEAD` is unset — where the built-in would guess `main`.
 
 ## The Jira adapter
 
@@ -193,7 +276,7 @@ It **declares all five verbs**, so `issue-transition` is the contract's live exi
 
 - **State.** `closed` is the status *category* `done`; `open` is anything else. `state_raw` is the status name (`In Review`). `issue-list` is the project's items whose category is not Done, one page of up to 100 (the GitHub adapter's cap), through `/rest/api/3/search/jql` — the older `/search` endpoint has been removed from Jira Cloud. Search reads Jira's index, which trails a write by a second or two, so an item transitioned a moment ago can still appear; `issue-read` is always current.
 - **`issue-transition`.** Workflows are per project, so it asks Jira which transitions are available from the current status and takes the first that lands in the target category — for `open`, preferring a To Do-category status. Already there is a no-op, exit 0. No fitting transition is exit 1, listing the transitions that do exist. A transition that needs a screen field fails with Jira's 400 message, also exit 1.
-- **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the forge with smart commits enabled — the second of the three cases above.
+- **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the code host with smart commits enabled — the second of the three cases above.
 - **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
 ## Docs: not a capability
@@ -206,28 +289,47 @@ There is no `.cdd/docs`. An adapter is justified only when a CDD script or struc
 4. **What was used is recorded** under the plan's `## External findings`, with the page link and its version.
 5. **Page content is never copied** into the repo's docs. The repo stays the source of its own docs (replace-vs-mirror).
 
-## Resolution and the announcement rule
+## Resolution, the broken-adapter rule, and the announcement rule
 
-Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machine `~/.cdd/adapters/<capability>`, then built-in behaviour — first executable wins, and it degrades loudly rather than failing.
+Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machine `~/.cdd/adapters/<capability>`, then built-in behaviour — and the **first file present** wins. What happens next is one of three cases, for every capability ([ADR 0010](adr/0010-code-host-rename-and-broken-adapter-rule.md)):
 
-"Loudly" is scoped **to the point of use, not to the session**:
+- **Missing** — no file at the rung: the next rung.
+- **Installed but broken** — the file is not executable; `describe` exits non-zero, does not parse as JSON, reports another `capability`, or a `contract` outside N / N-1; or `jq` is absent, so the caller cannot read `describe`: **one line naming the adapter and why, and no lower rung.** A broken project adapter does not fall to a working machine one, and neither falls to the built-in. An installed adapter declares the backend, so any lower rung would answer from the wrong system.
+- **Verb unsupported** — absent from `describe.verbs`, or exit 3: not an error. The caller skips the feature, exactly as when the backend has no answer.
+
+Once an adapter serves, a call that **fails** (exit 1, 4, anything but 0 or 3) is reported in one line and treated as "no answer" — never retried against a lower rung.
+
+How far "no lower rung" reaches is set per call site, by what the caller would do with a wrong answer:
+
+| Call site                                          | Broken adapter                                               |
+| -------------------------------------------------- | ------------------------------------------------------------ |
+| `/cdd-next-step` (tracker)                         | stops the command                                            |
+| `/cdd-pre-pr` §0, `/cdd-merge-base` §0 (code host) | stops the command — only reached when no base was recorded   |
+| `cdd-worktree` (code host)                         | stops before cutting the branch — only when no base was recorded |
+| `cdd-worktree-done`, `-gc`, `-resume` (code host)  | stops before doing anything                                  |
+| `cdd-worktree-list` (code host)                    | prints the line and shows `-` for every PR                   |
+
+The helpers' side is detailed in [Shell helpers](shell-helpers.md#code-host-resolution).
+
+Announcing which rung served is scoped **to the point of use, not to the session**:
 
 - Resolution performed merely to **classify** something — deciding whether `$ARGUMENTS` looks like an issue reference, say — is **silent**. Taken literally, "an absent adapter yields today's behaviour with a line saying so" would print a fallback line in every session in every repo, since no project has an adapter; that is noise, and noise is how a load-bearing line stops being read.
-- When a tracker call is **actually made**, the caller announces in one line which rung served it — including the "no adapter installed, using built-in `gh`" case.
-- **One exception, unconditional:** an adapter that is **present but rejected** — unparseable `describe`, an unsupported `contract` version, or a non-zero exit from `describe` — is announced **always**, even during silent classification. The user installed something that is not working, and silence there is indistinguishable from it working.
+- When a prompt **actually makes a call**, it announces in one line which rung served it — including the "no adapter installed, using built-in `gh`" case.
+- **The shell helpers are silent on the built-in rung** and print one line only when an adapter serves. A helper line on the built-in rung would print on every `cdd-worktree-list` in every repo; and because a present-but-non-executable file is broken rather than absent, there is no way left for a misconfigured adapter to hide behind a silent built-in.
+- **The broken-adapter line is unconditional**, even during silent classification. The user installed something that is not working, and silence there is indistinguishable from it working.
 
 ## The conformance gate
 
-`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker`; `scripts/ci.sh` runs it over every `tools/adapters/tracker/*.sh`, so both shipped adapters are checked and a new one is covered without editing the runner.
+`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document, for either capability. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker` or `.cdd/code-host`, and an optional capability; without one, the capability comes from the path (`tools/adapters/<capability>/…`, `.cdd/<capability>`, `~/.cdd/adapters/<capability>`), and failing that from `describe` itself. `scripts/ci.sh` runs it over every `tools/adapters/*/*.sh`, so all three shipped adapters are checked and a new one is covered without editing the runner.
 
 It is **offline by construction**, and backend-neutral: every probe runs with the environment scrubbed (`env -i`, so a credential or coordinate the caller happens to have exported never reaches the subject), under either a scratch `PATH` holding stub backend tools — a `gh` that is authenticated and useless, a `curl` that always fails as if the host were unreachable — or a minimal `PATH` with no backend tooling at all. Nothing it runs can reach the network or authenticate. No probe mode, no dry-run flag — an adapter is checked exactly as a caller would invoke it. What it asserts:
 
 1. `describe` exits 0 with backend tooling absent from `PATH` and the environment scrubbed, and its stdout parses as JSON (hermeticity).
-2. `describe` is contract-shaped: `capability` is `tracker`; `contract` is an integer ≥ 1; `backend` is a non-empty string; `ref_pattern` is a non-empty string that `grep -E` accepts as a valid ERE; `verbs` is a non-empty array of strings; `describe` is **not** among them; every declared verb is one of the five non-`describe` verbs above; and no `null` appears anywhere in the output.
+2. `describe` is contract-shaped: `capability` is the one being checked; `contract` is an integer ≥ 1; `backend` is a non-empty string; for a tracker, `ref_pattern` is a non-empty string that `grep -E` accepts as a valid ERE; `verbs` is a non-empty array of strings; `describe` is **not** among them; every declared verb is one of that capability's non-`describe` verbs; and no `null` appears anywhere in the output.
 3. Every verb in `describe.verbs`, invoked with **no arguments**, exits something other than 3 — i.e. dispatch reaches a real implementation rather than the unsupported-verb branch.
-4. Every contract verb the adapter does not declare exits 3 (`issue-transition`, on GitHub), and so does a nonsense verb.
-5. `issue-read` with no arguments exits 2.
-6. `issue-list` with backend tooling absent and the environment scrubbed exits 4 with a line on stderr — missing tooling for a `gh`-based adapter, missing configuration for an env-configured one.
+4. Every contract verb the adapter does not declare exits 3 (`issue-transition`, on the GitHub tracker), and so does a nonsense verb.
+5. A verb called without its required argument exits 2 — `issue-read` for a tracker, `pr-merged` for a code host.
+6. A verb that needs the backend, called with backend tooling absent and the environment scrubbed, exits 4 with a line on stderr — `issue-list` for a tracker, `pr-for-branch <branch>` for a code host; missing tooling for a `gh`-based adapter, missing configuration for an env-configured one.
 7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, an Atlassian API token prefix, a hardcoded basic-auth header, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.
 
 **Its stated limit:** check 3 proves that dispatch *reaches* an implementation, not that the implementation is *correct*. Correctness needs a live call against a real backend, which the offline-only decision rules out on purpose — a gate that SKIPs on most hosts is a gate whose verdict nobody can rely on. Checks 1, 2 and 4–7 are exact; check 3 is a floor.

@@ -12,7 +12,8 @@
 # checker's seven checks gets at least one mutation, against the GitHub adapter:
 #   1. describe is hermetic      — describe authenticates; describe emits non-JSON.
 #   2. describe is contract-shaped — describe lists itself in verbs; it emits a null;
-#      its ref_pattern is not a valid ERE.
+#      its ref_pattern is not a valid ERE; it claims the code-host capability while
+#      being checked as a tracker.
 #   3. Declared verbs dispatch   — the adapter declares a verb it does not implement.
 #   4. Unsupported verb -> 3     — an unknown verb exits 1 instead.
 #   5. Usage error -> 2          — a missing argument exits 1 instead.
@@ -29,12 +30,22 @@
 #      reaching the subject; without it, this mutation passes on any host that has them set.
 #   6. Missing config -> 4       — unset configuration exits 1 instead.
 #
-# Plus three controls, which are what make the mutations mean anything:
+# And against the GitHub code-host adapter, checked against the code-host contract:
+#   2. describe is contract-shaped — it claims the tracker capability.
+#   3. Declared verbs dispatch   — a declared verb's dispatch branch exits 3.
+#   5. Usage error -> 2          — a missing branch exits 1 instead.
+#   6. Missing backend -> 4      — an absent `gh` exits 1 instead.
+#
+# Plus four controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
 #     checker that is simply broken and fails on everything.
 #   - An adapter that omits the optional `create_target` must PASS, pinning the other
 #     direction: the checker must not have quietly started requiring an optional field.
 #   - An unmutated copy of the Jira adapter must PASS, for the same reason as the first.
+#   - An unmutated copy of the code-host adapter must PASS, likewise.
+#
+# The checker is always told which contract to check (its second argument), because
+# the sandbox copy's path no longer names the capability the way the real one does.
 #
 # Every mutation is verified to have actually CHANGED the file before the checker runs.
 # A mutation whose anchor has rotted away applies nothing, and a checker "detecting" an
@@ -53,6 +64,8 @@ cd "$REPO_ROOT" || exit 1
 CHECKER="./scripts/adapter-conformance-check.sh"
 ADAPTER="tools/adapters/tracker/github.sh"
 JIRA_ADAPTER="tools/adapters/tracker/jira.sh"
+CODE_HOST_ADAPTER="tools/adapters/code-host/github.sh"
+CAP="tracker"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
@@ -60,6 +73,7 @@ pass() { echo "ok: $*"; }
 [[ -x "$CHECKER" ]] || fail "checker not found or not executable: $CHECKER"
 [[ -x "$ADAPTER" ]] || fail "adapter not found or not executable: $ADAPTER"
 [[ -x "$JIRA_ADAPTER" ]] || fail "adapter not found or not executable: $JIRA_ADAPTER"
+[[ -x "$CODE_HOST_ADAPTER" ]] || fail "adapter not found or not executable: $CODE_HOST_ADAPTER"
 
 # The checker skips without jq, so every expect_fail below would see a clean exit 0 and
 # report a checker that has stopped firing. Skip loudly instead — the runner's posture
@@ -124,7 +138,7 @@ mutate_prog() {  # mutate_prog <label> <awk program>
 
 # --- Running the checker against the mutated copy -----------------------------
 run_checker() {
-  OUT="$("$CHECKER" "$SUBJECT" 2>&1)"
+  OUT="$("$CHECKER" "$SUBJECT" "$CAP" 2>&1)"
   STATUS=$?
 }
 
@@ -167,6 +181,10 @@ expect_fail "describe emitting a null is caught" "emits null somewhere"
 mutate_replace_line "ref_pattern is not a valid ERE" '^REF_PATTERN=' \
   'REF_PATTERN='"'"'^#?[0-9+$'"'"''
 expect_fail "an unparseable ref_pattern is caught" "not a valid ERE"
+
+mutate_prog "a tracker claiming the code-host capability" \
+  '{ sub(/"capability":"tracker"/, "\"capability\":\"code-host\""); print }'
+expect_fail "a tracker adapter claiming another capability is caught" "describe reports capability"
 
 # --- Check 3: every declared verb dispatches to an implementation -------------
 mutate_replace_line "declares a verb it does not implement" '^DECLARED_VERBS=' \
@@ -244,4 +262,34 @@ mutate_prog "missing config exits 1" \
   '/^require_config\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
 expect_fail "missing configuration exiting 1 instead of 4 is caught" "expected exit 4, got 1"
 
-echo "adapter-conformance checker contract: clean (17 mutations, 3 controls)"
+# --- The GitHub code-host adapter ----------------------------------------------
+ADAPTER="$CODE_HOST_ADAPTER"
+CAP="code-host"
+cp "$ADAPTER" "$MASTER" || fail "could not copy $ADAPTER into the sandbox"
+
+cp "$MASTER" "$SUBJECT"; chmod 755 "$SUBJECT"
+expect_pass "control: an unmutated copy of the code-host adapter passes"
+
+# Check 2: the capability has to be the one being checked.
+mutate_prog "a code-host claiming the tracker capability" \
+  '{ sub(/"capability":"code-host"/, "\"capability\":\"tracker\""); print }'
+expect_fail "a code-host adapter claiming another capability is caught" "describe reports capability"
+
+# Check 3: pr-comments stays declared, but its dispatch branch now exits 3.
+# SC2016: $0 is awk's current line.
+# shellcheck disable=SC2016
+mutate_prog "declared code-host verb exits 3" \
+  '{ print; if ($0 ~ /^  pr-comments[)]$/) print "    exit 3" }'
+expect_fail "a declared-but-unimplemented code-host verb is caught" "declared verb 'pr-comments' exits 3"
+
+# Check 5: the usage probe (pr-merged with no branch) must be 2, not 1.
+mutate_prog "code-host usage error exits 1" \
+  '/^require_branch\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 2/, "exit 1") } { print }'
+expect_fail "a code-host usage error exiting 1 instead of 2 is caught" "expected exit 2, got 1"
+
+# Check 6: an absent gh must be 4, not 1.
+mutate_prog "code-host missing backend exits 1" \
+  '/^require_gh\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
+expect_fail "a code-host missing backend exiting 1 instead of 4 is caught" "expected exit 4, got 1"
+
+echo "adapter-conformance checker contract: clean (22 mutations, 4 controls)"

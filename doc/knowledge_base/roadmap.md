@@ -194,7 +194,7 @@ Give each task a machine-readable record of where it sits in its lifecycle and w
 
 ## Phase 14: Extensibility — capability adapters
 
-Make CDD adaptable to a project's tracker and forge without editing a shipped prompt: a fixed `.cdd/` namespace of capability adapters, resolved project → machine → built-in and degrading loudly to today's behaviour. The design detail — namespace, verb contracts, JSON shapes, exit codes, and the replace-vs-mirror rule that bounds what an extension may substitute — lives in GitHub issue #86.
+Make CDD adaptable to a project's tracker and code host without editing a shipped prompt: a fixed `.cdd/` namespace of capability adapters, resolved project → machine → built-in and falling back to today's behaviour when none is installed. The design detail — namespace, verb contracts, JSON shapes, exit codes, and the replace-vs-mirror rule that bounds what an extension may substitute — lives in GitHub issue #86.
 
 - [x] Decide the near-term extension shortlist and its order: Jira, Confluence, GitLab, Linear, Slack; record the verdict in the ADR.
 - [x] ADR + process-doc section: the `.cdd/` namespace, capability adapters, replace-vs-mirror, CLI-first; spec only, no adapter shipped.
@@ -204,9 +204,10 @@ Make CDD adaptable to a project's tracker and forge without editing a shipped pr
 - [x] Move issue refs from the branch name onto the state record (multi-ref, any backend); `/cdd-pre-pr` emits one close line per ref via `issue-close-token` (#97).
 - [x] Drop the `gh_issue_NN_` branch token; the state record is the only carrier, and an unusable record means no close lines, said out loud (ADR 0008).
 - [x] Jira tracker adapter, validated end-to-end on a real project.
-- [ ] Forge verb contract + GitHub reference adapter; `pr-merged` and `default-branch` move behind it.
-- [ ] Close issues post-merge via `issue-transition` from `cdd-worktree-gc`, opt-in and reported per ref; needs the forge adapter's `pr-merged` first.
-- [ ] GitLab forge adapter, validated on a real project.
+- [x] Code-host verb contract + GitHub reference adapter; `pr-merged`, `pr-for-branch` and `default-branch` move behind it; a broken adapter stops (ADR 0010).
+- [ ] Close issues post-merge via `issue-transition` from `cdd-worktree-gc`, opt-in and reported per ref; code-host `pr-merged` now in place.
+- [ ] Route `/cdd-pre-pr` and `/cdd-process-pr` PR calls through the code-host adapter (`pr-create`, `pr-comments`, `pr-reply`).
+- [ ] GitLab code-host adapter, validated on a real project.
 - [ ] Teach `/cdd-bootstrap` and `/cdd-retrofit` to detect and install adapters; retrofit gains a migrate-into-`.cdd/` verdict.
 
 **Milestone:** a project can run CDD with Jira as its tracker without editing a single shipped prompt, and `/cdd-retrofit` can migrate an existing project's local prompt edits onto the extension points.

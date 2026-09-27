@@ -1,6 +1,6 @@
 # 0007: Extend CDD through `.cdd/` capability adapters
 
-**Status:** Accepted; partially superseded by [0009](0009-drop-the-docs-capability.md)
+**Status:** Accepted; partially superseded by [0009](0009-drop-the-docs-capability.md) and [0010](0010-code-host-rename-and-broken-adapter-rule.md)
 
 ## Context
 
