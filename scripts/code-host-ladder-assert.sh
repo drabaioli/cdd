@@ -89,7 +89,8 @@ chmod +x "$WORK/bin/gh" "$WORK/bin/claude"
 
 # make_adapter <dest> <mode> <default branch> <call log>
 # Modes: working; only-default (declares default-branch alone); declared-exit3
-# (declares the PR verbs but exits 3 on them); and the broken ones — nonexec,
+# (declares the PR verbs but exits 3 on them); exit3-after-first (pr-merged answers
+# once, then exits 3); and the broken ones — nonexec,
 # desc-exit1, desc-nonjson, contract99, cap-tracker.
 make_adapter() {
   mkdir -p "$(dirname "$1")"
@@ -109,6 +110,7 @@ case "$1" in
     echo '{"capability":"code-host","contract":1,"backend":"stub","verbs":'"$verbs"'}' ;;
   pr-merged)
     [[ "$MODE" == declared-exit3 ]] && exit 3
+    [[ "$MODE" == exit3-after-first && "$(grep -c '^pr-merged' "$LOG")" -gt 1 ]] && exit 3
     if [[ "$2" == feat_merged ]]; then
       echo '{"branch":"feat_merged","merged":true,"ref":"42"}'
     else
@@ -279,6 +281,17 @@ for mode in only-default declared-exit3; do
   [[ ! -s "$GH_LOG" ]] || fail "unsupported ($mode): gh was called: $(cat "$GH_LOG")"
   pass "unsupported pr verbs ($mode): gc reaps nothing and exits 0, list shows '-'"
 done
+
+# An adapter that turns unsupported mid-run must not end GC after it has reaped:
+# the rest are kept with a warning, and the run still prints its summary.
+reset
+make_adapter "$PROJECT_RUNG" exit3-after-first trunk "$PROJECT_LOG"
+run "$MACHINE" cdd-worktree-gc
+[[ $RC -eq 0 ]] || fail "unsupported mid-run: gc should exit 0$(show)"
+grep -q "^GC dry-run:" "$WORK/out" || fail "unsupported mid-run: gc should still print its summary$(show)"
+grep -q "keeping it" "$WORK/err" || fail "unsupported mid-run: gc should warn per kept branch$(show)"
+! grep -q "does not support pr-merged" "$WORK/err" || fail "unsupported mid-run: gc must not claim nothing was reaped$(show)"
+pass "unsupported pr-merged after the first call: later tasks kept with a warning, summary printed"
 
 # --- 6. resume and cdd-worktree stop before creating anything ------------------
 reset

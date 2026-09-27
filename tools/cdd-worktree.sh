@@ -591,12 +591,17 @@ cdd-worktree-gc() {
       if (( rc == 0 )); then
         pr_state="not merged"
         [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]] && pr_state="MERGED"
-      elif (( rc == 3 )); then
-        # Declared but unsupported at runtime. Checked on the first call, so nothing
-        # has been reaped yet.
+      elif (( rc == 3 && reaped + kept == 0 )); then
+        # Declared but unsupported at runtime, on the first call: nothing has been
+        # reaped yet, so skipping the whole run is still honest.
         echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
         echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
         return 0
+      elif (( rc == 3 )); then
+        # Unsupported only after earlier calls answered: some tasks may already be
+        # reaped, so keep this one and let the run finish with its summary.
+        echo "warning: pr-merged unsupported for $branch via ${CDD_ADAPTER}; keeping it." >&2
+        pr_state="PR state unknown"
       else
         cdd-worktree-adapter-warn pr-merged "$rc"
         pr_state="PR state unknown"
