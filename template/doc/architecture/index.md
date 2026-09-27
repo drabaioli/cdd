@@ -8,4 +8,5 @@ System design documents: what the system is, structurally. Content lives in the 
 
 - `overview.md` — high-level system shape, main modules, data flow (created by the Phase 1 bootstrap survey)
 - `adr/` — architecture decision records (`adr/0000-template.md` for the format; list each ADR as it is written)
+- Writing a `.cdd/` capability adapter (tracker, code host)? The contract is not copied here: read https://github.com/drabaioli/cdd/blob/main/doc/architecture/capability-adapters.md
 - <add documents as the architecture takes shape — one link per doc, with a one-line summary>
