@@ -79,6 +79,7 @@ GATES=(
   "adapter-conformance|jq|the shipped capability adapters (tracker, code-host) against their contracts (offline)"
   "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
   "code-host-ladder|jq|code-host resolution: missing, broken and working adapters at every helper call site"
+  "issue-close|jq|post-merge issue close from cdd-worktree-done and cdd-worktree-gc"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
   "stage-render||render-only staging (--stage), no git tree"
@@ -180,6 +181,10 @@ gate_adapter_conformance_contract() {
 
 gate_code_host_ladder() {
   ./scripts/code-host-ladder-assert.sh
+}
+
+gate_issue_close() {
+  ./scripts/issue-close-assert.sh
 }
 
 # The three gates that bootstrap a real tree (both of these plus demo-seed) run with a

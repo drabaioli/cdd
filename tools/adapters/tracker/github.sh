@@ -9,6 +9,7 @@
 #   tools/adapters/tracker/github.sh issue-read <ref>
 #   tools/adapters/tracker/github.sh issue-list
 #   tools/adapters/tracker/github.sh issue-create --title <title> --body <body>
+#   tools/adapters/tracker/github.sh issue-transition <ref> <open|closed>
 #   tools/adapters/tracker/github.sh issue-close-token <ref>
 #
 # A project binds to it by making `.cdd/tracker` an executable that execs this file:
@@ -30,9 +31,10 @@ CONTRACT_VERSION=1
 BACKEND="github"
 REF_PATTERN='^#?[0-9]+$'
 # `describe` is excluded from this list by the contract: it is mandatory for every
-# adapter, so declaring it would be redundant. `issue-transition` is absent because
-# GitHub has no workflow states beyond open/closed — calling it exits 3.
-DECLARED_VERBS='["issue-read","issue-list","issue-create","issue-close-token"]'
+# adapter, so declaring it would be redundant. GitHub has no workflow states beyond
+# open/closed, which is all `issue-transition` needs: the post-merge close in
+# cdd-worktree-done / -gc calls it on every backend, GitHub included.
+DECLARED_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'
 
 err() { printf '%s\n' "$*" >&2; }
 
@@ -190,6 +192,32 @@ verb_issue_create() {
   printf '{"ref":"%s","url":"%s","backend":"%s"}\n' "${url##*/}" "$(json_escape "$url")" "$BACKEND"
 }
 
+# --- issue-transition ---------------------------------------------------------
+# GitHub's two states map one-to-one onto the normalized ones (CLOSED <-> closed,
+# OPEN <-> open). The current state is read first rather than trusting `gh issue
+# close`'s own handling of an already-closed issue: already in the target state is a
+# no-op, exit 0 with `changed: false`, which is how a caller tells "closed now" from
+# "was already closed" (the PR's `Closes #NN` usually got there first).
+verb_issue_transition() {
+  local ref="$1" want="$2" current target_raw action
+  if [[ "$want" == closed ]]; then target_raw=CLOSED action=close; else target_raw=OPEN action=reopen; fi
+  require_gh
+  if ! current="$(gh issue view "$ref" --json state --jq .state 2>/dev/null)"; then
+    err "could not read GitHub issue #$ref (no such issue, no access, or the request failed)"
+    exit 1
+  fi
+  if [[ "$current" == "$target_raw" ]]; then
+    err "#$ref is already $want; nothing to do"
+    printf '{"ref":"%s","state":"%s","state_raw":"%s","changed":false}\n' "$ref" "$want" "$target_raw"
+    return 0
+  fi
+  if ! gh issue "$action" "$ref" >/dev/null 2>&1; then
+    err "could not $action GitHub issue #$ref (no access, or the request failed)"
+    exit 1
+  fi
+  printf '{"ref":"%s","state":"%s","state_raw":"%s","changed":true}\n' "$ref" "$want" "$target_raw"
+}
+
 # --- issue-close-token --------------------------------------------------------
 # Purely local: the token is a property of the backend's commit-message syntax, not of
 # any particular issue, so this verb contacts nothing and needs no credentials.
@@ -227,11 +255,17 @@ case "$VERB" in
     verb_issue_close_token "$REF"
     ;;
   issue-transition)
-    err "issue-transition is not supported by the GitHub backend: GitHub issues have no workflow states beyond open/closed"
-    exit 3
+    normalize_ref "${1-}"
+    case "${2-}" in
+      open|closed) ;;
+      '') err "usage: $(basename "$0") issue-transition <ref> <open|closed>"; exit 2 ;;
+      *)  err "not a normalized state: '${2}' (expected open or closed)"; exit 2 ;;
+    esac
+    [[ $# -le 2 ]] || { err "issue-transition takes a reference and a state"; exit 2; }
+    verb_issue_transition "$REF" "$2"
     ;;
   ''|-h|--help|help)
-    err "usage: $(basename "$0") <describe|issue-read|issue-list|issue-create|issue-close-token> [args...]"
+    err "usage: $(basename "$0") <describe|issue-read|issue-list|issue-create|issue-transition|issue-close-token> [args...]"
     exit 2
     ;;
   *)
