@@ -352,7 +352,7 @@ Three further session types sit outside the per-task lifecycle, each run as a on
             └──────────────────────────────────┘
                             │
                             ▼
-                     gh pr create + human review
+                      open PR + human review
                             │
                             │  (optional, if review left comments)
                             ▼
@@ -452,7 +452,7 @@ Output is a pass/fail/skipped summary across the gates. The session then auto-co
 
 ### 3.7 PR review and merge
 
-The PR is opened from §3.6's opt-in step or by the human running `gh pr create` manually. The human reviews (with full Claude assistance if desired, but in a fresh session) and merges. Squash-merge is the default; the worktree helper handles squash-merged branches as a first-class case.
+The PR is opened from §3.6's opt-in step or by the human opening it by hand. The human reviews (with full Claude assistance if desired, but in a fresh session) and merges. Squash-merge is the default; the worktree helper handles squash-merged branches as a first-class case.
 
 ### 3.8 PR-review session (optional): `/cdd-process-pr`
 
