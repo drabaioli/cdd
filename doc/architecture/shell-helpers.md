@@ -105,7 +105,7 @@ It is **advisory** like the rest of the helper: a failing `rev-parse`, an unwrit
 | `implementation_done` | `/cdd-implement` — after its local commit; or `/cdd-small-change`, after its own, on the small-change lane |
 | `merged`              | `/cdd-merge-base` — after a successful merge         |
 | `checks_passed`       | `/cdd-pre-pr` — after the checklist + reconciliation commit |
-| `pr_open`             | `/cdd-pre-pr` — after `gh pr create` (also sets `pr`) |
+| `pr_open`             | `/cdd-pre-pr` — after opening the PR (also sets `pr`) |
 | `addressed`           | `/cdd-process-pr` — after a review round (sets `pr`) |
 
 The small-change lane never passes through `plan_written`: it writes no plan file, so there is no state to record. Nothing depends on the transition — every consumer compares stages by index, so a stage that was never written is simply one it never observes. Every stage is written by a command file; nothing rides on a standing instruction in the handoff any more. `/cdd-plan` writes once, not twice: approval and the plan file are a second apart with no gate between them, so a separate `plan_approved` would distinguish two states nothing acts on differently.

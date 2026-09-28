@@ -74,6 +74,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check, code-host ladder assertion |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
+| `.cdd/`                            | This repo's own capability-adapter bindings: `code-host` and `tracker`, relative symlinks to the GitHub adapters under `tools/adapters/` |
 | `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing) + the capability adapters under `adapters/<capability>/<backend>.sh` (mirroring `~/.cdd/adapters/<capability>`; none self-installing) |
 
 ## Architecture

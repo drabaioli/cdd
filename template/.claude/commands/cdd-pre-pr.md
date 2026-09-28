@@ -193,19 +193,31 @@ Then advance the task **state record** (advisory): run `cdd-state set checks_pas
 
 After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
 
-**Preconditions.** Needs the `gh` CLI authenticated and a GitHub `origin`:
+**Resolve the code host** — here even if §0 did not, since §0 looks only when no base was recorded. If §0 already resolved and checked an adapter, reuse it without announcing it again:
+
+```bash
+[ -z "$CODE_HOST" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
+```
+
+If `$CODE_HOST` is set, check it as §0 does: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path and **do not open the PR**; do not fall back to `gh`, because an installed adapter declares which code host this project uses. The checklist above still stands. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, say in one line that no code-host adapter is installed and the built-in `gh` path serves.
+
+**Preconditions (built-in `gh` path only).** Needs the `gh` CLI authenticated and a GitHub `origin`:
 
 ```bash
 gh auth status && git remote get-url origin   # origin should be a github.com URL
 ```
 
-If either is missing, say so in one line and skip this step (the checklist above still stands).
+If either is missing, say so in one line and skip this step (the checklist above still stands). An adapter carries its own authentication: when it is missing, the adapter's own error line is what the user sees.
 
 If §8 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##'`, a bare name like `$BASE_BRANCH`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Then run `gh pr create --title "<title>" --body "<body>"`, adding `--base "$BASE_BRANCH"` when the base differs from the default, and print the resulting PR URL. Derive the body's close lines as described under **Close lines** below, so every issue the task was sourced from auto-closes on merge. Then advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
+- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##'`, a bare name like `$BASE_BRANCH`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Derive the body's close lines as described under **Close lines** below, so every issue the task was sourced from auto-closes on merge. Then open it, adding `--base "$BASE_BRANCH"` when the base differs from the default:
+  - **Through the adapter:** if its `describe.verbs` lacks `pr-create`, say in one line that this code host's adapter cannot open PRs, and do not open one. Otherwise run `"$CODE_HOST" pr-create --title "<title>" --body "<body>"` and print the returned `.url`; the new PR's number is its `.ref`. An exit 3 reads as the undeclared case; any other failure → say in one line that the PR was not opened, quoting the adapter's error line, and never retry through `gh`.
+  - **On the built-in `gh` path:** run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL.
+
+  Once a PR is open, advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist above already stands on its own.
 
 **Close lines.** The body carries one close line per reference the task was sourced from. Read the recorded references first:
