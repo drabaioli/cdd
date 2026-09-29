@@ -14,8 +14,10 @@
 #   2. describe is contract-shaped — describe lists itself in verbs; it emits a null;
 #      its ref_pattern is not a valid ERE; it claims the code-host capability while
 #      being checked as a tracker.
-#   3. Declared verbs dispatch   — the adapter declares a verb it does not implement.
-#   4. Unsupported verb -> 3     — an unknown verb exits 1 instead.
+#   3. Declared verbs dispatch   — a declared verb's dispatch branch exits 3.
+#   4. Unsupported verb -> 3     — an unknown verb exits 1 instead; a contract verb the
+#      adapter implements but no longer declares (the checker's undeclared-contract-verb
+#      probe, which no shipped adapter exercises now that each declares every verb).
 #   5. Usage error -> 2          — a missing argument exits 1 instead.
 #   6. Missing backend -> 4      — an absent `gh` exits 1 instead.
 #   7. Secret scan               — one planted secret per pattern the scan carries (a
@@ -171,7 +173,7 @@ expect_fail "describe that emits non-JSON is caught" "did not emit parseable JSO
 
 # --- Check 2: describe is contract-shaped -------------------------------------
 mutate_replace_line "describe lists itself in verbs" '^DECLARED_VERBS=' \
-  'DECLARED_VERBS='"'"'["describe","issue-read","issue-list","issue-create","issue-close-token"]'"'"''
+  'DECLARED_VERBS='"'"'["describe","issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'"'"''
 expect_fail "describe listing itself in verbs is caught" "not contract-shaped"
 
 mutate_replace_line "describe emits a null" "^  printf '}" \
@@ -187,18 +189,29 @@ mutate_prog "a tracker claiming the code-host capability" \
 expect_fail "a tracker adapter claiming another capability is caught" "describe reports capability"
 
 # --- Check 3: every declared verb dispatches to an implementation -------------
-mutate_replace_line "declares a verb it does not implement" '^DECLARED_VERBS=' \
-  'DECLARED_VERBS='"'"'["issue-read","issue-list","issue-create","issue-close-token","issue-transition"]'"'"''
+# issue-transition stays declared, but its dispatch branch now exits 3.
+# SC2016: $0 is awk's current line.
+# shellcheck disable=SC2016
+mutate_prog "declared verb exits 3" \
+  '{ print; if ($0 ~ /^  issue-transition[)]$/) print "    exit 3" }'
 expect_fail "a declared-but-unimplemented verb is caught" "declared verb 'issue-transition' exits 3"
 
 # --- Check 4: an unsupported verb exits 3 -------------------------------------
-# Scoped to the line after the unknown-verb message, so the deliberate exit 3 on
-# issue-transition (a different branch) is left alone.
+# Scoped to the line after the unknown-verb message, the only exit 3 the adapter
+# carries, so the mutation cannot land anywhere else.
 # SC2016: $0 is awk's current line.
 # shellcheck disable=SC2016
 mutate_prog "unknown verb exits 1" \
   '{ if (prev ~ /unknown verb/) sub(/exit 3/, "exit 1"); print; prev = $0 }'
 expect_fail "an unknown verb exiting 1 instead of 3 is caught" "expected exit 3, got 1"
+
+# Every shipped adapter now declares every contract verb, so the checker's loop over
+# undeclared contract verbs runs over nothing on the real tree. Drop issue-transition
+# from the declaration while its implementation stays: the probe must find it answering
+# (exit 2, a usage error) where an undeclared verb has to exit 3.
+mutate_replace_line "issue-transition implemented but undeclared" '^DECLARED_VERBS=' \
+  'DECLARED_VERBS='"'"'["issue-read","issue-list","issue-create","issue-close-token"]'"'"''
+expect_fail "an implemented-but-undeclared contract verb is caught" "undeclared contract verb 'issue-transition'"
 
 # --- Check 5: a usage error exits 2 -------------------------------------------
 mutate_prog "usage error exits 1" \
@@ -292,4 +305,4 @@ mutate_prog "code-host missing backend exits 1" \
   '/^require_gh\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
 expect_fail "a code-host missing backend exiting 1 instead of 4 is caught" "expected exit 4, got 1"
 
-echo "adapter-conformance checker contract: clean (22 mutations, 4 controls)"
+echo "adapter-conformance checker contract: clean (23 mutations, 4 controls)"

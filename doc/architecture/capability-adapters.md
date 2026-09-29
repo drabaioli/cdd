@@ -72,7 +72,7 @@ Six verbs, of which one (`describe`) is mandatory and the other five are declare
 | `issue-read <ref>`                  | `gh issue view` (`/cdd-next-step` §0b)      | comments inline                |
 | `issue-list`                        | `gh issue list` (`/cdd-next-step` §0b)      | open items only                |
 | `issue-create --title T --body B`   | `/cdd-pre-pr`'s improvement channel         |                                |
-| `issue-transition <ref> <state>`    | —                                           | unsupported on GitHub          |
+| `issue-transition <ref> <state>`    | `cdd-worktree-done` / `-gc`, post-merge     | once per recorded ref          |
 | `issue-close-token <ref>`           | `/cdd-pre-pr` §11, once per recorded ref    | `Closes #42` / a Jira smart commit |
 
 ### `issue-read <ref>` → object
@@ -112,10 +112,12 @@ Open items only. Empty is `[]`, not an error.
 ### `issue-transition <ref> <state>` → object
 
 ```json
-{"ref":"XYZ-123","state":"closed","state_raw":"Done"}
+{"ref":"XYZ-123","state":"closed","state_raw":"Done","changed":true}
 ```
 
-`<state>` is a normalized `open`/`closed`; the adapter maps it onto whatever the backend calls that. Backends without a workflow model do not declare this verb.
+`<state>` is a normalized `open`/`closed`; the adapter maps it onto whatever the backend calls that. An item already in the target state is a no-op: exit 0 with `changed: false`, so the caller can tell "closed now" from "was already closed" without parsing stderr. `changed` is an additive field, so the contract stays at 1; a caller treats its absence as `true`. A backend with no way to change an item's state does not declare the verb.
+
+Its consumer is the post-merge close in `cdd-worktree-done` and `cdd-worktree-gc`: once the code host confirms the task's PR merged, each calls `issue-transition <ref> closed` once for every ref on the task's state record (see [Shell helpers](shell-helpers.md#tracker-resolution-the-post-merge-issue-close)).
 
 ### `issue-close-token <ref>` → object
 
@@ -132,7 +134,7 @@ item, and the contract deliberately does not claim otherwise. Three cases:
 
 - **Tracker and code host are the same backend** (a GitHub PR closing a GitHub issue, a GitLab MR
   closing a GitLab issue). The code host parses its own PR body and closes the item on merge. This
-  is the *code host's* feature, not the tracker's, and it is the only case CDD can rely on.
+  is the *code host's* feature, not the tracker's, and it is the only case where the token alone can be relied on.
 - **Different backends, with an integration** (a GitHub PR closing a Jira issue). Still a string in
   text, but the party acting on it is a tracker-side integration — Jira's DVCS connector or the
   GitHub-for-Jira app — which must be installed and watching the repo. Where it is, a smart commit
@@ -146,13 +148,12 @@ that anything is listening, and an adapter cannot check the latter offline. So `
 which of the three cases applies when it offers to open the PR, rather than letting a line that
 does nothing look like one that does.
 
-**A close that is guaranteed across backends needs `issue-transition` called after the merge**, by
-an actor CDD does not have today: `/cdd-pre-pr` runs pre-merge, and `cdd-worktree-gc` — the only
-thing that runs post-merge — is local maintenance. Its merge check now goes through the code
-host's `pr-merged` when an adapter serves, so the prerequisite is in place; the natural home is gc,
-opt-in and reporting each transition, which is where the roadmap sequences it. Until then,
-cross-backend closing is the tracker integration's job and CDD's contribution is emitting the
-token it reads.
+**The close CDD guarantees is made after the merge, by `issue-transition`.** `cdd-worktree-done`
+(the primary path) and `cdd-worktree-gc` (the backstop) close every ref recorded on the task's state
+record once the code host confirms the PR merged — automatically, on every backend, GitHub-on-GitHub
+included. There it is usually a no-op (`changed: false`), but it also covers a dropped close line
+and a PR merged into a non-default branch, where GitHub does not auto-close. So the token is now
+the fast path where a backend or integration acts on it, not the only mechanism.
 
 ## The GitHub reference adapter
 
@@ -160,7 +161,7 @@ Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one dire
 
 `tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
-It **declares four verbs**: `issue-read`, `issue-list`, `issue-create`, `issue-close-token`. It **does not declare `issue-transition`** — issue #86 settles that verb as "unsupported on GitHub" — so calling it exits 3. That is the contract's only live exit-3 case on a shipped adapter, and the conformance gate asserts it.
+It **declares all five verbs**. `issue-transition` reverses issue #86's "unsupported on GitHub" verdict: GitHub has no workflow states beyond open/closed, but open/closed is all the verb needs, and the post-merge close calls it on every backend — consistency rather than detecting GitHub-on-GitHub and skipping it. `closed` is `gh issue close`, `open` is `gh issue reopen`; it reads the issue's state first, so an issue already there is `changed: false` and no write. With no shipped adapter now omitting a contract verb, the live exit-3 case is the nonsense verb, and the undeclared-contract-verb path is kept tested by a mutation in `scripts/adapter-conformance-assert.sh`.
 
 Its `ref_pattern` is `^#?[0-9]+$`, which is exactly the shape `/cdd-next-step` hardcoded before the ladder existed. `create_target` is derived from `git remote get-url origin` parsed to `owner/repo` — local, no network — and omitted when it cannot be derived.
 
@@ -276,10 +277,10 @@ exec /path/to/cdd/tools/adapters/tracker/jira.sh "$@"
 
 A missing variable is exit 4 with one stderr line per variable, naming it — after argument validation, so a usage error is still 2 on an unconfigured machine. The token reaches `curl` through `--config -` on stdin, never on the command line (where `ps` would show it), and is never written to a file. Rejected credentials are exit 1 ("auth rejected", per the exit-code table) and said as such — including the case Jira Cloud does not answer with a 401: a bad token is served anonymously and gets a 404, with the failed login flagged only in the `X-Seraph-LoginReason` response header, which the adapter checks first. A 404 and every other non-2xx are exit 1 with Jira's own error messages on stderr — a project's required custom fields, for instance, surface here by name.
 
-It **declares all five verbs**, so `issue-transition` is the contract's live exit-0 case that GitHub lacks. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` — a Jira key, which never overlaps the built-in `^#?[0-9]+$`. `describe` needs neither network nor `jq`; `create_target` is `<JIRA_PROJECT_KEY> @ <site host>` when both variables are set, and omitted otherwise.
+It **declares all five verbs**. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` — a Jira key, which never overlaps the built-in `^#?[0-9]+$`. `describe` needs neither network nor `jq`; `create_target` is `<JIRA_PROJECT_KEY> @ <site host>` when both variables are set, and omitted otherwise.
 
 - **State.** `closed` is the status *category* `done`; `open` is anything else. `state_raw` is the status name (`In Review`). `issue-list` is the project's items whose category is not Done, one page of up to 100 (the GitHub adapter's cap), through `/rest/api/3/search/jql` — the older `/search` endpoint has been removed from Jira Cloud. Search reads Jira's index, which trails a write by a second or two, so an item transitioned a moment ago can still appear; `issue-read` is always current.
-- **`issue-transition`.** Workflows are per project, so it asks Jira which transitions are available from the current status and takes the first that lands in the target category — for `open`, preferring a To Do-category status. Already there is a no-op, exit 0. No fitting transition is exit 1, listing the transitions that do exist. A transition that needs a screen field fails with Jira's 400 message, also exit 1.
+- **`issue-transition`.** Workflows are per project, so it asks Jira which transitions are available from the current status and takes the first that lands in the target category — for `open`, preferring a To Do-category status. Already there is a no-op, exit 0 with `changed: false`; a transition made is `changed: true`. No fitting transition is exit 1, listing the transitions that do exist. A transition that needs a screen field fails with Jira's 400 message, also exit 1.
 - **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the code host with smart commits enabled — the second of the three cases above.
 - **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
@@ -311,6 +312,8 @@ How far "no lower rung" reaches is set per call site, by what the caller would d
 | `/cdd-pre-pr` §0, `/cdd-merge-base` §0 (code host) | stops the command — only reached when no base was recorded   |
 | `cdd-worktree` (code host)                         | stops before cutting the branch — only when no base was recorded |
 | `cdd-worktree-done`, `-gc`, `-resume` (code host)  | stops before doing anything                                  |
+| `cdd-worktree-done` (tracker)                      | stops before doing anything — only when the task recorded issue refs |
+| `cdd-worktree-gc` (tracker)                        | keeps the tasks with issue refs; reaps the rest              |
 | `cdd-worktree-list` (code host)                    | prints the line and shows `-` for every PR                   |
 | `/cdd-pre-pr` §11 (code host)                      | does not open the PR; the checklist still stands             |
 | `/cdd-process-pr` (code host)                      | stops the command                                            |
@@ -333,7 +336,7 @@ It is **offline by construction**, and backend-neutral: every probe runs with th
 1. `describe` exits 0 with backend tooling absent from `PATH` and the environment scrubbed, and its stdout parses as JSON (hermeticity).
 2. `describe` is contract-shaped: `capability` is the one being checked; `contract` is an integer ≥ 1; `backend` is a non-empty string; for a tracker, `ref_pattern` is a non-empty string that `grep -E` accepts as a valid ERE; `verbs` is a non-empty array of strings; `describe` is **not** among them; every declared verb is one of that capability's non-`describe` verbs; and no `null` appears anywhere in the output.
 3. Every verb in `describe.verbs`, invoked with **no arguments**, exits something other than 3 — i.e. dispatch reaches a real implementation rather than the unsupported-verb branch.
-4. Every contract verb the adapter does not declare exits 3 (`issue-transition`, on the GitHub tracker), and so does a nonsense verb.
+4. Every contract verb the adapter does not declare exits 3, and so does a nonsense verb. The shipped adapters each declare every verb of their contract, so on them the nonsense verb is the live case; a mutation in `scripts/adapter-conformance-assert.sh` keeps the undeclared-verb path tested.
 5. A verb called without its required argument exits 2 — `issue-read` for a tracker, `pr-merged` for a code host.
 6. A verb that needs the backend, called with backend tooling absent and the environment scrubbed, exits 4 with a line on stderr — `issue-list` for a tracker, `pr-for-branch <branch>` for a code host; missing tooling for a `gh`-based adapter, missing configuration for an env-configured one.
 7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, an Atlassian API token prefix, a hardcoded basic-auth header, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.

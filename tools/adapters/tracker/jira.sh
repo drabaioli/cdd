@@ -332,8 +332,9 @@ verb_issue_create() {
 # Normalized state <-> status category: `closed` is category `done`, `open` is anything
 # else. Jira transitions are per-workflow, so the adapter asks which ones are available
 # from the issue's current status and takes the first that lands in the target category
-# (for `open`, preferring a To Do-category status). Already there is a no-op, exit 0.
-# No fitting transition is exit 1, naming the ones that do exist.
+# (for `open`, preferring a To Do-category status). Already there is a no-op, exit 0,
+# reported as `changed: false` (a transition made is `changed: true`), so a caller can
+# tell "closed now" from "was already closed". No fitting transition is exit 1, naming the ones that do exist.
 verb_issue_transition() {
   local ref="$1" want="$2" current cur_name chosen
   jira_request GET "/rest/api/3/issue/$ref?fields=status"
@@ -341,7 +342,7 @@ verb_issue_transition() {
   cur_name="$(jq -r '.fields.status.name' "$RESP")"
   if { [[ "$want" == closed && "$current" == "done" ]] || [[ "$want" == open && "$current" != "done" ]]; }; then
     err "$ref is already $want ('$cur_name'); nothing to do"
-    jq -cn --arg ref "$ref" --arg state "$want" --arg raw "$cur_name" '{ref: $ref, state: $state, state_raw: $raw}'
+    jq -cn --arg ref "$ref" --arg state "$want" --arg raw "$cur_name" '{ref: $ref, state: $state, state_raw: $raw, changed: false}'
     return 0
   fi
 
@@ -362,7 +363,7 @@ verb_issue_transition() {
   jq -c '{transition: {id: .id}}' <<<"$chosen" > "$SCRATCH/body.json"
   jira_request POST "/rest/api/3/issue/$ref/transitions" \
     -H 'Content-Type: application/json' --data-binary @"$SCRATCH/body.json"
-  jq -cn --arg ref "$ref" --arg state "$want" --argjson t "$chosen" '{ref: $ref, state: $state, state_raw: $t.to.name}'
+  jq -cn --arg ref "$ref" --arg state "$want" --argjson t "$chosen" '{ref: $ref, state: $state, state_raw: $t.to.name, changed: true}'
 }
 
 # --- issue-close-token --------------------------------------------------------
