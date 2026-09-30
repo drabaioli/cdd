@@ -80,6 +80,7 @@ GATES=(
   "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
   "code-host-ladder|jq|code-host resolution: missing, broken and working adapters at every helper call site"
   "issue-close|jq|post-merge issue close from cdd-worktree-done and cdd-worktree-gc"
+  "adapter-bindings|jq|bootstrap with adapter bindings: .cdd/ shims resolve and pass describe from a fresh clone (offline)"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
   "stage-render||render-only staging (--stage), no git tree"
@@ -187,6 +188,10 @@ gate_issue_close() {
   ./scripts/issue-close-assert.sh
 }
 
+gate_adapter_bindings() {
+  ./scripts/adapter-bindings-assert.sh
+}
+
 # The three gates that bootstrap a real tree (both of these plus demo-seed) run with a
 # throwaway HOME: a non-staged bootstrap writes the per-repo marker
 # ~/.cdd/handoffs/<repo>/repo.json, and the runner must not leave markers for its own
@@ -270,6 +275,8 @@ gate_demo_seed() {
   # The seeded roadmap carries the deliberate conflict seam the demo relies on.
   grep -q 'ACTIONS' "$target/doc/knowledge_base/roadmap.md" || return 1
   grep -q 'inline_styles' "$target/doc/knowledge_base/roadmap.md" || return 1
+  # setup.sh binds the GitHub adapters; the shims must be in the scaffold commit.
+  [[ -n "$(git -C "$target" ls-files .cdd/tracker .cdd/code-host)" ]] || return 1
   echo "demo seed overlay is clean"
 }
 

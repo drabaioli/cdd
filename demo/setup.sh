@@ -91,8 +91,10 @@ echo "  location     : $TARGET"
 echo "  github        : $( (( LOCAL_ONLY )) && echo 'skipped (--local-only)' || echo "create + push ($VISIBILITY)" )"
 echo
 
-# Bootstrap the template, overlay the seed, substitute identifiers, git init + scaffold commit.
-"$BOOTSTRAP" --name "$NAME" --path "$TARGET" --overlay "$SEED_DIR"
+# Bootstrap the template, overlay the seed, substitute identifiers, bind the GitHub
+# tracker and code-host adapters in .cdd/, git init + scaffold commit.
+"$BOOTSTRAP" --name "$NAME" --path "$TARGET" --overlay "$SEED_DIR" \
+  --tracker github --code-host github
 
 if (( ! LOCAL_ONLY )); then
   ( cd "$TARGET" && gh repo create "$DIR" --source . --push "$VISIBILITY" )
@@ -105,7 +107,8 @@ CDD_WORKTREE="$REPO_ROOT/tools/cdd-worktree.sh"
 # Install the shared, project-independent worktree helper once (idempotent). This
 # wires ~/.bashrc and ~/.zshrc to source ~/.cdd/tools/cdd-worktree.sh, so the
 # `cdd-worktree` command is available for every CDD project — including this
-# instance. Skipped under --local-only (CI path: no environment side effects).
+# instance — and installs the adapter library this instance's .cdd/ bindings run.
+# Skipped under --local-only (CI path: no environment side effects).
 if (( ! LOCAL_ONLY )); then
   "$CDD_WORKTREE" install
 fi
@@ -116,7 +119,8 @@ if (( LOCAL_ONLY )); then
 Done. Instance '$INSTANCE' is ready at $TARGET
 
 Next steps:
-  1. Install the shared worktree helper once (if you haven't already):
+  1. Install the shared worktree helper once (if you haven't already; it also
+     installs the adapter library the instance's .cdd/ bindings run):
        $CDD_WORKTREE install
   2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 

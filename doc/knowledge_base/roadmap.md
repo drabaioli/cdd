@@ -209,8 +209,8 @@ Make CDD adaptable to a project's tracker and code host without editing a shippe
 - [ ] Link the merged PR on an issue closed post-merge (a tracker comment verb), so a Jira issue names the PR that closed it.
 - [x] Route `/cdd-pre-pr` and `/cdd-process-pr` PR calls through the code-host adapter (`pr-create`, `pr-comments`, `pr-reply`).
 - [ ] GitLab code-host adapter, validated on a real project.
-- [ ] Teach `/cdd-bootstrap` and `/cdd-retrofit` to detect and install adapters; retrofit gains a migrate-into-`.cdd/` verdict.
-- [ ] Decide whether to drop the built-in `gh` fallback and require an adapter (e.g. install the GitHub adapters by default).
+- [x] Teach `/cdd-bootstrap` and `/cdd-retrofit` to detect and install adapters; retrofit gains a migrate-into-`.cdd/` verdict.
+- [ ] Decide whether to drop the built-in `gh` fallback and require an adapter (GitHub adapters are now installed by default).
 
 **Milestone:** a project can run CDD with Jira as its tracker without editing a single shipped prompt, and `/cdd-retrofit` can migrate an existing project's local prompt edits onto the extension points.
 

@@ -13,15 +13,18 @@
 #   tools/adapters/code-host/github.sh pr-merged <branch> [--base <branch>]
 #   tools/adapters/code-host/github.sh default-branch
 #
-# A project binds to it by making `.cdd/code-host` an executable that execs this file:
+# A project binds to it with a committed `.cdd/code-host` shim that execs the copy
+# `cdd-worktree.sh install` puts in the adapter library, via $HOME so the binding
+# names no machine's checkout (ADR 0011). `bootstrap-cdd-project.sh --code-host github`
+# writes it; its core is:
 #
 #   #!/usr/bin/env bash
-#   exec /path/to/cdd/tools/adapters/code-host/github.sh "$@"
+#   exec "$HOME/.cdd/tools/adapters/code-host/github.sh" "$@"
 #
-# It deliberately does NOT self-install, for the tracker adapter's reason: the built-in
-# rung of the resolution ladder already IS GitHub, so a machine-global install would
+# It deliberately never installs itself as a resolution-ladder RUNG, for the tracker
+# adapter's reason: the built-in rung already IS GitHub, so a machine-rung install would
 # change no behaviour while destroying the "no adapter installed" baseline that
-# behaviour-neutrality is checked against.
+# behaviour-neutrality is checked against. The library copy is not a rung.
 #
 # Exit codes (contract-wide): 0 ok, 1 operation failed, 2 usage error,
 # 3 verb unsupported by this backend, 4 not configured / auth missing.

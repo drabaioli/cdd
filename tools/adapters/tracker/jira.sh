@@ -25,15 +25,19 @@
 #   JIRA_CLOSE_TRANSITION  optional; the smart-commit transition issue-close-token names
 #                          (default done; lowercased, spaces become hyphens)
 #
-# A project binds to it by making `.cdd/tracker` an executable that execs this file,
-# exporting only the non-secret coordinates — the token stays in the user's shell:
+# A project binds to it with a committed `.cdd/tracker` shim that exports only the
+# non-secret coordinates — the token stays in the user's shell — and execs the copy
+# `cdd-worktree.sh install` puts in the adapter library (ADR 0011).
+# `bootstrap-cdd-project.sh --tracker jira --jira-site <site> --jira-key ABC` writes it;
+# its core is:
 #
 #   #!/usr/bin/env bash
-#   export JIRA_BASE_URL=https://<site>.atlassian.net JIRA_PROJECT_KEY=ABC
-#   exec /path/to/cdd/tools/adapters/tracker/jira.sh "$@"
+#   export JIRA_BASE_URL='https://<site>.atlassian.net' JIRA_PROJECT_KEY='ABC'
+#   exec "$HOME/.cdd/tools/adapters/tracker/jira.sh" "$@"
 #
-# It does NOT self-install: a Jira binding is per-project by nature (a site and a
-# project key), so a machine-global install has nothing sensible to point at.
+# It never installs itself as a resolution-ladder rung: a Jira binding is per-project
+# by nature (a site and a project key), so a machine rung has nothing sensible to point
+# at. The library copy is not a rung; only a project's shim gives it coordinates.
 #
 # Jira Cloud only. Data Center / Server (personal access tokens, API v2) is out of scope.
 #

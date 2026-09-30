@@ -35,10 +35,12 @@ Changes flow process-first, template-second. A PR that touches the process doc b
     ├── bootstrap-cdd-project.sh              # non-interactive bootstrap for new projects
     ├── cdd-worktree.sh                       # shared worktree helper (self-installing)
     ├── cdd-state.sh                          # shared task-state helper (self-installing)
-    └── adapters/                             # capability adapters, one dir per capability (mirrors ~/.cdd/adapters/)
-        └── tracker/
-            ├── github.sh                     # GitHub backend, the reference implementation (not self-installing)
-            └── jira.sh                       # Jira Cloud backend (curl + jq, env-configured; not self-installing)
+    └── adapters/                             # capability adapters, one dir per capability (mirrors ~/.cdd/adapters/); cdd-worktree.sh install copies them to the ~/.cdd/tools/adapters/ library, never a rung
+        ├── tracker/
+        │   ├── github.sh                     # GitHub backend, the reference implementation
+        │   └── jira.sh                       # Jira Cloud backend (curl + jq, env-configured)
+        └── code-host/
+            └── github.sh                     # GitHub backend, the reference implementation
 ```
 
 ## Layer relationships

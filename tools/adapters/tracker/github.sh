@@ -12,15 +12,19 @@
 #   tools/adapters/tracker/github.sh issue-transition <ref> <open|closed>
 #   tools/adapters/tracker/github.sh issue-close-token <ref>
 #
-# A project binds to it by making `.cdd/tracker` an executable that execs this file:
+# A project binds to it with a committed `.cdd/tracker` shim that execs the copy
+# `cdd-worktree.sh install` puts in the adapter library, via $HOME so the binding
+# names no machine's checkout (ADR 0011). `bootstrap-cdd-project.sh --tracker github`
+# writes it; its core is:
 #
 #   #!/usr/bin/env bash
-#   exec /path/to/cdd/tools/adapters/tracker/github.sh "$@"
+#   exec "$HOME/.cdd/tools/adapters/tracker/github.sh" "$@"
 #
-# It deliberately does NOT self-install (unlike cdd-worktree.sh / cdd-state.sh, which
-# are sourced shell libraries): the built-in rung of the resolution ladder already IS
-# GitHub, so a machine-global install would change no behaviour while destroying the
-# "no adapter installed" baseline that behaviour-neutrality is checked against.
+# It deliberately never installs itself as a resolution-ladder RUNG (unlike
+# cdd-worktree.sh / cdd-state.sh, it has no install verb): the built-in rung already IS
+# GitHub, so a machine-rung install would change no behaviour while destroying the "no
+# adapter installed" baseline that behaviour-neutrality is checked against. The library
+# copy is not a rung, so it binds nothing until a project's shim points at it.
 #
 # Exit codes (contract-wide): 0 ok, 1 operation failed, 2 usage error,
 # 3 verb unsupported by this backend, 4 not configured / auth missing.
