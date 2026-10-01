@@ -20,12 +20,16 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
 - **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch: nothing exists yet to detect, so the answers are commitments, and most of them will honestly be *expected*.
+- **Where issues and code review live** — the tracker (where issues live) and the code host (where pull requests are reviewed). Always ask; never assume. Offer GitHub (Issues + pull requests) as the default answer. The answer becomes the project's capability bindings in `.cdd/` (process doc Section 2.16), written by the bootstrap script in step 6:
+  - **GitHub** — bind both to the shipped GitHub adapters.
+  - **Jira for issues** — ask for the Jira site (e.g. `acme.atlassian.net`) and the project key (e.g. `ABC`) only. **Never ask for credentials**: tell the user they set `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell. The code host is asked separately.
+  - **Anything CDD ships no adapter for** (GitLab, Bitbucket, …) — say in one line that no binding is written for it and the built-in `gh` path keeps serving; a project adapter can be written later against `doc/architecture/capability-adapters.md`.
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
 **Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (`doc/features/template.md`, "Deliverable or project?") and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
 
-**Checkpoint:** present a structured summary of the captured definition (the headings above). Get explicit confirmation or corrections before writing anything.
+**Checkpoint:** present a structured summary of the captured definition (the headings above, including the chosen tracker and code host). Get explicit confirmation or corrections before writing anything.
 
 ## 2. Draft the initial roadmap
 
@@ -87,11 +91,14 @@ Reuse the bootstrap script — do not reimplement copying or substitution:
 ./tools/bootstrap-cdd-project.sh \
   --name "<PROJECT_NAME>" \
   --path "<target>" \
-  --overlay "$OVERLAY"
+  --overlay "$OVERLAY" \
+  --tracker github --code-host github
 # add `--dir <PROJECT_DIR>` only if <PROJECT_DIR> differs from the basename of <target>
 ```
 
-(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived, so the example omits it.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the two identifiers, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
+Pass the binding flags from step 1's answer: `--tracker github` or `--tracker jira --jira-site <site> --jira-key <KEY>`, and `--code-host github`. Leave a flag out for a backend CDD ships no adapter for; the script refuses one.
+
+(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived, so the example omits it.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the two identifiers, writes the capability bindings into `.cdd/`, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
 
 Then remove the overlay: `rm -rf "$OVERLAY"`.
 
@@ -113,7 +120,8 @@ Report:
 - What was written into the scaffold commit: project overview, roadmap (real first phase, no survey phase), `CLAUDE.md`, and whether an architecture overview was included.
 - The baseline marker value and that the "Initial CDD scaffold" commit was created.
 - The GitHub repo, if one was created (step 7).
-- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project.
+- The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and the built-in `gh` path serves). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
+- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
 
   ```bash
   ./tools/cdd-worktree.sh install

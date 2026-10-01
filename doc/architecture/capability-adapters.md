@@ -2,7 +2,7 @@
 
 The wire contract every capability adapter answers, pinned for two capabilities: the **tracker**, with a GitHub reference implementation (`tools/adapters/tracker/github.sh`) and a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`), and the **code host** — where PRs and merge state live — with a GitHub reference implementation (`tools/adapters/code-host/github.sh`).
 
-The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives (`adr/0009-drop-the-docs-capability.md` narrows it: docs is not a capability; `adr/0010-code-host-rename-and-broken-adapter-rule.md` names the code host and replaces the ladder's fall-through for a broken adapter). This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
+The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives (`adr/0009-drop-the-docs-capability.md` narrows it: docs is not a capability; `adr/0010-code-host-rename-and-broken-adapter-rule.md` names the code host and replaces the ladder's fall-through for a broken adapter; `adr/0011-bind-adapters-through-a-machine-global-library.md` settles how a downstream project's committed binding reaches a shipped adapter). This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
 Nothing here ships to downstream projects. The CDD repo is the canonical reference for adapter authors, exactly as it is for the process doc, and the template ships no copy of either — only a one-line pointer here, in its `doc/architecture/index.md`.
 
@@ -159,7 +159,7 @@ the fast path where a backend or integration acts on it, not the only mechanism.
 
 Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new backend is one new file, which the lint and conformance gates pick up by glob.
 
-`tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it by making `.cdd/tracker` an executable that `exec`s it. **It does not self-install**: the built-in rung of the ladder already *is* GitHub, so installing it machine-globally would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. This is the one way it differs from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which do self-install — and they are sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
+`tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it with a committed `.cdd/tracker` shim onto the adapter library (see [Installing a binding](#installing-a-binding)). **It never installs itself as a ladder rung**: the built-in rung already *is* GitHub, so a machine-rung install would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. `cdd-worktree.sh install` does copy it machine-globally — but into the adapter library, which is not a rung and binds nothing on its own. That is the difference from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which self-install as sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
 It **declares all five verbs**. `issue-transition` reverses issue #86's "unsupported on GitHub" verdict: GitHub has no workflow states beyond open/closed, but open/closed is all the verb needs, and the post-merge close calls it on every backend — consistency rather than detecting GitHub-on-GitHub and skipping it. `closed` is `gh issue close`, `open` is `gh issue reopen`; it reads the issue's state first, so an issue already there is `changed: false` and no write. With no shipped adapter now omitting a contract verb, the live exit-3 case is the nonsense verb, and the undeclared-contract-verb path is kept tested by a mutation in `scripts/adapter-conformance-assert.sh`.
 
@@ -247,20 +247,20 @@ A bare branch name, never `origin/main`.
 
 ## The GitHub code-host adapter
 
-`tools/adapters/code-host/github.sh` is the reference implementation and the code-host conformance subject. It follows the tracker adapter line for line — dispatch before any backend work, `gh`'s own authentication (absent or unauthenticated is exit 4), no JSON dependency beyond `gh --jq`, and **no self-install**, for the same reason: the built-in rung already is GitHub. A project binds to it by making `.cdd/code-host` an executable that `exec`s it.
+`tools/adapters/code-host/github.sh` is the reference implementation and the code-host conformance subject. It follows the tracker adapter line for line — dispatch before any backend work, `gh`'s own authentication (absent or unauthenticated is exit 4), no JSON dependency beyond `gh --jq`, and **never a ladder rung**, for the same reason: the built-in rung already is GitHub. A project binds to it with a committed `.cdd/code-host` shim onto the adapter library.
 
-This repo binds both GitHub adapters to itself by committing `.cdd/code-host` and `.cdd/tracker` as relative symlinks into `tools/adapters/` — dogfooding, and a symlink cannot drift from its target. A downstream project has no `tools/adapters/` of its own, so it binds by exec-wrapper. The cost is that this repo no longer exercises the built-in `gh` rung day to day; the `code-host-ladder` gate still covers it.
+This repo binds both GitHub adapters to itself by committing `.cdd/code-host` and `.cdd/tracker` as relative symlinks into `tools/adapters/` — dogfooding, and a symlink cannot drift from its target. A downstream project has no `tools/adapters/` of its own, so it binds by a shim onto the machine-global adapter library ([Installing a binding](#installing-a-binding)). The cost is that this repo no longer exercises the built-in `gh` rung day to day; the `code-host-ladder` gate still covers it.
 
 It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline and exactly as the built-in does, and asks `gh repo view` only when `origin/HEAD` is unset — where the built-in would guess `main`.
 
 ## The Jira adapter
 
-`tools/adapters/tracker/jira.sh` answers the same contract against **Jira Cloud** through its REST API v3, with `curl` and `jq` — no Jira CLI. Data Center / Server (personal access tokens, API v2) is out of scope. Like the GitHub adapter it **does not self-install**, for a different reason: a Jira binding is per-project by nature (a site and a project key), so a machine-global install has nothing sensible to point at. A project binds it through `.cdd/tracker`, which may export the non-secret coordinates:
+`tools/adapters/tracker/jira.sh` answers the same contract against **Jira Cloud** through its REST API v3, with `curl` and `jq` — no Jira CLI. Data Center / Server (personal access tokens, API v2) is out of scope. Like the GitHub adapter it **is never a ladder rung**, for a different reason: a Jira binding is per-project by nature (a site and a project key), so a machine rung has nothing sensible to point at. A project binds it through a `.cdd/tracker` shim onto the adapter library, which exports the non-secret coordinates (the generated form, abridged — see [Installing a binding](#installing-a-binding)):
 
 ```bash
 #!/usr/bin/env bash
-export JIRA_BASE_URL=https://<site>.atlassian.net JIRA_PROJECT_KEY=ABC
-exec /path/to/cdd/tools/adapters/tracker/jira.sh "$@"
+export JIRA_BASE_URL='https://<site>.atlassian.net' JIRA_PROJECT_KEY='ABC'
+exec "$HOME/.cdd/tools/adapters/tracker/jira.sh" "$@"
 ```
 
 **Configuration is environment variables only** — no config file, nothing read from disk:
@@ -284,6 +284,28 @@ It **declares all five verbs**. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` 
 - **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the code host with smart commits enabled — the second of the three cases above.
 - **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
+## Installing a binding
+
+The installers bind a project to the shipped adapters ([ADR 0011](adr/0011-bind-adapters-through-a-machine-global-library.md)). Two layers:
+
+- **The adapter code is machine-global.** `cdd-worktree.sh install`, run from a CDD checkout, copies every `tools/adapters/<capability>/<backend>.sh` to the **adapter library**, `~/.cdd/tools/adapters/<capability>/<backend>.sh` — newest wins, like the helpers themselves. The library is **not a ladder rung**: the machine rung is `~/.cdd/adapters/<capability>`, and nothing in the library is consulted unless a project's binding points at it, so installing it leaves every unbound project on the built-in path.
+- **The binding is per-project and committed.** `.cdd/<capability>` is a small shim that names the backend and, for Jira, the site and project key. It reaches the library through `$HOME`, never through a path to one machine's CDD checkout, so a fresh clone on another machine works once the helpers are installed there. It holds no secret (§2.16).
+
+`tools/bootstrap-cdd-project.sh` writes the shims, from opt-in flags: `--tracker <backend>`, `--code-host <backend>`, and `--jira-site <host>` / `--jira-key <KEY>` with `--tracker jira`. A backend with no shipped adapter is refused (exit 2) rather than written as a binding that cannot work. The flags work under `--stage` too. The prompts decide *which* backends; the script is the only writer:
+
+- **`/cdd-bootstrap`** asks where issues and code review live, offering GitHub as the default, and asks only for the site and key for Jira.
+- **`/cdd-retrofit`** detects them from the target (the origin host, and Jira-key-shaped branch names or commit subjects), proposes each with its evidence under per-file approval, and never overwrites an existing `.cdd/<capability>`. In upgrade mode it also classifies a local prompt edit that swaps in another backend as **migrate into `.cdd/`**.
+
+A backend CDD ships no adapter for (GitLab, say) gets no binding, said in one line; the built-in path keeps serving, and a project adapter written against this contract can be bound by hand.
+
+The shim checks that its library file is executable and `exec`s it; the script's `write_binding` is the one source of its text.
+
+**A missing library is a broken adapter, not an absent one.** The shim exists, so the ladder has resolved to it; its `describe` exits 4 with the install command, and the resolver relays that first stderr line in its one "is unusable" line. Every call site then stops (or shows no data, for a listing) — never a silent fall-through to `gh`. A machine whose helper install predates the library needs one re-run of `cdd-worktree.sh install`.
+
+**The announcement line appears.** A bound GitHub project is served by an adapter where it used to be served by the built-in rung, so the helpers print their one "using adapter" line (below) where they used to be silent. The behaviour is otherwise identical — that is what behaviour-neutrality asserts.
+
+The conformance checker is not run against a downstream shim: it probes with an empty `HOME`, where no library exists. The `adapter-bindings` gate covers the shims instead, from a fresh clone on a second scratch `HOME`, through both a direct `describe` and the helpers' resolver.
+
 ## Docs: not a capability
 
 There is no `.cdd/docs`. An adapter is justified only when a CDD script or structured workflow step consumes its output, and a docs lookup is read only by Claude, as prose (`adr/0009-drop-the-docs-capability.md`). A project whose reference docs live in an external store — Confluence, Notion, a wiki — serves them this way instead:
@@ -299,7 +321,7 @@ There is no `.cdd/docs`. An adapter is justified only when a CDD script or struc
 Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machine `~/.cdd/adapters/<capability>`, then built-in behaviour — and the **first file present** wins. What happens next is one of three cases, for every capability ([ADR 0010](adr/0010-code-host-rename-and-broken-adapter-rule.md)):
 
 - **Missing** — no file at the rung: the next rung.
-- **Installed but broken** — the file is not executable; `describe` exits non-zero, does not parse as JSON, reports another `capability`, or a `contract` outside N / N-1; or `jq` is absent, so the caller cannot read `describe`: **one line naming the adapter and why, and no lower rung.** A broken project adapter does not fall to a working machine one, and neither falls to the built-in. An installed adapter declares the backend, so any lower rung would answer from the wrong system.
+- **Installed but broken** — the file is not executable; `describe` exits non-zero, does not parse as JSON, reports another `capability`, or a `contract` outside N / N-1; or `jq` is absent, so the caller cannot read `describe`: **one line naming the adapter and why, and no lower rung.** When `describe` exits non-zero, the "why" carries the first line it printed on stderr, so an adapter's own diagnosis (a binding's "adapter library missing … install with …") reaches the user. A broken project adapter does not fall to a working machine one, and neither falls to the built-in. An installed adapter declares the backend, so any lower rung would answer from the wrong system.
 - **Verb unsupported** — absent from `describe.verbs`, or exit 3: not an error. The caller skips the feature, exactly as when the backend has no answer.
 
 Once an adapter serves, a call that **fails** (exit 1, 4, anything but 0 or 3) is reported in one line and treated as "no answer" — never retried against a lower rung.

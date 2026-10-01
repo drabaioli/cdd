@@ -11,6 +11,9 @@ After bootstrap, the new project directory contains:
 ```
 <PROJECT_DIR>/
 ├── CLAUDE.md                                 # entry point Claude Code reads
+├── .cdd/                                     # only with the binding flags below: capability bindings
+│   ├── tracker                               # where issues live (a shim onto the adapter library)
+│   └── code-host                             # where code review lives (same)
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
 │   ├── settings.json                         # auto-allows sessions to read the handoff, write the plan file, run cdd-state, and run read-only shell commands
@@ -32,7 +35,7 @@ After bootstrap, the new project directory contains:
 │       └── index.md                          # explains the knowledge base
 ```
 
-(No `tools/` directory: the worktree helper is a single project-independent script you install once — see below — not a per-project file.)
+(No `tools/` directory: the worktree helper is a single project-independent script you install once — see below — not a per-project file. Likewise `.cdd/` holds only the backend choice and its coordinates; the adapter code is installed once per machine with the helper.)
 
 The bootstrap script also runs `git init -b main` and creates a single "Initial CDD scaffold" commit.
 
@@ -59,12 +62,29 @@ From the CDD repo root:
 
 `--path` is where the project will be created (absolute or relative to the current directory). Its basename becomes the directory slug (`<PROJECT_DIR>`). The path must not exist, or must be an empty directory.
 
+To bind the project's tracker (where issues live) and code host (where code review lives) to the adapters CDD ships, add the binding flags. For GitHub Issues and pull requests:
+
+```bash
+./tools/bootstrap-cdd-project.sh \
+  --name "My Project Display Name" \
+  --path ../my-project \
+  --tracker github --code-host github
+```
+
+For issues in Jira Cloud, give the site and project key — never a credential; you export `JIRA_EMAIL` and `JIRA_API_TOKEN` in your own shell:
+
+```bash
+  --tracker jira --jira-site <site>.atlassian.net --jira-key <KEY> --code-host github
+```
+
+Each flag writes a small `.cdd/<capability>` file that runs the adapter from the library the helper install provides (below), so it works from a clone on any machine. The script refuses a backend CDD ships no adapter for. Without the flags, no `.cdd/` is written and the built-in GitHub (`gh`) behaviour serves.
+
 The script will:
 
 1. Refuse to proceed if the target directory exists and is non-empty.
 2. Copy `template/` into the target, excluding this `BOOTSTRAP.md`.
 3. Substitute `<PROJECT_NAME>` and `<PROJECT_DIR>`.
-4. Write the baseline marker `.claude/cdd-baseline` (the CDD repo commit hash the template was rendered from; used later by `/cdd-retrofit`'s upgrade mode).
+4. Write the `.cdd/` bindings, if any flags were passed, then the baseline marker `.claude/cdd-baseline` (the CDD repo commit hash the template was rendered from; used later by `/cdd-retrofit`'s upgrade mode).
 5. Run `git init -b main` and create an initial scaffold commit.
 6. Print a "next steps" block pointing at the one-time worktree-helper install.
 
@@ -88,6 +108,8 @@ The script will:
    ```
 
    (Each must land on disk first — `curl … | bash` won't work, because each installer copies itself from its own file path.) Either form copies the helper to `~/.cdd/tools/`, wires `~/.bashrc` and `~/.zshrc` to source it (idempotent), and drops PATH shims into `~/.local/bin` so the commands also resolve in non-interactive shells (e.g. Claude Code's Bash tool, where `cdd-state set …` runs). Open a new shell. After this, `cdd-worktree` and `cdd-state` work in every CDD project — there is nothing per-project to add. They are machine-global toolchain dependencies, like `git` or `gh`: one install per machine, newest wins.
+
+   Run from the CDD repo checkout, the install also copies the adapter library, `~/.cdd/tools/adapters/`, that the project's `.cdd/` bindings run (re-run it if you installed the helper before this CDD version). The curl form fetches only the helper; it prints the per-adapter curl line to fetch the rest. Until the library is there, a bound capability stops with that command rather than falling back to `gh`.
 
 2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 

@@ -5,6 +5,9 @@
 # the other smoke paths. This test points it at a temp HOME instead and asserts:
 #   - the helper is copied to ~/.cdd/tools/cdd-worktree.sh and is executable
 #   - the handoff root ~/.cdd/handoffs/ is created
+#   - the shipped capability adapters are copied, executable, into the adapter
+#     library ~/.cdd/tools/adapters/<cap>/<backend>.sh (ADR 0011), and re-running
+#     install from the installed copy still succeeds
 #   - ~/.bashrc is created (neither rc existed) and carries the marker-guarded
 #     source line exactly once
 #   - PATH shims for every cdd-worktree* command are written to ~/.local/bin,
@@ -82,6 +85,12 @@ pass "helper copied to ~/.cdd/tools/ and executable"
 
 [[ -d "$FAKE_HOME/.cdd/handoffs" ]] || fail "handoff root ~/.cdd/handoffs not created"
 pass "handoff root created"
+
+for a in tracker/github.sh tracker/jira.sh code-host/github.sh; do
+  lib="$FAKE_HOME/.cdd/tools/adapters/$a"
+  [[ -f "$lib" && -x "$lib" ]] || fail "adapter library file missing/not executable: $lib"
+done
+pass "adapter library installed to ~/.cdd/tools/adapters/"
 
 [[ -f "$FAKE_HOME/.bashrc" ]] || fail ".bashrc not created when no rc existed"
 markers=$(grep -cF "CDD worktree helper (managed by cdd-worktree.sh install) BEGIN" "$FAKE_HOME/.bashrc")
@@ -199,6 +208,14 @@ HOME="$FAKE_HOME" "$HELPER" install >/dev/null
 markers=$(grep -cF "CDD worktree helper (managed by cdd-worktree.sh install) BEGIN" "$FAKE_HOME/.bashrc")
 [[ "$markers" -eq 1 ]] || fail "second install duplicated the marker block (found $markers)"
 pass "second install is idempotent (no duplicate marker block)"
+
+# Re-running from the installed copy (the upgrade path documented for the curl form)
+# has no sibling source to copy the library from; it must still succeed and keep it.
+HOME="$FAKE_HOME" bash "$DEST" install >/dev/null 2>&1 \
+  || fail "install from the installed copy failed"
+[[ -x "$FAKE_HOME/.cdd/tools/adapters/tracker/github.sh" ]] \
+  || fail "install from the installed copy lost the adapter library"
+pass "install from the installed copy succeeds and keeps the adapter library"
 
 # Self-repair: a managed block that is present but DISABLED (commented out) must be
 # rewritten as an active source line on re-install — the case a bare marker grep

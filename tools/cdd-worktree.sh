@@ -25,6 +25,11 @@
 # any handoffs from the old ~/.claude-handoffs/ location. After installing, open a
 # new shell; the CDD clone can then disappear and the commands still work.
 #
+# Run from a CDD checkout, install also copies the shipped capability adapters
+# (tools/adapters/<cap>/<backend>.sh) to ~/.cdd/tools/adapters/ -- a library the
+# committed .cdd/<cap> bindings exec, never a resolution-ladder rung (ADR 0011). The
+# curl form above fetches only this file, so it prints the per-adapter curl form.
+#
 # The helper is a machine-global toolchain dependency, like git or gh: one install
 # per machine, newest wins, install is idempotent (re-run to upgrade). Its contract
 # with projects is frozen and deliberately tiny -- the three command names below
@@ -113,10 +118,20 @@ cdd-worktree-adapter() {
   elif ! command -v jq >/dev/null 2>&1; then
     why="reading its describe needs jq, which is not installed"
   else
-    desc="$("$path" describe 2>/dev/null)" || rc=$?
+    # Keep describe's first stderr line: a failing binding says why there (e.g. a
+    # shim whose adapter library is missing names the install command), and that
+    # hint is only useful if it reaches the user through this one line.
+    local errf errline=""
+    if errf="$(mktemp 2>/dev/null)"; then
+      desc="$("$path" describe 2>"$errf")" || rc=$?
+      IFS= read -r errline <"$errf" || true
+      rm -f "$errf"
+    else
+      desc="$("$path" describe 2>/dev/null)" || rc=$?
+    fi
     got="$(jq -r '.capability // empty' <<<"$desc" 2>/dev/null)"
     if (( rc != 0 )); then
-      why="describe exited $rc"
+      why="describe exited $rc${errline:+: $errline}"
     elif ! jq -e . >/dev/null 2>&1 <<<"$desc"; then
       why="describe did not print JSON"
     elif [[ "$got" != "$cap" ]]; then
@@ -1114,6 +1129,31 @@ cdd-worktree-install() {
     echo "Installed helper: $dest"
   else
     echo "Helper already at $dest (running from the installed copy)."
+  fi
+
+  # Copy the shipped capability adapters beside it, as a machine-global LIBRARY at
+  # ~/.cdd/tools/adapters/<cap>/<backend>.sh -- deliberately not a resolution-ladder
+  # rung (that is ~/.cdd/adapters/<cap>), so installing binds no project. A project
+  # binds by committing a .cdd/<cap> shim that execs a library file (ADR 0011).
+  # Newest wins: shipped files are overwritten, nothing is deleted. Nothing to copy
+  # when running from the installed copy (the library is already its sibling); a
+  # note when no library results (a curl-only install fetches this one file).
+  local src_dir lib_dir="$dest_dir/adapters" a rel lib_count=0
+  src_dir="$(dirname "$src")"
+  if [[ "$src_dir" != "$dest_dir" && -d "$src_dir/adapters" ]]; then
+    shopt -s nullglob
+    for a in "$src_dir"/adapters/*/*.sh; do
+      rel="${a#"$src_dir"/adapters/}"
+      mkdir -p "$lib_dir/$(dirname "$rel")"
+      cp "$a" "$lib_dir/$rel"
+      chmod +x "$lib_dir/$rel"
+      lib_count=$((lib_count + 1))
+    done
+    shopt -u nullglob
+    echo "Installed adapter library: $lib_dir ($lib_count adapter(s))"
+  elif [[ ! -d "$lib_dir" ]]; then
+    echo "Note: no adapters/ beside $src, so no adapter library is installed. A project binding (.cdd/<cap>) needs it; fetch each adapter it names with:" >&2
+    echo "  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/adapters/<cap>/<backend>.sh --create-dirs -o ~/.cdd/tools/adapters/<cap>/<backend>.sh && chmod +x ~/.cdd/tools/adapters/<cap>/<backend>.sh" >&2
   fi
 
   # Wire each shell rc that exists; create ~/.bashrc if neither exists so there
