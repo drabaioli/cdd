@@ -294,23 +294,11 @@ The installers bind a project to the shipped adapters ([ADR 0011](adr/0011-bind-
 `tools/bootstrap-cdd-project.sh` writes the shims, from opt-in flags: `--tracker <backend>`, `--code-host <backend>`, and `--jira-site <host>` / `--jira-key <KEY>` with `--tracker jira`. A backend with no shipped adapter is refused (exit 2) rather than written as a binding that cannot work. The flags work under `--stage` too. The prompts decide *which* backends; the script is the only writer:
 
 - **`/cdd-bootstrap`** asks where issues and code review live, offering GitHub as the default, and asks only for the site and key for Jira.
-- **`/cdd-retrofit`** detects them from the target: the origin host, and Jira-key-shaped branch names or commit subjects (at least three distinct numbers under one prefix, look-alikes such as `UTF-8` excluded). It proposes each binding with its evidence, under per-file approval, and never overwrites an existing `.cdd/<capability>`. In upgrade mode it also flags a binding that execs an absolute checkout path as non-portable, and classifies a local prompt edit that swaps in another backend as **migrate into `.cdd/`**.
+- **`/cdd-retrofit`** detects them from the target (the origin host, and Jira-key-shaped branch names or commit subjects), proposes each with its evidence under per-file approval, and never overwrites an existing `.cdd/<capability>`. In upgrade mode it also classifies a local prompt edit that swaps in another backend as **migrate into `.cdd/`**.
 
 A backend CDD ships no adapter for (GitLab, say) gets no binding, said in one line; the built-in path keeps serving, and a project adapter written against this contract can be bound by hand.
 
-The generated shim, for the GitHub tracker:
-
-```bash
-#!/usr/bin/env bash
-# CDD capability adapter binding: tracker -> github. Written by bootstrap-cdd-project.sh.
-# (two more comment lines)
-lib="$HOME/.cdd/tools/adapters/tracker/github.sh"
-if [ ! -x "$lib" ]; then
-  echo "adapter library missing: $lib; install once per machine: <cdd>/tools/cdd-worktree.sh install, or: curl … " >&2
-  exit 4
-fi
-exec "$lib" "$@"
-```
+The shim checks that its library file is executable and `exec`s it; the script's `write_binding` is the one source of its text.
 
 **A missing library is a broken adapter, not an absent one.** The shim exists, so the ladder has resolved to it; its `describe` exits 4 with the install command, and the resolver relays that first stderr line in its one "is unusable" line. Every call site then stops (or shows no data, for a listing) — never a silent fall-through to `gh`. A machine whose helper install predates the library needs one re-run of `cdd-worktree.sh install`.
 

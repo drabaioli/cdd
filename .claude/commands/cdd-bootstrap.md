@@ -96,9 +96,9 @@ Reuse the bootstrap script — do not reimplement copying or substitution:
 # add `--dir <PROJECT_DIR>` only if <PROJECT_DIR> differs from the basename of <target>
 ```
 
-Pass the binding flags from step 1's answer: `--tracker github` or `--tracker jira --jira-site <site> --jira-key <KEY>`, and `--code-host github`. Leave a flag out for a capability whose backend CDD ships no adapter for — the script refuses such a backend rather than write a binding that cannot work.
+Pass the binding flags from step 1's answer: `--tracker github` or `--tracker jira --jira-site <site> --jira-key <KEY>`, and `--code-host github`. Leave a flag out for a backend CDD ships no adapter for; the script refuses one.
 
-(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived, so the example omits it.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the two identifiers, writes the capability bindings into `.cdd/` (small committed shims onto the adapter library the worktree-helper install provides — no path to this machine's CDD checkout, so they work from any clone), writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
+(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived, so the example omits it.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the two identifiers, writes the capability bindings into `.cdd/`, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
 
 Then remove the overlay: `rm -rf "$OVERLAY"`.
 
@@ -120,14 +120,8 @@ Report:
 - What was written into the scaffold commit: project overview, roadmap (real first phase, no survey phase), `CLAUDE.md`, and whether an architecture overview was included.
 - The baseline marker value and that the "Initial CDD scaffold" commit was created.
 - The GitHub repo, if one was created (step 7).
-- The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and the built-in `gh` path serves). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell. Mention that the worktree helpers now print one "using adapter" line when they reach a bound capability.
-- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project. It also installs the adapter library the bindings run, so check for each bound adapter:
-
-  ```bash
-  [ -x ~/.cdd/tools/adapters/<capability>/<backend>.sh ] || echo "adapter library missing"
-  ```
-
-  If one is missing — the helper was installed before this CDD version, or never — offer the same install; until it runs, the helpers and prompts stop on the bound capability with the install command rather than silently falling back.
+- The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and the built-in `gh` path serves). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
+- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
 
   ```bash
   ./tools/cdd-worktree.sh install

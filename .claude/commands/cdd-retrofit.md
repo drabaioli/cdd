@@ -20,7 +20,7 @@ git -C <target> status --porcelain 2>/dev/null
 - If the target is not a git repo, warn the user (retrofit changes won't be revertable via git, and the isolated-worktree step in section 2.5 won't run) and ask whether to proceed.
 - A **dirty working tree no longer blocks the retrofit**: section 2.5 writes into a fresh worktree branched from HEAD, so the target's current checkout is untouched. Do *not* hard-stop on a dirty tree. There is one nuance to warn about: because the worktree is taken from HEAD, any **uncommitted local edits to CDD-managed files** (the set listed in section 4.4) are invisible to the upgrade comparison. If `git status --porcelain` shows uncommitted changes to those files, tell the user to commit them first or they won't be considered, then let them decide whether to proceed.
 
-Also note `<target>/.gitignore`: if any path the retrofit will write (`.claude/`, `doc/`, `tools/`) is gitignored, warn that those writes will not show in `git status` (and won't be staged by the retrofit commit in sections 3.4 / 4.8), and include this in the final summary.
+Also note `<target>/.gitignore`: if any path the retrofit will write (`.claude/`, `doc/`, `tools/`) is gitignored, warn that those writes will not show in `git status` (and won't be staged by the retrofit commit in sections 3.4 / 4.7), and include this in the final summary.
 
 ## 2. Detect the mode
 
@@ -56,31 +56,22 @@ WT="$(dirname "<target>")/$(basename "<target>")-$BRANCH"
   On success, set `$WT` as the destination for all subsequent writes and the source for any reads of the project's current files (in upgrade mode the worktree is identical to HEAD).
 
 - **Fallbacks — warn, then degrade; never silently skip isolation:**
-  - Target is **not a git repo** (from section 1) → no worktree possible. Warn, set `$WT` = `<target>` (in-place writes, today's behavior), and **skip the commit step** in sections 3.4 / 4.8.
+  - Target is **not a git repo** (from section 1) → no worktree possible. Warn, set `$WT` = `<target>` (in-place writes, today's behavior), and **skip the commit step** in sections 3.4 / 4.7.
   - Target git repo has **no commits / unborn or detached HEAD** (`worktree add -b` fails) → warn and fall back to a plain `git -C <target> switch -c "$BRANCH"` in the existing checkout, with `$WT` = `<target>`; if even that fails, fall back to in-place writes and skip the commit step.
 
 ## 2.6 Capability bindings
 
-Both modes offer the project **capability bindings** in `.cdd/` (process doc Section 2.16; contract in `doc/architecture/capability-adapters.md`): a committed `.cdd/tracker` / `.cdd/code-host` shim that points the workflow at a shipped adapter. This section is shared; sections 3 and 4 say where it applies. Nothing here is written without approval.
-
-**Detect the backends from the target**, and show the user the evidence alongside each proposal:
+Both modes offer a `.cdd/tracker` / `.cdd/code-host` binding to a shipped adapter (process doc Section 2.16), for each capability the project does not already bind. Detect the backends and show the evidence with each proposal:
 
 ```bash
 git -C <target> remote get-url origin 2>/dev/null
-git -C <target> for-each-ref --format='%(refname:short)' refs/heads refs/remotes
-git -C <target> log -n 500 --format=%s
-git -C <target> log -n 500 --format=%b | grep -oE 'https://[A-Za-z0-9.-]+\.atlassian\.net' | sort | uniq -c | sort -rn
+git -C <target> log -n 500 --format='%D %s %b'
 ```
 
-- **Code host, and the default tracker, from the origin host.** A host containing `github` → propose the GitHub tracker and code host. Any other host (GitLab, Bitbucket, …) → one line: CDD ships no adapter for it, so no binding is written and the built-in `gh` path keeps serving; a project adapter can be written later against `doc/architecture/capability-adapters.md`. No origin → ask the user where issues and code review live, as `/cdd-bootstrap` does.
-- **Jira from issue keys.** Match `\b[A-Z][A-Z0-9_]+-[0-9]+\b` in the branch names and commit subjects and count the distinct numbers under each prefix. A prefix with **at least three** distinct numbers, and not on the denylist of look-alikes (`UTF`, `SHA`, `ISO`, `CVE`, `RFC`, `GPL`, `HTTP`, `TLS`, `X`, …), is evidence of a Jira project: propose the Jira tracker with the dominant prefix as the project key, quoting a few matching refs. Propose the site from the commit-body `atlassian.net` URLs when there are any; otherwise ask for it. The code host still comes from the origin.
-- **Never ask for or write a credential.** For Jira, tell the user they set `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell.
+- **Origin host** containing `github` → propose GitHub for both. Another host (GitLab, …) → say in one line that CDD ships no adapter for it and the built-in `gh` path keeps serving. No origin → ask, as `/cdd-bootstrap` does.
+- **Jira** → a key prefix recurring in branch names or commit subjects (`ABC-123`, several distinct numbers, not look-alikes like `UTF-8`) proposes the Jira tracker with that key; take the site from any `atlassian.net` URL, otherwise ask. Never ask for a credential: the user sets `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell.
 
-**Render the bindings through the bootstrap script** — add the approved flags to a `--stage` render (`--tracker github` or `--tracker jira --jira-site <site> --jira-key <KEY>`, and `--code-host github`); never hand-write a shim. The script refuses a backend CDD ships no adapter for.
-
-**Approve each `.cdd/<capability>` as its own file**, and never overwrite or merge into an existing one — report it and leave it.
-
-**Check the adapter library on this machine.** A binding runs the adapter from the library the worktree-helper install provides; warn if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing, since until `./tools/cdd-worktree.sh install` runs here the helpers and prompts stop on the bound capability with the install command.
+Approve each binding as its own file, render it with the matching flags on the section 3.2 / 4.3 render (never hand-write one), and never overwrite an existing `.cdd/<capability>`.
 
 ## 3. Install mode
 
@@ -111,8 +102,7 @@ The staging tree is fully substituted, has no `.git`, and contains the baseline 
 
 Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated worktree from section 2.5), and presence is judged against `$WT` — which, for a fresh worktree, mirrors the target's HEAD:
 
-- **Absent in `$WT`** → copy it directly (create parent dirs as needed). This covers the slash commands, doc skeletons, `.claude/settings.json`, and the marker in the common case. A `.cdd/<capability>` shim is the exception: it is copied only under its own approval (section 2.6), even when absent.
-- **`.cdd/<capability>` present in `$WT`** → the project already binds it: never overwrite or merge it; report it and leave it.
+- **Absent in `$WT`** → copy it directly (create parent dirs as needed). This covers the slash commands, doc skeletons, `.claude/settings.json`, and the marker in the common case. A `.cdd/<capability>` binding is the exception: it is copied only under its own approval, and never over an existing one (section 2.6).
 - **Present in `$WT`** (collision — typically `CLAUDE.md`, sometimes `doc/` files or `.claude/settings.json`) → propose a merge interactively, one file at a time:
   - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/cdd-next-step`, `/cdd-pre-pr`, `/cdd-merge-base`). Show the proposed result; apply only on approval.
   - `.claude/settings.json`: merge the `permissions.allow` arrays (union); show the result before writing.
@@ -130,7 +120,7 @@ Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated workt
   ```
 
   Stage with `add -A` — the worktree was fresh, so this captures exactly the retrofit's writes. Gitignored paths won't be staged (see the section 1 gitignore warning). Commit only on this dedicated branch; never commit onto the target's existing branches.
-- Print next steps: the one-time worktree-helper install (`./tools/cdd-worktree.sh install` in the CDD repo — project-independent, only needed if the user hasn't installed it before; nothing is added per project; it also installs the adapter library any `.cdd/` binding runs, so re-run it on a machine whose install predates this CDD version); how to review and merge the branch (`git -C "$WT" show`, then — before opening the PR — `cd "$WT"` and start a fresh Claude session there to run `/cdd-pre-pr`, which reconciles and reviews the retrofit's own edits and catches doc skeletons left with unfilled placeholders; then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting; the roadmap's Phase 1 intro carries a seed set of common fold-in patterns (split architecture docs → `doc/architecture/`, a `future-work.md`/TODO/backlog doc → the roadmap, an oversized `CLAUDE.md` → slim to pointers) so the reconciliation session has them on hand.
+- Print next steps: the one-time worktree-helper install (`./tools/cdd-worktree.sh install` in the CDD repo — project-independent, only needed if the user hasn't installed it before; nothing is added per project; re-run it if it predates the adapter library a `.cdd/` binding runs); how to review and merge the branch (`git -C "$WT" show`, then — before opening the PR — `cd "$WT"` and start a fresh Claude session there to run `/cdd-pre-pr`, which reconciles and reviews the retrofit's own edits and catches doc skeletons left with unfilled placeholders; then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting; the roadmap's Phase 1 intro carries a seed set of common fold-in patterns (split architecture docs → `doc/architecture/`, a `future-work.md`/TODO/backlog doc → the roadmap, an oversized `CLAUDE.md` → slim to pointers) so the reconciliation session has them on hand.
 
 ## 4. Upgrade mode
 
@@ -159,10 +149,10 @@ STAGE=$(mktemp -d)
 ./tools/bootstrap-cdd-project.sh --stage \
   --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
   --path "$STAGE/current" \
-  --tracker github --code-host github   # only the bindings section 4.5 approves; omit the rest
+  --tracker github --code-host github   # the bindings approved per section 2.6; omit any declined
 ```
 
-Pass binding flags to this current render only — never to the old one, which models what the project was bootstrapped from. Bindings are proposed in section 4.5, not compared in section 4.4, so they are not part of the CDD-managed set below.
+Binding flags go on this current render only, never the old one; bindings are proposed per section 2.6, not compared in section 4.4.
 
 Old (baseline) template, extracted from this repo's history and rendered through the same substitution path:
 
@@ -194,14 +184,14 @@ The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claud
 - **both present** → do not guess: report both and ask which to keep.
 - **neither present** → fall through to the table's "file absent in target" row on the new path.
 
-**Land a rename in the template, add a row** — the same rule §4.6 states for path tokens. Like §4.6's rows these are transitional; retire a row once every project is past it (#93 tracks the reaping).
+**Land a rename in the template, add a row** — the same rule §4.5 states for path tokens. Like §4.5's rows these are transitional; retire a row once every project is past it (#93 tracks the reaping).
 
 For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file **read from `$WT`** (the section 2.5 worktree, which mirrors HEAD; this is why section 1 warns when CDD-managed files have uncommitted edits — those won't be reflected here):
 
 | Comparison | Meaning | Action |
 | --- | --- | --- |
 | target == old, current != old | template evolved, project untouched | propose applying the upgrade (show the diff; apply on approval) |
-| target != old, current == old | local customization, template unchanged | preserve; assess for upstreaming (4.7) |
+| target != old, current == old | local customization, template unchanged | preserve; assess for upstreaming (4.6) |
 | target != old, current != old | both changed | show both diffs; propose a merge that keeps the local intent while adopting the template improvement; apply on approval |
 | all equal | nothing to do | skip silently |
 | file absent in old render | newer than the project's baseline | propose adding it as a new file |
@@ -209,7 +199,7 @@ For each file, with `old` = staged old render, `current` = staged current render
 
 Every application is per-file interactive: show the diff, get approval, write into `$WT`.
 
-**Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" and "both changed" rows) that swaps in another service for something a capability covers is not a customization to preserve but a backend to bind: issue reads, lists, creates or closes (`gh issue …` replaced by `jira`, `acli`, `glab issue`, `curl …atlassian.net/…`), or pull-request create, lookup, comments or merge state and the default branch (`gh pr …` replaced by `glab mr …`). Classify such a hunk **"migrate into `.cdd/`"** and propose, under per-file approval: restore the template's version of that hunk, and bind the capability instead — through a shipped adapter if CDD has one for the backend (section 2.6), otherwise by writing a project adapter against `doc/architecture/capability-adapters.md`. The user may decline; the hunk is then preserved as any other customization. This is how an upgrade un-forks a project whose prompts were edited to reach a different backend.
+**Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" or "both changed" rows) that swaps `gh issue …` / `gh pr …` for another backend (`jira`, `acli`, `glab`, `curl …atlassian.net/…`) is a backend to bind, not a customization to keep. Propose, per file: restore the template's hunk and bind the capability instead — a shipped adapter if CDD has one (section 2.6), otherwise a project adapter written against `doc/architecture/capability-adapters.md`. If declined, preserve it like any customization.
 
 **Added files — reconcile fill-in skeletons, don't ship them raw.** A file absent from the old render is newer than the project's baseline, and it may be a fill-in skeleton whose placeholder defaults would make false claims about a mature project (the motivating case: `engineering-practices.md` arriving with `<test command>` / `<lint command>` / `<ci workflow / command>` placeholders and provisional `<Enforced once …; Expected until then>` markers, claiming no gate exists in a project that already runs pytest, ruff, and CI). For every file you propose adding:
 
@@ -218,13 +208,7 @@ Every application is per-file interactive: show the diff, get approval, write in
 - **Worked example — `engineering-practices.md`.** Fill `<test command>` / `<integration test command>` / `<lint command>` / `<format check command>` / `<ci workflow / command>` from the commands you can detect (a `Makefile`/`pyproject.toml`/`package.json` test or lint target, a test-runner or linter config), and flip each provisional status marker to **Enforced** or **Expected** according to whether that gate actually exists — CI judged by a `.github/workflows/*.yml`, tests/lint by the presence of the corresponding runner or linter config. Apply the same shape to any other added fill-in doc.
 - Anything left unreconciled after the approved edit still counts as residual and is carried into the section 5 summary flag.
 
-### 4.5 Capability bindings
-
-For each capability whose `$WT/.cdd/<capability>` is **absent**, offer a binding per section 2.6 (detect, show the evidence, per-file approval), rendered through the section 4.3 current render.
-
-A **present** `.cdd/<capability>` is never overwritten. Validate it in one line — `"$WT/.cdd/<capability>" describe` prints the capability, backend and contract — and if it names an absolute path into a CDD checkout (the old documented `exec /path/to/cdd/tools/adapters/…` form), flag it **non-portable, consider rebinding**: it works only on a machine with that checkout at that path. Flag only; never write it.
-
-### 4.6 Legacy-token sweep and helper migration
+### 4.5 Legacy-token sweep and helper migration
 
 Section 4.4 migrated the CDD-managed files; anything **else** naming a pre-migration path or command is now dangling and unlooked-at. So this sweep covers every tracked text file, not just `*.md` — `tools/*.sh` bites hardest, because the pre-#24 per-project worktree helper lives there. **Upgrade mode only:** an install target carries no CDD-era tokens, and a hand-copied CDD install is detected as *upgrade* anyway (section 2 keys on `cdd-next-step.md` / `roadmap.md`; its manual override is the escape hatch).
 
@@ -258,16 +242,11 @@ Both narrowings are load-bearing: unbounded, the second pattern matches `css/boo
 
 Either way it is an outcome, not a silent success — section 5 reports it.
 
-### 4.7 Upstream candidates
+### 4.6 Upstream candidates
 
-For each preserved local customization, judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Do not silently keep general improvements local: collect them into a report — file, hunk, why it looks upstreamable, and its destination — and present it at the end as candidates for a normal CDD task in this repo. Two destinations:
+For each preserved local customization, judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Do not silently keep general improvements local: collect them into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as an extension**: a new shipped adapter, not a prompt change. Do not auto-apply anything to the CDD repo in this session.
 
-- **Port into `template/`** (and the process doc) — a workflow improvement.
-- **Propose as an extension** — a general-looking customization that reaches a backend CDD ships no adapter for (a declined "migrate into `.cdd/`" hunk is the usual source) is a candidate new shipped adapter, `tools/adapters/<capability>/<backend>.sh`, rather than a prompt change.
-
-Do not auto-apply anything to the CDD repo in this session.
-
-### 4.8 Update the marker and commit
+### 4.7 Update the marker and commit
 
 After all approved changes are applied, write the marker into the worktree (run `git rev-parse` from the CDD repo root, redirect into `$WT`):
 
@@ -293,8 +272,7 @@ Report, in both modes:
 - Files copied / upgraded / merged / preserved (and any the user declined).
 - **Added — needs reconciliation** (upgrade mode): any added file that still contains residual `<...>` placeholders or provisional status markers after all approved edits, listed by path. Keep this as a distinct category from clean adds so it reads as an action item, not a silent success — the user must finish these, and the recommended `/cdd-pre-pr` pass below will also catch them.
 - **Legacy migration** (upgrade mode): the sweep's outcome as a distinct category — *swept* (what was found, including the historical hits deliberately left alone), *patched* (files brought back into agreement, listed), and *recommended for removal* (a project-local worktree/state helper, with the exact shell rc line the user still has to delete by hand). An empty sweep says so in one line. Keep it separate from the file lists above: a legacy hit the user declined is an action item they carry away, not a closed row.
-- **Capability bindings** (both modes): each `.cdd/<capability>` written (backend, and the evidence it was detected from), declined, already present and kept, or flagged non-portable; each one-line "CDD ships no adapter for this backend" outcome; and whether the adapter library is missing on this machine (with the install command). For Jira, the env vars the user sets (`JIRA_EMAIL`, `JIRA_API_TOKEN`).
-- **Migrate into `.cdd/`** (upgrade mode): each hunk given that verdict, and whether it was migrated or declined and preserved.
+- **Capability bindings**: each `.cdd/<capability>` written (with its evidence), declined, or already present; each "no adapter for this backend" line; any upgrade-mode "migrate into `.cdd/`" hunk and its outcome; for Jira, the env vars the user sets; and, if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing on this machine, that the bound capability stops until `./tools/cdd-worktree.sh install` runs.
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), each with its destination (port into `template/`, or propose as an extension), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.

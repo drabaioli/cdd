@@ -109,15 +109,7 @@ The script will:
 
    (Each must land on disk first — `curl … | bash` won't work, because each installer copies itself from its own file path.) Either form copies the helper to `~/.cdd/tools/`, wires `~/.bashrc` and `~/.zshrc` to source it (idempotent), and drops PATH shims into `~/.local/bin` so the commands also resolve in non-interactive shells (e.g. Claude Code's Bash tool, where `cdd-state set …` runs). Open a new shell. After this, `cdd-worktree` and `cdd-state` work in every CDD project — there is nothing per-project to add. They are machine-global toolchain dependencies, like `git` or `gh`: one install per machine, newest wins.
 
-   Run from the CDD repo checkout, the worktree-helper install also copies the adapter library, `~/.cdd/tools/adapters/`, that the project's `.cdd/` bindings run (re-run it if you installed the helper before this CDD version). The curl form fetches only the helper, so on a fresh machine fetch each adapter the project's `.cdd/` names too — the install prints this form:
-
-   ```bash
-   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/adapters/<capability>/<backend>.sh \
-     --create-dirs -o ~/.cdd/tools/adapters/<capability>/<backend>.sh \
-     && chmod +x ~/.cdd/tools/adapters/<capability>/<backend>.sh
-   ```
-
-   Until the library is there, a bound capability stops with this command rather than falling back to `gh`.
+   Run from the CDD repo checkout, the install also copies the adapter library, `~/.cdd/tools/adapters/`, that the project's `.cdd/` bindings run (re-run it if you installed the helper before this CDD version). The curl form fetches only the helper; it prints the per-adapter curl line to fetch the rest. Until the library is there, a bound capability stops with that command rather than falling back to `gh`.
 
 2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 
