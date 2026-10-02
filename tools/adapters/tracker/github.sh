@@ -22,10 +22,9 @@
 #   exec "$HOME/.cdd/tools/adapters/tracker/github.sh" "$@"
 #
 # It deliberately never installs itself as a resolution-ladder RUNG (unlike
-# cdd-worktree.sh / cdd-state.sh, it has no install verb): the built-in rung already IS
-# GitHub, so a machine-rung install would change no behaviour while destroying the "no
-# adapter installed" baseline that behaviour-neutrality is checked against. The library
-# copy is not a rung, so it binds nothing until a project's shim points at it.
+# cdd-worktree.sh / cdd-state.sh, it has no install verb): the machine rung binds every
+# repository on the machine, GitHub or not, so only a project's shim should bind it. The
+# library copy is not a rung, so it binds nothing until a project's shim points at it.
 #
 # Exit codes (contract-wide): 0 ok, 1 operation failed, 2 usage error,
 # 3 verb unsupported by this backend, 4 not configured / auth missing.

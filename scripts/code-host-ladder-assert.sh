@@ -2,11 +2,12 @@
 # Smoke for code-host adapter resolution in the worktree helpers (ADR 0010).
 #
 # The helpers' PR lookups and default-branch lookup go down a ladder: the project's
-# .cdd/code-host, then the machine's ~/.cdd/adapters/code-host, then the built-in
-# gh / git. This pins the three cases of the broken-adapter rule at every helper call
-# site that consults it:
-#   - missing (no file at a rung)  -> the next rung; with none at all, the built-in,
-#     silently (no announcement line)
+# .cdd/code-host, then the machine's ~/.cdd/adapters/code-host, then nothing (ADR 0012:
+# there is no built-in gh rung). This pins the cases of the broken-adapter rule at every
+# helper call site that consults it:
+#   - missing (no file at a rung)  -> the next rung; with none at all, the PR-dependent
+#     steps skip with one line naming /cdd-retrofit: gc reaps nothing, done falls to its
+#     keep/delete/abort prompt, list and resume show no PR status; `gh` is never called
 #   - installed and working        -> it serves, announced in exactly one stderr line,
 #     and `gh` is never called; the project rung wins over the machine rung
 #   - installed but broken (not executable; describe exits non-zero, prints non-JSON,
@@ -17,8 +18,8 @@
 #     gc reaps nothing and exits 0, list shows "-"
 #
 # Like gc-assert.sh it stands in a local bare repo for origin, gives the helpers their
-# own $HOME, and stubs `gh` on PATH — here a stub that also logs every call, which is
-# what proves "never falls back to gh". The stub adapters are small bash scripts that
+# own $HOME, and stubs `gh` on PATH — a stub that only logs every call, which is what
+# proves "never falls back to gh". The stub adapters are small bash scripts that
 # log their own calls the same way.
 #
 # Usage: scripts/code-host-ladder-assert.sh   (provisions and tears down its own temp tree)
@@ -53,32 +54,18 @@ cat > "$GIT_CONFIG_GLOBAL" <<'EOF'
 	gpgsign = false
 EOF
 
-MERGED="feat_merged"   # the adapter (and the gh stub) say its PR merged
+MERGED="feat_merged"   # the adapter says its PR merged
 OPEN="feat_open"       # no merged PR
 RESUME="feat_resume"   # a remote branch for the resume case
 HOME_A="$WORK/home"
 GH_LOG="$WORK/gh.log"
 export GH_LOG
 
-# Stub gh: logs every call. `auth status` succeeds; `pr list --head feat_merged` answers
-# in the shape of whichever --jq the caller used (list's "#N STATE" or gc's bare state).
+# Stub gh: logs every call and answers nothing. No command may reach it.
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "$*" >> "$GH_LOG"
-case "$1" in
-  auth) exit 0 ;;
-  pr)
-    branch="" all="$*"
-    while [[ $# -gt 0 ]]; do
-      [[ "$1" == "--head" ]] && { branch="$2"; break; }
-      shift
-    done
-    if [[ "$branch" == "feat_merged" ]]; then
-      if [[ "$all" == *"number,state"* ]]; then echo "#7 MERGED"; else echo "MERGED"; fi
-    fi
-    exit 0 ;;
-esac
 exit 0
 EOF
 cat > "$WORK/bin/claude" <<'EOF'
@@ -192,19 +179,39 @@ one_line_matching() {
   [[ "$(stderr_lines)" == 1 ]] && grep -q "$@" "$WORK/err"
 }
 
-# --- 1. No adapter: the built-in rung, silently --------------------------------
+# --- 1. No adapter: skip with one line, never gh --------------------------------
+missing="code-host: no adapter installed; run /cdd-retrofit in this project to install one"
 reset
 run "$MACHINE" cdd-worktree-default-branch
 [[ $RC -eq 0 && "$(cat "$WORK/out")" == "main" ]] || fail "no adapter: default branch should be main$(show)"
-[[ ! -s "$WORK/err" ]] || fail "no adapter: the built-in rung must be silent$(show)"
+[[ ! -s "$WORK/err" ]] || fail "no adapter: default-branch (git only) must be silent$(show)"
 
-run "$MACHINE" cdd-worktree-gc
+run "$MACHINE" cdd-worktree-gc --force
 [[ $RC -eq 0 ]] || fail "no adapter: gc exited $RC$(show)"
-grep -q "reap  $MERGED (MERGED): would remove" "$WORK/out" || fail "no adapter: gc did not reap via gh$(show)"
-grep -q "keep  $OPEN" "$WORK/out" || fail "no adapter: gc did not keep $OPEN$(show)"
-[[ ! -s "$WORK/err" ]] || fail "no adapter: gc must print no adapter line$(show)"
-[[ -s "$GH_LOG" ]] || fail "no adapter: gc should have asked gh"
-pass "no adapter: default branch from git, gc from gh, nothing announced"
+one_line_matching -F "$missing" || fail "no adapter: gc should print exactly the missing-adapter line$(show)"
+! grep -q '^reap ' "$WORK/out" || fail "no adapter: gc reaped something$(show)"
+[[ -f "$DIR/$MERGED.md" && -f "$DIR/$OPEN.md" ]] || fail "no adapter: gc deleted a handoff"
+
+run "$MACHINE" cdd-worktree-list
+[[ $RC -eq 0 ]] || fail "no adapter: list exited $RC$(show)"
+one_line_matching -F "$missing" || fail "no adapter: list should print exactly the missing-adapter line$(show)"
+[[ "$(pr_column "$MERGED")" == "-" && "$(pr_column "$OPEN")" == "-" ]] || fail "no adapter: list should show no PR status$(show)"
+
+run "$MACHINE" cdd-worktree-resume
+grep -qF "$missing" "$WORK/err" || fail "no adapter: resume should print the missing-adapter line$(show)"
+! grep -q '(PR #' "$WORK/out" || fail "no adapter: resume should show no PR status$(show)"
+
+# done: a squash-merged branch git cannot prove merged must reach the prompt (here
+# answered by EOF, which aborts), never be force-deleted or have its handoff reaped.
+git -C "$MACHINE" worktree add -q "$WORK/machine-$MERGED" "$MERGED" 2>/dev/null
+run "$WORK/machine-$MERGED" cdd-worktree-done
+grep -qF "$missing" "$WORK/err" || fail "no adapter: done should print the missing-adapter line$(show)"
+grep -q "is not merged into main" "$WORK/out" || fail "no adapter: done should fall to the keep/delete/abort prompt$(show)"
+git -C "$MACHINE" show-ref --verify --quiet "refs/heads/$MERGED" || fail "no adapter: done deleted the branch without asking"
+[[ -f "$DIR/$MERGED.md" ]] || fail "no adapter: done reaped the handoff without asking"
+git -C "$MACHINE" worktree prune
+[[ ! -s "$GH_LOG" ]] || fail "no adapter: gh was called: $(cat "$GH_LOG")"
+pass "no adapter: one missing-adapter line; gc reaps nothing, list/resume show no PR, done asks; gh never called"
 
 # --- 2. A working project adapter serves, and gh is never called ---------------
 reset

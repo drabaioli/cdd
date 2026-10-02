@@ -53,8 +53,8 @@
 #                               if merged, force-delete if squash-merged on
 #                               the code host, otherwise prompt), close the
 #                               issues recorded on the task's state record once a
-#                               merged PR is confirmed (via the tracker adapter, or
-#                               gh), and delete the handoff file iff the branch was
+#                               merged PR is confirmed (via the tracker adapter),
+#                               and delete the handoff file iff the branch was
 #                               deleted and every close succeeded.
 #
 #   cdd-worktree-list       List all active handoffs in ~/.cdd/handoffs/<repo-name>/
@@ -81,13 +81,14 @@
 #                               record lists (the backstop for done's close).
 #                               Conservative — reaps only merged tasks (never a
 #                               scoped-but-unstarted or open-PR one) and is
-#                               dry-run unless --force. Needs gh, or a
-#                               code-host adapter declaring pr-merged.
+#                               dry-run unless --force. Needs a code-host
+#                               adapter declaring pr-merged.
 #
-# PR lookups and the default branch go through a code-host capability adapter when
-# one is installed (.cdd/code-host, then ~/.cdd/adapters/code-host), and through
-# gh / git otherwise. An installed-but-broken adapter stops the command that needs
-# it rather than falling back (ADR 0010). See shell-helpers.md, "Code-host resolution".
+# PR lookups go through a code-host capability adapter (.cdd/code-host, then
+# ~/.cdd/adapters/code-host); the default branch falls back to git. With none installed
+# the PR-dependent steps skip with one line naming /cdd-retrofit (ADR 0012), and an
+# installed-but-broken adapter stops the command that needs it (ADR 0010). See
+# shell-helpers.md, "Code-host resolution".
 # The post-merge issue close in done / gc resolves the tracker adapter the same way,
 # only for a task that recorded issue refs. See shell-helpers.md, "Tracker resolution".
 
@@ -101,7 +102,7 @@
 # none) and CDD_ADAPTER_DESCRIBE (its describe JSON). Globals rather than stdout
 # because a command substitution's subshell could not publish the describe as well.
 # Returns 0 when a valid adapter serves (announcing it in one stderr line), 1 when none
-# is installed (the built-in rung; silent), 2 when one is installed but broken (after
+# is installed (silent; callers say what they skip), 2 when one is installed but broken (after
 # printing exactly one stderr line naming it and why).
 cdd-worktree-adapter() {
   local cap="$1" top c path="" why="" desc="" rc=0 got
@@ -177,28 +178,27 @@ cdd-worktree-adapter-warn() {  # cdd-worktree-adapter-warn <verb> <exit code>
 }
 
 # Ask the code host whether <branch> merged into <base> through a PR: the caller's
-# resolved adapter (CDD_ADAPTER) when one serves, else gh. Prints "<PR number> <PR url>"
+# resolved adapter (CDD_ADAPTER). Prints "<PR number> <PR url>"
 # on one line (the url may be absent: an adapter need not report it) and returns 0 when
 # merged; returns 1 when the host answered "not merged", 2 when it could not answer (no
-# gh, a failing call, an unsupported verb).
+# adapter, a failing call, an unsupported verb); the caller says why when none resolved.
 cdd-worktree-merged-pr() {
-  local branch="$1" base="$2" rc=0 line
-  if [[ -n "${CDD_ADAPTER:-}" ]]; then
-    # Never falls back to gh once an adapter resolved: it names the backend.
-    cdd-worktree-adapter-call pr-merged "$branch" --base "$base" || rc=$?
-    if (( rc == 0 )); then
-      [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]] || return 1
-      jq -r '"\(.ref // "?") \(.url // "")"' <<<"$CDD_ADAPTER_OUT"
-      return 0
-    fi
-    (( rc != 3 )) && cdd-worktree-adapter-warn pr-merged "$rc"
-    return 2
+  local branch="$1" base="$2" rc=0
+  [[ -n "${CDD_ADAPTER:-}" ]] || return 2
+  cdd-worktree-adapter-call pr-merged "$branch" --base "$base" || rc=$?
+  if (( rc == 0 )); then
+    [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]] || return 1
+    jq -r '"\(.ref // "?") \(.url // "")"' <<<"$CDD_ADAPTER_OUT"
+    return 0
   fi
-  command -v gh >/dev/null 2>&1 || return 2
-  line="$(gh pr list --state merged --base "$base" --head "$branch" \
-            --json number,url --jq '.[0] | select(.) | "\(.number) \(.url)"' 2>/dev/null)" || return 2
-  [[ -n "$line" && "$line" != null ]] || return 1
-  printf '%s\n' "$line"
+  (( rc != 3 )) && cdd-worktree-adapter-warn pr-merged "$rc"
+  return 2
+}
+
+# The one-line "nothing installed" notice for <capability>, naming what the caller skips
+# (<skipped>, may be empty). The wording is shared with the command prompts (ADR 0012).
+cdd-worktree-no-adapter() {  # cdd-worktree-no-adapter <capability> [<skipped>]
+  echo "$1: no adapter installed; run /cdd-retrofit in this project to install one${2:+; $2}." >&2
 }
 
 # Read the issue refs recorded on <branch>'s state record into the caller's
@@ -225,7 +225,7 @@ cdd-worktree-issue-refs() {
 }
 
 # Resolve the tracker adapter into the caller's CDD_TRACKER / CDD_TRACKER_DESCRIBE /
-# CDD_TRACKER_RC (0 adapter, 1 the built-in gh rung, 2 broken), inside a scope of its
+# CDD_TRACKER_RC (0 adapter, 1 none installed, 2 broken), inside a scope of its
 # own: both callers hold the code-host adapter in CDD_ADAPTER*, and gc keeps asking it
 # pr-merged after a close, so the tracker must not overwrite it. The resolver's own
 # line is the one announcement; callers resolve at most once per run.
@@ -236,7 +236,7 @@ cdd-worktree-resolve-tracker() {
 }
 
 # Close each <ref> through the tracker the caller resolved (CDD_TRACKER*): the adapter's
-# `issue-transition <ref> closed`, or gh on the built-in rung. One outcome line per ref
+# `issue-transition <ref> closed`. One outcome line per ref
 # — closed, already closed (a success: the PR's close line usually got there first), or
 # a warning. An adapter without issue-transition skips the rest in one line; retrying
 # would never help, so that is not a failure. Returns 1 when any ref failed, so the
@@ -247,7 +247,7 @@ cdd-worktree-resolve-tracker() {
 # via cdd-worktree-link-pr. Best-effort: a comment never affects the return code.
 cdd-worktree-close-issues() {  # cdd-worktree-close-issues <pr-ref> <pr-url> <ref>...
   local CDD_ADAPTER="$CDD_TRACKER" CDD_ADAPTER_DESCRIBE="$CDD_TRACKER_DESCRIBE"
-  local CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" ref rc failed=0 n state
+  local CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" ref rc failed=0
   local pr="$1" pr_url="$2" CDD_LINK_UNSUPPORTED=0
   shift 2
   if [[ -n "$CDD_ADAPTER" ]]; then
@@ -273,34 +273,13 @@ cdd-worktree-close-issues() {  # cdd-worktree-close-issues <pr-ref> <pr-url> <re
     return "$failed"
   fi
 
-  if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
-    echo "warning: could not close issue(s) $*: gh is missing or not authenticated." >&2
-    return 1
-  fi
-  for ref in "$@"; do
-    n="${ref#\#}"
-    if [[ ! "$n" =~ ^[0-9]+$ ]]; then
-      echo "warning: could not close issue $ref: not a GitHub issue number, and no tracker adapter is installed." >&2
-      failed=1
-    elif ! state="$(gh issue view "$n" --json state --jq .state 2>/dev/null)"; then
-      echo "warning: could not close issue $ref: gh could not read it." >&2
-      failed=1
-    elif [[ "$state" == CLOSED ]]; then
-      echo "issue $ref: already closed"
-    elif gh issue close "$n" >/dev/null 2>&1; then
-      echo "issue $ref: closed"
-      cdd-worktree-link-pr "$ref" "$pr" "$pr_url"
-    else
-      echo "warning: could not close issue $ref: gh issue close failed." >&2
-      failed=1
-    fi
-  done
-  return "$failed"
+  cdd-worktree-no-adapter tracker "not closing $*"
+  return 1
 }
 
 # Comment on <ref>, just closed, that the merged PR closed it: the tracker adapter's
-# `issue-comment` (CDD_ADAPTER, as scoped by cdd-worktree-close-issues), or gh on the
-# built-in rung. One line either way. Without issue-comment the adapter is told once per
+# `issue-comment` (CDD_ADAPTER, as scoped by cdd-worktree-close-issues; callers only
+# reach it with one). One line. Without issue-comment the adapter is told once per
 # close-issues call (CDD_LINK_UNSUPPORTED, its local) and the rest are skipped. Never
 # fails: a missing link is not worth keeping a task's record for.
 cdd-worktree-link-pr() {  # cdd-worktree-link-pr <ref> <pr-ref> <pr-url>
@@ -324,10 +303,6 @@ cdd-worktree-link-pr() {  # cdd-worktree-link-pr <ref> <pr-ref> <pr-url>
     else
       echo "warning: could not link $label on issue $ref (exit $rc) via ${CDD_ADAPTER}${CDD_ADAPTER_ERR:+: $CDD_ADAPTER_ERR}" >&2
     fi
-  elif gh issue comment "${ref#\#}" --body "$body" >/dev/null 2>&1; then
-    echo "issue $ref: linked $label"
-  else
-    echo "warning: could not link $label on issue $ref: gh issue comment failed." >&2
   fi
   return 0
 }
@@ -467,6 +442,9 @@ cdd-worktree-done() {
   local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
   cdd-worktree-adapter code-host || rc=$?
   if (( rc == 2 )); then return 1; fi
+  # No code host: merged-PR detection is skipped, so a branch git cannot prove merged
+  # falls to the keep/delete/abort prompt below rather than being reaped silently.
+  (( rc == 1 )) && cdd-worktree-no-adapter code-host "not detecting merged PRs; unmerged branches ask before deletion"
   local default_branch
   default_branch="$(cdd-worktree-default-branch --resolved)"
   local branch
@@ -554,12 +532,17 @@ cdd-worktree-done() {
     prc=0
     pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch")" || prc=$?
     pr_num="${pr_line%% *}"
+    (( prc == 2 )) && pr_unknown=1
     if (( prc == 0 )); then
       echo "Branch '$branch' was squash-merged via PR #$pr_num, force-deleting."
       git branch -D "$branch" && branch_deleted=1 && pr_merged=1
     else
       echo
-      echo "Branch '$branch' is not merged into $default_branch and has no merged PR."
+      if (( prc == 2 )); then
+        echo "Branch '$branch' is not merged into $default_branch, and no merged PR could be confirmed."
+      else
+        echo "Branch '$branch' is not merged into $default_branch and has no merged PR."
+      fi
       echo "Unmerged commits:"
       git log "$default_branch".."$branch" --oneline
       echo
@@ -658,16 +641,12 @@ cdd-worktree-list() {
   fi
 
   # A broken code-host adapter is reported (by the resolver) but does not stop a
-  # read-only listing: its PR column just shows "-", never a gh fallback.
+  # read-only listing: its PR column just shows "-". With none installed it says so once.
   local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR=""
   local adapter_rc=0 use_adapter=0 warned=0 crc
   cdd-worktree-adapter code-host || adapter_rc=$?
   (( adapter_rc == 0 )) && use_adapter=1
-
-  local have_gh=0
-  if (( adapter_rc == 1 )) && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-    have_gh=1
-  fi
+  (( adapter_rc == 1 )) && cdd-worktree-no-adapter code-host "no PR status shown"
 
   # Snapshot worktree branches once.
   local worktree_branches
@@ -708,10 +687,6 @@ cdd-worktree-list() {
         cdd-worktree-adapter-warn pr-for-branch "$crc"
         warned=1
       fi
-    elif (( have_gh )); then
-      pr_line="$(gh pr list --head "$branch" --state all \
-                   --json number,state \
-                   --jq '.[0] | select(.) | "#\(.number) \(.state)"' 2>/dev/null)"
     fi
     [[ -n "$pr_line" ]] && pr="$pr_line"
 
@@ -742,9 +717,9 @@ cdd-worktree-list() {
 # merged task it closes the issues its state record lists — the backstop for the same
 # close in cdd-worktree-done — and a failed close keeps the task for the next run.
 # Dry-run by default (it lists what it would close, and calls no tracker verb);
-# --force actually closes and deletes. Needs an authenticated gh to read PR state;
-# without it a merged task can't be told from a fresh one, so it reaps nothing. See
-# shell-helpers.md.
+# --force actually closes and deletes. Needs a code-host adapter to read PR state;
+# without one a merged task can't be told from a fresh one, so it reaps nothing (one
+# advisory line, ADR 0012). See shell-helpers.md.
 cdd-worktree-gc() {
   local force=0
   case "${1:-}" in
@@ -759,15 +734,13 @@ cdd-worktree-gc() {
   cdd-worktree-adapter code-host || rc=$?
   if (( rc == 2 )); then return 1; fi
 
-  if [[ -n "$CDD_ADAPTER" ]]; then
-    if ! cdd-worktree-adapter-has pr-merged; then
-      echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
-      echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
-      return 0
-    fi
-  elif ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
-    echo "cdd-worktree-gc needs an authenticated gh to tell a merged task from a" >&2
-    echo "just-scoped one; without it nothing can be safely reaped. Skipping (advisory)." >&2
+  if [[ -z "$CDD_ADAPTER" ]]; then
+    cdd-worktree-no-adapter code-host "a merged task cannot be told from a just-scoped one, so nothing is reaped (advisory)"
+    return 0
+  fi
+  if ! cdd-worktree-adapter-has pr-merged; then
+    echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
+    echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
     return 0
   fi
 
@@ -803,40 +776,32 @@ cdd-worktree-gc() {
   # and a run with none never touches the tracker at all.
   local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC="" closing
   local -a CDD_ISSUE_REFS=()
-  local reaped=0 kept=0 pr_state pr_ref pr_url pr_line handoff plan state items joined
+  local reaped=0 kept=0 pr_state pr_ref pr_url handoff plan state items joined
   for branch in "${!seen[@]}"; do
     pr_ref="" pr_url=""
-    if [[ -n "$CDD_ADAPTER" ]]; then
-      rc=0
-      cdd-worktree-adapter-call pr-merged "$branch" || rc=$?
-      if (( rc == 0 )); then
-        pr_state="not merged"
-        if [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]]; then
-          pr_state="MERGED"
-          pr_ref="$(jq -r '.ref // ""' <<<"$CDD_ADAPTER_OUT")"
-          pr_url="$(jq -r '.url // ""' <<<"$CDD_ADAPTER_OUT")"
-        fi
-      elif (( rc == 3 && reaped + kept == 0 )); then
-        # Declared but unsupported at runtime, on the first call: nothing has been
-        # reaped yet, so skipping the whole run is still honest.
-        echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
-        echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
-        return 0
-      elif (( rc == 3 )); then
-        # Unsupported only after earlier calls answered: some tasks may already be
-        # reaped, so keep this one and let the run finish with its summary.
-        echo "warning: pr-merged unsupported for $branch via ${CDD_ADAPTER}; keeping it." >&2
-        pr_state="PR state unknown"
-      else
-        cdd-worktree-adapter-warn pr-merged "$rc"
-        pr_state="PR state unknown"
+    rc=0
+    cdd-worktree-adapter-call pr-merged "$branch" || rc=$?
+    if (( rc == 0 )); then
+      pr_state="not merged"
+      if [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]]; then
+        pr_state="MERGED"
+        pr_ref="$(jq -r '.ref // ""' <<<"$CDD_ADAPTER_OUT")"
+        pr_url="$(jq -r '.url // ""' <<<"$CDD_ADAPTER_OUT")"
       fi
+    elif (( rc == 3 && reaped + kept == 0 )); then
+      # Declared but unsupported at runtime, on the first call: nothing has been
+      # reaped yet, so skipping the whole run is still honest.
+      echo "cdd-worktree-gc: $CDD_ADAPTER does not support pr-merged, so a merged task cannot" >&2
+      echo "be told from a just-scoped one; nothing can be safely reaped. Skipping (advisory)." >&2
+      return 0
+    elif (( rc == 3 )); then
+      # Unsupported only after earlier calls answered: some tasks may already be
+      # reaped, so keep this one and let the run finish with its summary.
+      echo "warning: pr-merged unsupported for $branch via ${CDD_ADAPTER}; keeping it." >&2
+      pr_state="PR state unknown"
     else
-      # "<state> <number> <url>". Keep `state` first in --json: the gate stubs read a
-      # `number,state` query as the list view's and answer in its shape.
-      pr_line="$(gh pr list --head "$branch" --state all --json state,number,url \
-                   --jq '.[0] | select(.) | "\(.state) \(.number) \(.url)"' 2>/dev/null)"
-      read -r pr_state pr_ref pr_url <<<"$pr_line" || true
+      cdd-worktree-adapter-warn pr-merged "$rc"
+      pr_state="PR state unknown"
     fi
     if [[ "$pr_state" != "MERGED" ]]; then
       kept=$(( kept + 1 ))
@@ -865,6 +830,16 @@ cdd-worktree-gc() {
         else
           echo "keep  $branch (MERGED): tracker adapter unusable, would not reap until it is fixed"
         fi
+        continue
+      fi
+      if (( CDD_TRACKER_RC == 1 )); then
+        kept=$(( kept + 1 ))
+        if (( force )); then
+          echo "keep  $branch (MERGED, no tracker adapter: issues ${CDD_ISSUE_REFS[*]} not closed)"
+        else
+          echo "keep  $branch (MERGED): no tracker adapter, would not reap until one is installed"
+        fi
+        cdd-worktree-no-adapter tracker "not closing ${CDD_ISSUE_REFS[*]}"
         continue
       fi
       if (( ! force )); then
@@ -1004,7 +979,7 @@ cdd-worktree-materialize-ref() {
 # state record are fetched and materialized here before launch (most-advanced-stage
 # wins, advisory — a missing ref just means nothing to transfer); the resume-side commands
 # (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read PR/branch state from git and
-# gh, not the handoff, so its absence is still fine.
+# the code host, not the handoff, so its absence is still fine.
 cdd-worktree-resume() {
   local branch="${1:-}"
   # No argument is the discovery mode, so only option-shaped input is rejected here.
@@ -1045,11 +1020,11 @@ cdd-worktree-resume() {
     # Discovery: remote feature branches (exclude default + HEAD) not already
     # checked out as a local worktree. The fetch above pruned merged-and-deleted
     # branches, so what remains is the set of live branches shown on GitHub.
-    local have_gh=0 use_adapter=0 crc
+    local use_adapter=0 crc
     if [[ -n "$CDD_ADAPTER" ]]; then
       use_adapter=1
-    elif command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-      have_gh=1
+    else
+      cdd-worktree-no-adapter code-host "no PR status shown"
     fi
 
     # Iterate full refnames and strip the full prefix: the short form of the
@@ -1083,10 +1058,6 @@ cdd-worktree-resume() {
           (( crc == 3 )) || cdd-worktree-adapter-warn pr-for-branch "$crc"
           use_adapter=0
         fi
-      elif (( have_gh )); then
-        pr_line="$(gh pr list --head "${candidates[$i]}" --state all \
-                     --json number,state \
-                     --jq '.[0] | select(.) | " (PR #\(.number) \(.state))"' 2>/dev/null)"
       fi
       printf '  %2d) %s%s\n' "$(( i + 1 ))" "${candidates[$i]}" "$pr_line"
     done
@@ -1136,7 +1107,7 @@ cdd-worktree-resume() {
   # Fetch + materialize the handoff/plan/state from refs/cdd/<branch> if it was synced.
   if ! cdd-worktree-materialize-ref "$branch"; then
     echo "No synced task ref (refs/cdd/$branch); handoff/plan/state not transferred."
-    echo "Resume-side commands read PR/branch state from git and gh, so this is fine."
+    echo "Resume-side commands read PR/branch state from git and the code host, so this is fine."
   fi
   # A task parked at plan_written has an approved plan on disk and no code yet, so it
   # resumes into the implementation half of the split rather than into a review-side

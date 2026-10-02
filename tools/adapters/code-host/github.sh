@@ -22,9 +22,8 @@
 #   exec "$HOME/.cdd/tools/adapters/code-host/github.sh" "$@"
 #
 # It deliberately never installs itself as a resolution-ladder RUNG, for the tracker
-# adapter's reason: the built-in rung already IS GitHub, so a machine-rung install would
-# change no behaviour while destroying the "no adapter installed" baseline that
-# behaviour-neutrality is checked against. The library copy is not a rung.
+# adapter's reason: the machine rung binds every repository on the machine, GitHub or
+# not. The library copy is not a rung.
 #
 # Exit codes (contract-wide): 0 ok, 1 operation failed, 2 usage error,
 # 3 verb unsupported by this backend, 4 not configured / auth missing.
@@ -235,8 +234,8 @@ verb_pr_merged() {
 }
 
 # --- default-branch ------------------------------------------------------------
-# Local first: origin/HEAD answers on a normal clone and offline, identically to the
-# built-in. `gh repo view` only when it is unset, where the built-in would guess.
+# Local first: origin/HEAD answers on a normal clone and offline, the way git does.
+# `gh repo view` only when it is unset, where the helpers' git fallback would guess.
 verb_default_branch() {
   local ref branch=''
   if ref="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)" && [[ -n "$ref" ]]; then

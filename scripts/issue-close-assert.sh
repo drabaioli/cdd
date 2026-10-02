@@ -3,7 +3,8 @@
 #
 # Once a task's PR has merged, both commands close the issue refs recorded on the
 # task's state record, through the tracker adapter's `issue-transition <ref> closed`
-# or, with none installed, the built-in gh. This pins, for both commands:
+# (ADR 0012: with no adapter installed there is no built-in gh to fall back to). This
+# pins, for both commands:
 #   - no refs recorded   -> no tracker call at all, cleanup unchanged, and a broken
 #     tracker adapter cannot block it
 #   - a successful close -> one "closed" line per ref, record and refs/cdd removed
@@ -18,15 +19,18 @@
 # line and cleanup proceeds; and the GitHub tracker adapter's issue-transition itself.
 #
 # And the PR link that follows a close: each ref closed now gets one comment naming the
-# merged PR and its URL (gh's, or the adapter's issue-comment) and a "linked" line; an
+# merged PR and its URL (from the code-host adapter's pr-merged) and a "linked" line; an
 # already-closed ref gets none, so a gc retry never comments twice; a failed comment is
 # one warning and changes nothing else; an adapter without issue-comment is told once
 # per run; and the GitHub tracker adapter's issue-comment itself.
 #
 # Like code-host-ladder-assert.sh it stands in a local bare repo for origin, gives the
-# helpers their own $HOME, and puts a logging `gh` stub on PATH. Issue state lives in
-# two files the stubs share: $CLOSED (closed issues) and $FAILING (issues whose close
-# fails), one ref per line; $MERGED lists the branches whose PR merged.
+# helpers their own $HOME, and puts a logging `gh` stub on PATH. A stub code-host
+# adapter (the machine rung) answers pr-merged for the branches in $MERGED. Where the
+# GitHub tracker is wanted, the shipped GitHub adapter runs over the `gh` stub; the stub
+# tracker adapters stand in for other backends. Issue state lives in two files the
+# stubs share: $CLOSED (closed issues) and $FAILING (issues whose close fails), one ref
+# per line. With no adapter at all, nothing may reach `gh` (see "no adapter" below).
 #
 # Usage: scripts/issue-close-assert.sh   (provisions and tears down its own temp tree)
 
@@ -70,11 +74,10 @@ COMMENT_FAILING="$WORK/comment-failing"
 MERGED="$WORK/merged"
 export GH_LOG CLOSED FAILING COMMENT_FAILING MERGED
 
-# Stub gh: logs every call. `pr list` answers merged for the branches in $MERGED, in
-# the shape of whichever --jq the caller used (done's "N URL", list's "#N STATE", gc's
-# "STATE N URL"). `issue view` reads $CLOSED; `issue close` fails for a ref in $FAILING
-# and otherwise records the ref in $CLOSED; `issue comment` fails for a ref in
-# $COMMENT_FAILING and otherwise prints the new comment's URL.
+# Stub gh: logs every call. `issue view` reads $CLOSED; `issue close` fails for a ref in
+# $FAILING and otherwise records the ref in $CLOSED; `issue comment` fails for a ref in
+# $COMMENT_FAILING and otherwise prints the new comment's URL. `pr` answers nothing: no
+# command may ask gh about PRs.
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -82,19 +85,6 @@ echo "$*" >> "$GH_LOG"
 has() { grep -qxF -- "$1" "$2" 2>/dev/null; }
 case "$1" in
   auth) exit 0 ;;
-  pr)
-    branch="" all="$*"
-    while [[ $# -gt 0 ]]; do
-      [[ "$1" == "--head" ]] && { branch="$2"; break; }
-      shift
-    done
-    if has "$branch" "$MERGED"; then
-      if [[ "$all" == *"--state merged"* ]]; then echo "7 https://github.com/o/r/pull/7"
-      elif [[ "$all" == *"number,state"* ]]; then echo "#7 MERGED"
-      elif [[ "$all" == *"state,number,url"* ]]; then echo "MERGED 7 https://github.com/o/r/pull/7"
-      else echo MERGED; fi
-    fi
-    exit 0 ;;
   issue)
     n="$3"
     case "$2" in
@@ -143,6 +133,35 @@ EOF
   chmod 755 "$1"
 }
 
+# make_code_host: the machine-rung code-host adapter; pr-merged says merged (PR #7) for
+# the branches listed in $MERGED.
+make_code_host() {
+  mkdir -p "$HOME_A/.cdd/adapters"
+  cat > "$HOME_A/.cdd/adapters/code-host" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  describe) echo '{"capability":"code-host","contract":1,"backend":"stub","verbs":["pr-for-branch","pr-merged"]}' ;;
+  pr-for-branch) echo '[]' ;;
+  pr-merged)
+    if grep -qxF -- "$2" "$MERGED" 2>/dev/null; then
+      echo '{"merged":true,"ref":"7","url":"https://github.com/o/r/pull/7"}'
+    else
+      echo '{"merged":false}'
+    fi ;;
+  *) exit 3 ;;
+esac
+EOF
+  chmod 755 "$HOME_A/.cdd/adapters/code-host"
+}
+
+# use_github_tracker: bind the shipped GitHub tracker adapter at the machine rung; it
+# runs over the `gh` stub on PATH.
+use_github_tracker() {
+  mkdir -p "$HOME_A/.cdd/adapters"
+  printf '#!/usr/bin/env bash\nexec %q "$@"\n' "$GH_ADAPTER" > "$MACHINE_TRACKER"
+  chmod 755 "$MACHINE_TRACKER"
+}
+
 git init --bare -q "$WORK/origin.git"
 git clone -q "$WORK/origin.git" "$WORK/seed" 2>/dev/null
 ( cd "$WORK/seed"; echo "# seed" > README.md; git add README.md; git commit -q -m seed; git push -q -u origin main )
@@ -160,6 +179,7 @@ reset() {
     git -C "$WORK/origin.git" update-ref -d "$r"
   done
   : > "$GH_LOG"; : > "$TRACKER_LOG"; : > "$CLOSED"; : > "$FAILING"; : > "$COMMENT_FAILING"; : > "$MERGED"
+  make_code_host
 }
 
 # task <branch> <refs as a JSON array, or ""> — seeds the handoff, plan and state
@@ -225,8 +245,9 @@ no_issue_calls || fail "done, no refs: a tracker call was made$(show)"
 ! grep -q tracker "$WORK/err" || fail "done, no refs: the tracker should not be resolved$(show)"
 pass "done, no refs: no tracker call, cleanup unchanged, a broken tracker adapter irrelevant"
 
-# 2. A successful close on the built-in rung, one line per ref.
+# 2. A successful close through the GitHub tracker adapter, one line per ref.
 reset
+use_github_tracker
 task d_ok '["#11","#12"]'; merged d_ok; worktree d_ok
 run "$WORK/wt-d_ok" cdd-worktree-done
 [[ $RC -eq 0 ]] || fail "done, close: exited $RC$(show)"
@@ -237,11 +258,12 @@ for n in 11 12; do
   grep -qx "issue #$n: linked PR #7" "$WORK/out" || fail "done, close: expected a linked line for #$n$(show)"
 done
 record_gone d_ok || fail "done, close: the record should be removed$(show)"
-! grep -q tracker "$WORK/err" || fail "done, close: the built-in rung must be silent$(show)"
-pass "done closes each recorded issue through gh, links the merged PR on each, then cleans up"
+grep -q "tracker: using adapter .*(github)" "$WORK/err" || fail "done, close: the tracker adapter should be announced$(show)"
+pass "done closes each recorded issue through the GitHub adapter, links the merged PR on each, then cleans up"
 
 # 3. Already closed is a success: an info line, no warning, no close call.
 reset
+use_github_tracker
 echo 13 >> "$CLOSED"
 task d_already '["#13"]'; merged d_already; worktree d_already
 run "$WORK/wt-d_already" cdd-worktree-done
@@ -255,6 +277,7 @@ pass "done treats an already-closed issue as a success, and does not comment on 
 
 # 4. A failed close keeps the record and refs/cdd; the next gc --force retries it.
 reset
+use_github_tracker
 echo 14 >> "$FAILING"
 task d_fail '["#14"]'; merged d_fail; worktree d_fail
 run "$WORK/wt-d_fail" cdd-worktree-done
@@ -272,6 +295,7 @@ pass "done keeps the record after a failed close, and the next gc --force closes
 
 # 5. A zero-commit branch with no merged PR closes nothing.
 reset
+use_github_tracker
 task d_zero '["#15"]'; worktree d_zero zero
 run "$WORK/wt-d_zero" cdd-worktree-done
 [[ $RC -eq 0 ]] || fail "done, zero-commit: exited $RC$(show)"
@@ -330,7 +354,7 @@ make_tracker "$WORK/wt-d_broken/.cdd/tracker" broken
 run "$WORK/wt-d_broken" cdd-worktree-done
 [[ $RC -ne 0 ]] || fail "done, broken tracker: should fail$(show)"
 [[ -d "$WORK/wt-d_broken" ]] || fail "done, broken tracker: the worktree was removed"
-[[ "$(grep -c . "$WORK/err")" == 1 ]] || fail "done, broken tracker: expected exactly one stderr line$(show)"
+[[ "$(grep -c "unusable" "$WORK/err")" == 1 ]] || fail "done, broken tracker: expected exactly one line naming the adapter$(show)"
 grep -q "tracker adapter .cdd/tracker is unusable" "$WORK/err" || fail "done, broken tracker: the line should name it$(show)"
 record_kept d_broken || fail "done, broken tracker: the record should be untouched$(show)"
 no_issue_calls || fail "done, broken tracker: fell through to gh$(show)"
@@ -341,6 +365,7 @@ pass "a broken tracker adapter stops done before anything is touched, with no lo
 
 # 9. Dry run: lists what it would close, calls no tracker verb, deletes nothing.
 reset
+use_github_tracker
 task g_dry '["#21"]'; merged g_dry
 run "$MACHINE" cdd-worktree-gc
 [[ $RC -eq 0 ]] || fail "gc dry run: exited $RC$(show)"
@@ -349,9 +374,10 @@ no_issue_calls || fail "gc dry run: a tracker call was made$(show)"
 record_kept g_dry || fail "gc dry run: something was deleted$(show)"
 pass "gc's dry run lists what it would close and calls no tracker verb"
 
-# 10. --force, built-in rung: no refs, success (record only on refs/cdd), already
+# 10. --force, GitHub tracker adapter: no refs, success (record only on refs/cdd), already
 # closed, failed, and an unmerged task — all in one run.
 reset
+use_github_tracker
 echo 23 >> "$CLOSED"; echo 24 >> "$FAILING"
 task g_norefs "";           merged g_norefs
 task g_ok '["#22"]';        merged g_ok
@@ -372,7 +398,7 @@ record_kept g_fail || fail "gc --force: a failed close should keep the task$(sho
 record_kept g_open || fail "gc --force: the unmerged task was reaped$(show)"
 ! grep -q "^issue .* 25" "$GH_LOG" || fail "gc --force: the unmerged task's issue was touched$(show)"
 [[ "$(grep -c "issue close" "$GH_LOG")" == 2 ]] || fail "gc --force: expected two close calls (22, 24)$(show)"
-grep -qxF "issue comment 22 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$GH_LOG" || fail "gc --force: #22 should get the PR link from gh's url$(show)"
+grep -qxF "issue comment 22 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$GH_LOG" || fail "gc --force: #22 should get the PR link from the code host's url$(show)"
 [[ "$(grep -c "issue comment" "$GH_LOG")" == 1 ]] || fail "gc --force: only the issue gc closed should be commented on$(show)"
 ! grep -q "^warning" <(grep -v "#24" "$WORK/err") || fail "gc --force: unexpected warning$(show)"
 pass "gc --force closes, treats already-closed as success, keeps a failed close, skips ref-less tasks"
@@ -455,6 +481,54 @@ record_gone g_none || fail "gc, broken tracker: the ref-less task should still b
 [[ "$(grep -c "is unusable" "$WORK/err")" == 1 ]] || fail "gc, broken tracker: expected one line naming it$(show)"
 no_issue_calls || fail "gc, broken tracker: fell through to gh$(show)"
 pass "a broken tracker adapter keeps the tasks with refs and reaps the rest"
+
+# --- no adapter: skip with one line, never gh (ADR 0012) -------------------------
+
+# 14. No tracker adapter, a merged PR: done warns naming the refs, keeps the record for
+# gc, and a gc --force with still no tracker keeps the task too. gh is never called.
+reset
+task n_done '["#41"]'; merged n_done; worktree n_done
+run "$WORK/wt-n_done" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "done, no tracker: exited $RC$(show)"
+grep -qF "tracker: no adapter installed; run /cdd-retrofit in this project to install one; not closing #41" "$WORK/err" \
+  || fail "done, no tracker: expected the missing-adapter warning naming the ref$(show)"
+grep -q "so cdd-worktree-gc can retry" "$WORK/out" || fail "done, no tracker: should say gc can retry$(show)"
+record_kept n_done || fail "done, no tracker: the record should be kept$(show)"
+[[ ! -s "$GH_LOG" ]] || fail "done, no tracker: gh was called: $(cat "$GH_LOG")"
+run "$MACHINE" cdd-worktree-gc
+grep -qF "keep  n_done (MERGED): no tracker adapter, would not reap until one is installed" "$WORK/out" \
+  || fail "gc dry run, no tracker: expected the keep line$(show)"
+run "$MACHINE" cdd-worktree-gc --force
+[[ $RC -eq 0 ]] || fail "gc, no tracker: exited $RC$(show)"
+grep -qF "keep  n_done (MERGED, no tracker adapter: issues #41 not closed)" "$WORK/out" \
+  || fail "gc, no tracker: expected the keep line$(show)"
+record_kept n_done || fail "gc, no tracker: the task should be kept$(show)"
+[[ ! -s "$GH_LOG" ]] || fail "gc, no tracker: gh was called: $(cat "$GH_LOG")"
+use_github_tracker
+run "$MACHINE" cdd-worktree-gc --force
+grep -qx "issue #41: closed" "$WORK/out" || fail "gc, tracker installed later: the issue should now close$(show)"
+record_gone n_done || fail "gc, tracker installed later: the task should be reaped$(show)"
+pass "no tracker adapter: done and gc skip the close with one line, keep the record, and gc closes once one is installed"
+
+# 15. No code-host adapter: a task with refs cannot be confirmed merged, so done warns
+# and keeps the record (never silently reaps or closes), and gc reaps nothing.
+reset
+rm -f "$HOME_A/.cdd/adapters/code-host"
+use_github_tracker
+task n_ch '["#42"]'; worktree n_ch zero
+run "$WORK/wt-n_ch" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "done, no code host: exited $RC$(show)"
+grep -qF "code-host: no adapter installed; run /cdd-retrofit in this project to install one" "$WORK/err" \
+  || fail "done, no code host: expected the missing-adapter line$(show)"
+grep -q "could not confirm a merged PR for 'n_ch'; not closing #42 yet" "$WORK/err" || fail "done, no code host: expected the could-not-confirm warning$(show)"
+record_kept n_ch || fail "done, no code host: the record should be kept$(show)"
+task n_gc '["#43"]'; merged n_gc
+run "$MACHINE" cdd-worktree-gc --force
+grep -qF "code-host: no adapter installed; run /cdd-retrofit in this project to install one" "$WORK/err" || fail "gc, no code host: expected the missing-adapter line$(show)"
+record_kept n_gc || fail "gc, no code host: nothing may be reaped$(show)"
+! grep -q "^issue" "$GH_LOG" "$TRACKER_LOG" || fail "no code host: an issue call was made$(show)"
+[[ ! -s "$GH_LOG" ]] || fail "no code host: gh was called: $(cat "$GH_LOG")"
+pass "no code-host adapter: done keeps the record, gc reaps nothing, nothing closes, gh never called"
 
 # --- the GitHub tracker adapter's issue-transition ------------------------------
 reset

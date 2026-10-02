@@ -31,7 +31,7 @@
 #   9. Eligibility heuristic   — cdd-small-change.md restates the lane heuristic in
 #      words of its own instead of the pinned sentence.
 #  10. Code-host callers     — cdd-process-pr.md stops naming `pr-comments`, as an edit
-#      that dropped the adapter path and kept only the built-in `gh` one would.
+#      that dropped the adapter path would.
 #  11. Seam-check count       — a check is added to the checker's own registry without
 #      updating the prose that restates how many checks there are. Self-referential, so
 #      the mutation has to add a registry entry AND a check function, not just a number.
@@ -277,8 +277,8 @@ expect_fail "check 9 catches a command that reworded the lane heuristic" \
   "it no longer states the lane heuristic verbatim"
 
 # --- Check 10: code-host callers -----------------------------------------------
-# Drop the adapter's feedback read from cdd-process-pr.md, leaving the built-in `gh` reads
-# in place: the command still works on GitHub, which is why nothing else would notice.
+# Drop the adapter's feedback read from cdd-process-pr.md: the rest of the command still
+# reads sensibly, which is why nothing else would notice.
 fresh_sandbox
 sandbox_sed 's/pr-comments/pr-xomments/g' "$CMDS/cdd-process-pr.md"
 expect_fail "check 10 catches a code-host caller that stopped naming its verb" \

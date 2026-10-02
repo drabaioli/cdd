@@ -23,7 +23,7 @@ Have a conversation to define the project. Do not dump a rigid questionnaire; as
 - **Where issues and code review live** — the tracker (where issues live) and the code host (where pull requests are reviewed). Always ask; never assume. Offer GitHub (Issues + pull requests) as the default answer. The answer becomes the project's capability bindings in `.cdd/` (process doc Section 2.16), written by the bootstrap script in step 6:
   - **GitHub** — bind both to the shipped GitHub adapters.
   - **Jira for issues** — ask for the Jira site (e.g. `acme.atlassian.net`) and the project key (e.g. `ABC`) only. **Never ask for credentials**: tell the user they set `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell. The code host is asked separately.
-  - **Anything CDD ships no adapter for** (GitLab, Bitbucket, …) — say in one line that no binding is written for it and the built-in `gh` path keeps serving; a project adapter can be written later against `doc/architecture/capability-adapters.md`.
+  - **Anything CDD ships no adapter for** (GitLab, Bitbucket, …) — say in one line that no binding is written for it and the issue and PR features skip until one is bound; a project adapter can be written later against `doc/architecture/capability-adapters.md`.
 
 The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
@@ -120,7 +120,7 @@ Report:
 - What was written into the scaffold commit: project overview, roadmap (real first phase, no survey phase), `CLAUDE.md`, and whether an architecture overview was included.
 - The baseline marker value and that the "Initial CDD scaffold" commit was created.
 - The GitHub repo, if one was created (step 7).
-- The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and the built-in `gh` path serves). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
+- The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and those features skip). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
 - The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
 
   ```bash

@@ -35,11 +35,12 @@
       "Bash(git describe *)",
       "Bash(git branch --list *)",
       "Bash(git tag -l *)",
-      "Bash(gh pr view *)",
-      "Bash(gh pr list *)",
-      "Bash(gh pr checks *)",
-      "Bash(gh issue view *)",
-      "Bash(gh issue list *)"
+      "Bash(.cdd/tracker describe)",
+      "Bash(.cdd/tracker issue-read *)",
+      "Bash(.cdd/tracker issue-list *)",
+      "Bash(.cdd/code-host describe)",
+      "Bash(.cdd/code-host pr-for-branch *)",
+      "Bash(.cdd/code-host pr-comments *)"
     ]
   }
 }

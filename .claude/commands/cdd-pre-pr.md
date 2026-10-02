@@ -224,23 +224,14 @@ After the checklist, offer to open the PR. This is human-gated — never open a 
 [ -z "$CODE_HOST" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-If `$CODE_HOST` is set, check it as §0 does: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path and **do not open the PR**; do not fall back to `gh`, because an installed adapter declares which code host this project uses. The checklist above still stands. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, say in one line that no code-host adapter is installed and the built-in `gh` path serves.
-
-**Preconditions (built-in `gh` path only).** Needs the `gh` CLI authenticated and a GitHub `origin`:
-
-```bash
-gh auth status && git remote get-url origin   # origin should be a github.com URL
-```
-
-If either is missing, say so in one line and skip this step (the checklist above still stands). An adapter carries its own authentication: when it is missing, the adapter's own error line is what the user sees.
+If `$CODE_HOST` is set, check it as §0 does: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path and **do not open the PR**; do not route around it, because an installed adapter declares which code host this project uses. The checklist above still stands. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **skip this step** (the checklist above still stands). An adapter carries its own authentication: when it is missing, the adapter's own error line is what the user sees.
 
 If §8 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
 
-Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual `gh` instructions — just ask whether to proceed.
+Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual PR instructions — just ask whether to proceed.
 
 - **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##'`, a bare name like `$BASE_BRANCH`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Derive the body's close lines as described under **Close lines** below, so every issue the task was sourced from auto-closes on merge. Then open it, adding `--base "$BASE_BRANCH"` when the base differs from the default:
-  - **Through the adapter:** if its `describe.verbs` lacks `pr-create`, say in one line that this code host's adapter cannot open PRs, and do not open one. Otherwise run `"$CODE_HOST" pr-create --title "<title>" --body "<body>"` and print the returned `.url`; the new PR's number is its `.ref`. An exit 3 reads as the undeclared case; any other failure → say in one line that the PR was not opened, quoting the adapter's error line, and never retry through `gh`.
-  - **On the built-in `gh` path:** run `gh pr create --title "<title>" --body "<body>"` and print the resulting PR URL.
+  If the adapter's `describe.verbs` lacks `pr-create`, say in one line that this code host's adapter cannot open PRs, and do not open one. Otherwise run `"$CODE_HOST" pr-create --title "<title>" --body "<body>"` and print the returned `.url`; the new PR's number is its `.ref`. An exit 3 reads as the undeclared case; any other failure → say in one line that the PR was not opened, quoting the adapter's error line, and never retry another way.
 
   Once a PR is open, advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist above already stands on its own.
@@ -251,15 +242,15 @@ Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manu
 cdd-state get issue_refs    # one reference per line; empty when none were recorded
 ```
 
-- **Non-empty**: resolve the tracker down the ladder — project, then machine, then built-in — and take the first file present:
+- **Non-empty**: resolve the tracker down the ladder — project, then machine — and take the first file present:
 
   ```bash
   for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
   ```
 
-  If one resolved but is broken — not executable, or its `describe` exits non-zero, does not parse, or reports another `capability` or an unsupported `contract` — say so in one line naming it and emit **no close lines**; do not fall back to the built-in `Closes #` syntax, which would be the wrong tracker's. The PR itself can still be opened.
+  If one resolved but is broken — not executable, or its `describe` exits non-zero, does not parse, or reports another `capability` or an unsupported `contract` — say so in one line naming it and emit **no close lines**; do not guess a `Closes #` syntax, which would be the wrong tracker's. The PR itself can still be opened.
 
-  **Announce the rung in one line, once**, before the first call: the announcement rule is per call, but N identical lines is noise, and noise is how a load-bearing line stops being read. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved the built-in `gh` rung serves: strip any leading `#` and append `Closes #<ref>`. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line and leave them out rather than guessing a syntax for it.
+  **Announce the rung in one line, once**, before the first call: the announcement rule is per call, but N identical lines is noise, and noise is how a load-bearing line stops being read. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved there is no tracker to ask: emit **no close lines** and say in one line `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` — the PR still opens, and the issues stay open for someone to close by hand. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line and leave them out rather than guessing a syntax for it.
 
-  **Then say what those lines will actually do**, once, before asking to open the PR. A close line is a string in the PR body, and who acts on it depends on where the issue lives. When the tracker is the built-in `gh` rung, or an adapter whose `describe.backend` is `github`, the code host that hosts the PR also hosts the issue and closes it on merge — say that plainly. Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close. CDD emits the token and has no way to check that anything is listening, so the one thing it can honestly do is not overstate it.
+  **Then say what those lines will actually do**, once, before asking to open the PR. A close line is a string in the PR body, and who acts on it depends on where the issue lives. When the tracker is an adapter whose `describe.backend` is `github`, the code host that hosts the PR also hosts the issue and closes it on merge — say that plainly. Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close. CDD emits the token and has no way to check that anything is listening, so the one thing it can honestly do is not overstate it.
 - **Empty** (no record, an unsynced or reaped one, or no `jq`): **no close lines.** The record is the only place a reference is kept, and a branch name is not a second one. Say so in one line at the confirmation step rather than opening a silently incomplete PR — the PR itself is fine, and the issues simply stay open for someone to close by hand.
