@@ -1,6 +1,6 @@
 # 0010: Rename "forge" to "code host", and stop on a broken adapter
 
-**Status:** Accepted
+**Status:** Accepted; partially superseded by [0012](0012-drop-the-builtin-gh-rung.md) (a missing adapter no longer falls through to a built-in `gh` rung, and the helpers no longer have a silent built-in rung to be silent on)
 
 ## Context
 

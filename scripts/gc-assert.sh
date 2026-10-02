@@ -3,9 +3,12 @@
 # file and state, and the remote refs/cdd/<branch>) but never a scoped-but-unstarted one.
 #
 # Like ref-sync-assert.sh this stands in a local `git init --bare` for origin and
-# a clone with its own $HOME. PR state is the reap predicate, so `gh` is stubbed on
-# PATH: `gh pr list --head feat_merged ...` reports MERGED, everything else reports
-# no PR. It asserts:
+# a clone with its own $HOME. PR state is the reap predicate, so a stub code-host
+# adapter at the machine rung ($HOME/.cdd/adapters/code-host) answers `pr-merged`:
+# feat_merged is merged, everything else is not. A `gh` stub on PATH logs any call and
+# must never be reached (ADR 0012: no command calls gh for a code-host job). It asserts:
+#   - with NO adapter installed, gc says so in one advisory line and reaps nothing
+#     (dry-run and --force alike), and gh is never called
 #   - dry-run: the merged branch is listed as "would remove", the scoped one kept,
 #     and NOTHING is actually deleted
 #   - --force: the merged branch's local files + remote ref are gone, while the
@@ -54,22 +57,12 @@ EOF
 MERGED="feat_merged"   # has a MERGED PR (per the gh stub) -> reap
 SCOPED="feat_scoped"   # no PR yet -> keep
 
-# Stub gh: `auth status` succeeds; `pr list --head feat_merged` reports MERGED, any
-# other head reports nothing (empty -> "no PR yet"). Mirrors the --jq shape gc uses.
+# Stub gh: records every call. gc must never reach it, with or without an adapter.
 mkdir -p "$WORK/bin"
-cat > "$WORK/bin/gh" <<'EOF'
+GH_LOG="$WORK/gh.log"
+cat > "$WORK/bin/gh" <<EOF
 #!/usr/bin/env bash
-case "$1" in
-  auth) exit 0 ;;
-  pr)
-    branch=""
-    while [[ $# -gt 0 ]]; do
-      [[ "$1" == "--head" ]] && { branch="$2"; break; }
-      shift
-    done
-    [[ "$branch" == "feat_merged" ]] && echo "MERGED"
-    exit 0 ;;
-esac
+echo "gh \$*" >> "$GH_LOG"
 exit 0
 EOF
 chmod +x "$WORK/bin/gh"
@@ -118,6 +111,26 @@ marker_path="$(jq -r '.path' "$DIR/repo.json")"
   || fail "repo.json .path = '$marker_path', expected '$WORK/machine'"
 pass "seed wrote the per-repo marker pointing at the main worktree"
 
+# Stub code-host adapter, installed at the machine rung once the no-adapter case is done.
+install_adapter() {
+  mkdir -p "$HOME_A/.cdd/adapters"
+  cat > "$HOME_A/.cdd/adapters/code-host" <<'EOF'
+#!/usr/bin/env bash
+case "$1" in
+  describe) echo '{"capability":"code-host","contract":1,"backend":"stub","verbs":["pr-for-branch","pr-merged"]}' ;;
+  pr-for-branch) echo '[]' ;;
+  pr-merged)
+    if [[ "$2" == "feat_merged" ]]; then
+      echo '{"merged":true,"ref":"7","url":"https://example.invalid/pull/7"}'
+    else
+      echo '{"merged":false}'
+    fi ;;
+  *) exit 3 ;;
+esac
+EOF
+  chmod +x "$HOME_A/.cdd/adapters/code-host"
+}
+
 run_gc() {
   (
     cd "$WORK/machine"
@@ -128,6 +141,23 @@ run_gc() {
     cdd-worktree-gc "$@"
   )
 }
+
+# 0. No code-host adapter at any rung: gc cannot tell a merged task from a just-scoped
+# one, so it says so in one line and reaps nothing, dry-run or --force.
+for flag in "" --force; do
+  out="$(run_gc $flag 2>&1)" || fail "gc ${flag:-dry-run} with no adapter exited non-zero"
+  grep -q "code-host: no adapter installed; run /cdd-retrofit in this project to install one" <<<"$out" \
+    || fail "gc ${flag:-dry-run} with no adapter did not print the missing-adapter line. Output:\n$out"
+  grep -q '^reap ' <<<"$out" && fail "gc ${flag:-dry-run} with no adapter reaped a task. Output:\n$out"
+  [[ -f "$DIR/$MERGED.md" && -f "$DIR/$MERGED.state.json" && -f "$DIR/$MERGED.plan.md" ]] \
+    || fail "gc ${flag:-dry-run} with no adapter deleted local files"
+  git -C "$WORK/machine" ls-remote origin "refs/cdd/$MERGED" | grep -q "refs/cdd/$MERGED" \
+    || fail "gc ${flag:-dry-run} with no adapter deleted the remote ref"
+done
+[[ ! -s "$GH_LOG" ]] || fail "gc with no adapter called gh: $(cat "$GH_LOG")"
+pass "no adapter: gc prints the missing-adapter line, reaps nothing, never calls gh"
+
+install_adapter
 
 # 1. Dry-run: merged -> "would remove", scoped -> "keep", and nothing deleted.
 out="$(run_gc 2>&1)" || fail "gc dry-run exited non-zero"
@@ -177,11 +207,14 @@ run_list() {
   )
 }
 out="$(run_list 2>&1)" || fail "cdd-worktree-list exited non-zero"
-# Data rows only: drop the header and its dashed rule. After case 2 the merged task is
+# Data rows only: drop the adapter announcement, the header and its dashed rule. After case 2 the merged task is
 # gone, so exactly one task remains — and its plan file must add nothing.
-branches="$(awk 'NR > 2 { print $1 }' <<<"$out")"
+branches="$(awk '/^(BRANCH|------|code-host:)/ { next } { print $1 }' <<<"$out")"
 [[ "$branches" == "$SCOPED" ]] \
   || fail "cdd-worktree-list should list exactly '$SCOPED', got: $(tr '\n' ' ' <<<"$branches"). Output:\n$out"
 pass "a plan file produces no phantom row in cdd-worktree-list"
+
+[[ ! -s "$GH_LOG" ]] || fail "gc called gh: $(cat "$GH_LOG")"
+pass "gh was never called"
 
 echo "all gc smoke checks passed"

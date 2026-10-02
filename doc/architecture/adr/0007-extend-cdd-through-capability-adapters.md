@@ -1,6 +1,6 @@
 # 0007: Extend CDD through `.cdd/` capability adapters
 
-**Status:** Accepted; partially superseded by [0009](0009-drop-the-docs-capability.md) and [0010](0010-code-host-rename-and-broken-adapter-rule.md)
+**Status:** Accepted; partially superseded by [0009](0009-drop-the-docs-capability.md), [0010](0010-code-host-rename-and-broken-adapter-rule.md) and [0012](0012-drop-the-builtin-gh-rung.md) (the built-in third rung)
 
 ## Context
 
@@ -52,7 +52,7 @@ variable — and **never a secret**; where an adapter has a generic half, that h
 machine-globally under §2.8's rules (newest wins, never pinned per project).
 
 **Resolution ladder: `.cdd/<capability>` → `~/.cdd/adapters/<capability>` → built-in behaviour** —
-today's `gh` path — **degrading loudly and never failing.** This is §2.14's per-gate skip rule
+today's `gh` path — **degrading loudly and never failing.** *(The built-in rung was dropped by [0012](0012-drop-the-builtin-gh-rung.md); the ladder now ends at "nothing".)* This is §2.14's per-gate skip rule
 applied to a different artifact: an absent adapter yields a weaker binding, announced, rather than a
 broken session. The machine-global tier exists because one Jira shop has many repos, and repeating
 the same adapter in each of them is the thing that makes people stop updating any of them.

@@ -12,17 +12,15 @@ Confirm the current branch is not `main`:
 git rev-parse --abbrev-ref HEAD
 ```
 
-Resolve the code host down the ladder — project, then machine, then built-in; the first file present wins:
+Resolve the code host down the ladder — project, then machine; the first file present wins:
 
 ```bash
 for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not fall back to `gh`, because an installed adapter declares which code host this project uses. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, say in one line that no code-host adapter is installed and the built-in `gh` path serves. Steps 2, 3 and 6 each have one form per path; use the one that matches.
+If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not route around it, because an installed adapter declares which code host this project uses. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **stop**.
 
 Resolve the open PR for the current branch.
-
-**Through the adapter:**
 
 ```bash
 "$CODE_HOST" pr-for-branch "$(git rev-parse --abbrev-ref HEAD)"   # JSON array, newest first
@@ -30,25 +28,16 @@ Resolve the open PR for the current branch.
 
 Keep only the entries whose `state` is `open`. If `pr-for-branch` is not in the adapter's `describe.verbs` (or it exits 3), say so in one line and ask the user for the PR reference instead. Any other failure → say so in one line, quoting the adapter's error line, and stop.
 
-**On the built-in `gh` path:**
-
-```bash
-gh pr view --json number,url,state,headRefName
-gh repo view --json owner,name -q '.owner.login + "/" + .name'
-```
-
-On either path:
-
 - If there is no open PR, stop and report clearly: "No open PR for this branch; nothing to process."
 - If there is more than one open candidate PR, stop and ask the user which PR number to process.
 
-Hold the PR number — the open entry's `.ref` through the adapter — and, on the built-in path, the owner and repo; the steps below refer to them as NUMBER, OWNER, and REPO.
+Hold the PR number — the open entry's `.ref`; the steps below refer to it as NUMBER.
 
 ## 2. Read all three comment surfaces
 
 Read every place a reviewer can leave feedback: inline review threads (with their resolution state), review summary bodies, and general conversation comments.
 
-**Through the adapter**, one call returns all three:
+One call returns all three:
 
 ```bash
 "$CODE_HOST" pr-comments NUMBER
@@ -56,51 +45,12 @@ Read every place a reviewer can leave feedback: inline review threads (with thei
 
 Its `threads[]` carry `id` (the reply target for step 6), `resolved`, `outdated`, `path`, `line` (absent when outdated) and `comments[]` with each `author`; `reviews[]` are the summary bodies, already limited to non-empty ones; `comments[]` are the general conversation comments; `viewer` is who the adapter acts as, when it can tell. If `pr-comments` is not in the adapter's `describe.verbs` (or it exits 3), say in one line that this code host's adapter cannot read review feedback, and stop — there is nothing to triage. Any other failure → say so in one line, quoting the adapter's error line, and stop.
 
-**On the built-in `gh` path**, `gh pr view` alone is insufficient for inline review threads and their resolution state, so use `gh api`.
-
-**Inline review threads (with resolution state), via GraphQL:**
-
-```bash
-gh api graphql -f query='
-query($owner:String!, $repo:String!, $pr:Int!) {
-  repository(owner:$owner, name:$repo) {
-    pullRequest(number:$pr) {
-      reviewThreads(first:100) {
-        nodes {
-          isResolved
-          isOutdated
-          comments(first:100) {
-            nodes { databaseId body path line author { login } }
-          }
-        }
-      }
-    }
-  }
-}' -F owner=OWNER -F repo=REPO -F pr=NUMBER
-```
-
-Each thread is a list of comments; the first comment's `databaseId` is the REST id used to reply in-thread.
-
-**Review summary bodies (the text a reviewer writes when approving / requesting changes):**
-
-```bash
-gh api repos/OWNER/REPO/pulls/NUMBER/reviews
-```
-
-Use entries whose `body` is non-empty.
-
-**General PR conversation comments (not attached to a diff line):**
-
-```bash
-gh api repos/OWNER/REPO/issues/NUMBER/comments
-```
-
 ## 3. Scope: only unresolved / open feedback
 
 Process **only** what still needs action:
 
-- Skip any review thread that is resolved (`isResolved` on the built-in path, `resolved` through the adapter).
-- Skip any thread whose latest comment is your own reply — it was addressed in a previous run and is waiting on the reviewer. On the built-in path, compare `author.login` against `gh api user -q .login`; through the adapter, compare the thread's last `comments[].author` against `viewer`. If the adapter omits `viewer`, say so in one line, skip nothing on authorship, and mark those threads in the triage plan as possibly already answered, so the step 4 checkpoint can drop them. Never ask `gh api user` on the adapter path: it would ask the wrong system.
+- Skip any review thread that is resolved (`resolved`).
+- Skip any thread whose latest comment is your own reply — it was addressed in a previous run and is waiting on the reviewer. Compare the thread's last `comments[].author` against `viewer`. If the adapter omits `viewer`, say so in one line, skip nothing on authorship, and mark those threads in the triage plan as possibly already answered, so the step 4 checkpoint can drop them.
 - Skip comments that are already addressed (e.g. a later commit or reply already handled them).
 
 This keeps re-runs idempotent: since the command never resolves threads itself, a re-run after a review round only picks up items with new reviewer activity.
@@ -154,19 +104,13 @@ Say in the reply (step 6) where the gap was routed, so the reviewer sees the com
 
 Reply **in-thread** to each processed review thread — reply to the specific comment, not just a top-level PR comment.
 
-**Through the adapter**, using the thread's `id` from step 2:
+Using the thread's `id` from step 2:
 
 ```bash
 "$CODE_HOST" pr-reply NUMBER --to THREAD_ID --body '...'
 ```
 
 If `pr-reply` is not in the adapter's `describe.verbs` (or it exits 3), say so in one line and print each prepared reply instead — with its thread's `path:line`, or "top-level" — for the user to post; step 7 still runs. If a single reply fails, say which in one line and carry on with the rest.
-
-**On the built-in `gh` path**, using the first comment's `databaseId`:
-
-```bash
-gh api -X POST repos/OWNER/REPO/pulls/NUMBER/comments/COMMENT_ID/replies -f body='...'
-```
 
 Keep every reply short — a sentence or two. Content by triage class:
 
@@ -181,8 +125,7 @@ Do **not** resolve threads — leave all of them, including addressed ones, for 
 For review-summary bodies and general conversation comments that have no inline thread to reply into, respond with a single top-level comment that references them:
 
 ```bash
-"$CODE_HOST" pr-reply NUMBER --body '...'   # through the adapter
-gh pr comment NUMBER --body '...'           # on the built-in gh path
+"$CODE_HOST" pr-reply NUMBER --body '...'
 ```
 
 ## 7. Commit and push

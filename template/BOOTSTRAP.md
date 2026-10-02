@@ -77,7 +77,7 @@ For issues in Jira Cloud, give the site and project key — never a credential; 
   --tracker jira --jira-site <site>.atlassian.net --jira-key <KEY> --code-host github
 ```
 
-Each flag writes a small `.cdd/<capability>` file that runs the adapter from the library the helper install provides (below), so it works from a clone on any machine. The script refuses a backend CDD ships no adapter for. Without the flags, no `.cdd/` is written and the built-in GitHub (`gh`) behaviour serves.
+Each flag writes a small `.cdd/<capability>` file that runs the adapter from the library the helper install provides (below), so it works from a clone on any machine. The script refuses a backend CDD ships no adapter for. Without the flags, no `.cdd/` is written, and the issue and PR features skip (each says so in one line) until `/cdd-retrofit` or a hand-made binding installs an adapter.
 
 The script will:
 

@@ -51,7 +51,7 @@ CONTRACT_VERSION=1
 BACKEND="jira"
 # A Jira key: the project key (an uppercase letter, then uppercase letters, digits or
 # underscores), a hyphen, the issue number. No leading `#`, so it never overlaps the
-# built-in GitHub shape.
+# GitHub shape.
 REF_PATTERN='^[A-Z][A-Z0-9_]+-[0-9]+$'
 PROJECT_KEY_PATTERN='^[A-Z][A-Z0-9_]+$'
 # `describe` is excluded from this list by the contract: it is mandatory for every

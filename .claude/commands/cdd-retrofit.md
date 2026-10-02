@@ -68,7 +68,7 @@ git -C <target> remote get-url origin 2>/dev/null
 git -C <target> log -n 500 --format='%D %s %b'
 ```
 
-- **Origin host** containing `github` → propose GitHub for both. Another host (GitLab, …) → say in one line that CDD ships no adapter for it and the built-in `gh` path keeps serving. No origin → ask, as `/cdd-bootstrap` does.
+- **Origin host** containing `github` → propose GitHub for both. Another host (GitLab, …) → say in one line that CDD ships no adapter for it, no binding is written, and the commands needing it skip. No origin → ask, as `/cdd-bootstrap` does.
 - **Jira** → a key prefix recurring in branch names or commit subjects (`ABC-123`, several distinct numbers, not look-alikes like `UTF-8`) proposes the Jira tracker with that key; take the site from any `atlassian.net` URL, otherwise ask. Never ask for a credential: the user sets `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell.
 
 Approve each binding as its own file, render it with the matching flags on the section 3.2 / 4.3 render (never hand-write one), and never overwrite an existing `.cdd/<capability>`.

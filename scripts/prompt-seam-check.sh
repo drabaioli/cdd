@@ -318,10 +318,10 @@ check_heuristic() {
 
 # --- Check: code-host callers ------------------------------------------------
 # /cdd-pre-pr opens the PR and /cdd-process-pr finds, reads and answers it through the
-# resolved code-host adapter, with the built-in `gh` path as the fallback. A one-sided
-# edit that drops the adapter path would still work here, on GitHub, and silently leave
-# a project on any other code host unable to open or process a PR — the same class as
-# the issue-refs seam. Both files are read stripped, as there: cdd-pre-pr.md's triage
+# resolved code-host adapter, and with none installed stop or skip with the
+# /cdd-retrofit line (ADR 0012). A one-sided edit that dropped the adapter calls would
+# leave every project unable to open or process a PR — the same class as the
+# issue-refs seam. Both files are read stripped, as there: cdd-pre-pr.md's triage
 # prose names these verbs while describing this check. Captured into variables, as
 # there, rather than piped: under pipefail, `grep -q` exiting early SIGPIPEs the sed.
 check_code_host_callers() {

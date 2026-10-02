@@ -17,7 +17,7 @@ This command has one optional argument. Dispatch on its shape, trying the rows i
 
 The argument splits on whitespace, and the direct row matches only when **every** token matches — one task may be sourced from several issues (`/cdd-next-step 97 12`). A single token is the common case and behaves exactly as before; a mixed argument (one token matching, one not) is not issue-driven and falls to intent-driven, where the whole string is read as a task prompt.
 
-**What a reference looks like is the tracker's decision, not this command's.** Resolve the tracker down the ladder — project, then machine, then built-in — and take the first file present:
+**What a reference looks like is the tracker's decision, not this command's.** Resolve the tracker down the ladder — project, then machine — and take the first file present:
 
 ```bash
 for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
@@ -29,9 +29,9 @@ If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the sh
 <adapter> describe    # JSON on stdout; hermetic, so it needs no network and no credentials
 ```
 
-Use it only if the file is executable and `describe` exits 0, parses as JSON, reports `capability` `tracker`, and reports a `contract` this CDD supports (currently `1`). Otherwise — not executable, a non-zero exit, unparseable, another capability, or wrong version — the adapter is **installed but broken**: say so in **one line** naming its path, and **stop the command**. Do not try a lower rung: an installed adapter declares which tracker this project uses, so a lower rung would answer from the wrong system. With nothing resolved, the built-in rung serves and its `ref_pattern` is the constant `^#?[0-9]+$` — `#123` or a bare `123`, exactly as before adapters existed.
+Use it only if the file is executable and `describe` exits 0, parses as JSON, reports `capability` `tracker`, and reports a `contract` this CDD supports (currently `1`). Otherwise — not executable, a non-zero exit, unparseable, another capability, or wrong version — the adapter is **installed but broken**: say so in **one line** naming its path, and **stop the command**. Do not try a lower rung: an installed adapter declares which tracker this project uses, so a lower rung would answer from the wrong system. With nothing resolved there is no `ref_pattern`, so no argument is issue-shaped: the direct row never matches, and `issue` / `issues` still dispatches to §0b, which stops with the install line.
 
-Resolution done only to classify the argument is otherwise **silent**. The line naming which rung served is printed in §0b, where a tracker call is actually made: a fallback line in every session in every repo is noise, and noise is how a load-bearing line stops being read.
+Resolution done only to classify the argument is otherwise **silent**. The line naming which rung served is printed in §0b, where a tracker call is actually made: a line in every session in every repo is noise, and noise is how a load-bearing line stops being read.
 
 Every mode first runs §0a (checkout freshness), §1 (read context) and §2 (stale-handoff sweep); the "Branches at" column is only where the mode-specific path begins after that.
 
@@ -55,7 +55,7 @@ The count prints two numbers, ahead then behind. The fetch updates remote-tracki
 
 - **Behind** (second number non-zero): **stop**. Say how many commits behind the upstream this checkout is, and tell the user to run `git pull --ff-only` here and re-run the command. Do not pull, and do not offer to.
 - **Ahead or diverged**: report it in one line and continue. Never a block.
-- **Fetch failed or no upstream** (offline, no remote, or no counterpart branch on `origin`): say in one line that the freshness check was skipped, and continue — the command stays usable offline, the same way roadmap and intent modes stay usable without `gh`.
+- **Fetch failed or no upstream** (offline, no remote, or no counterpart branch on `origin`): say in one line that the freshness check was skipped, and continue — the command stays usable offline, the same way roadmap and intent modes stay usable without an adapter.
 
 Then continue with §0b (issue-driven mode) or §1.
 
@@ -65,32 +65,22 @@ Then continue with §0b (issue-driven mode) or §1.
 
 *With an adapter resolved* (§0), that verb must appear in its `describe.verbs`; if it does not, say which verb the adapter is missing and stop. A call that exits **4** (not configured / auth missing) prints an actionable line on stderr — show that line and stop, rather than reinterpreting it.
 
-*With nothing resolved*, the built-in rung serves, and it needs the `gh` CLI authenticated and a GitHub `origin`:
+*With nothing resolved*, print exactly `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` and stop. Roadmap- and intent-driven modes never reach this step and stay usable.
 
-```bash
-gh auth status && git remote get-url origin   # origin should be a github.com URL
-```
+**Announce the rung in one line** before the first call — `.cdd/tracker` or `~/.cdd/adapters/tracker`. This is the one place the ladder is visible to the user, and where a wrong binding would otherwise stay silent.
 
-If `gh` is missing/unauthenticated or `origin` is not a GitHub remote, print a one-line explanation (e.g. "Issue mode needs the `gh` CLI and a GitHub origin; neither roadmap nor intent mode does — pass a task prompt or no argument instead.") and stop. Do not crash; roadmap- and intent-driven modes never reach this step.
-
-**Announce the rung in one line** before the first call — `.cdd/tracker`, `~/.cdd/adapters/tracker`, or "no tracker adapter installed; using the built-in `gh` path". This is the one place the ladder is visible to the user, and where a wrong binding would otherwise stay silent.
-
-**Direct** (every token of `$ARGUMENTS` matched the `ref_pattern`): read each item, in the order given (read-only — never assign, comment, or relabel). With an adapter, that is one `<adapter> issue-read <ref>` per token, passing each through unchanged — normalizing a reference is the adapter's job, not this command's. Otherwise strip any leading `#` and use the built-in, once per reference:
-
-```bash
-gh issue view <N> --json number,title,body,url,comments
-```
+**Direct** (every token of `$ARGUMENTS` matched the `ref_pattern`): read each item, in the order given (read-only — never assign, comment, or relabel). That is one `<adapter> issue-read <ref>` per token, passing each through unchanged — normalizing a reference is the adapter's job, not this command's.
 
 Several references mean one task sourced from several issues, not several tasks. If the items turn out to describe unrelated work, say so and ask which to scope — do not fold unrelated work into one handoff silently.
 
 **Browse** (`issue` / `issues`): list open issues, then exclude any already in flight, so the user only sees unstarted work:
 
 ```bash
-gh issue list --state open --json number,title,labels
+<adapter> issue-list
 jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/<PROJECT_DIR>/*.state.json 2>/dev/null   # already-started issues, by state record
 ```
 
-With an adapter, `<adapter> issue-list` replaces the first line; the second stays as it is, since a task's own state record is a fact about this checkout, not about the tracker.
+The second line is a fact about this checkout, not about the tracker: a task's own state record.
 
 The state records are the only exclusion source. Compare after stripping any leading `#`, as a reference is recorded exactly as the tracker reports it. They are advisory — local to this machine, absent without `jq`, reaped once a PR merges — so this narrows the blind spot rather than closing it: a reference found there means "already in flight", while finding none is not proof the issue is unstarted. Say that in one line when presenting the list, since an issue started on another machine will not be filtered out here.
 
@@ -264,7 +254,7 @@ It is a separate call rather than a flag on `seed` so that a machine whose `cdd-
 cdd-state issue-refs <branch> <ref> [<ref>...]
 ```
 
-Pass each reference exactly as the tracker reports it — the adapter's `.ref`, or the argument as typed on the built-in `gh` rung. `/cdd-pre-pr` reads this list back and emits one close line per entry. It is its own subcommand for the same reason `lane` is: a machine whose `cdd-state` predates it fails this one call and keeps the seeded record. If it fails, say so in one line — the task still runs, but nothing carries its issues forward, so `/cdd-pre-pr` will open the PR with no close lines and the issues stay open.
+Pass each reference exactly as the tracker reports it — the adapter's `.ref`. `/cdd-pre-pr` reads this list back and emits one close line per entry. It is its own subcommand for the same reason `lane` is: a machine whose `cdd-state` predates it fails this one call and keeps the seeded record. If it fails, say so in one line — the task still runs, but nothing carries its issues forward, so `/cdd-pre-pr` will open the PR with no close lines and the issues stay open.
 
 ## 8. Print the next command
 
