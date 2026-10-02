@@ -43,7 +43,7 @@ Mandatory for every adapter of every capability. It takes no arguments.
 $ .cdd/tracker describe
 {"capability":"tracker","contract":1,"backend":"github",
  "ref_pattern":"^#?[0-9]+$",
- "verbs":["issue-read","issue-list","issue-create","issue-close-token"],
+ "verbs":["issue-read","issue-list","issue-create","issue-transition","issue-comment","issue-close-token"],
  "create_target":"drabaioli/cdd"}
 ```
 
@@ -64,7 +64,7 @@ $ .cdd/tracker describe
 
 ## The tracker verbs
 
-Six verbs, of which one (`describe`) is mandatory and the other five are declared per backend.
+Seven verbs, of which one (`describe`) is mandatory and the other six are declared per backend.
 
 | Verb                                | Replaces today                              | Notes                          |
 | ----------------------------------- | ------------------------------------------- | ------------------------------ |
@@ -73,6 +73,7 @@ Six verbs, of which one (`describe`) is mandatory and the other five are declare
 | `issue-list`                        | `gh issue list` (`/cdd-next-step` §0b)      | open items only                |
 | `issue-create --title T --body B`   | `/cdd-pre-pr`'s improvement channel         |                                |
 | `issue-transition <ref> <state>`    | `cdd-worktree-done` / `-gc`, post-merge     | once per recorded ref          |
+| `issue-comment <ref> --body B`      | — (new)                                     | `cdd-worktree-done` / `-gc`, after a post-merge close |
 | `issue-close-token <ref>`           | `/cdd-pre-pr` §11, once per recorded ref    | `Closes #42` / a Jira smart commit |
 
 ### `issue-read <ref>` → object
@@ -119,6 +120,16 @@ Open items only. Empty is `[]`, not an error.
 
 Its consumer is the post-merge close in `cdd-worktree-done` and `cdd-worktree-gc`: once the code host confirms the task's PR merged, each calls `issue-transition <ref> closed` once for every ref on the task's state record (see [Shell helpers](shell-helpers.md#tracker-resolution-the-post-merge-issue-close)).
 
+### `issue-comment <ref> --body B` → object
+
+```json
+{"ref":"XYZ-123","id":"10000","url":"https://…/browse/XYZ-123?focusedCommentId=10000"}
+```
+
+Posts a comment on the item. `B` is plain text; an adapter may render a bare `http(s)` URL in it as a link (the Jira adapter does). `url` is the new comment's, omitted when the backend does not report one; `id` follows `issue-create`'s omit rule. Additive, so the contract stays at 1.
+
+Its consumer is the post-merge close: on each ref that `issue-transition` reports it closed **now** (`changed: true`), `cdd-worktree-done` and `cdd-worktree-gc` post one comment naming the merged PR and its link — `Closed after PR #42 merged: https://…`. A ref already closed (`changed: false`) gets none, so a gc retry never comments twice, and an item closed by the PR's own close line already shows the PR (GitHub's timeline, Jira's development panel). The comment is best-effort: a failure is one warning and never keeps the task's record, and an adapter that does not declare the verb is said once per run and the rest skipped.
+
 ### `issue-close-token <ref>` → object
 
 ```json
@@ -153,7 +164,9 @@ does nothing look like one that does.
 record once the code host confirms the PR merged — automatically, on every backend, GitHub-on-GitHub
 included. There it is usually a no-op (`changed: false`), but it also covers a dropped close line
 and a PR merged into a non-default branch, where GitHub does not auto-close. So the token is now
-the fast path where a backend or integration acts on it, not the only mechanism.
+the fast path where a backend or integration acts on it, not the only mechanism. When CDD itself
+makes the close, it follows it with an `issue-comment` linking the merged PR, so the item still
+names the PR that closed it.
 
 ## The GitHub reference adapter
 
@@ -161,7 +174,7 @@ Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one dire
 
 `tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it with a committed `.cdd/tracker` shim onto the adapter library (see [Installing a binding](#installing-a-binding)). **It never installs itself as a ladder rung**: the built-in rung already *is* GitHub, so a machine-rung install would change no behaviour while destroying the "no adapter installed" baseline that behaviour-neutrality is checked against. `cdd-worktree.sh install` does copy it machine-globally — but into the adapter library, which is not a rung and binds nothing on its own. That is the difference from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which self-install as sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
-It **declares all five verbs**. `issue-transition` reverses issue #86's "unsupported on GitHub" verdict: GitHub has no workflow states beyond open/closed, but open/closed is all the verb needs, and the post-merge close calls it on every backend — consistency rather than detecting GitHub-on-GitHub and skipping it. `closed` is `gh issue close`, `open` is `gh issue reopen`; it reads the issue's state first, so an issue already there is `changed: false` and no write. With no shipped adapter now omitting a contract verb, the live exit-3 case is the nonsense verb, and the undeclared-contract-verb path is kept tested by a mutation in `scripts/adapter-conformance-assert.sh`.
+It **declares all six verbs**. `issue-transition` reverses issue #86's "unsupported on GitHub" verdict: GitHub has no workflow states beyond open/closed, but open/closed is all the verb needs, and the post-merge close calls it on every backend — consistency rather than detecting GitHub-on-GitHub and skipping it. `closed` is `gh issue close`, `open` is `gh issue reopen`; it reads the issue's state first, so an issue already there is `changed: false` and no write. `issue-comment` is `gh issue comment`, whose printed URL becomes `url`. With no shipped adapter now omitting a contract verb, the live exit-3 case is the nonsense verb, and the undeclared-contract-verb path is kept tested by a mutation in `scripts/adapter-conformance-assert.sh`.
 
 Its `ref_pattern` is `^#?[0-9]+$`, which is exactly the shape `/cdd-next-step` hardcoded before the ladder existed. `create_target` is derived from `git remote get-url origin` parsed to `owner/repo` — local, no network — and omitted when it cannot be derived.
 
@@ -212,10 +225,10 @@ Every PR whose head is the branch, **newest first**; `[]` when there is none, as
 ### `pr-merged <branch> [--base B]` → object
 
 ```json
-{"branch":"my_branch","merged":true,"ref":"42"}
+{"branch":"my_branch","merged":true,"ref":"42","url":"https://…"}
 ```
 
-**Whether the branch's most recent PR** (into `--base`, if given) **has merged.** It takes a branch because both of its callers start from one. `ref` is present only when `merged` is true. This is slightly more conservative than the built-in `done` check it replaces, which accepted *any* merged PR into the base: a branch with an older merged PR and a newer open one reads as not merged, so `done` prompts instead of force-deleting.
+**Whether the branch's most recent PR** (into `--base`, if given) **has merged.** It takes a branch because both of its callers start from one. `ref` and `url` (the PR's page, an additive field) are present only when `merged` is true; `url` is what the post-merge close links on the items it closes, and a caller without it names the PR by `ref` alone. This is slightly more conservative than the built-in `done` check it replaces, which accepted *any* merged PR into the base: a branch with an older merged PR and a newer open one reads as not merged, so `done` prompts instead of force-deleting.
 
 ### `pr-comments <pr>` → object
 
@@ -251,7 +264,7 @@ A bare branch name, never `origin/main`.
 
 This repo binds both GitHub adapters to itself by committing `.cdd/code-host` and `.cdd/tracker` as relative symlinks into `tools/adapters/` — dogfooding, and a symlink cannot drift from its target. A downstream project has no `tools/adapters/` of its own, so it binds by a shim onto the machine-global adapter library ([Installing a binding](#installing-a-binding)). The cost is that this repo no longer exercises the built-in `gh` rung day to day; the `code-host-ladder` gate still covers it.
 
-It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline and exactly as the built-in does, and asks `gh repo view` only when `origin/HEAD` is unset — where the built-in would guess `main`.
+It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` (asked for the PR's `url` too) are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline and exactly as the built-in does, and asks `gh repo view` only when `origin/HEAD` is unset — where the built-in would guess `main`.
 
 ## The Jira adapter
 
@@ -277,12 +290,13 @@ exec "$HOME/.cdd/tools/adapters/tracker/jira.sh" "$@"
 
 A missing variable is exit 4 with one stderr line per variable, naming it — after argument validation, so a usage error is still 2 on an unconfigured machine. The token reaches `curl` through `--config -` on stdin, never on the command line (where `ps` would show it), and is never written to a file. Rejected credentials are exit 1 ("auth rejected", per the exit-code table) and said as such — including the case Jira Cloud does not answer with a 401: a bad token is served anonymously and gets a 404, with the failed login flagged only in the `X-Seraph-LoginReason` response header, which the adapter checks first. A 404 and every other non-2xx are exit 1 with Jira's own error messages on stderr — a project's required custom fields, for instance, surface here by name.
 
-It **declares all five verbs**. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` — a Jira key, which never overlaps the built-in `^#?[0-9]+$`. `describe` needs neither network nor `jq`; `create_target` is `<JIRA_PROJECT_KEY> @ <site host>` when both variables are set, and omitted otherwise.
+It **declares all six verbs**. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` — a Jira key, which never overlaps the built-in `^#?[0-9]+$`. `describe` needs neither network nor `jq`; `create_target` is `<JIRA_PROJECT_KEY> @ <site host>` when both variables are set, and omitted otherwise.
 
 - **State.** `closed` is the status *category* `done`; `open` is anything else. `state_raw` is the status name (`In Review`). `issue-list` is the project's items whose category is not Done, one page of up to 100 (the GitHub adapter's cap), through `/rest/api/3/search/jql` — the older `/search` endpoint has been removed from Jira Cloud. Search reads Jira's index, which trails a write by a second or two, so an item transitioned a moment ago can still appear; `issue-read` is always current.
 - **`issue-transition`.** Workflows are per project, so it asks Jira which transitions are available from the current status and takes the first that lands in the target category — for `open`, preferring a To Do-category status. Already there is a no-op, exit 0 with `changed: false`; a transition made is `changed: true`. No fitting transition is exit 1, listing the transitions that do exist. A transition that needs a screen field fails with Jira's 400 message, also exit 1.
+- **`issue-comment`** posts to `/rest/api/3/issue/<key>/comment`; `id` is the comment's numeric id and `url` the issue page focused on it (`…/browse/<key>?focusedCommentId=<id>`).
 - **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the code host with smart commits enabled — the second of the three cases above.
-- **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` wraps plain text as ADF paragraphs, so Markdown shows literally. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
+- **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` and `issue-comment` wrap plain text as ADF paragraphs, so Markdown shows literally, but a bare `http(s)` URL becomes a link. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
 ## Installing a binding
 

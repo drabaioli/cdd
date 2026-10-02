@@ -173,7 +173,7 @@ expect_fail "describe that emits non-JSON is caught" "did not emit parseable JSO
 
 # --- Check 2: describe is contract-shaped -------------------------------------
 mutate_replace_line "describe lists itself in verbs" '^DECLARED_VERBS=' \
-  'DECLARED_VERBS='"'"'["describe","issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'"'"''
+  'DECLARED_VERBS='"'"'["describe","issue-read","issue-list","issue-create","issue-transition","issue-comment","issue-close-token"]'"'"''
 expect_fail "describe listing itself in verbs is caught" "not contract-shaped"
 
 mutate_replace_line "describe emits a null" "^  printf '}" \
@@ -210,7 +210,7 @@ expect_fail "an unknown verb exiting 1 instead of 3 is caught" "expected exit 3,
 # from the declaration while its implementation stays: the probe must find it answering
 # (exit 2, a usage error) where an undeclared verb has to exit 3.
 mutate_replace_line "issue-transition implemented but undeclared" '^DECLARED_VERBS=' \
-  'DECLARED_VERBS='"'"'["issue-read","issue-list","issue-create","issue-close-token"]'"'"''
+  'DECLARED_VERBS='"'"'["issue-read","issue-list","issue-create","issue-comment","issue-close-token"]'"'"''
 expect_fail "an implemented-but-undeclared contract verb is caught" "undeclared contract verb 'issue-transition'"
 
 # --- Check 5: a usage error exits 2 -------------------------------------------

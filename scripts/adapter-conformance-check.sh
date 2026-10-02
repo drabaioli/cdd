@@ -148,7 +148,7 @@ fi
 # error, and a verb call that must need the backend.
 case "$CAPABILITY" in
   tracker)
-    CONTRACT_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'
+    CONTRACT_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-comment","issue-close-token"]'
     USAGE_PROBE=(issue-read)
     BACKEND_PROBE=(issue-list)
     ;;
