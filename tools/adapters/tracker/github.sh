@@ -10,6 +10,7 @@
 #   tools/adapters/tracker/github.sh issue-list
 #   tools/adapters/tracker/github.sh issue-create --title <title> --body <body>
 #   tools/adapters/tracker/github.sh issue-transition <ref> <open|closed>
+#   tools/adapters/tracker/github.sh issue-comment <ref> --body <body>
 #   tools/adapters/tracker/github.sh issue-close-token <ref>
 #
 # A project binds to it with a committed `.cdd/tracker` shim that execs the copy
@@ -38,7 +39,7 @@ REF_PATTERN='^#?[0-9]+$'
 # adapter, so declaring it would be redundant. GitHub has no workflow states beyond
 # open/closed, which is all `issue-transition` needs: the post-merge close in
 # cdd-worktree-done / -gc calls it on every backend, GitHub included.
-DECLARED_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'
+DECLARED_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-comment","issue-close-token"]'
 
 err() { printf '%s\n' "$*" >&2; }
 
@@ -222,6 +223,25 @@ verb_issue_transition() {
   printf '{"ref":"%s","state":"%s","state_raw":"%s","changed":true}\n' "$ref" "$want" "$target_raw"
 }
 
+# --- issue-comment ------------------------------------------------------------
+# `gh issue comment` prints the new comment's URL on stdout, not JSON. The comment is
+# posted either way, so a missing URL is not a failure: `url` is just omitted.
+verb_issue_comment() {
+  local ref="$1" body="$2" out url
+  require_gh
+  if ! out="$(gh issue comment "$ref" --body "$body" 2>/dev/null)"; then
+    err "could not comment on GitHub issue #$ref (no such issue, no access, or the request failed)"
+    exit 1
+  fi
+  # `|| true`: under `set -e` + `pipefail` a grep that matches nothing would abort here.
+  url="$(printf '%s' "$out" | grep -oE 'https://[^[:space:]]+' | tail -1 || true)"
+  if [[ -n "$url" ]]; then
+    printf '{"ref":"%s","url":"%s"}\n' "$ref" "$(json_escape "$url")"
+  else
+    printf '{"ref":"%s"}\n' "$ref"
+  fi
+}
+
 # --- issue-close-token --------------------------------------------------------
 # Purely local: the token is a property of the backend's commit-message syntax, not of
 # any particular issue, so this verb contacts nothing and needs no credentials.
@@ -268,8 +288,24 @@ case "$VERB" in
     [[ $# -le 2 ]] || { err "issue-transition takes a reference and a state"; exit 2; }
     verb_issue_transition "$REF" "$2"
     ;;
+  issue-comment)
+    normalize_ref "${1-}"
+    shift
+    body=''
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --body) body="${2-}"; shift 2 || { err "--body needs a value"; exit 2; } ;;
+        *) err "unknown argument for issue-comment: $1"; exit 2 ;;
+      esac
+    done
+    if [[ -z "$body" ]]; then
+      err "usage: $(basename "$0") issue-comment <ref> --body <body>"
+      exit 2
+    fi
+    verb_issue_comment "$REF" "$body"
+    ;;
   ''|-h|--help|help)
-    err "usage: $(basename "$0") <describe|issue-read|issue-list|issue-create|issue-transition|issue-close-token> [args...]"
+    err "usage: $(basename "$0") <describe|issue-read|issue-list|issue-create|issue-transition|issue-comment|issue-close-token> [args...]"
     exit 2
     ;;
   *)

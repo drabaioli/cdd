@@ -10,6 +10,7 @@
 #   tools/adapters/tracker/jira.sh issue-list
 #   tools/adapters/tracker/jira.sh issue-create --title <title> --body <body>
 #   tools/adapters/tracker/jira.sh issue-transition <ref> <open|closed>
+#   tools/adapters/tracker/jira.sh issue-comment <ref> --body <body>
 #   tools/adapters/tracker/jira.sh issue-close-token <ref>
 #
 # Configuration is environment variables only — no config file, nothing read from disk:
@@ -55,7 +56,7 @@ REF_PATTERN='^[A-Z][A-Z0-9_]+-[0-9]+$'
 PROJECT_KEY_PATTERN='^[A-Z][A-Z0-9_]+$'
 # `describe` is excluded from this list by the contract: it is mandatory for every
 # adapter, so declaring it would be redundant.
-DECLARED_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-close-token"]'
+DECLARED_VERBS='["issue-read","issue-list","issue-create","issue-transition","issue-comment","issue-close-token"]'
 
 err() { printf '%s\n' "$*" >&2; }
 
@@ -181,6 +182,10 @@ jira_request() {
 #
 # adf_text: Atlassian Document Format -> plain text. Lossy by design (marks, colours
 # and layout are dropped); the goal is a body a reader — or a session — can follow.
+#
+# adf_doc: plain text -> ADF, the other way. link_nodes turns one line into text nodes,
+# a bare http(s) URL becoming a link-marked node. It tokenizes on whitespace rather than
+# slicing at `match` offsets, which jq 1.6 reports in bytes for non-ASCII input.
 # shellcheck disable=SC2016  # $c and $i are jq variables, not shell ones
 JQ_LIB='
 def iso_utc:
@@ -218,6 +223,14 @@ def adf_text:
   else [.content[]? | adf_block] | join("\n\n")
   end
   | sub("\\s+$"; "");
+def link_nodes:
+  [scan("\\s+|\\S+")]
+  | reduce .[] as $t ([];
+      if ($t | test("^https?://")) then . + [{type: "text", text: $t, marks: [{type: "link", attrs: {href: $t}}]}]
+      elif length > 0 and (.[-1].marks == null) then .[-1].text += $t
+      else . + [{type: "text", text: $t}]
+      end)
+  | .[];
 def adf_doc:
   { type: "doc", version: 1,
     content: [ splits("\n\\s*\n") | sub("^\\s+"; "") | sub("\\s+$"; "") | select(length > 0)
@@ -225,7 +238,7 @@ def adf_doc:
                | { type: "paragraph",
                    content: [ range(0; $lines | length) as $i
                               | (if $i > 0 then {type: "hardBreak"} else empty end),
-                                (if $lines[$i] != "" then {type: "text", text: $lines[$i]} else empty end) ] } ] };
+                                (if $lines[$i] != "" then ($lines[$i] | link_nodes) else empty end) ] } ] };
 def norm_state: if .statusCategory.key == "done" then "closed" else "open" end;
 '
 
@@ -370,6 +383,23 @@ verb_issue_transition() {
   jq -cn --arg ref "$ref" --arg state "$want" --argjson t "$chosen" '{ref: $ref, state: $state, state_raw: $t.to.name, changed: true}'
 }
 
+# --- issue-comment ------------------------------------------------------------
+# The body is plain text wrapped as ADF, as on issue-create (bare URLs become links).
+# Jira reports the comment's numeric id, so it is emitted; `url` is the issue page
+# focused on that comment. Both are omitted if Jira returned no id.
+verb_issue_comment() {
+  local ref="$1" body="$2"
+  scratch
+  jq -n --arg body "$body" "$JQ_LIB"'{body: ($body | adf_doc)}' > "$SCRATCH/body.json"
+  jira_request POST "/rest/api/3/issue/$ref/comment" \
+    -H 'Content-Type: application/json' --data-binary @"$SCRATCH/body.json"
+  jq -c --arg ref "$ref" --arg base "$JIRA_BASE_URL" '
+    {ref: $ref}
+    + (if ((.id // "") | tostring) != "" then
+         {id: (.id | tostring), url: "\($base)/browse/\($ref)?focusedCommentId=\(.id)"}
+       else {} end)' "$RESP"
+}
+
 # --- issue-close-token --------------------------------------------------------
 # Purely local: a smart commit, `<KEY> #<transition>`. It only acts where Jira is
 # connected to the code host with smart commits enabled (the contract doc's three cases).
@@ -436,13 +466,31 @@ case "$VERB" in
     require_tools
     verb_issue_transition "$REF" "$2"
     ;;
+  issue-comment)
+    normalize_ref "${1-}"
+    shift
+    body=''
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --body) body="${2-}"; shift 2 || { err "--body needs a value"; exit 2; } ;;
+        *) err "unknown argument for issue-comment: $1"; exit 2 ;;
+      esac
+    done
+    if [[ -z "$body" ]]; then
+      err "usage: $(basename "$0") issue-comment <ref> --body <body>"
+      exit 2
+    fi
+    require_config JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN
+    require_tools
+    verb_issue_comment "$REF" "$body"
+    ;;
   issue-close-token)
     normalize_ref "${1-}"
     [[ $# -le 1 ]] || { err "issue-close-token takes exactly one reference"; exit 2; }
     verb_issue_close_token "$REF"
     ;;
   ''|-h|--help|help)
-    err "usage: $(basename "$0") <describe|issue-read|issue-list|issue-create|issue-transition|issue-close-token> [args...]"
+    err "usage: $(basename "$0") <describe|issue-read|issue-list|issue-create|issue-transition|issue-comment|issue-close-token> [args...]"
     exit 2
     ;;
   *)

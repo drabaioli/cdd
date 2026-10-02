@@ -212,20 +212,23 @@ verb_pr_reply() {
 }
 
 # --- pr-merged -----------------------------------------------------------------
-# Whether the branch's MOST RECENT PR (into --base, if given) has merged. `ref` is
-# present only when it has, per omit-don't-null.
+# Whether the branch's MOST RECENT PR (into --base, if given) has merged. `ref` and
+# `url` are present only when it has, per omit-don't-null.
 verb_pr_merged() {
-  local branch="$1" base="$2" line
+  local branch="$1" base="$2" line num state url
   local -a args=(--head "$branch" --state all)
   [[ -n "$base" ]] && args+=(--base "$base")
   require_gh
-  if ! line="$(gh pr list "${args[@]}" --json number,state \
-                 --jq '.[0] | select(.) | "\(.number) \(.state)"' 2>/dev/null)"; then
+  if ! line="$(gh pr list "${args[@]}" --json number,state,url \
+                 --jq '.[0] | select(.) | "\(.number) \(.state) \(.url)"' 2>/dev/null)"; then
     err "could not list GitHub pull requests for branch '$branch' (no access, or the request failed)"
     exit 1
   fi
-  if [[ "$line" == *" MERGED" ]]; then
-    printf '{"branch":"%s","merged":true,"ref":"%s"}\n' "$(json_escape "$branch")" "${line%% *}"
+  read -r num state url <<<"$line" || true
+  if [[ "$state" == MERGED ]]; then
+    printf '{"branch":"%s","merged":true,"ref":"%s"' "$(json_escape "$branch")" "$num"
+    [[ -n "$url" ]] && printf ',"url":"%s"' "$(json_escape "$url")"
+    printf '}\n'
   else
     printf '{"branch":"%s","merged":false}\n' "$(json_escape "$branch")"
   fi

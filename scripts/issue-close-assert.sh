@@ -17,6 +17,12 @@
 # announced once per run; an adapter without issue-transition skips the close in one
 # line and cleanup proceeds; and the GitHub tracker adapter's issue-transition itself.
 #
+# And the PR link that follows a close: each ref closed now gets one comment naming the
+# merged PR and its URL (gh's, or the adapter's issue-comment) and a "linked" line; an
+# already-closed ref gets none, so a gc retry never comments twice; a failed comment is
+# one warning and changes nothing else; an adapter without issue-comment is told once
+# per run; and the GitHub tracker adapter's issue-comment itself.
+#
 # Like code-host-ladder-assert.sh it stands in a local bare repo for origin, gives the
 # helpers their own $HOME, and puts a logging `gh` stub on PATH. Issue state lives in
 # two files the stubs share: $CLOSED (closed issues) and $FAILING (issues whose close
@@ -60,13 +66,15 @@ GH_LOG="$WORK/gh.log"
 TRACKER_LOG="$WORK/tracker.log"
 CLOSED="$WORK/closed"
 FAILING="$WORK/failing"
+COMMENT_FAILING="$WORK/comment-failing"
 MERGED="$WORK/merged"
-export GH_LOG CLOSED FAILING MERGED
+export GH_LOG CLOSED FAILING COMMENT_FAILING MERGED
 
 # Stub gh: logs every call. `pr list` answers merged for the branches in $MERGED, in
-# the shape of whichever --jq the caller used (done's number, list's "#N STATE", gc's
-# bare state). `issue view` reads $CLOSED; `issue close` fails for a ref in $FAILING
-# and otherwise records the ref in $CLOSED.
+# the shape of whichever --jq the caller used (done's "N URL", list's "#N STATE", gc's
+# "STATE N URL"). `issue view` reads $CLOSED; `issue close` fails for a ref in $FAILING
+# and otherwise records the ref in $CLOSED; `issue comment` fails for a ref in
+# $COMMENT_FAILING and otherwise prints the new comment's URL.
 mkdir -p "$WORK/bin"
 cat > "$WORK/bin/gh" <<'EOF'
 #!/usr/bin/env bash
@@ -81,8 +89,9 @@ case "$1" in
       shift
     done
     if has "$branch" "$MERGED"; then
-      if [[ "$all" == *"--state merged"* ]]; then echo 7
+      if [[ "$all" == *"--state merged"* ]]; then echo "7 https://github.com/o/r/pull/7"
       elif [[ "$all" == *"number,state"* ]]; then echo "#7 MERGED"
+      elif [[ "$all" == *"state,number,url"* ]]; then echo "MERGED 7 https://github.com/o/r/pull/7"
       else echo MERGED; fi
     fi
     exit 0 ;;
@@ -92,6 +101,7 @@ case "$1" in
       view)   if has "$n" "$CLOSED"; then echo CLOSED; else echo OPEN; fi ;;
       close)  has "$n" "$FAILING" && exit 1; echo "$n" >> "$CLOSED" ;;
       reopen) grep -vxF -- "$n" "$CLOSED" > "$CLOSED.tmp" || true; mv "$CLOSED.tmp" "$CLOSED" ;;
+      comment) has "$n" "$COMMENT_FAILING" && exit 1; echo "https://github.com/o/r/issues/$n#issuecomment-1" ;;
     esac
     exit 0 ;;
 esac
@@ -100,16 +110,18 @@ EOF
 chmod +x "$WORK/bin/gh"
 
 # make_tracker <dest> <mode>: a stub tracker adapter logging to $TRACKER_LOG, sharing
-# the gh stub's $CLOSED / $FAILING. Modes: working; no-transition (does not declare
-# issue-transition); broken (describe exits 1).
+# the gh stub's $CLOSED / $FAILING / $COMMENT_FAILING. Modes: working; no-transition
+# (does not declare issue-transition); no-comment (does not declare issue-comment);
+# broken (describe exits 1).
 make_tracker() {
   mkdir -p "$(dirname "$1")"
   printf '#!/usr/bin/env bash\nMODE=%q LOG=%q\n' "$2" "$TRACKER_LOG" > "$1"
   cat >> "$1" <<'EOF'
 echo "$*" >> "$LOG"
 has() { grep -qxF -- "$1" "$2" 2>/dev/null; }
-verbs='["issue-read","issue-transition"]'
+verbs='["issue-read","issue-transition","issue-comment"]'
 [[ "$MODE" == no-transition ]] && verbs='["issue-read"]'
+[[ "$MODE" == no-comment ]] && verbs='["issue-read","issue-transition"]'
 case "$1" in
   describe)
     [[ "$MODE" == broken ]] && exit 1
@@ -122,6 +134,9 @@ case "$1" in
       echo "$2" >> "$CLOSED"
       echo "{\"ref\":\"$2\",\"state\":\"closed\",\"state_raw\":\"Done\",\"changed\":true}"
     fi ;;
+  issue-comment)
+    if has "$2" "$COMMENT_FAILING"; then echo "stub: comment refused" >&2; exit 1; fi
+    echo "{\"ref\":\"$2\",\"url\":\"u\"}" ;;
   *) exit 3 ;;
 esac
 EOF
@@ -144,7 +159,7 @@ reset() {
   for r in $(git -C "$WORK/origin.git" for-each-ref --format='%(refname)' refs/cdd/); do
     git -C "$WORK/origin.git" update-ref -d "$r"
   done
-  : > "$GH_LOG"; : > "$TRACKER_LOG"; : > "$CLOSED"; : > "$FAILING"; : > "$MERGED"
+  : > "$GH_LOG"; : > "$TRACKER_LOG"; : > "$CLOSED"; : > "$FAILING"; : > "$COMMENT_FAILING"; : > "$MERGED"
 }
 
 # task <branch> <refs as a JSON array, or ""> — seeds the handoff, plan and state
@@ -218,10 +233,12 @@ run "$WORK/wt-d_ok" cdd-worktree-done
 for n in 11 12; do
   grep -qx "issue #$n: closed" "$WORK/out" || fail "done, close: expected a closed line for #$n$(show)"
   grep -qx "issue close $n" "$GH_LOG" || fail "done, close: gh issue close $n not called$(show)"
+  grep -qxF "issue comment $n --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$GH_LOG" || fail "done, close: #$n should get the PR link comment$(show)"
+  grep -qx "issue #$n: linked PR #7" "$WORK/out" || fail "done, close: expected a linked line for #$n$(show)"
 done
 record_gone d_ok || fail "done, close: the record should be removed$(show)"
 ! grep -q tracker "$WORK/err" || fail "done, close: the built-in rung must be silent$(show)"
-pass "done closes each recorded issue through gh, one line per ref, then cleans up"
+pass "done closes each recorded issue through gh, links the merged PR on each, then cleans up"
 
 # 3. Already closed is a success: an info line, no warning, no close call.
 reset
@@ -232,8 +249,9 @@ run "$WORK/wt-d_already" cdd-worktree-done
 grep -qx "issue #13: already closed" "$WORK/out" || fail "done, already closed: expected the info line$(show)"
 ! grep -q warning "$WORK/err" || fail "done, already closed: must not warn$(show)"
 ! grep -q "issue close" "$GH_LOG" || fail "done, already closed: gh issue close was called$(show)"
+! grep -q "issue comment" "$GH_LOG" || fail "done, already closed: an issue CDD did not close was commented on$(show)"
 record_gone d_already || fail "done, already closed: the record should be removed$(show)"
-pass "done treats an already-closed issue as a success"
+pass "done treats an already-closed issue as a success, and does not comment on it"
 
 # 4. A failed close keeps the record and refs/cdd; the next gc --force retries it.
 reset
@@ -273,9 +291,12 @@ grep -qx "issue ABC-1: closed" "$WORK/out" || fail "done, adapter: expected ABC-
 grep -qx "issue ABC-2: already closed" "$WORK/out" || fail "done, adapter: expected ABC-2 already closed$(show)"
 [[ "$(grep -c "tracker: using adapter" "$WORK/err")" == 1 ]] || fail "done, adapter: announce exactly once$(show)"
 grep -qx "issue-transition ABC-1 closed" "$TRACKER_LOG" || fail "done, adapter: issue-transition not called$(show)"
+grep -qxF "issue-comment ABC-1 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$TRACKER_LOG" || fail "done, adapter: ABC-1 should get the PR link comment$(show)"
+grep -qx "issue ABC-1: linked PR #7" "$WORK/out" || fail "done, adapter: expected a linked line for ABC-1$(show)"
+! grep -q "issue-comment ABC-2" "$TRACKER_LOG" || fail "done, adapter: the changed:false ABC-2 was commented on$(show)"
 ! grep -q '^issue' "$GH_LOG" || fail "done, adapter: gh was used for issues$(show)"
 record_gone d_adapter || fail "done, adapter: the record should be removed$(show)"
-pass "done closes through a tracker adapter, announced once, reading changed:false as already closed"
+pass "done closes through a tracker adapter, announced once, linking the PR only on the ref it closed"
 
 # 7. A failing adapter close keeps the record, naming the adapter's reason.
 reset
@@ -287,6 +308,20 @@ run "$WORK/wt-d_afail" cdd-worktree-done
 grep -q "warning: could not close issue ABC-6 (exit 1).*transition refused" "$WORK/err" || fail "done, adapter fails: expected the warning$(show)"
 record_kept d_afail || fail "done, adapter fails: the record should be kept$(show)"
 pass "done keeps the record when the tracker adapter fails to close"
+
+# 7b. A failed comment is one warning; the close stands and cleanup proceeds.
+reset
+make_tracker "$MACHINE_TRACKER" working
+echo ABC-9 >> "$COMMENT_FAILING"
+task d_cfail '["ABC-9"]'; merged d_cfail; worktree d_cfail
+run "$WORK/wt-d_cfail" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "done, comment fails: exited $RC$(show)"
+grep -qx "issue ABC-9: closed" "$WORK/out" || fail "done, comment fails: the close should stand$(show)"
+[[ "$(grep -c "warning: could not link PR #7 on issue ABC-9 (exit 1).*comment refused" "$WORK/err")" == 1 ]] \
+  || fail "done, comment fails: expected exactly one warning naming the ref$(show)"
+! grep -q "linked" "$WORK/out" || fail "done, comment fails: claimed a link$(show)"
+record_gone d_cfail || fail "done, comment fails: the record should still be removed$(show)"
+pass "a failed PR-link comment is one warning and never keeps the record"
 
 # 8. A broken tracker adapter stops done before the worktree is touched.
 reset
@@ -337,6 +372,8 @@ record_kept g_fail || fail "gc --force: a failed close should keep the task$(sho
 record_kept g_open || fail "gc --force: the unmerged task was reaped$(show)"
 ! grep -q "^issue .* 25" "$GH_LOG" || fail "gc --force: the unmerged task's issue was touched$(show)"
 [[ "$(grep -c "issue close" "$GH_LOG")" == 2 ]] || fail "gc --force: expected two close calls (22, 24)$(show)"
+grep -qxF "issue comment 22 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$GH_LOG" || fail "gc --force: #22 should get the PR link from gh's url$(show)"
+[[ "$(grep -c "issue comment" "$GH_LOG")" == 1 ]] || fail "gc --force: only the issue gc closed should be commented on$(show)"
 ! grep -q "^warning" <(grep -v "#24" "$WORK/err") || fail "gc --force: unexpected warning$(show)"
 pass "gc --force closes, treats already-closed as success, keeps a failed close, skips ref-less tasks"
 
@@ -366,6 +403,40 @@ run "$MACHINE" cdd-worktree-gc --force
 [[ "$(grep -c "does not support issue-transition" "$WORK/err")" == 1 ]] || fail "gc, no issue-transition: expected one line$(show)"
 record_gone g_nt || fail "gc, no issue-transition: the task should still be reaped$(show)"
 pass "an adapter without issue-transition skips the close in one line; cleanup proceeds"
+
+# 12b. An adapter without issue-comment: closes both, says so once, cleanup proceeds.
+reset
+make_tracker "$MACHINE_TRACKER" no-comment
+task g_nc '["ABC-10","ABC-11"]'; merged g_nc
+run "$MACHINE" cdd-worktree-gc --force
+[[ $RC -eq 0 ]] || fail "gc, no issue-comment: exited $RC$(show)"
+for r in ABC-10 ABC-11; do
+  grep -qx "issue $r: closed" "$WORK/out" || fail "gc, no issue-comment: $r should close$(show)"
+done
+[[ "$(grep -c "does not support issue-comment" "$WORK/err")" == 1 ]] || fail "gc, no issue-comment: expected one line$(show)"
+! grep -q "^warning" "$WORK/err" || fail "gc, no issue-comment: unexpected warning$(show)"
+record_gone g_nc || fail "gc, no issue-comment: the task should be reaped$(show)"
+pass "an adapter without issue-comment closes anyway, says so once, cleanup proceeds"
+
+# 12c. A gc retry after a partly failed close comments only on the ref it closes now,
+# with the PR's url from gc's own merge check.
+reset
+make_tracker "$MACHINE_TRACKER" working
+echo ABC-13 >> "$FAILING"
+task g_retry '["ABC-12","ABC-13"]'; merged g_retry; worktree g_retry
+run "$WORK/wt-g_retry" cdd-worktree-done
+record_kept g_retry || fail "gc retry, comments: done should keep the record$(show)"
+: > "$FAILING"
+run "$MACHINE" cdd-worktree-gc --force
+[[ $RC -eq 0 ]] || fail "gc retry, comments: exited $RC$(show)"
+grep -qx "issue ABC-12: already closed" "$WORK/out" || fail "gc retry, comments: ABC-12 was closed by done$(show)"
+grep -qx "issue ABC-13: linked PR #7" "$WORK/out" || fail "gc retry, comments: ABC-13 should be linked now$(show)"
+for r in ABC-12 ABC-13; do
+  [[ "$(grep -c "^issue-comment $r " "$TRACKER_LOG")" == 1 ]] || fail "gc retry, comments: $r should be commented on exactly once$(show)"
+done
+grep -qxF "issue-comment ABC-13 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$TRACKER_LOG" || fail "gc retry, comments: gc should pass the PR's url$(show)"
+record_gone g_retry || fail "gc retry, comments: the task should be reaped$(show)"
+pass "a gc retry never comments twice, and links the PR from its own merge check"
 
 # 13. A broken tracker adapter keeps only the tasks with refs.
 reset
@@ -406,5 +477,19 @@ grep -qx "issue reopen 31" "$GH_LOG" || fail "github adapter: open should reopen
 gh_adapter issue-transition 31 bogus
 [[ $RC -eq 2 ]] || fail "github adapter: a bad state should exit 2, got $RC$(show)"
 pass "the GitHub tracker adapter's issue-transition closes, reopens, and no-ops when already there"
+
+: > "$GH_LOG"
+gh_adapter issue-comment 31 --body hi
+[[ $RC -eq 0 && "$(jq -c . "$WORK/out")" == '{"ref":"31","url":"https://github.com/o/r/issues/31#issuecomment-1"}' ]] \
+  || fail "github adapter: issue-comment should report the comment's url$(show)"
+grep -qx "issue comment 31 --body hi" "$GH_LOG" || fail "github adapter: gh issue comment not called$(show)"
+gh_adapter issue-comment 31
+[[ $RC -eq 2 ]] || fail "github adapter: issue-comment without --body should exit 2, got $RC$(show)"
+gh_adapter issue-comment
+[[ $RC -eq 2 ]] || fail "github adapter: issue-comment without a ref should exit 2, got $RC$(show)"
+echo 31 >> "$COMMENT_FAILING"
+gh_adapter issue-comment 31 --body hi
+[[ $RC -eq 1 ]] || fail "github adapter: a failed comment should exit 1, got $RC$(show)"
+pass "the GitHub tracker adapter's issue-comment posts, reports the url, and rejects bad usage"
 
 echo "all issue-close checks passed"
