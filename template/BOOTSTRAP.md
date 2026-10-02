@@ -130,5 +130,5 @@ A few things you'll want to add or change as the project takes shape:
 ## Required CLI tools
 
 - `git` (with worktree support, any modern version).
-- `gh` (GitHub CLI), used by `cdd-worktree-done` and `cdd-worktree-list` to query PR state, and by `cdd-worktree-done` / `cdd-worktree-gc` to close a merged task's issues. Optional but recommended.
+- `gh` (GitHub CLI), used by `cdd-worktree-done` and `cdd-worktree-list` to query PR state, and by `cdd-worktree-done` / `cdd-worktree-gc` to close a merged task's issues and link the merged PR on each. Optional but recommended.
 - `claude` (Claude Code CLI).
