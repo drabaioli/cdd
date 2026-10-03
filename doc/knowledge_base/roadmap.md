@@ -120,7 +120,7 @@ Support producing a small, self-contained deliverable without the full CDD proje
 - [x] Implement `/cdd-quick-create`: lightweight guided discovery, files-first write, optional smoke test, separately-offered local commit and GitHub repo.
 - [x] Add the bidirectional off-ramps: `/cdd-quick-create` → `/cdd-bootstrap` when project-signals trip, and `/cdd-bootstrap` → `/cdd-quick-create` when the task is a trivial single artifact.
 - [x] Register `/cdd-quick-create` as CDD-repo-only in the command-drift whitelist (no template copy).
-- [ ] Validate `/cdd-quick-create` end-to-end against a real one-off deliverable.
+- [x] Validate `/cdd-quick-create` end-to-end against a real one-off deliverable.
 
 **Milestone:** a trivial standalone artifact can be produced through one guided `/cdd-quick-create` session, with an escalation path to `/cdd-bootstrap` when it turns out to be a project.
 
