@@ -7,6 +7,7 @@
 #     --path /path/to/dir-slug \
 #     [--overlay /path/to/seed ...] \
 #     [--tracker BACKEND] [--code-host BACKEND] [--jira-site HOST --jira-key KEY] \
+#     [--gitlab-project PATH [--gitlab-url URL]] \
 #     [--stage --dir dir-slug] [--template-dir DIR]
 #
 # The basename of --path becomes the directory slug (<PROJECT_DIR>). The path
@@ -30,10 +31,11 @@
 # (tools/adapters/<cap>/<BACKEND>.sh) by writing .cdd/<cap>: a small committed shim
 # that execs the machine-global adapter library at ~/.cdd/tools/adapters/<cap>/, which
 # `cdd-worktree.sh install` provides (ADR 0011). The shim carries the backend and, for
-# Jira, the non-secret coordinates (--jira-site, --jira-key) -- never a credential, and
-# no path to this checkout, so the binding works from a clone on any machine. A backend
-# with no shipped adapter is refused (exit 2). Opt-in: no flag, no .cdd/. Honoured under
-# --stage too, which is how /cdd-retrofit renders bindings for approval.
+# Jira and GitLab, the non-secret coordinates (--jira-site, --jira-key; --gitlab-url,
+# --gitlab-project) -- never a credential, and no path to this checkout, so the binding
+# works from a clone on any machine. A backend with no shipped adapter is refused
+# (exit 2). Opt-in: no flag, no .cdd/. Honoured under --stage too, which is how
+# /cdd-retrofit renders bindings for approval.
 #
 # In both modes the script writes a one-line baseline marker, .claude/cdd-baseline,
 # holding the CDD repo commit hash the template was rendered from (or "unknown"
@@ -48,6 +50,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug [--overlay DIR ...]
          [--tracker BACKEND] [--code-host BACKEND] [--jira-site HOST --jira-key KEY]
+         [--gitlab-project PATH [--gitlab-url URL]]
          [--stage --dir dir-slug] [--template-dir DIR]
 
   --name          Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
@@ -56,14 +59,20 @@ usage: bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug [
                   directory.
   --overlay       Directory copied over the template before substitution (repeatable). Lets a
                   filled-in seed override template files; overlaid files are substituted too.
-  --tracker       Bind the tracker capability to a shipped adapter (github, jira): writes
+  --tracker       Bind the tracker capability to a shipped adapter (github, jira, gitlab): writes
                   .cdd/tracker, a shim onto ~/.cdd/tools/adapters/tracker/BACKEND.sh.
-  --code-host     Bind the code-host capability to a shipped adapter (github): writes
+  --code-host     Bind the code-host capability to a shipped adapter (github, gitlab): writes
                   .cdd/code-host, a shim onto ~/.cdd/tools/adapters/code-host/BACKEND.sh.
   --jira-site     With --tracker jira (required): the Jira Cloud site, e.g. acme.atlassian.net.
   --jira-key      With --tracker jira (required): the Jira project key, e.g. ABC.
                   Credentials (JIRA_EMAIL, the API token) are never written; they stay in
                   the user's shell.
+  --gitlab-project
+                  With --tracker gitlab or --code-host gitlab (required): the GitLab project
+                  path, e.g. group/project.
+  --gitlab-url    With a gitlab binding (optional): the instance, default https://gitlab.com;
+                  a self-managed host, with a sub-path root if it has one. The token
+                  (GITLAB_TOKEN) is never written; it stays in the user's shell.
   --stage         Render-only mode: substitute into --path but skip git init and the scaffold
                   commit. Requires --dir. Used by /cdd-retrofit to stage a render for merging
                   into an existing project.
@@ -85,6 +94,8 @@ BIND_TRACKER=""
 BIND_CODE_HOST=""
 JIRA_SITE=""
 JIRA_KEY=""
+GITLAB_URL=""
+GITLAB_PROJECT=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -98,6 +109,8 @@ while [[ $# -gt 0 ]]; do
     --code-host)    BIND_CODE_HOST="${2:-}";        shift 2 ;;
     --jira-site)    JIRA_SITE="${2:-}";             shift 2 ;;
     --jira-key)     JIRA_KEY="${2:-}";              shift 2 ;;
+    --gitlab-url)   GITLAB_URL="${2:-}";            shift 2 ;;
+    --gitlab-project) GITLAB_PROJECT="${2:-}";      shift 2 ;;
     -h|--help) usage ;;
     *) echo "unknown arg: $1" >&2; usage ;;
   esac
@@ -168,6 +181,28 @@ if [[ -n "$JIRA_SITE" ]]; then
     exit 2
   fi
   JIRA_SITE="https://$JIRA_SITE"
+fi
+# GitLab: one set of coordinates serves either capability, or both.
+if [[ "$BIND_TRACKER" == "gitlab" || "$BIND_CODE_HOST" == "gitlab" ]]; then
+  [[ -n "$GITLAB_PROJECT" ]] || { echo "error: a gitlab binding requires --gitlab-project" >&2; exit 2; }
+elif [[ -n "$GITLAB_URL$GITLAB_PROJECT" ]]; then
+  echo "error: --gitlab-url / --gitlab-project apply only with --tracker gitlab or --code-host gitlab" >&2
+  exit 2
+fi
+if [[ -n "$GITLAB_PROJECT" ]] && ! [[ "$GITLAB_PROJECT" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$ ]]; then
+  echo "error: --gitlab-project must be a project path such as group/project (got: $GITLAB_PROJECT)" >&2
+  exit 2
+fi
+if [[ -n "$GITLAB_PROJECT" ]]; then
+  # Normalize to <scheme>://<host>[:port][/root]: https:// is added to a bare host, a
+  # trailing slash dropped. http:// is kept if given (a self-managed instance may be one).
+  GITLAB_URL="${GITLAB_URL:-https://gitlab.com}"
+  GITLAB_URL="${GITLAB_URL%/}"
+  [[ "$GITLAB_URL" == http://* || "$GITLAB_URL" == https://* ]] || GITLAB_URL="https://$GITLAB_URL"
+  if ! [[ "${GITLAB_URL#*://}" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~-]+)*$ ]]; then
+    echo "error: --gitlab-url must be a host such as gitlab.example.com, optionally with a port and a path (got: $GITLAB_URL)" >&2
+    exit 2
+  fi
 fi
 
 # Refuse if target exists and is non-empty.
@@ -251,6 +286,12 @@ SHIM
       cat <<SHIM
 # Credentials stay in your own shell: export JIRA_EMAIL and the Jira API token there.
 export JIRA_BASE_URL='$JIRA_SITE' JIRA_PROJECT_KEY='$JIRA_KEY'
+SHIM
+    fi
+    if [[ "$backend" == "gitlab" ]]; then
+      cat <<SHIM
+# Credentials stay in your own shell: export GITLAB_TOKEN there.
+export GITLAB_URL='$GITLAB_URL' GITLAB_PROJECT='$GITLAB_PROJECT'
 SHIM
     fi
     cat <<SHIM
@@ -343,6 +384,9 @@ Adapter bindings committed in .cdd/: $BOUND
 EOF
   if [[ "$BIND_TRACKER" == "jira" ]]; then
     echo "  Jira: export JIRA_EMAIL and JIRA_API_TOKEN in your own shell; neither is written to the project."
+  fi
+  if [[ "$BIND_TRACKER" == "gitlab" || "$BIND_CODE_HOST" == "gitlab" ]]; then
+    echo "  GitLab: export GITLAB_TOKEN in your own shell; it is not written to the project."
   fi
   echo
 fi

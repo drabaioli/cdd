@@ -12,7 +12,11 @@
 #   - on a machine without the library the resolver stops with one "is unusable"
 #     line that relays the shim's install hint (the broken-adapter rule, no fallback)
 #   - a Jira binding carries its site and key (and no credential) in the shim
-#   - unsupported backends and malformed Jira coordinates are refused before any write
+#   - a GitLab binding carries its instance and project path (and no token), for either
+#     capability or both, on gitlab.com or a self-managed instance, mixed with another
+#     backend for the other capability
+#   - unsupported backends and malformed Jira or GitLab coordinates are refused before
+#     any write
 #   - --stage renders the shims too; a bare bootstrap writes no .cdd/
 #
 # The conformance checker is deliberately not run on these shims: it probes with an
@@ -67,7 +71,7 @@ resolve() {
 for home in "$HOME_A" "$HOME_B"; do
   HOME="$home" bash "$HELPER" install >/dev/null 2>&1 || fail "install into $home failed"
 done
-for a in tracker/github.sh tracker/jira.sh code-host/github.sh; do
+for a in tracker/github.sh tracker/jira.sh tracker/gitlab.sh code-host/github.sh code-host/gitlab.sh; do
   [[ -x "$HOME_A/.cdd/tools/adapters/$a" ]] || fail "install did not provide the library file $a"
 done
 pass "install copies the shipped adapters into ~/.cdd/tools/adapters/"
@@ -124,6 +128,7 @@ secret_patterns=(
   'gh[pousr]_[A-Za-z0-9]{16,}'
   'github_pat_[A-Za-z0-9_]{20,}'
   'AT[AC]TT[A-Za-z0-9_=-]{40,}'
+  'glpat-[A-Za-z0-9_-]{20,}'
   'Authorization:[[:space:]]*Basic[[:space:]]+[A-Za-z0-9+/=]{16,}'
   '-----BEGIN [A-Z ]*PRIVATE KEY'
   '(password|passwd|secret|token|api[_-]?key)[[:space:]]*=[[:space:]]*.[^"'"'"']{8,}'
@@ -135,6 +140,47 @@ for pattern in "${secret_patterns[@]}"; do
 done
 pass "a Jira binding exports its site and key, and no credential"
 
+# --- 5b. a GitLab binding: instance and project path, never the token ---------
+# gitlab_case <label> <expected create_target> <bootstrap args...>: bootstrap, then from a
+# fresh clone on the second machine each gitlab shim must describe as gitlab — with the
+# environment scrubbed, so only the shim's own exports reach the adapter.
+gitlab_case() {
+  local label="$1" target="$2"; shift 2
+  local proj="$WORK/gl-$label" clone="$WORK/gl-$label-clone" cap
+  HOME="$HOME_A" "$BOOTSTRAP" --name "GitLab $label" --path "$proj" "$@" >/dev/null \
+    || fail "GitLab ($label): bootstrap failed"
+  git clone -q "$proj" "$clone"
+  for cap in tracker code-host; do
+    grep -q "gitlab.sh" "$clone/.cdd/$cap" 2>/dev/null || continue
+    env -i HOME="$HOME_B" PATH="$PATH" "$clone/.cdd/$cap" describe \
+      | jq -e --arg c "$cap" '.capability == $c and .backend == "gitlab"' >/dev/null \
+      || fail "GitLab ($label): .cdd/$cap describe did not report the gitlab backend"
+    if grep -nE 'GITLAB_TOKEN[[:space:]]*=' "$clone/.cdd/$cap"; then
+      fail "GitLab ($label): the .cdd/$cap shim assigns the token"
+    fi
+    for pattern in "${secret_patterns[@]}"; do
+      if grep -nEI -e "$pattern" "$clone/.cdd/$cap"; then
+        fail "GitLab ($label): .cdd/$cap matches the secret pattern $pattern"
+      fi
+    done
+  done
+  if [[ -n "$target" ]]; then
+    env -i HOME="$HOME_B" PATH="$PATH" "$clone/.cdd/tracker" describe \
+      | jq -e --arg t "$target" '.create_target == $t' >/dev/null \
+      || fail "GitLab ($label): tracker describe should report create_target '$target'"
+  fi
+}
+gitlab_case both 'grp/sub/proj @ gitlab.com' \
+  --tracker gitlab --code-host gitlab --gitlab-project grp/sub/proj
+gitlab_case self-managed 'grp/proj @ gitlab.example.com' \
+  --tracker gitlab --code-host gitlab --gitlab-project grp/proj --gitlab-url gitlab.example.com/root/
+grep -qF "GITLAB_URL='https://gitlab.example.com/root'" "$WORK/gl-self-managed/.cdd/code-host" \
+  || fail "GitLab (self-managed): the shim should carry the normalized instance URL with its sub-path"
+gitlab_case mixed 'ABC @ acme.atlassian.net' \
+  --tracker jira --jira-site acme.atlassian.net --jira-key ABC --code-host gitlab --gitlab-project a/b
+grep -q 'jira.sh' "$WORK/gl-mixed/.cdd/tracker" || fail "GitLab (mixed): the tracker should stay bound to Jira"
+pass "a GitLab binding exports its instance and project path, and no token, for either capability"
+
 # --- 6. refusals exit 2 before touching the target -----------------------------
 refuse() {
   local label="$1"; shift
@@ -143,13 +189,17 @@ refuse() {
   [[ $rc -eq 2 ]] || fail "refusal ($label): expected exit 2, got $rc"
   [[ ! -e "$t" ]] || fail "refusal ($label): the target was created"
 }
-refuse gitlab-tracker   --tracker gitlab
-refuse gitlab-code-host --code-host gitlab
+refuse unshipped-tracker   --tracker bitbucket
+refuse unshipped-code-host --code-host bitbucket
 refuse jira-no-coords   --tracker jira
 refuse jira-bad-key     --tracker jira --jira-site acme.atlassian.net --jira-key abc
 refuse jira-bad-site    --tracker jira --jira-site 'acme.atlassian.net/x y' --jira-key ABC
 refuse site-no-jira     --tracker github --jira-site acme.atlassian.net
-pass "unsupported backends and malformed Jira coordinates are refused before any write"
+refuse gitlab-no-project  --code-host gitlab
+refuse project-no-gitlab  --tracker github --gitlab-project a/b
+refuse gitlab-bad-project --tracker gitlab --gitlab-project noslash
+refuse gitlab-bad-url     --code-host gitlab --gitlab-project a/b --gitlab-url 'x y'
+pass "unsupported backends and malformed Jira or GitLab coordinates are refused before any write"
 
 # --- 7. --stage renders the shims; 8. a bare bootstrap writes none -------------
 STAGED="$WORK/stage/render"
