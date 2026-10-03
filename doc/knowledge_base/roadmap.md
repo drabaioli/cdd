@@ -208,7 +208,8 @@ Make CDD adaptable to a project's tracker and code host without editing a shippe
 - [x] Close a task's issues post-merge via `issue-transition`, automatically from `cdd-worktree-done`, with `cdd-worktree-gc` as backstop; GitHub adapter gains the verb
 - [x] Link the merged PR on an issue closed post-merge (a tracker comment verb), so a Jira issue names the PR that closed it.
 - [x] Route `/cdd-pre-pr` and `/cdd-process-pr` PR calls through the code-host adapter (`pr-create`, `pr-comments`, `pr-reply`).
-- [ ] GitLab code-host adapter, validated on a real project.
+- [x] GitLab code-host adapter, validated on a real project.
+- [x] GitLab tracker adapter, validated on a real project.
 - [x] Teach `/cdd-bootstrap` and `/cdd-retrofit` to detect and install adapters; retrofit gains a migrate-into-`.cdd/` verdict.
 - [x] Decide whether to drop the built-in `gh` fallback and require an adapter (GitHub adapters are now installed by default); dropped, ADR 0012.
 

@@ -239,6 +239,7 @@ secret_patterns=(
   'gh[pousr]_[A-Za-z0-9]{16,}'
   'github_pat_[A-Za-z0-9_]{20,}'
   'AT[AC]TT[A-Za-z0-9_=-]{40,}'
+  'glpat-[A-Za-z0-9_-]{20,}'
   'Authorization:[[:space:]]*Basic[[:space:]]+[A-Za-z0-9+/=]{16,}'
   '-----BEGIN [A-Z ]*PRIVATE KEY'
   '(password|passwd|secret|token|api[_-]?key)[[:space:]]*=[[:space:]]*.[^"'"'"']{8,}'

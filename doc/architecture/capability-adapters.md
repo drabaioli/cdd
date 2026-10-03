@@ -1,6 +1,6 @@
 # Capability adapters: the tracker and code-host contracts
 
-The wire contract every capability adapter answers, pinned for two capabilities: the **tracker**, with a GitHub reference implementation (`tools/adapters/tracker/github.sh`) and a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`), and the **code host** — where PRs and merge state live — with a GitHub reference implementation (`tools/adapters/code-host/github.sh`).
+The wire contract every capability adapter answers, pinned for two capabilities: the **tracker**, with a GitHub reference implementation (`tools/adapters/tracker/github.sh`), a Jira Cloud adapter (`tools/adapters/tracker/jira.sh`) and a GitLab adapter (`tools/adapters/tracker/gitlab.sh`), and the **code host** — where PRs and merge state live — with a GitHub reference implementation (`tools/adapters/code-host/github.sh`) and a GitLab adapter (`tools/adapters/code-host/gitlab.sh`).
 
 The *why* lives elsewhere and is not restated here: the process doc's §2.16 states the workflow-level rules (the fixed `.cdd/` namespace, the mandatory `describe` verb, the resolution ladder, the replace-vs-mirror rule, and that CDD never stores or proxies a secret), and `adr/0007-extend-cdd-through-capability-adapters.md` records the decision and its alternatives (`adr/0009-drop-the-docs-capability.md` narrows it: docs is not a capability; `adr/0010-code-host-rename-and-broken-adapter-rule.md` names the code host and replaces the ladder's fall-through for a broken adapter; `adr/0011-bind-adapters-through-a-machine-global-library.md` settles how a downstream project's committed binding reaches a shipped adapter). This document is the layer below both: the verbs, the JSON each returns, the exit codes, and the two invariants a conformance gate can be written against. An adapter author needs this document and nothing else.
 
@@ -298,19 +298,56 @@ It **declares all six verbs**. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` �
 - **`issue-close-token`** yields a smart commit, `ABC-123 #done`; `JIRA_CLOSE_TRANSITION` overrides the transition name, lowercased with spaces hyphenated as smart commits expect (`Close Issue` → `#close-issue`). It acts only where Jira is connected to the code host with smart commits enabled — the second of the three cases above.
 - **Bodies.** Jira v3 speaks Atlassian Document Format. `issue-read` flattens it to plain text (paragraphs, line breaks, lists, mentions, code; marks and layout dropped) for the body and every comment; `issue-create` and `issue-comment` wrap plain text as ADF paragraphs, so Markdown shows literally, but a bare `http(s)` URL becomes a link. Comment timestamps are converted to ISO-8601 UTC. `id` is Jira's numeric id and is emitted on both `issue-read` and `issue-create`, since Jira reports it on a create; `assignee` is the display name, omitted when unassigned.
 
+## The GitLab adapters
+
+`tools/adapters/tracker/gitlab.sh` (issues) and `tools/adapters/code-host/gitlab.sh` (merge requests) answer the two contracts against **GitLab's REST API v4**, with `curl` and `jq` — no `glab`. Both work against gitlab.com and a self-managed instance. They follow the Jira adapter's posture — env-configured, never a ladder rung, a binding being per-project by nature — and share one configuration vocabulary, so a project may bind either, both, or GitLab for one capability and another backend for the other. Each is a single standalone file, so the small config and HTTP helpers are duplicated between them on purpose: the library installs, and the shim's hint `curl`-fetches, one file per adapter. A project binds them through shims onto the adapter library, each exporting the same non-secret coordinates (abridged — see [Installing a binding](#installing-a-binding)):
+
+```bash
+#!/usr/bin/env bash
+export GITLAB_URL='https://gitlab.com' GITLAB_PROJECT='group/project'
+exec "$HOME/.cdd/tools/adapters/code-host/gitlab.sh" "$@"
+```
+
+| Variable         | Needed by                                                  | Meaning |
+| ---------------- | ---------------------------------------------------------- | ------- |
+| `GITLAB_URL`     | optional                                                   | The instance, default `https://gitlab.com`. A self-managed host, with its sub-path root if it has one (`https://example.com/gitlab`); a bare host gets `https://` added |
+| `GITLAB_PROJECT` | every verb but `describe` / `issue-close-token` (and `default-branch` while `origin/HEAD` is set) | The project's path, `group/project` or `group/sub/project`. The path form, not a numeric id: it is also what builds `create_target` and comment URLs |
+| `GITLAB_TOKEN`   | same                                                       | A personal, project or group access token with the `api` scope. Lives in the user's shell; never in a shim or any file |
+
+The project is named explicitly rather than derived from `origin` inside the adapter: an SSH remote's host and port are not the API's, and `describe` must depend on the binding alone. `/cdd-retrofit` derives the coordinates from `origin` once, as a proposal for the user to confirm.
+
+A missing variable is exit 4 with one stderr line per variable, after argument validation; a malformed `GITLAB_PROJECT` is exit 4 too. The token reaches `curl` as a `PRIVATE-TOKEN` header through `--config -` on stdin — never on the command line, never in a file. A 401 is exit 1, "GitLab rejected the token"; a 403 is exit 1 naming the `api` scope and the role; a 404 is exit 1, "no such item or project, or no access"; every other non-2xx is exit 1 with GitLab's own message. Every list is one page of 100, the other adapters' cap. Timestamps arrive with milliseconds and are trimmed to ISO-8601 UTC.
+
+**The tracker.** Its `ref_pattern` is `^#?[0-9]+$` — GitLab's own `#42`, the same shape as GitHub's, which is harmless since only one tracker resolves per project. `create_target` is `<GITLAB_PROJECT> @ <instance host>` when `GITLAB_PROJECT` is set, omitted otherwise.
+
+- **Ids.** `ref` is the issue's project-scoped number (its `iid`); `id` is GitLab's global id, which differs, so it is emitted on `issue-read` and on `issue-create` (GitLab reports it there).
+- **State.** `opened` is `open`, `closed` is `closed`; `state_raw` is GitLab's value. There is no workflow: `issue-transition` is a `close` or `reopen` state event, read first so an issue already there is `changed: false` and no write.
+- **`issue-read`** carries the issue's notes as `comments`, oldest first, system notes ("changed the label") dropped; `assignee` is the first assignee's username, omitted when none.
+- **`issue-comment`** posts a note; `url` is the issue's own `web_url` anchored on it (`#note_<id>`) — read from GitLab rather than built, since gitlab.com now serves issues under `/-/work_items/<n>`.
+- **`issue-close-token`** yields `Closes #42`. It acts only when the MR carrying it merges into the project's **default** branch, and only while the project's "Auto-close referenced issues on default branch" setting is on (the default) — the first of the three cases above, with that caveat.
+
+**The code host.** A PR is a merge request; its `ref` is the MR's `iid` as a string, accepted as `42`, `#42` or GitLab's own `!42`.
+
+- **State.** `opened` and `locked` (an MR mid-merge) are `open`; `closed` and `merged` are themselves.
+- **`pr-create`** opens an MR from the current branch, which must already be pushed; without `--base` the target is the project's default branch, asked of GitLab. An existing open MR for the branch is GitLab's own refusal, exit 1.
+- **`pr-for-branch` / `pr-merged`** list the branch's MRs (into `--base`, if given) newest first.
+- **`pr-comments`** reads the MR's discussions. A threaded discussion is a thread: its `id` is the **discussion id** — the reply target `pr-reply --to` takes — `resolved` is GitLab's flag, and an inline one carries the `path` and `line` of its position (both omitted for a general thread on the overview). A standalone note is a top-level comment; system notes ("added 1 commit") are dropped. `viewer` is the token's user (`/user`), omitted if GitLab does not say. **`outdated` and `reviews` are omitted**: GitLab has no "this hunk no longer applies" flag (a note on an older revision is a different fact), and no review object carrying a body — an approval has none, and a submitted review's summary is an ordinary note, already in `comments`.
+- **`pr-reply`** posts a note in the discussion (with `--to`) or on the MR; `url` is the MR page anchored on it.
+- **`default-branch`** reads the local `origin/HEAD` first, as the GitHub adapter does, and asks GitLab only when it is unset.
+
 ## Installing a binding
 
 The installers bind a project to the shipped adapters ([ADR 0011](adr/0011-bind-adapters-through-a-machine-global-library.md)). Two layers:
 
 - **The adapter code is machine-global.** `cdd-worktree.sh install`, run from a CDD checkout, copies every `tools/adapters/<capability>/<backend>.sh` to the **adapter library**, `~/.cdd/tools/adapters/<capability>/<backend>.sh` — newest wins, like the helpers themselves. The library is **not a ladder rung**: the machine rung is `~/.cdd/adapters/<capability>`, and nothing in the library is consulted unless a project's binding points at it, so installing it leaves every unbound project with no adapter.
-- **The binding is per-project and committed.** `.cdd/<capability>` is a small shim that names the backend and, for Jira, the site and project key. It reaches the library through `$HOME`, never through a path to one machine's CDD checkout, so a fresh clone on another machine works once the helpers are installed there. It holds no secret (§2.16).
+- **The binding is per-project and committed.** `.cdd/<capability>` is a small shim that names the backend and, for Jira, the site and project key; for GitLab, the instance and project path. It reaches the library through `$HOME`, never through a path to one machine's CDD checkout, so a fresh clone on another machine works once the helpers are installed there. It holds no secret (§2.16).
 
-`tools/bootstrap-cdd-project.sh` writes the shims, from opt-in flags: `--tracker <backend>`, `--code-host <backend>`, and `--jira-site <host>` / `--jira-key <KEY>` with `--tracker jira`. A backend with no shipped adapter is refused (exit 2) rather than written as a binding that cannot work. The flags work under `--stage` too. The prompts decide *which* backends; the script is the only writer:
+`tools/bootstrap-cdd-project.sh` writes the shims, from opt-in flags: `--tracker <backend>`, `--code-host <backend>`, `--jira-site <host>` / `--jira-key <KEY>` with `--tracker jira`, and `--gitlab-project <path>` / `--gitlab-url <url>` (optional, default gitlab.com) with either capability bound to `gitlab`. A backend with no shipped adapter is refused (exit 2) rather than written as a binding that cannot work. The flags work under `--stage` too. The prompts decide *which* backends; the script is the only writer:
 
-- **`/cdd-bootstrap`** asks where issues and code review live, offering GitHub as the default, and asks only for the site and key for Jira.
-- **`/cdd-retrofit`** detects them from the target (the origin host, and Jira-key-shaped branch names or commit subjects), proposes each with its evidence under per-file approval, and never overwrites an existing `.cdd/<capability>`. In upgrade mode it also classifies a local prompt edit that swaps in another backend as **migrate into `.cdd/`**.
+- **`/cdd-bootstrap`** asks where issues and code review live, offering GitHub as the default, and asks only for the site and key for Jira, and the instance and project path for GitLab.
+- **`/cdd-retrofit`** detects them from the target (the origin host — `github` or `gitlab` in it, with GitLab's coordinates derived from the remote — and Jira-key-shaped branch names or commit subjects), proposes each with its evidence under per-file approval, and never overwrites an existing `.cdd/<capability>`. In upgrade mode it also classifies a local prompt edit that swaps in another backend as **migrate into `.cdd/`**.
 
-A backend CDD ships no adapter for (GitLab, say) gets no binding, said in one line, with the issue and PR features skipping until one is bound; a project adapter written against this contract can be bound by hand.
+A backend CDD ships no adapter for (Bitbucket, say) gets no binding, said in one line, with the issue and PR features skipping until one is bound; a project adapter written against this contract can be bound by hand.
 
 The shim checks that its library file is executable and `exec`s it; the script's `write_binding` is the one source of its text.
 
@@ -366,7 +403,7 @@ Announcing which rung served is scoped **to the point of use, not to the session
 
 ## The conformance gate
 
-`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document, for either capability. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker` or `.cdd/code-host`, and an optional capability; without one, the capability comes from the path (`tools/adapters/<capability>/…`, `.cdd/<capability>`, `~/.cdd/adapters/<capability>`), and failing that from `describe` itself. `scripts/ci.sh` runs it over every `tools/adapters/*/*.sh`, so all three shipped adapters are checked and a new one is covered without editing the runner.
+`scripts/adapter-conformance-check.sh` (the `adapter-conformance` gate, `needs: jq`) checks an adapter against this document, for either capability. It defaults to `tools/adapters/tracker/github.sh` and takes an optional path, so a project can point it at its own `.cdd/tracker` or `.cdd/code-host`, and an optional capability; without one, the capability comes from the path (`tools/adapters/<capability>/…`, `.cdd/<capability>`, `~/.cdd/adapters/<capability>`), and failing that from `describe` itself. `scripts/ci.sh` runs it over every `tools/adapters/*/*.sh`, so all five shipped adapters are checked and a new one is covered without editing the runner.
 
 It is **offline by construction**, and backend-neutral: every probe runs with the environment scrubbed (`env -i`, so a credential or coordinate the caller happens to have exported never reaches the subject), under either a scratch `PATH` holding stub backend tools — a `gh` that is authenticated and useless, a `curl` that always fails as if the host were unreachable — or a minimal `PATH` with no backend tooling at all. Nothing it runs can reach the network or authenticate. No probe mode, no dry-run flag — an adapter is checked exactly as a caller would invoke it. What it asserts:
 
@@ -376,7 +413,7 @@ It is **offline by construction**, and backend-neutral: every probe runs with th
 4. Every contract verb the adapter does not declare exits 3, and so does a nonsense verb. The shipped adapters each declare every verb of their contract, so on them the nonsense verb is the live case; a mutation in `scripts/adapter-conformance-assert.sh` keeps the undeclared-verb path tested.
 5. A verb called without its required argument exits 2 — `issue-read` for a tracker, `pr-merged` for a code host.
 6. A verb that needs the backend, called with backend tooling absent and the environment scrubbed, exits 4 with a line on stderr — `issue-list` for a tracker, `pr-for-branch <branch>` for a code host; missing tooling for a `gh`-based adapter, missing configuration for an env-configured one.
-7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, an Atlassian API token prefix, a hardcoded basic-auth header, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.
+7. Neither the adapter nor `.cdd/*` (when present) contains anything secret-shaped — a GitHub token prefix, an Atlassian API token prefix, a GitLab token prefix, a hardcoded basic-auth header, a PEM private-key header, or an assignment of a password / secret / token / api-key to a literal. This is §2.16's "never stores a secret" made mechanical, and it is the same class of check as `scripts/prompt-seam-check.sh`.
 
 **Its stated limit:** check 3 proves that dispatch *reaches* an implementation, not that the implementation is *correct*. Correctness needs a live call against a real backend, which the offline-only decision rules out on purpose — a gate that SKIPs on most hosts is a gate whose verdict nobody can rely on. Checks 1, 2 and 4–7 are exact; check 3 is a floor.
 

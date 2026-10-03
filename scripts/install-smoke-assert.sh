@@ -86,7 +86,7 @@ pass "helper copied to ~/.cdd/tools/ and executable"
 [[ -d "$FAKE_HOME/.cdd/handoffs" ]] || fail "handoff root ~/.cdd/handoffs not created"
 pass "handoff root created"
 
-for a in tracker/github.sh tracker/jira.sh code-host/github.sh; do
+for a in tracker/github.sh tracker/jira.sh tracker/gitlab.sh code-host/github.sh code-host/gitlab.sh; do
   lib="$FAKE_HOME/.cdd/tools/adapters/$a"
   [[ -f "$lib" && -x "$lib" ]] || fail "adapter library file missing/not executable: $lib"
 done

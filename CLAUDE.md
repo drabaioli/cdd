@@ -67,7 +67,9 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
 | `tools/adapters/tracker/github.sh` | Tracker capability adapter, GitHub backend (the reference implementation) |
 | `tools/adapters/tracker/jira.sh`   | Tracker capability adapter, Jira Cloud backend (curl + jq, env-configured) |
+| `tools/adapters/tracker/gitlab.sh` | Tracker capability adapter, GitLab backend (curl + jq, REST v4, env-configured; gitlab.com or self-managed) |
 | `tools/adapters/code-host/github.sh` | Code-host capability adapter, GitHub backend (the reference implementation) |
+| `tools/adapters/code-host/gitlab.sh` | Code-host capability adapter, GitLab backend (curl + jq, REST v4, env-configured; gitlab.com or self-managed) |
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |

@@ -21,8 +21,9 @@
 #   5. Usage error -> 2          — a missing argument exits 1 instead.
 #   6. Missing backend -> 4      — an absent `gh` exits 1 instead.
 #   7. Secret scan               — one planted secret per pattern the scan carries (a
-#      GitHub token prefix, a fine-grained PAT, an Atlassian token prefix, a hardcoded
-#      basic-auth header, a PEM header, a secret-shaped assignment), because the
+#      GitHub token prefix, a fine-grained PAT, an Atlassian token prefix, a GitLab
+#      token prefix, a hardcoded basic-auth header, a PEM header, a secret-shaped
+#      assignment), because the
 #      patterns are independent greps and one plant would leave the rest free to rot
 #      unnoticed.
 #
@@ -38,13 +39,18 @@
 #   5. Usage error -> 2          — a missing branch exits 1 instead.
 #   6. Missing backend -> 4      — an absent `gh` exits 1 instead.
 #
-# Plus four controls, which are what make the mutations mean anything:
+# And against the two GitLab adapters, env-configured like Jira:
+#   6. Missing config -> 4       — unset configuration exits 1 instead, once per adapter
+#      (the tracker's `require_config`, the code host's `require_backend`).
+#
+# Plus six controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
 #     checker that is simply broken and fails on everything.
 #   - An adapter that omits the optional `create_target` must PASS, pinning the other
 #     direction: the checker must not have quietly started requiring an optional field.
 #   - An unmutated copy of the Jira adapter must PASS, for the same reason as the first.
 #   - An unmutated copy of the code-host adapter must PASS, likewise.
+#   - An unmutated copy of each GitLab adapter must PASS, likewise.
 #
 # The checker is always told which contract to check (its second argument), because
 # the sandbox copy's path no longer names the capability the way the real one does.
@@ -67,6 +73,8 @@ CHECKER="./scripts/adapter-conformance-check.sh"
 ADAPTER="tools/adapters/tracker/github.sh"
 JIRA_ADAPTER="tools/adapters/tracker/jira.sh"
 CODE_HOST_ADAPTER="tools/adapters/code-host/github.sh"
+GITLAB_TRACKER_ADAPTER="tools/adapters/tracker/gitlab.sh"
+GITLAB_CODE_HOST_ADAPTER="tools/adapters/code-host/gitlab.sh"
 CAP="tracker"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -76,6 +84,8 @@ pass() { echo "ok: $*"; }
 [[ -x "$ADAPTER" ]] || fail "adapter not found or not executable: $ADAPTER"
 [[ -x "$JIRA_ADAPTER" ]] || fail "adapter not found or not executable: $JIRA_ADAPTER"
 [[ -x "$CODE_HOST_ADAPTER" ]] || fail "adapter not found or not executable: $CODE_HOST_ADAPTER"
+[[ -x "$GITLAB_TRACKER_ADAPTER" ]] || fail "adapter not found or not executable: $GITLAB_TRACKER_ADAPTER"
+[[ -x "$GITLAB_CODE_HOST_ADAPTER" ]] || fail "adapter not found or not executable: $GITLAB_CODE_HOST_ADAPTER"
 
 # The checker skips without jq, so every expect_fail below would see a clean exit 0 and
 # report a checker that has stopped firing. Skip loudly instead — the runner's posture
@@ -236,6 +246,7 @@ done <<'SECRETS'
 a GitHub token prefix|ghp_000000000000000000000000000000000000
 a GitHub fine-grained PAT prefix|github_pat_00000000000000000000_0000000000
 an Atlassian API token prefix|ATATT3000000000000000000000000000000000000000000000000000000000000
+a GitLab personal access token prefix|glpat-00000000000000000000
 a hardcoded basic-auth header|Authorization: Basic ZmFrZTpmYWtlZmFrZWZha2U=
 a PEM private-key header|-----BEGIN RSA PRIVATE KEY-----
 a secret-shaped assignment|api_key = "not-a-real-secret-but-shaped-like-one"
@@ -305,4 +316,29 @@ mutate_prog "code-host missing backend exits 1" \
   '/^require_gh\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
 expect_fail "a code-host missing backend exiting 1 instead of 4 is caught" "expected exit 4, got 1"
 
-echo "adapter-conformance checker contract: clean (23 mutations, 4 controls)"
+# --- The GitLab adapters -------------------------------------------------------
+# Env-configured like Jira, so the failure mode worth pinning is the same: missing
+# configuration must be 4 (not configured), not 1 (operation failed).
+ADAPTER="$GITLAB_TRACKER_ADAPTER"
+CAP="tracker"
+cp "$ADAPTER" "$MASTER" || fail "could not copy $ADAPTER into the sandbox"
+
+cp "$MASTER" "$SUBJECT"; chmod 755 "$SUBJECT"
+expect_pass "control: an unmutated copy of the GitLab tracker adapter passes"
+
+mutate_prog "GitLab tracker missing config exits 1" \
+  '/^require_config\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
+expect_fail "GitLab tracker missing configuration exiting 1 instead of 4 is caught" "expected exit 4, got 1"
+
+ADAPTER="$GITLAB_CODE_HOST_ADAPTER"
+CAP="code-host"
+cp "$ADAPTER" "$MASTER" || fail "could not copy $ADAPTER into the sandbox"
+
+cp "$MASTER" "$SUBJECT"; chmod 755 "$SUBJECT"
+expect_pass "control: an unmutated copy of the GitLab code-host adapter passes"
+
+mutate_prog "GitLab code-host missing config exits 1" \
+  '/^require_backend\(\) \{/ { inf = 1 } inf && /^\}/ { inf = 0 } inf { sub(/exit 4/, "exit 1") } { print }'
+expect_fail "GitLab code-host missing configuration exiting 1 instead of 4 is caught" "expected exit 4, got 1"
+
+echo "adapter-conformance checker contract: clean (26 mutations, 6 controls)"
