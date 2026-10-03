@@ -99,7 +99,8 @@ case "$1" in
     [[ "$MODE" == declared-exit3 ]] && exit 3
     [[ "$MODE" == exit3-after-first && "$(grep -c '^pr-merged' "$LOG")" -gt 1 ]] && exit 3
     if [[ "$2" == feat_merged ]]; then
-      echo '{"branch":"feat_merged","merged":true,"ref":"42"}'
+      head="$(git rev-parse --verify -q "refs/heads/$2" 2>/dev/null)"
+      echo '{"branch":"feat_merged","merged":true,"ref":"42"'"${head:+,\"head_sha\":\"$head\"}"'}'
     else
       echo "{\"branch\":\"$2\",\"merged\":false}"
     fi ;;
