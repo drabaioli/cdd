@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "branch": "quick_create_validated_index_gitlab",
+  "stage": "scoped",
+  "pr": null,
+  "base_branch": "main",
+  "sessions": [
+    {
+      "id": "34365202-8232-4da3-9f9b-be47d6cc0732",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    }
+  ],
+  "lane": "small"
+}
