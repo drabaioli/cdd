@@ -15,6 +15,8 @@
 #     case that motivates the shims: Claude Code's Bash tool never sources ~/.bashrc)
 #   - the dispatching shims refuse to recurse: with the helper missing, or no longer
 #     defining the function, the shim exits 127 with a reinstall hint
+#   - the helper refuses bash < 4 before defining any function: positionally on every
+#     host, and behaviourally (sourced and as install) where a bash 3.2 exists — macOS
 #   - `cdd-state stages` answers with no jq on PATH: it is the capability probe
 #     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq guard
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
@@ -59,6 +61,9 @@ comment_block() {
 
 [[ -x "$HELPER" ]] || fail "helper not found/executable: $HELPER"
 [[ -x "$STATE_HELPER" ]] || fail "state helper not found/executable: $STATE_HELPER"
+# jq is required: the helper writes state records only with it, and the seed assertions
+# read them. A missing tool is a failure, never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 # A truncated helper passes the -x test above (truncation preserves the mode bit) and then
 # installs a 0-byte file, which surfaces a dozen lines down as the misleading "helper not
@@ -122,16 +127,25 @@ pass "cdd-worktree* PATH shims written to ~/.local/bin and executable"
 # unconditional. Both, so neither is load-bearing alone.
 NOSHELLRC=(bash --norc --noprofile)
 
+# The probe PATH leads with this run's own bash (>= 4: the runner guarantees it), alone in
+# its dir so nothing else beside it leaks in. Without it `bash` — the probe shell and every
+# shim's `#!/usr/bin/env bash` — resolves through /usr/bin:/bin, which on macOS is the
+# stock 3.2 the helper refuses; a user there runs Homebrew bash ahead of it, as this does.
+BASH_BIN="$FAKE_HOME/bash-bin"
+mkdir -p "$BASH_BIN"
+ln -sf "$BASH" "$BASH_BIN/bash"
+PROBE_SYS_PATH="$BASH_BIN:/usr/bin:/bin"
+
 # Pin the no-rc property itself: drop --norc or the stdin redirect and every probe below goes
 # green again, passing for the reason it exists to rule out. In the probe shell a cdd-* name
 # must resolve to a FILE (the shim), never to a function.
-rc_leak="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+rc_leak="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'type -t cdd-worktree-list' </dev/null 2>&1)"
 [[ "$rc_leak" == "file" ]] \
   || fail "probe shell sourced a shell rc: cdd-worktree-list is a '$rc_leak', not the PATH shim"
 pass "probe shell sources no rc (shim names resolve to files, not functions)"
 
-env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'command -v cdd-worktree-list >/dev/null && cdd-worktree-list >/dev/null 2>&1' \
   </dev/null \
   || fail "cdd-worktree-list shim did not resolve/dispatch in a non-interactive shell"
@@ -141,7 +155,7 @@ pass "cdd-worktree-list shim resolves and dispatches non-interactively"
 # LOUDLY via the shim rather than dispatch into a subshell whose `cd` can't reach the caller.
 # Probe cdd-worktree-done: its shim exits before sourcing anything, so no git state is needed.
 # Same no-rc requirement as above, or the probe reaches the real function instead.
-done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'cdd-worktree-done' </dev/null 2>&1)" && \
   fail "cdd-worktree-done shim succeeded silently (should refuse when unsourced)"
 grep -qF "must run as a sourced shell function" <<<"$done_out" \
@@ -240,16 +254,32 @@ STATE_SHIM="$FAKE_HOME/.local/bin/cdd-state"
 [[ -f "$STATE_SHIM" && -x "$STATE_SHIM" ]] || fail "cdd-state shim missing/not executable: $STATE_SHIM"
 # Resolution under a non-interactive, PATH-only shell is the property that keeps
 # `cdd-state set …` from silently no-oping when Claude Code's Bash tool runs it.
-resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'command -v cdd-state' </dev/null) \
   || fail "cdd-state shim did not resolve in a non-interactive shell"
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
 pass "cdd-state PATH shim written and resolves non-interactively"
 
+# `timeout` is GNU coreutils: macOS ships none, and Homebrew's coreutils names it gtimeout.
+# With neither, the bounded probes below run unbounded — a regressed guard then hangs the
+# gate until the CI job's own 5-minute timeout fails it — so say so once rather than fail.
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT=(timeout)
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT=(gtimeout)
+else
+  TIMEOUT=()
+  echo "note: neither timeout nor gtimeout is installed; the recursion probes run unbounded"
+fi
+bounded() {  # bounded <seconds> <cmd>...
+  local secs="$1"; shift
+  if [[ ${#TIMEOUT[@]} -gt 0 ]]; then "${TIMEOUT[@]}" "$secs" "$@"; else "$@"; fi
+}
+
 # Each shim sources the helper then calls the function by bare name; unguarded, a
 # missing/blank helper leaves that name resolving back through PATH to the shim —
 # unbounded recursion, not an error. Probed against a COPY, so a healthy install
-# survives. `timeout` is half the assertion: a regressed guard hangs rather than fails.
+# survives. The timeout is half the assertion: a regressed guard hangs rather than fails.
 probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|blank> <arg>
   local name="$1" rel="$2" how="$3" arg="$4"
   local broken="$BROKEN_ROOT/$name-$how"
@@ -259,7 +289,7 @@ probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|b
     rm)    rm -f "$broken/$rel" ;;
     blank) printf '# a helper that no longer defines the function\n' > "$broken/$rel" ;;
   esac
-  timeout 20 env -i HOME="$broken" PATH="$broken/.local/bin:/usr/bin:/bin" \
+  bounded 20 env -i HOME="$broken" PATH="$broken/.local/bin:$PROBE_SYS_PATH" \
     "${NOSHELLRC[@]}" -c "$name $arg" </dev/null 2>&1
   echo "STATUS:$?"
 }
@@ -278,6 +308,45 @@ for probe in "cdd-worktree-list|.cdd/tools/cdd-worktree.sh|" \
 done
 pass "dispatching shims exit 127 with a reinstall hint instead of recursing (helper missing / not defining it)"
 
+# The helper's bash >= 4 guard precedes its first function, so on bash 3.2 nothing is
+# defined; checked positionally on every host, behaviourally below where a 3.2 exists.
+# awk, not `grep | head -n 1`: head exiting early can SIGPIPE grep, fatal under pipefail.
+guard_at="$(awk '/BASH_VERSINFO/ { print NR; exit }' "$HELPER")"
+fn_at="$(awk '/^[A-Za-z_][A-Za-z0-9_-]*[(][)]/ { print NR; exit }' "$HELPER")"
+[[ -n "$guard_at" && -n "$fn_at" && "$guard_at" -lt "$fn_at" ]] \
+  || fail "helper's bash >= 4 guard (line ${guard_at:-none}) must precede its first function (line ${fn_at:-none})"
+pass "helper's bash >= 4 guard precedes its first function"
+
+# The same guard, against a real bash 3.2 where the host has one (macOS's
+# /bin/bash; CI's macOS job runs this). Sourced, it must return before defining anything
+# and leave the shell running; executed, install must stop before writing to HOME.
+OLD_BASH=""
+# shellcheck disable=SC2016  # the single-quoted scripts expand in the probed bash
+for b in /bin/bash /usr/bin/bash; do
+  [[ -x "$b" ]] && (( $("$b" -c 'echo "${BASH_VERSINFO[0]}"') < 4 )) && { OLD_BASH="$b"; break; }
+done
+if [[ -n "$OLD_BASH" ]]; then
+  # shellcheck disable=SC2016  # expands in the probed bash, with the helper as $1
+  old_out="$("$OLD_BASH" --norc --noprofile -c \
+    'source "$1"; echo "RC:$?"; declare -F cdd-worktree-list >/dev/null || echo UNDEFINED' \
+    _ "$HELPER" </dev/null 2>&1)"
+  if ! { grep -qF 'bash >= 4 required' <<<"$old_out" && grep -qx 'RC:1' <<<"$old_out" \
+         && grep -qx UNDEFINED <<<"$old_out"; }; then
+    fail "sourcing the helper under $OLD_BASH did not refuse cleanly; got: $old_out"
+  fi
+  OLD_HOME="$BROKEN_ROOT/old-bash-home"
+  mkdir -p "$OLD_HOME"
+  old_rc=0
+  old_out="$(HOME="$OLD_HOME" "$OLD_BASH" "$HELPER" install </dev/null 2>&1)" || old_rc=$?
+  if [[ $old_rc -eq 0 ]] || ! grep -qF 'bash >= 4 required' <<<"$old_out"; then
+    fail "install under $OLD_BASH did not refuse (exit $old_rc); got: $old_out"
+  fi
+  [[ -z "$(ls -A "$OLD_HOME")" ]] || fail "install under $OLD_BASH wrote to HOME before refusing"
+  pass "helper refuses bash < 4 ($OLD_BASH): sourced defines nothing, install writes nothing"
+else
+  echo "note: no bash < 4 on this host; the helper's bash-version guard is exercised on macOS CI"
+fi
+
 # `stages` must answer BEFORE cdd-state's jq guard: behind it, a jq-less host reports an
 # empty enum, cdd-worktree's skew check fires on a current helper, and every run there
 # warns wrongly. worktree-launch-assert.sh stubs cdd-state, so only this — the real helper on
@@ -285,12 +354,12 @@ pass "dispatching shims exit 127 with a reinstall hint instead of recursing (hel
 # else; anything richer (/usr/bin) puts jq back and the case proves nothing.
 JQLESS_BIN="$FAKE_HOME/jqless-bin"
 mkdir -p "$JQLESS_BIN"
-ln -sf "$(command -v bash)" "$JQLESS_BIN/bash"
+ln -sf "$BASH" "$JQLESS_BIN/bash"
 JQLESS_PATH="$FAKE_HOME/.local/bin:$JQLESS_BIN"
 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" "${NOSHELLRC[@]}" \
   -c 'command -v jq' </dev/null >/dev/null 2>&1 \
   && fail "probe setup: jq is still reachable on the stripped PATH, so this case proves nothing"
-stages_out="$(timeout 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
+stages_out="$(bounded 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
   "${NOSHELLRC[@]}" -c 'cdd-state stages' </dev/null 2>&1)" \
   || fail "cdd-state stages failed with no jq on PATH; got: $stages_out"
 grep -qx plan_written <<<"$stages_out" \
@@ -318,93 +387,88 @@ pass "install self-repairs a disabled state block (active again, still single)"
 # in the environment, the seeded record's first `sessions[]` entry is the current
 # session at stage `scoped`, carrying `dir` = the worktree root. Run it from this
 # repo (a real git repo) against FAKE_HOME so the record lands under the temp tree.
-# Guarded on jq, like the helper itself.
-if command -v jq >/dev/null 2>&1; then
-  SEED_BRANCH="issue51_seed_probe"
-  # The record path uses the repo name derived from git's common-dir (the main
-  # worktree), not this checkout's basename — mirror the helper's derivation.
-  REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
-  SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
-  EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
+SEED_BRANCH="issue51_seed_probe"
+# The record path uses the repo name derived from git's common-dir (the main
+# worktree), not this checkout's basename — mirror the helper's derivation.
+REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
+EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
 
-  # `cdd-state seed` pushes refs/cdd/<branch> to `origin` — the repo's REAL remote, so this
-  # gate used to make live SSH round-trips and force-publish a test fixture to GitHub on every
-  # run. Point it at a throwaway bare repo instead: offline, deterministic, no side effects.
-  # Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
-  # helper's own `git push --force origin ...` is untouched, so the real path still runs.
-  # GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
-  FAKE_ORIGIN="$FAKE_HOME/origin.git"
-  git init -q --bare "$FAKE_ORIGIN"
-  PUSH_TO_FAKE=(
-    GIT_CONFIG_COUNT=1
-    GIT_CONFIG_KEY_0=remote.origin.pushurl
-    GIT_CONFIG_VALUE_0="$FAKE_ORIGIN"
-  )
-  # The helper is dual-mode: executed directly it only installs, so source it and
-  # call the function (the same path the PATH shim takes) to reach `seed`.
-  # SC2016: the single quotes are deliberate -- $1/$2 are `bash -c` positional parameters,
-  # bound from the trailing arguments, not variables to expand here.
-  # shellcheck disable=SC2016
+# `cdd-state seed` pushes refs/cdd/<branch> to `origin` — the repo's REAL remote, so this
+# gate used to make live SSH round-trips and force-publish a test fixture to GitHub on every
+# run. Point it at a throwaway bare repo instead: offline, deterministic, no side effects.
+# Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
+# helper's own `git push --force origin ...` is untouched, so the real path still runs.
+# GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
+FAKE_ORIGIN="$FAKE_HOME/origin.git"
+git init -q --bare "$FAKE_ORIGIN"
+PUSH_TO_FAKE=(
+  GIT_CONFIG_COUNT=1
+  GIT_CONFIG_KEY_0=remote.origin.pushurl
+  GIT_CONFIG_VALUE_0="$FAKE_ORIGIN"
+)
+# The helper is dual-mode: executed directly it only installs, so source it and
+# call the function (the same path the PATH shim takes) to reach `seed`.
+# SC2016: the single quotes are deliberate -- $1/$2 are `bash -c` positional parameters,
+# bound from the trailing arguments, not variables to expand here.
+# shellcheck disable=SC2016
+( cd "$REPO_ROOT" \
+  && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 "${PUSH_TO_FAKE[@]}" \
+     bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
+[[ -f "$SEED_FILE" ]] || fail "seed did not write $SEED_FILE"
+got="$(jq -r '.sessions[0] | "\(.id)|\(.stage)|\(.dir)"' "$SEED_FILE")"
+[[ "$got" == "seed-probe-123|scoped|$EXPECT_DIR" ]] \
+  || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
+pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
+
+# The push is now observable, so assert it instead of leaving it an unchecked side effect.
+git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$SEED_BRANCH" >/dev/null \
+  || fail "seed did not sync refs/cdd/$SEED_BRANCH to origin"
+pass "cdd-state seed syncs the task ref to origin (a throwaway one: no network, no side effects)"
+
+# Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
+# shellcheck disable=SC2016  # as above: `bash -c` positional parameters
+( cd "$REPO_ROOT" \
+  && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' "${PUSH_TO_FAKE[@]}" \
+     bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
+count="$(jq -r '.sessions | length' "$SEED_FILE")"
+[[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
+pass "cdd-state seed omits the session entry when no session id is set"
+
+# An option-shaped branch is rejected before anything is written or pushed. `cdd-state
+# seed --help` used to take "--help" as the branch, write --help.state.json, and
+# force-push refs/cdd/--help to the REAL origin -- which is how one appeared on the
+# shared repo. Assert both halves: no record, and no ref in the throwaway origin.
+for bad_arg in --help --bogus; do
+  # `|| true`: a rejected argument exits non-zero by design, and this script runs under
+  # `set -e`. What is asserted is the absence of effects, not the exit status.
+  # shellcheck disable=SC2016  # $1/$2 are `bash -c` positional parameters
   ( cd "$REPO_ROOT" \
-    && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 "${PUSH_TO_FAKE[@]}" \
-       bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
-  [[ -f "$SEED_FILE" ]] || fail "seed did not write $SEED_FILE"
-  got="$(jq -r '.sessions[0] | "\(.id)|\(.stage)|\(.dir)"' "$SEED_FILE")"
-  [[ "$got" == "seed-probe-123|scoped|$EXPECT_DIR" ]] \
-    || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
-  pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
-
-  # The push is now observable, so assert it instead of leaving it an unchecked side effect.
-  git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$SEED_BRANCH" >/dev/null \
-    || fail "seed did not sync refs/cdd/$SEED_BRANCH to origin"
-  pass "cdd-state seed syncs the task ref to origin (a throwaway one: no network, no side effects)"
-
-  # Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
-  # shellcheck disable=SC2016  # as above: `bash -c` positional parameters
-  ( cd "$REPO_ROOT" \
-    && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' "${PUSH_TO_FAKE[@]}" \
-       bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
-  count="$(jq -r '.sessions | length' "$SEED_FILE")"
-  [[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
-  pass "cdd-state seed omits the session entry when no session id is set"
-
-  # An option-shaped branch is rejected before anything is written or pushed. `cdd-state
-  # seed --help` used to take "--help" as the branch, write --help.state.json, and
-  # force-push refs/cdd/--help to the REAL origin -- which is how one appeared on the
-  # shared repo. Assert both halves: no record, and no ref in the throwaway origin.
-  for bad_arg in --help --bogus; do
-    # `|| true`: a rejected argument exits non-zero by design, and this script runs under
-    # `set -e`. What is asserted is the absence of effects, not the exit status.
-    # shellcheck disable=SC2016  # $1/$2 are `bash -c` positional parameters
-    ( cd "$REPO_ROOT" \
-      && env HOME="$FAKE_HOME" "${PUSH_TO_FAKE[@]}" \
-         "${NOSHELLRC[@]}" -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$bad_arg" \
-         </dev/null >/dev/null 2>&1 ) || true
-    [[ ! -f "$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$bad_arg.state.json" ]] \
-      || fail "cdd-state seed '$bad_arg' wrote a state record for an option-shaped branch"
-    if git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$bad_arg" >/dev/null; then
-      fail "cdd-state seed '$bad_arg' pushed refs/cdd/$bad_arg"
-    fi
-  done
-  pass "cdd-state seed rejects an option-shaped branch without writing or pushing"
-
-  # The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
-  # writer ran in. This assertion only bites when the two differ — i.e. whenever the
-  # check runs from a feature worktree, which is the case that regresses if someone
-  # swaps the derivation for `git rev-parse --show-toplevel`.
-  MARKER="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/repo.json"
-  MAIN_WT="$(cd "$REPO_ROOT" && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
-  [[ -f "$MARKER" ]] || fail "seed did not write the per-repo marker $MARKER"
-  got="$(jq -r '"\(.schema_version)|\(.name)|\(.path)"' "$MARKER")"
-  [[ "$got" == "1|$REPO_NAME|$MAIN_WT" ]] \
-    || fail "repo.json = '$got', expected '1|$REPO_NAME|$MAIN_WT'"
-  if [[ "$MAIN_WT" != "$EXPECT_DIR" ]]; then
-    pass "cdd-state seed writes repo.json with the MAIN worktree ($MAIN_WT), not this worktree ($EXPECT_DIR)"
-  else
-    pass "cdd-state seed writes repo.json {schema_version, name, path} (run from the main worktree)"
+    && env HOME="$FAKE_HOME" "${PUSH_TO_FAKE[@]}" \
+       "${NOSHELLRC[@]}" -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$bad_arg" \
+       </dev/null >/dev/null 2>&1 ) || true
+  [[ ! -f "$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$bad_arg.state.json" ]] \
+    || fail "cdd-state seed '$bad_arg' wrote a state record for an option-shaped branch"
+  if git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$bad_arg" >/dev/null; then
+    fail "cdd-state seed '$bad_arg' pushed refs/cdd/$bad_arg"
   fi
+done
+pass "cdd-state seed rejects an option-shaped branch without writing or pushing"
+
+# The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
+# writer ran in. This assertion only bites when the two differ — i.e. whenever the
+# check runs from a feature worktree, which is the case that regresses if someone
+# swaps the derivation for `git rev-parse --show-toplevel`.
+MARKER="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/repo.json"
+MAIN_WT="$(cd "$REPO_ROOT" && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+[[ -f "$MARKER" ]] || fail "seed did not write the per-repo marker $MARKER"
+got="$(jq -r '"\(.schema_version)|\(.name)|\(.path)"' "$MARKER")"
+[[ "$got" == "1|$REPO_NAME|$MAIN_WT" ]] \
+  || fail "repo.json = '$got', expected '1|$REPO_NAME|$MAIN_WT'"
+if [[ "$MAIN_WT" != "$EXPECT_DIR" ]]; then
+  pass "cdd-state seed writes repo.json with the MAIN worktree ($MAIN_WT), not this worktree ($EXPECT_DIR)"
 else
-  echo "skip: jq not found; seed assertions skipped (advisory)"
+  pass "cdd-state seed writes repo.json {schema_version, name, path} (run from the main worktree)"
 fi
 
 echo "all install smoke checks passed"

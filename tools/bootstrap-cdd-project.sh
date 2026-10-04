@@ -252,13 +252,24 @@ DIR_ESC=$(escape_sed_repl "$PROJECT_DIR")
 # Walk every regular file in the target and substitute the angle-bracketed placeholders.
 # Skip binary files (grep -I treats them as non-matching) so an overlay can carry
 # images or other binary assets without sed corrupting them.
+#
+# Not `sed -i`: BSD/macOS sed reads the next argument as a backup suffix, so the GNU form
+# breaks there. Instead sed writes to one temp file and `cat` copies it back — a
+# truncating write that keeps the file's mode (template scripts carry exec bits; `mv`
+# would not). The temp lives outside $TARGET so the find walk below cannot pick it up.
+subst_tmp="$(mktemp)"
+trap 'rm -f "$subst_tmp"' EXIT
 while IFS= read -r -d '' f; do
   grep -Iq . "$f" || continue
-  sed -i \
+  grep -qE '<PROJECT_(NAME|DIR)>' "$f" || continue
+  sed \
     -e "s#<PROJECT_NAME>#${NAME_ESC}#g" \
     -e "s#<PROJECT_DIR>#${DIR_ESC}#g" \
-    "$f"
+    "$f" > "$subst_tmp"
+  cat "$subst_tmp" > "$f"
 done < <(find "$TARGET" -type f -print0)
+rm -f "$subst_tmp"
+trap - EXIT
 
 # Write the adapter bindings: one .cdd/<cap> shim per bound capability. The shim
 # reaches the adapter through $HOME, never through this checkout's path, so it works

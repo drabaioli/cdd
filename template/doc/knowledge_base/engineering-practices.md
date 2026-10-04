@@ -20,10 +20,11 @@ New behaviour ships with a test, or an explicit, recorded reason it does not. `/
 
 ## Continuous integration — <Enforced once CI runs on every change; Expected until then>
 
-Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so the local verdict is CI's verdict and no gate list is written twice. By default a gate whose tool is missing on the host is reported skipped — loudly and non-fatally — never passed silently; detection is per gate, so a partial toolchain yields a partial verdict rather than none. Making a gate's tool a hard requirement instead is a legitimate per-project call: skip-and-continue is right where gates carry independent optional tools, and wrong where every gate shares one toolchain, because there a missing tool means no gate ran at all — reported green.
+Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so no gate list is written twice. Host tools differ between machines, so a green local run can still fail CI: keep scripts to behaviour every tool named under dependency hygiene below shares. A missing tool fails its gate, never skips it, locally and in CI.
 
 - CI entry point: `<ci workflow / command>`
 - Check runner: `<check runner command>`
+- Slow gates: CI may fan out instead of calling the runner whole — one job lists the gates with `<check runner command> list`, and one job per gate runs `<check runner command> <gate>` — so the list still exists only once, in the runner.
 
 ## Lint & format — <Expected until a lint/format command exists>
 
@@ -32,7 +33,7 @@ Build and checks run on every PR, and every gate below is reachable from **one c
 
 ## Dependency & toolchain hygiene — Expected
 
-Dependencies are pinned or locked; toolchain versions are documented.
+Dependencies are pinned or locked; toolchain versions are documented, including the host tools the check runner's scripts assume and any of their behaviours that differ between machines and so are off-limits.
 
 ## How this list grows
 

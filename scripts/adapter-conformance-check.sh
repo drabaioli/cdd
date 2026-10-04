@@ -56,10 +56,9 @@ fi
 [[ -f "$SUBJECT" ]] || fail "adapter not found: $SUBJECT"
 [[ -x "$SUBJECT" ]] || fail "adapter is not executable: $SUBJECT (an adapter is discovered by \`-x\`)"
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "skip: jq not available; the describe shape checks need it"
-  exit 0
-fi
+# jq is required: the describe shape checks need it. A missing tool is a failure,
+# never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

@@ -285,7 +285,7 @@ lane_routes_in() {  # lane_routes_in <function-name>
   awk -v fn="$1() {" '$0 == fn { inside = 1; next } inside && /^}/ { exit } inside' \
     "$WT_HELPER" \
     | grep -v '^[[:space:]]*#' \
-    | grep -q -- '/cdd-small-change\([^.]\|$\)'
+    | grep -qE -- '/cdd-small-change([^.]|$)'
 }
 
 check_lane_marker() {

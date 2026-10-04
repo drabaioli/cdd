@@ -4,16 +4,36 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  bootstrap:
-    runs-on: ubuntu-latest
+  checks:
+    name: checks (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # Two OSes because each brings its own sed/grep/awk family (GNU with gawk,
+        # BSD with BWK awk), so a gate that leans on one host's tools fails the PR
+        # rather than a contributor's run (issue #107). Pinned, not -latest.
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    # The runner takes about 40s on Ubuntu and 90s on macOS; this bounds a hung gate
+    # (on macOS the install-smoke probes run without `timeout`, which the image does
+    # not ship), with headroom for a slow runner.
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+
+      # Install-only: the runner needs bash >= 4 (the macOS image ships 3.2), and every
+      # tool a gate names — a missing one fails that gate. Ubuntu's image has them all;
+      # macOS lacks shellcheck. jq is preinstalled on both.
+      - name: Install bash >= 4 and shellcheck (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bash shellcheck
 
       # The gate sequence lives in scripts/ci.sh and nowhere else, so CI and
       # /cdd-pre-pr cannot drift apart. The runner folds each gate into a named
       # ::group:: and prints a PASS/FAIL/SKIP summary. It provisions its own
-      # scratch dir and git identity, so no setup step is needed here.
+      # scratch dir and git identity, so no other setup step is needed here.
       - name: Run the check runner
         run: ./scripts/ci.sh

@@ -17,7 +17,7 @@
 #     refused and creates no worktree
 #   - the closing "Next:" guidance branches on the task's stage: a task parked at
 #     `plan_written` is sent to /cdd-implement, anything else to the review-side
-#     commands (needs jq to read the record; skipped without it)
+#     commands (reads the record, so the gate requires jq)
 #   - and on the task's lane before its stage: a small-change task still at `scoped`
 #     is sent to /cdd-small-change rather than told to open a PR on work that does
 #     not exist, while one already built falls through to the review-side commands
@@ -36,6 +36,10 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
 [[ -f "$HELPER" ]] || fail "helper not found: $HELPER"
+
+# jq is required: check 7 reads the state record with it. A missing tool is a failure,
+# never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -193,82 +197,78 @@ pass "explicit resume of a remote-deleted branch is refused without a worktree"
 #    `plan_written` has an approved plan on disk and no code yet, so it resumes into
 #    /cdd-implement rather than into a review-side command. The helper reads the
 #    record itself (no cdd-state dependency), so this needs jq.
-if command -v jq >/dev/null 2>&1; then
-  git clone -q "$WORK/origin.git" "$WORK/repoD"
-  state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoD")"
-  mkdir -p "$state_dir"
-  printf '{"schema_version":1,"branch":"%s","stage":"plan_written","pr":null,"sessions":[]}\n' \
-    "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
-  set +e
-  out="$(run_resume "$WORK/repoD" "$FEATURE_B" "" 2>&1)"
-  rc=$?
-  set -e
-  [[ "$rc" -eq 0 ]] || fail "resume of a plan_written task exited $rc: $out"
-  grep -q "/cdd-implement" <<<"$out" \
-    || fail "a plan_written task must be sent to /cdd-implement. Output:\n$out"
-  pass "a task parked at plan_written resumes into /cdd-implement"
+git clone -q "$WORK/origin.git" "$WORK/repoD"
+state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoD")"
+mkdir -p "$state_dir"
+printf '{"schema_version":1,"branch":"%s","stage":"plan_written","pr":null,"sessions":[]}\n' \
+  "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
+set +e
+out="$(run_resume "$WORK/repoD" "$FEATURE_B" "" 2>&1)"
+rc=$?
+set -e
+[[ "$rc" -eq 0 ]] || fail "resume of a plan_written task exited $rc: $out"
+grep -q "/cdd-implement" <<<"$out" \
+  || fail "a plan_written task must be sent to /cdd-implement. Output:\n$out"
+pass "a task parked at plan_written resumes into /cdd-implement"
 
-  # And the default is unchanged for any other stage.
-  git clone -q "$WORK/origin.git" "$WORK/repoE"
-  state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoE")"
-  mkdir -p "$state_dir"
-  printf '{"schema_version":1,"branch":"%s","stage":"implementation_done","pr":null,"sessions":[]}\n' \
-    "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
-  set +e
-  out="$(run_resume "$WORK/repoE" "$FEATURE_B" "" 2>&1)"
-  rc=$?
-  set -e
-  [[ "$rc" -eq 0 ]] || fail "resume of an implementation_done task exited $rc: $out"
-  grep -q "/cdd-pre-pr" <<<"$out" \
-    || fail "a non-plan_written task must keep the review-side guidance. Output:\n$out"
-  pass "any other stage keeps the review-side resume guidance"
+# And the default is unchanged for any other stage.
+git clone -q "$WORK/origin.git" "$WORK/repoE"
+state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoE")"
+mkdir -p "$state_dir"
+printf '{"schema_version":1,"branch":"%s","stage":"implementation_done","pr":null,"sessions":[]}\n' \
+  "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
+set +e
+out="$(run_resume "$WORK/repoE" "$FEATURE_B" "" 2>&1)"
+rc=$?
+set -e
+[[ "$rc" -eq 0 ]] || fail "resume of an implementation_done task exited $rc: $out"
+grep -q "/cdd-pre-pr" <<<"$out" \
+  || fail "a non-plan_written task must keep the review-side guidance. Output:\n$out"
+pass "any other stage keeps the review-side resume guidance"
 
-  # The lane is read before the stage. A small-change task that has not been built
-  # sits at `scoped` — the one real bug the lane would otherwise introduce, since
-  # `scoped` is not `plan_written` and would fall through to "open a PR".
-  # The probe runs inside the worktree resume just created, so the command file has
-  # to be on the branch, not merely in the clone that resumed it.
-  (
-    cd "$WORK/seed"
-    git switch -q "$FEATURE_B"
-    mkdir -p .claude/commands
-    printf 'Make a small, pre-stated change.\n' > .claude/commands/cdd-small-change.md
-    git add .claude/commands/cdd-small-change.md
-    git commit -q -m "ship cdd-small-change"
-    git push -q origin "$FEATURE_B"
-  )
-  git clone -q "$WORK/origin.git" "$WORK/repoF"
-  state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoF")"
-  mkdir -p "$state_dir"
-  printf '{"schema_version":1,"branch":"%s","stage":"scoped","pr":null,"lane":"small","sessions":[]}\n' \
-    "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
-  set +e
-  out="$(run_resume "$WORK/repoF" "$FEATURE_B" "" 2>&1)"
-  rc=$?
-  set -e
-  [[ "$rc" -eq 0 ]] || fail "resume of a scoped small-change task exited $rc: $out"
-  grep -q "/cdd-small-change" <<<"$out" \
-    || fail "a scoped small-change task must be sent to /cdd-small-change. Output:\n$out"
-  grep -q "/cdd-pre-pr" <<<"$out" \
-    && fail "a scoped small-change task must not be sent to the review-side commands. Output:\n$out"
-  pass "a small-change task still at scoped resumes into /cdd-small-change"
+# The lane is read before the stage. A small-change task that has not been built
+# sits at `scoped` — the one real bug the lane would otherwise introduce, since
+# `scoped` is not `plan_written` and would fall through to "open a PR".
+# The probe runs inside the worktree resume just created, so the command file has
+# to be on the branch, not merely in the clone that resumed it.
+(
+  cd "$WORK/seed"
+  git switch -q "$FEATURE_B"
+  mkdir -p .claude/commands
+  printf 'Make a small, pre-stated change.\n' > .claude/commands/cdd-small-change.md
+  git add .claude/commands/cdd-small-change.md
+  git commit -q -m "ship cdd-small-change"
+  git push -q origin "$FEATURE_B"
+)
+git clone -q "$WORK/origin.git" "$WORK/repoF"
+state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoF")"
+mkdir -p "$state_dir"
+printf '{"schema_version":1,"branch":"%s","stage":"scoped","pr":null,"lane":"small","sessions":[]}\n' \
+  "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
+set +e
+out="$(run_resume "$WORK/repoF" "$FEATURE_B" "" 2>&1)"
+rc=$?
+set -e
+[[ "$rc" -eq 0 ]] || fail "resume of a scoped small-change task exited $rc: $out"
+grep -q "/cdd-small-change" <<<"$out" \
+  || fail "a scoped small-change task must be sent to /cdd-small-change. Output:\n$out"
+grep -q "/cdd-pre-pr" <<<"$out" \
+  && fail "a scoped small-change task must not be sent to the review-side commands. Output:\n$out"
+pass "a small-change task still at scoped resumes into /cdd-small-change"
 
-  # Once built, the same task is review-side again: the lane branch is scoped-only.
-  git clone -q "$WORK/origin.git" "$WORK/repoG"
-  state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoG")"
-  mkdir -p "$state_dir"
-  printf '{"schema_version":1,"branch":"%s","stage":"implementation_done","pr":null,"lane":"small","sessions":[]}\n' \
-    "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
-  set +e
-  out="$(run_resume "$WORK/repoG" "$FEATURE_B" "" 2>&1)"
-  rc=$?
-  set -e
-  [[ "$rc" -eq 0 ]] || fail "resume of a built small-change task exited $rc: $out"
-  grep -q "/cdd-pre-pr" <<<"$out" \
-    || fail "a built small-change task must get the review-side guidance. Output:\n$out"
-  pass "a small-change task past implementation keeps the review-side guidance"
-else
-  echo "skip: jq not available; the stage-dependent resume guidance reads the record with jq"
-fi
+# Once built, the same task is review-side again: the lane branch is scoped-only.
+git clone -q "$WORK/origin.git" "$WORK/repoG"
+state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoG")"
+mkdir -p "$state_dir"
+printf '{"schema_version":1,"branch":"%s","stage":"implementation_done","pr":null,"lane":"small","sessions":[]}\n' \
+  "$FEATURE_B" > "$state_dir/$FEATURE_B.state.json"
+set +e
+out="$(run_resume "$WORK/repoG" "$FEATURE_B" "" 2>&1)"
+rc=$?
+set -e
+[[ "$rc" -eq 0 ]] || fail "resume of a built small-change task exited $rc: $out"
+grep -q "/cdd-pre-pr" <<<"$out" \
+  || fail "a built small-change task must get the review-side guidance. Output:\n$out"
+pass "a small-change task past implementation keeps the review-side guidance"
 
 echo "all worktree-resume smoke checks passed"

@@ -40,16 +40,12 @@ Each doc directory keeps an `index.md` pointer list: read the index, then load o
 This repo is documentation and shell scripts; there is no build step. Every check runs from one command:
 
 ```bash
-./scripts/ci.sh                  # every gate, then a PASS/FAIL/SKIP summary
+./scripts/ci.sh                  # every gate, then a PASS/FAIL summary
 ./scripts/ci.sh list             # the gate slugs
 ./scripts/ci.sh <gate> [<gate>]  # rerun one gate while iterating on a failure
 ```
 
-`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14) — the gate registry at the top of the script is the list, and there is no second copy. `.github/workflows/template-smoke.yml` holds no gate list at all: it checks out and calls the runner, so CI and a local run cannot drift. `/cdd-pre-pr` invokes the same command, so a green local run means a green CI run.
-
-The 25 gates: `syntax` and `shellcheck` over every shell script; `drift` (repo `.claude/commands/` and `.claude/settings.json` vs the rendered template) and `drift-contract` (the drift checker's own contract, mutation-tested), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension` (extension fields survive every write), `adapter-conformance` (the shipped capability adapters, tracker and code-host, against their contracts, plus the code-host adapters' `pr-merged` answers against canned backend responses, offline), `adapter-conformance-contract` (that checker's own contract, mutation-tested), `code-host-ladder` (code-host adapter resolution at every helper call site: missing, working, broken, unsupported verb), `issue-close` (the post-merge issue close from `cdd-worktree-done` and `cdd-worktree-gc`), `worktree-done` (`cdd-worktree-done`'s removal and branch-deletion paths) and `adapter-bindings` (a bootstrap with `--tracker`/`--code-host` yields `.cdd/` shims that pass `describe` from a fresh clone on a second machine, offline); the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
-
-Two behaviours worth knowing: a gate whose tool is missing (`shellcheck`, `jq`) is reported **SKIPPED — loudly and non-fatally**, so a host without it gets a weaker verdict, not a wrong one; and the run is **not fail-fast**, so one invocation surfaces every problem. The runner provisions its own scratch dir and a throwaway git identity, so it needs no host setup and is unaffected by your git signing config.
+`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 26 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` — **a missing tool fails its gate, never skips it**. The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
 
 When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into `./scripts/ci.sh` plus a doc reconciliation pass.
 
@@ -73,7 +69,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check, code-host ladder assertion, adapter-bindings assertion |
+| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, host-tool portability check, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check, code-host ladder assertion, adapter-bindings assertion |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `.cdd/`                            | This repo's own capability-adapter bindings: `code-host` and `tracker`, relative symlinks to the GitHub adapters under `tools/adapters/` |

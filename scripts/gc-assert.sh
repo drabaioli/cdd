@@ -37,12 +37,13 @@ pass() { echo "ok: $*"; }
 [[ -f "$HELPER_WT" ]] || fail "helper not found: $HELPER_WT"
 [[ -f "$HELPER_STATE" ]] || fail "helper not found: $HELPER_STATE"
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "skip: jq not available; the ref push under test lives behind cdd-state's jq guard"
-  exit 0
-fi
+# jq is required: the ref push under test lives behind cdd-state's jq guard. A missing
+# tool is a failure, never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
-WORK="$(mktemp -d)"
+# Physical path: on macOS mktemp hands out /var/..., a symlink to /private/var/..., while
+# git reports the resolved path, so the path compares below would fail spuriously.
+WORK="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT
 
 export GIT_CONFIG_SYSTEM=/dev/null

@@ -50,13 +50,13 @@ The same obligation the standard lane carries: a change is not done until the do
 
 ## 6. Verify
 
-Run the project's check runner, whole — the same command CI runs, not a subset chosen for a small diff.
+Run the project's check runner, whole — the same gate list CI runs, not a subset chosen for a small diff.
 <!-- cdd-only-begin -->
 
 In this repo the runner is `./scripts/ci.sh`. It is not fail-fast, so one invocation surfaces every problem; `./scripts/ci.sh <gate>` reruns one while iterating on a failure.
 <!-- cdd-only-end -->
 
-Report failures with their output rather than summarizing them away. A gate that skipped because its tool is missing is a skip, not a pass — say so.
+Report failures with their output rather than summarizing them away. A gate whose tool is missing has failed, not skipped — say which tool to install.
 
 ## 7. Commit
 

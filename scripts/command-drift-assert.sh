@@ -27,9 +27,8 @@
 #   - A cdd-only fence in the *repo* copy must PASS, pinning the stripping that makes
 #     CDD-meta sections possible at all.
 #
-# Check 3 needs jq, which the checker treats as optional; without it that one mutation is
-# skipped loudly rather than silently, the same posture scripts/ci.sh takes for a gate
-# whose tool is missing.
+# Check 3 needs jq, and a missing tool is a failure, never a skip (scripts/ci.sh): the
+# gate requires jq up front rather than dropping that one mutation.
 #
 # The copy is of the working tree, not HEAD, so this gate tests the checker as it is right
 # now rather than as it was last committed. The real tree is never mutated.
@@ -48,7 +47,8 @@ SANDBOX="$WORK/sandbox"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
-skip() { echo "skip: $*"; }
+
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 CHECKER="scripts/command-drift-check.sh"
 WHITELIST="scripts/command-drift-whitelist.txt"
@@ -169,15 +169,11 @@ expect_pass "control: a whitelisted settings.json divergence passes"
 # --- Check 3: settings JSON validity -------------------------------------------
 # The same syntax error in both copies, so they still render identical and the diff above
 # stays green: only the jq parse can catch this one, which is the point of the mutation.
-if command -v jq >/dev/null 2>&1; then
-  fresh_sandbox
-  insert_after_allow ',' "$SETTINGS"
-  insert_after_allow ',' "$TPL_SETTINGS"
-  expect_fail "check 3 catches a syntax error present in both settings copies" \
-    "is not valid JSON"
-else
-  skip "check 3 (settings JSON validity): jq not available on this host"
-fi
+fresh_sandbox
+insert_after_allow ',' "$SETTINGS"
+insert_after_allow ',' "$TPL_SETTINGS"
+expect_fail "check 3 catches a syntax error present in both settings copies" \
+  "is not valid JSON"
 
 # --- Check 6: schema-heading contracts -----------------------------------------
 # Mutating the *process doc* rather than the command file, so the command-set diff stays

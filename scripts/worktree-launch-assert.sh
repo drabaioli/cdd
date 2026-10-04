@@ -46,10 +46,9 @@ pass() { echo "ok: $*"; }
 [[ -f "$HELPER_WT" ]] || fail "helper not found: $HELPER_WT"
 [[ -f "$HELPER_STATE" ]] || fail "helper not found: $HELPER_STATE"
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "skip: jq not available; base_branch is advisory and skips without it"
-  exit 0
-fi
+# jq is required: without it the helper skips base_branch, leaving nothing to test. A
+# missing tool is a failure, never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

@@ -38,13 +38,13 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Because it is the same command, a green run here means CI will be green too. **Capture only the last 40 lines + exit code, do not read the full output.**
+Run the project's **check runner** — the single command that runs every gate, the same gate list CI runs (a host tool that behaves differently can still make CI disagree). **Capture only the last 40 lines + exit code, do not read the full output.**
 
 ```bash
 <check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 ```
 
-Report each gate as pass ✓ / fail ✗ / skipped ⊘ from the runner's summary. On failure, include the captured tail. A **skipped** gate is not a pass: say which gate was skipped and why (usually a tool missing on this host), so the reader knows the local verdict is weaker than CI's.
+Report each gate as pass ✓ / fail ✗ from the runner's summary. On failure, include the captured tail. **A missing tool is a failure, never a skip** — say which tool to install; an older runner's *skipped* counts as failed too.
 
 If the project has no single runner yet, run each gate command in sequence instead — and note the gap for step 6, because a split gate list drifts and a pre-PR session that runs only some of the gates gives a green verdict that guarantees little:
 
@@ -57,7 +57,7 @@ If the project has no single runner yet, run each gate command in sequence inste
 ```
 <!-- cdd-only-begin -->
 
-**In this repo the runner is `./scripts/ci.sh`** — 25 gates: shell syntax and shellcheck, the command-set drift and prompt-seam checks plus each checker's own contract, the roadmap item-length cap, the helper install / worktree-resume / ref-sync / GC / worktree-launch / state-extension assertions, the capability adapters' (tracker, code-host) offline conformance check plus that checker's own contract, the code-host resolution ladder, the post-merge issue close, the worktree teardown, the adapter bindings a bootstrap writes, the four bootstrap-and-render smokes, the demo seed overlay, and the runner's own contract. `./scripts/ci.sh list` names them; `./scripts/ci.sh <gate>` reruns one while iterating on a failure. It is not fail-fast — every gate runs, so one invocation surfaces every problem. Two of its gates need interpretation rather than a rerun; see the sections below.
+**In this repo the runner is `./scripts/ci.sh`** — 26 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. Not fail-fast. Two of its gates need interpretation rather than a rerun; see the sections below.
 <!-- cdd-only-end -->
 
 ## 3. Code review
@@ -179,7 +179,7 @@ Present a checklist summary:
 
 ```
 ## Pre-PR Checklist
-- [ ] Check runner passed (<N> gates: <N> passed, <N> skipped)
+- [ ] Check runner passed (<N> gates: <N> passed, <N> failed)
 - [ ] Code review: no issues / issues flagged (list them)
 - [ ] Handoff requirements met (or unmet/deviating criteria listed)
 - [ ] Architecture docs up to date
