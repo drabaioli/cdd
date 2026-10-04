@@ -307,15 +307,19 @@ verb_pr_reply() {
 }
 
 # --- pr-merged -----------------------------------------------------------------
-# Whether the branch's MOST RECENT MR (into --base, if given) has merged. `ref` and
-# `url` are present only when it has, per omit-don't-null.
+# Whether the branch's MOST RECENT MR (into --base, if given) has merged. `ref`, `url`
+# and `head_sha` are present only when it has, per omit-don't-null. `head_sha` is the
+# MR's `sha`, its source branch's head commit — not `merge_commit_sha` or
+# `squash_commit_sha`.
 verb_pr_merged() {
   local branch="$1" base="$2"
   mr_list "$branch" "$base"
   jq -c --arg branch "$branch" '
     .[0] as $m
     | if $m != null and $m.state == "merged"
-      then {branch: $branch, merged: true, ref: ($m.iid | tostring)} + (if $m.web_url then {url: $m.web_url} else {} end)
+      then {branch: $branch, merged: true, ref: ($m.iid | tostring)}
+           + (if $m.sha then {head_sha: $m.sha} else {} end)
+           + (if $m.web_url then {url: $m.web_url} else {} end)
       else {branch: $branch, merged: false}
       end' "$RESP"
 }

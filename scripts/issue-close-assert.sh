@@ -134,7 +134,7 @@ EOF
 }
 
 # make_code_host: the machine-rung code-host adapter; pr-merged says merged (PR #7) for
-# the branches listed in $MERGED.
+# the branches listed in $MERGED, with the local branch's tip as head_sha when it exists.
 make_code_host() {
   mkdir -p "$HOME_A/.cdd/adapters"
   cat > "$HOME_A/.cdd/adapters/code-host" <<'EOF'
@@ -144,7 +144,8 @@ case "$1" in
   pr-for-branch) echo '[]' ;;
   pr-merged)
     if grep -qxF -- "$2" "$MERGED" 2>/dev/null; then
-      echo '{"merged":true,"ref":"7","url":"https://github.com/o/r/pull/7"}'
+      head="$(git rev-parse --verify -q "refs/heads/$2" 2>/dev/null)"
+      echo '{"merged":true,"ref":"7"'"${head:+,\"head_sha\":\"$head\"}"',"url":"https://github.com/o/r/pull/7"}'
     else
       echo '{"merged":false}'
     fi ;;
@@ -351,6 +352,8 @@ pass "a failed PR-link comment is one warning and never keeps the record"
 reset
 task d_broken '["#16"]'; merged d_broken; worktree d_broken
 make_tracker "$WORK/wt-d_broken/.cdd/tracker" broken
+# Committed, as a project's binding is: done refuses to run over untracked files.
+( cd "$WORK/wt-d_broken"; git add .cdd/tracker; git commit -q -m "bind tracker" )
 run "$WORK/wt-d_broken" cdd-worktree-done
 [[ $RC -ne 0 ]] || fail "done, broken tracker: should fail$(show)"
 [[ -d "$WORK/wt-d_broken" ]] || fail "done, broken tracker: the worktree was removed"

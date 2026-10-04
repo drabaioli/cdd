@@ -19,6 +19,9 @@
 #     merged task and left alone for a scoped one
 #   - a plan file produces NO phantom row in cdd-worktree-list, even though it shares
 #     the handoff's .md extension: the shared enumerator filters branch-named sidecars
+#   - the head guard: a merged PR whose head_sha does not contain the local branch's tip
+#     (a reused name) keeps the task; one whose head_sha is the tip, or descends from
+#     it, reaps it
 #
 # Usage: scripts/gc-assert.sh   (provisions and tears down its own temp tree)
 
@@ -124,6 +127,14 @@ case "$1" in
   pr-merged)
     if [[ "$2" == "feat_merged" ]]; then
       echo '{"merged":true,"ref":"7","url":"https://example.invalid/pull/7"}'
+    elif [[ "$2" == "feat_reused" ]]; then
+      # An old merged PR for a reused name: its head is not the local branch's tip.
+      echo '{"merged":true,"ref":"8","head_sha":"0123456789abcdef0123456789abcdef01234567"}'
+    elif [[ "$2" == "feat_same" ]]; then
+      echo '{"merged":true,"ref":"9","head_sha":"'"$(git rev-parse "refs/heads/$2")"'"}'
+    elif [[ "$2" == "feat_ahead" ]]; then
+      # The PR's head descends from the local tip: the local branch is behind its PR.
+      echo '{"merged":true,"ref":"10","head_sha":"'"$(git rev-parse refs/pr-head/feat_ahead)"'"}'
     else
       echo '{"merged":false}'
     fi ;;
@@ -215,6 +226,28 @@ branches="$(awk '/^(BRANCH|------|code-host:)/ { next } { print $1 }' <<<"$out")
 [[ "$branches" == "$SCOPED" ]] \
   || fail "cdd-worktree-list should list exactly '$SCOPED', got: $(tr '\n' ' ' <<<"$branches"). Output:\n$out"
 pass "a plan file produces no phantom row in cdd-worktree-list"
+
+# 5. The head guard: a local branch the merged PR's head_sha does not contain is a reused
+# name, so its task is kept; one whose tip IS the head, or an ancestor of it (the local
+# branch behind its PR), is reaped as before.
+for b in feat_reused feat_same feat_ahead; do
+  git -C "$WORK/machine" branch "$b" main
+  printf '# Task: %s\n' "$b" > "$DIR/$b.md"
+  run_state seed "$b" >/dev/null 2>&1 || fail "cdd-state seed failed for $b"
+done
+git -C "$WORK/machine" update-ref refs/pr-head/feat_ahead \
+  "$(git -C "$WORK/machine" commit-tree -p main -m ahead "main^{tree}")"
+out="$(run_gc --force 2>&1)" || fail "gc --force (head guard) exited non-zero"
+grep -q "keep  feat_reused (merged PR #8 is for other commits than local feat_reused" <<<"$out" \
+  || fail "gc should keep a task whose local branch is not the merged PR's head. Output:\n$out"
+[[ -f "$DIR/feat_reused.md" && -f "$DIR/feat_reused.state.json" ]] \
+  || fail "gc reaped the reused-name task's files"
+grep -q "reap  feat_same (MERGED): removed" <<<"$out" \
+  || fail "gc should reap a task whose local branch is the merged PR's head. Output:\n$out"
+[[ ! -f "$DIR/feat_same.md" ]] || fail "gc did not reap feat_same"
+grep -q "reap  feat_ahead (MERGED): removed" <<<"$out" \
+  || fail "gc should reap a task whose local branch is behind the merged PR's head. Output:\n$out"
+pass "gc keeps a task whose local branch the merged PR's head does not contain, reaps one behind it"
 
 [[ ! -s "$GH_LOG" ]] || fail "gc called gh: $(cat "$GH_LOG")"
 pass "gh was never called"

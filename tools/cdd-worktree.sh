@@ -177,18 +177,50 @@ cdd-worktree-adapter-warn() {  # cdd-worktree-adapter-warn <verb> <exit code>
   echo "warning: $1 failed (exit $2) via ${CDD_ADAPTER}${CDD_ADAPTER_ERR:+: $CDD_ADAPTER_ERR}; treating it as no answer." >&2
 }
 
+# Whether a merged PR's head commit <head> contains the local tip <tip>: it is the tip,
+# or descends from it, so the PR merged every local commit. A branch behind its PR
+# (fixes pushed from another machine, a commit made in the web UI) is still this
+# branch's; a reused name's old PR does not contain the new commits. A head not present
+# locally is fetched once, best-effort; still absent, it does not contain the tip.
+cdd-worktree-tip-in-head() {
+  local tip="$1" head="$2"
+  [[ "${tip,,}" == "${head,,}" ]] && return 0
+  git cat-file -e "${head}^{commit}" 2>/dev/null \
+    || git fetch -q origin "$head" >/dev/null 2>&1 || return 1
+  git merge-base --is-ancestor "$tip" "$head" 2>/dev/null
+}
+
 # Ask the code host whether <branch> merged into <base> through a PR: the caller's
-# resolved adapter (CDD_ADAPTER). Prints "<PR number> <PR url>"
-# on one line (the url may be absent: an adapter need not report it) and returns 0 when
-# merged; returns 1 when the host answered "not merged", 2 when it could not answer (no
-# adapter, a failing call, an unsupported verb); the caller says why when none resolved.
+# resolved adapter (CDD_ADAPTER). Prints "<PR number> <PR url>" on one line (the url may
+# be absent: an adapter need not report it) whenever the PR merged. With <tip> (the
+# local branch's full SHA) the PR's reported head_sha must contain it
+# (cdd-worktree-tip-in-head), since a branch name can be reused and its old merged PR is
+# then not this branch's. Returns:
+#   0  merged (and, with <tip>, its head contains <tip>)
+#   1  the host answered "not merged"
+#   2  it could not answer (no adapter, a failing call, an unsupported verb); the caller
+#      says why when none resolved
+#   4  merged, but the adapter reported no head_sha to check against <tip>
+#   5  merged, but the PR's head does not contain <tip>
+# 4 and 5 print one stderr line each.
 cdd-worktree-merged-pr() {
-  local branch="$1" base="$2" rc=0
+  local branch="$1" base="$2" tip="${3:-}" rc=0 head line
   [[ -n "${CDD_ADAPTER:-}" ]] || return 2
   cdd-worktree-adapter-call pr-merged "$branch" --base "$base" || rc=$?
   if (( rc == 0 )); then
     [[ "$(jq -r '.merged' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "true" ]] || return 1
-    jq -r '"\(.ref // "?") \(.url // "")"' <<<"$CDD_ADAPTER_OUT"
+    line="$(jq -r '"\(.ref // "?") \(.url // "")"' <<<"$CDD_ADAPTER_OUT")"
+    printf '%s\n' "$line"
+    [[ -z "$tip" ]] && return 0
+    head="$(jq -r '.head_sha // empty' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)"
+    if [[ -z "$head" ]]; then
+      echo "pr-merged reported no head commit for '$branch'; cannot confirm PR #${line%% *} is this branch's." >&2
+      return 4
+    fi
+    if ! cdd-worktree-tip-in-head "$tip" "$head"; then
+      echo "PR #${line%% *} merged head ${head:0:12}, which does not contain local '$branch' at ${tip:0:12}." >&2
+      return 5
+    fi
     return 0
   fi
   (( rc != 3 )) && cdd-worktree-adapter-warn pr-merged "$rc"
@@ -454,8 +486,16 @@ cdd-worktree-done() {
     return 1
   fi
 
-  if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "Worktree has uncommitted changes, aborting." >&2
+  # Untracked files count too: `git worktree remove` would refuse them later anyway, and
+  # refusing here names them before anything has moved. Porcelain paths are relative to
+  # the worktree root, whatever the cwd.
+  local dirty n
+  dirty="$(git status --porcelain)" || return 1
+  if [[ -n "$dirty" ]]; then
+    echo "Worktree has uncommitted changes or untracked files, aborting:" >&2
+    head -n 10 <<<"$dirty" >&2
+    n="$(wc -l <<<"$dirty")"
+    (( n > 10 )) && echo "… and $(( n - 10 )) more" >&2
     return 1
   fi
 
@@ -469,7 +509,9 @@ cdd-worktree-done() {
     return 1
   fi
 
-  local feature_path="$PWD"
+  # The worktree's top level, not $PWD: run from a subdirectory, $PWD would name only it.
+  local feature_path
+  feature_path="$(git rev-parse --show-toplevel)" || return 1
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
@@ -499,10 +541,23 @@ cdd-worktree-done() {
     return 1
   fi
 
-  # 1. Worktree removal (handle root-owned build artefacts).
-  if ! git worktree remove "$feature_path" 2>/dev/null; then
+  # 1. Worktree removal. sudo is offered ONLY for a permission error (root-owned build
+  # artefacts, which git deletes as ignored files); any other failure — a locked
+  # worktree, a path that is not one — aborts with nothing deleted. LC_ALL=C because
+  # git's and strerror's messages are localized, and the match below reads them.
+  local rm_err
+  if ! rm_err="$(LC_ALL=C git worktree remove "$feature_path" 2>&1)"; then
+    case "$rm_err" in
+      *"Permission denied"*|*"Operation not permitted"*) ;;
+      *)
+        echo "git worktree remove failed for $feature_path: $rm_err" >&2
+        echo "Nothing was deleted; worktree left in place." >&2
+        return 1
+        ;;
+    esac
     echo
-    echo "git worktree remove failed for $feature_path."
+    echo "git worktree remove hit a permission error for $feature_path:"
+    echo "  $(head -n 1 <<<"$rm_err")"
     echo "This usually means container builds left root-owned files behind"
     echo "(e.g. build/, .cache/) that your user can't delete."
     echo "Falling back to: sudo rm -rf \"$feature_path\" && git worktree prune"
@@ -517,28 +572,38 @@ cdd-worktree-done() {
 
   # 2. Branch resolution. Closing the task's issues needs a merged PR the code host
   # confirms: git's ancestry alone also holds for an abandoned zero-commit branch, so
-  # on that path a task with refs asks the code host too.
-  local branch_deleted=0 pr_merged=0 pr_unknown=0 pr_num="" pr_url="" pr_line="" prc
+  # on that path a task with refs asks the code host too. The PR must also be THIS
+  # branch's: its reported head commit has to contain the local tip (a reused branch
+  # name's old merged PR does not), so an unknown head counts as unconfirmed and one
+  # that does not contain it as no merged PR — neither force-deletes.
+  local branch_deleted=0 pr_merged=0 pr_unknown=0 pr_mismatch=0 pr_num="" pr_url="" pr_line="" prc tip
+  tip="$(git rev-parse --verify -q "refs/heads/$branch")"
 
   if git branch --merged "$default_branch" --format='%(refname:short)' | grep -qx "$branch"; then
     git branch -d "$branch" && branch_deleted=1
     if (( ${#CDD_ISSUE_REFS[@]} )); then
       prc=0
-      pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch")" || prc=$?
+      pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch" "$tip")" || prc=$?
       (( prc == 0 )) && pr_merged=1
-      (( prc == 2 )) && pr_unknown=1
+      (( prc == 2 || prc == 4 )) && pr_unknown=1
+      (( prc == 5 )) && pr_mismatch=1
     fi
   else
     prc=0
-    pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch")" || prc=$?
+    pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch" "$tip")" || prc=$?
     pr_num="${pr_line%% *}"
-    (( prc == 2 )) && pr_unknown=1
+    (( prc == 2 || prc == 4 )) && pr_unknown=1
+    (( prc == 5 )) && pr_mismatch=1
     if (( prc == 0 )); then
       echo "Branch '$branch' was squash-merged via PR #$pr_num, force-deleting."
       git branch -D "$branch" && branch_deleted=1 && pr_merged=1
     else
       echo
-      if (( prc == 2 )); then
+      if (( prc == 5 )); then
+        echo "Branch '$branch' is not merged into $default_branch; merged PR #$pr_num is for other commits than its tip, so it was not force-deleted."
+      elif (( prc == 4 )); then
+        echo "Branch '$branch' is not merged into $default_branch; PR #$pr_num merged, but the code host did not report its head commit, so it cannot be confirmed as this branch's."
+      elif (( prc == 2 )); then
         echo "Branch '$branch' is not merged into $default_branch, and no merged PR could be confirmed."
       else
         echo "Branch '$branch' is not merged into $default_branch and has no merged PR."
@@ -581,6 +646,8 @@ cdd-worktree-done() {
       elif (( pr_unknown )); then
         echo "warning: could not confirm a merged PR for '$branch'; not closing ${CDD_ISSUE_REFS[*]} yet." >&2
         keep_for_gc=1
+      elif (( pr_mismatch )); then
+        echo "Not closing ${CDD_ISSUE_REFS[*]}: merged PR #${pr_line%% *} is for other commits than '$branch'."
       else
         echo "Not closing ${CDD_ISSUE_REFS[*]}: no merged PR for '$branch'."
       fi
@@ -716,6 +783,10 @@ cdd-worktree-list() {
 # branch presence alone, and only the PR state tells them apart. Before reaping a
 # merged task it closes the issues its state record lists — the backstop for the same
 # close in cdd-worktree-done — and a failed close keeps the task for the next run.
+# When the branch still exists locally and the merged PR's reported head_sha does not
+# contain its tip (cdd-worktree-tip-in-head), the name was reused and the task is
+# kept; with no local branch or no head_sha there is nothing to compare, and gc trusts
+# the PR state as before.
 # Dry-run by default (it lists what it would close, and calls no tracker verb);
 # --force actually closes and deletes. Needs a code-host adapter to read PR state;
 # without one a merged task can't be told from a fresh one, so it reaps nothing (one
@@ -776,7 +847,7 @@ cdd-worktree-gc() {
   # and a run with none never touches the tracker at all.
   local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC="" closing
   local -a CDD_ISSUE_REFS=()
-  local reaped=0 kept=0 pr_state pr_ref pr_url handoff plan state items joined
+  local reaped=0 kept=0 pr_state pr_ref pr_url pr_head pr_tip handoff plan state items joined
   for branch in "${!seen[@]}"; do
     pr_ref="" pr_url=""
     rc=0
@@ -787,6 +858,13 @@ cdd-worktree-gc() {
         pr_state="MERGED"
         pr_ref="$(jq -r '.ref // ""' <<<"$CDD_ADAPTER_OUT")"
         pr_url="$(jq -r '.url // ""' <<<"$CDD_ADAPTER_OUT")"
+        # A local branch the merged PR's head does not contain: the name was reused,
+        # and that PR is not this task's.
+        pr_head="$(jq -r '.head_sha // empty' <<<"$CDD_ADAPTER_OUT")"
+        pr_tip="$(git rev-parse --verify -q "refs/heads/$branch" 2>/dev/null)"
+        if [[ -n "$pr_head" && -n "$pr_tip" ]] && ! cdd-worktree-tip-in-head "$pr_tip" "$pr_head"; then
+          pr_state="merged PR #$pr_ref is for other commits than local $branch"
+        fi
       fi
     elif (( rc == 3 && reaped + kept == 0 )); then
       # Declared but unsupported at runtime, on the first call: nothing has been
