@@ -552,7 +552,95 @@ cdd-worktree-done() {
     return 1
   fi
 
-  # 1. Worktree removal. sudo is offered ONLY for a permission error (root-owned build
+  # Every adapter call (steps 1-2) happens before the worktree is removed (step 3): the
+  # adapters may be bound inside it, e.g. a relative .cdd/ symlink into its tools/.
+
+  # 1. Branch resolution; step 4 deletes it, once the worktree no longer holds it.
+  # Closing the task's issues needs a merged PR the code host confirms: git's ancestry
+  # alone also holds for an abandoned zero-commit branch, so on that path a task with
+  # refs asks the code host too. The PR must also be THIS branch's: its reported head
+  # commit has to contain the local tip (a reused branch name's old merged PR does not),
+  # so an unknown head counts as unconfirmed and one that does not contain it as no
+  # merged PR — neither force-deletes.
+  local delete_mode="" branch_deleted=0 pr_merged=0 pr_unknown=0 pr_mismatch=0 pr_num="" pr_url="" pr_line="" prc tip
+  tip="$(git rev-parse --verify -q "refs/heads/$branch")"
+
+  if git branch --merged "$default_branch" --format='%(refname:short)' | grep -qx "$branch"; then
+    delete_mode=-d
+    if (( ${#CDD_ISSUE_REFS[@]} )); then
+      prc=0
+      pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch" "$tip")" || prc=$?
+      (( prc == 0 )) && pr_merged=1
+      (( prc == 2 || prc == 4 )) && pr_unknown=1
+      (( prc == 5 )) && pr_mismatch=1
+    fi
+  else
+    prc=0
+    pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch" "$tip")" || prc=$?
+    pr_num="${pr_line%% *}"
+    (( prc == 2 || prc == 4 )) && pr_unknown=1
+    (( prc == 5 )) && pr_mismatch=1
+    if (( prc == 0 )); then
+      echo "Branch '$branch' was squash-merged via PR #$pr_num, force-deleting."
+      delete_mode=-D pr_merged=1
+    else
+      echo
+      if (( prc == 5 )); then
+        echo "Branch '$branch' is not merged into $default_branch; merged PR #$pr_num is for other commits than its tip, so it was not force-deleted."
+      elif (( prc == 4 )); then
+        echo "Branch '$branch' is not merged into $default_branch; PR #$pr_num merged, but the code host did not report its head commit, so it cannot be confirmed as this branch's."
+      elif (( prc == 2 )); then
+        echo "Branch '$branch' is not merged into $default_branch, and no merged PR could be confirmed."
+      else
+        echo "Branch '$branch' is not merged into $default_branch and has no merged PR."
+      fi
+      echo "Unmerged commits:"
+      git log "$default_branch".."$branch" --oneline
+      echo
+      local choice
+      read -r -p "[d]elete (-D) / [k]eep / [a]bort? " choice
+      case "$choice" in
+        d|D)
+          delete_mode=-D
+          ;;
+        k|K)
+          echo "Keeping branch '$branch'. Handoff will also be kept (in-flight task)."
+          ;;
+        a|A|*)
+          echo "Aborted. Nothing was removed: worktree, branch and handoff left in place." >&2
+          return 1
+          ;;
+      esac
+    fi
+  fi
+
+  # 2. Close the task's issues (only once a merged PR is confirmed, and only for a
+  # branch about to be deleted). A close that failed, or could not be attempted yet,
+  # keeps the record and refs/cdd/<branch> — the only carriers of the refs — so
+  # cdd-worktree-gc can retry it.
+  local keep_for_gc=0
+  if [[ -n "$delete_mode" ]]; then
+    if (( refs_unread )); then
+      echo "warning: the state record lists issue refs, but reading them needs jq; not closing them." >&2
+      keep_for_gc=1
+    elif (( ${#CDD_ISSUE_REFS[@]} )); then
+      if (( pr_merged )); then
+        # "<number> <url>": the url is whatever follows the first space, possibly nothing.
+        pr_num="${pr_line%% *}"
+        [[ "$pr_line" == *" "* ]] && pr_url="${pr_line#* }"
+        cdd-worktree-close-issues "$pr_num" "$pr_url" "${CDD_ISSUE_REFS[@]}" || keep_for_gc=1
+      elif (( pr_unknown )); then
+        echo "warning: could not confirm a merged PR for '$branch'; not closing ${CDD_ISSUE_REFS[*]} yet." >&2
+        keep_for_gc=1
+      elif (( pr_mismatch )); then
+        echo "Not closing ${CDD_ISSUE_REFS[*]}: merged PR #${pr_line%% *} is for other commits than '$branch'."
+      else
+        echo "Not closing ${CDD_ISSUE_REFS[*]}: no merged PR for '$branch'."
+      fi
+    fi
+  fi
+
+  # 3. Worktree removal. sudo is offered ONLY for a permission error (root-owned build
   # artefacts, which git deletes as ignored files); any other failure — a locked
   # worktree, a path that is not one — aborts with nothing deleted. LC_ALL=C because
   # git's and strerror's messages are localized, and the match below reads them.
@@ -581,90 +669,9 @@ cdd-worktree-done() {
     git worktree prune
   fi
 
-  # 2. Branch resolution. Closing the task's issues needs a merged PR the code host
-  # confirms: git's ancestry alone also holds for an abandoned zero-commit branch, so
-  # on that path a task with refs asks the code host too. The PR must also be THIS
-  # branch's: its reported head commit has to contain the local tip (a reused branch
-  # name's old merged PR does not), so an unknown head counts as unconfirmed and one
-  # that does not contain it as no merged PR — neither force-deletes.
-  local branch_deleted=0 pr_merged=0 pr_unknown=0 pr_mismatch=0 pr_num="" pr_url="" pr_line="" prc tip
-  tip="$(git rev-parse --verify -q "refs/heads/$branch")"
-
-  if git branch --merged "$default_branch" --format='%(refname:short)' | grep -qx "$branch"; then
-    git branch -d "$branch" && branch_deleted=1
-    if (( ${#CDD_ISSUE_REFS[@]} )); then
-      prc=0
-      pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch" "$tip")" || prc=$?
-      (( prc == 0 )) && pr_merged=1
-      (( prc == 2 || prc == 4 )) && pr_unknown=1
-      (( prc == 5 )) && pr_mismatch=1
-    fi
-  else
-    prc=0
-    pr_line="$(cdd-worktree-merged-pr "$branch" "$default_branch" "$tip")" || prc=$?
-    pr_num="${pr_line%% *}"
-    (( prc == 2 || prc == 4 )) && pr_unknown=1
-    (( prc == 5 )) && pr_mismatch=1
-    if (( prc == 0 )); then
-      echo "Branch '$branch' was squash-merged via PR #$pr_num, force-deleting."
-      git branch -D "$branch" && branch_deleted=1 && pr_merged=1
-    else
-      echo
-      if (( prc == 5 )); then
-        echo "Branch '$branch' is not merged into $default_branch; merged PR #$pr_num is for other commits than its tip, so it was not force-deleted."
-      elif (( prc == 4 )); then
-        echo "Branch '$branch' is not merged into $default_branch; PR #$pr_num merged, but the code host did not report its head commit, so it cannot be confirmed as this branch's."
-      elif (( prc == 2 )); then
-        echo "Branch '$branch' is not merged into $default_branch, and no merged PR could be confirmed."
-      else
-        echo "Branch '$branch' is not merged into $default_branch and has no merged PR."
-      fi
-      echo "Unmerged commits:"
-      git log "$default_branch".."$branch" --oneline
-      echo
-      local choice
-      read -r -p "[d]elete (-D) / [k]eep / [a]bort? " choice
-      case "$choice" in
-        d|D)
-          git branch -D "$branch" && branch_deleted=1
-          ;;
-        k|K)
-          echo "Keeping branch '$branch'. Handoff will also be kept (in-flight task)."
-          ;;
-        a|A|*)
-          echo "Aborted. Worktree was already removed; branch and handoff left in place." >&2
-          return 1
-          ;;
-      esac
-    fi
-  fi
-
-  # 3. Close the task's issues (only once a merged PR is confirmed), then delete the
-  # handoff + state record (only if the branch was actually deleted). A close that
-  # failed, or could not be attempted yet, keeps the record and refs/cdd/<branch> —
-  # the only carriers of the refs — so cdd-worktree-gc can retry it.
-  local keep_for_gc=0
-  if (( branch_deleted )); then
-    if (( refs_unread )); then
-      echo "warning: the state record lists issue refs, but reading them needs jq; not closing them." >&2
-      keep_for_gc=1
-    elif (( ${#CDD_ISSUE_REFS[@]} )); then
-      if (( pr_merged )); then
-        # "<number> <url>": the url is whatever follows the first space, possibly nothing.
-        pr_num="${pr_line%% *}"
-        [[ "$pr_line" == *" "* ]] && pr_url="${pr_line#* }"
-        cdd-worktree-close-issues "$pr_num" "$pr_url" "${CDD_ISSUE_REFS[@]}" || keep_for_gc=1
-      elif (( pr_unknown )); then
-        echo "warning: could not confirm a merged PR for '$branch'; not closing ${CDD_ISSUE_REFS[*]} yet." >&2
-        keep_for_gc=1
-      elif (( pr_mismatch )); then
-        echo "Not closing ${CDD_ISSUE_REFS[*]}: merged PR #${pr_line%% *} is for other commits than '$branch'."
-      else
-        echo "Not closing ${CDD_ISSUE_REFS[*]}: no merged PR for '$branch'."
-      fi
-    fi
-  fi
-
+  # 4. Delete the branch as decided in step 1, then the handoff + state record (only
+  # if the branch was actually deleted and no issue close is pending).
+  [[ -n "$delete_mode" ]] && git branch "$delete_mode" "$branch" && branch_deleted=1
   if (( branch_deleted && ! keep_for_gc )); then
     [[ -f "$handoff" ]] && rm "$handoff" && echo "Removed handoff: $handoff"
     [[ -f "$plan_file" ]] && rm "$plan_file" && echo "Removed plan: $plan_file"

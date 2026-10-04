@@ -19,6 +19,10 @@
 #   - no merged PR -> the prompt; abort keeps the branch
 #   - a head mismatch closes no issue, even when the human deletes the branch
 #
+# Project-rung adapters (relative .cdd/ symlinks into the feature worktree, like this
+# repo's): a squash-merged branch is force-deleted and its issue closed through them,
+# since every adapter call happens before the worktree is removed.
+#
 # Like issue-close-assert.sh it stands in a local bare repo for origin and gives the
 # helper its own $HOME. A stub code-host adapter (the machine rung) answers pr-merged
 # for the branches in $MERGED, with head_sha chosen by $HEADMODE: match (the local
@@ -293,14 +297,17 @@ has_branch f_nohead || fail "squash, no head: the branch was deleted$(show)"
 [[ -f "$DIR/f_nohead.md" ]] || fail "squash, no head: the handoff was removed$(show)"
 pass "a merged PR reporting no head commit falls to the prompt"
 
-# 10. No merged PR: the prompt; abort keeps the branch.
+# 10. No merged PR: the prompt; abort keeps the branch — and the worktree, since the
+# branch is decided before anything is removed.
 worktree f_open
 run "a" "$WORK/wt-f_open" cdd-worktree-done
 [[ $RC -eq 1 ]] || fail "unmerged, abort: expected exit 1, got $RC$(show)"
 grep -q "has no merged PR" "$WORK/out" || fail "unmerged, abort: expected the no-merged-PR line$(show)"
+grep -q "Nothing was removed" "$WORK/err" || fail "unmerged, abort: expected the nothing-removed line$(show)"
+{ [[ -d "$WORK/wt-f_open" ]] && listed "$WORK/wt-f_open"; } || fail "unmerged, abort: the worktree was removed$(show)"
 has_branch f_open || fail "unmerged, abort: the branch was deleted$(show)"
 [[ -f "$DIR/f_open.md" ]] || fail "unmerged, abort: the handoff was removed$(show)"
-pass "an unmerged branch falls to the prompt, and abort keeps it"
+pass "an unmerged branch falls to the prompt, and abort keeps it and its worktree"
 
 # 11. A head mismatch closes no issue, even when the human deletes the branch.
 worktree f_mmd; echo f_mmd >> "$MERGED"; echo mismatch > "$HEADMODE"
@@ -311,5 +318,39 @@ run "d" "$WORK/wt-f_mmd" cdd-worktree-done
 grep -qF "Not closing #5: merged PR #7 is for other commits than 'f_mmd'." "$WORK/out" \
   || fail "mismatch, delete: expected the not-closing line$(show)"
 pass "a head mismatch closes no issue, even when the branch is deleted"
+
+# 12. Project-rung adapters: the feature worktree's own .cdd/ binds both, through
+# relative symlinks that die with it. The machine-rung code host stays installed and
+# must lose; its body is reused with a logging line, so only the rung differs.
+PROJ_LOG="$WORK/proj.log"; export PROJ_LOG
+worktree p_sq zero
+( cd "$WORK/wt-p_sq"
+  mkdir -p tools .cdd
+  # shellcheck disable=SC2016  # the logging lines are written verbatim into the stubs
+  { echo '#!/usr/bin/env bash'; echo 'echo "code-host $*" >> "$PROJ_LOG"'
+    tail -n +2 "$HOME_A/.cdd/adapters/code-host"; } > tools/code-host
+  cat > tools/tracker <<'STUB'
+#!/usr/bin/env bash
+echo "tracker $*" >> "$PROJ_LOG"
+case "$1" in
+  describe) echo '{"capability":"tracker","contract":1,"backend":"stub","ref_pattern":"^#[0-9]+$","verbs":["issue-transition"]}' ;;
+  issue-transition) echo "{\"ref\":\"$2\",\"state\":\"closed\",\"changed\":true}" ;;
+  *) exit 3 ;;
+esac
+STUB
+  chmod +x tools/code-host tools/tracker
+  ln -s ../tools/code-host .cdd/code-host; ln -s ../tools/tracker .cdd/tracker
+  git add tools .cdd; git commit -q -m p_sq )
+printf '{"stage":"pr_open","issue_refs":["#9"]}\n' > "$DIR/p_sq.state.json"
+echo p_sq >> "$MERGED"; echo match > "$HEADMODE"
+run "" "$WORK/wt-p_sq" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "project rung: exited $RC$(show)"
+grep -q "^code-host pr-merged p_sq " "$PROJ_LOG" || fail "project rung: pr-merged missed it$(cat "$PROJ_LOG")$(show)"
+grep -qx "tracker issue-transition #9 closed" "$PROJ_LOG" || fail "project rung: #9 not closed through it$(show)"
+grep -qx "issue #9: closed" "$WORK/out" || fail "project rung: expected the closed line$(show)"
+! grep -q "\[d\]elete" "$WORK/out" || fail "project rung: the prompt was shown$(show)"
+{ ! has_branch p_sq && [[ ! -e "$WORK/wt-p_sq" && ! -e "$DIR/p_sq.state.json" ]]; } \
+  || fail "project rung: something was kept$(show)"
+pass "project-rung adapters: a squash-merged branch is force-deleted, its issue closed"
 
 echo "all worktree-done checks passed"
