@@ -15,6 +15,8 @@
 #     case that motivates the shims: Claude Code's Bash tool never sources ~/.bashrc)
 #   - the dispatching shims refuse to recurse: with the helper missing, or no longer
 #     defining the function, the shim exits 127 with a reinstall hint
+#   - the helper refuses bash < 4 before defining any function: positionally on every
+#     host, and behaviourally (sourced and as install) where a bash 3.2 exists — macOS
 #   - `cdd-state stages` answers with no jq on PATH: it is the capability probe
 #     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq guard
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
@@ -293,6 +295,44 @@ for probe in "cdd-worktree-list|.cdd/tools/cdd-worktree.sh|" \
   done
 done
 pass "dispatching shims exit 127 with a reinstall hint instead of recursing (helper missing / not defining it)"
+
+# The helper's bash >= 4 guard precedes its first function, so on bash 3.2 nothing is
+# defined; checked positionally on every host, behaviourally below where a 3.2 exists.
+guard_at="$(grep -nF 'BASH_VERSINFO' "$HELPER" | head -n 1 | cut -d: -f1)"
+fn_at="$(grep -nE '^[A-Za-z_][A-Za-z0-9_-]*\(\)' "$HELPER" | head -n 1 | cut -d: -f1)"
+[[ -n "$guard_at" && -n "$fn_at" && "$guard_at" -lt "$fn_at" ]] \
+  || fail "helper's bash >= 4 guard (line ${guard_at:-none}) must precede its first function (line ${fn_at:-none})"
+pass "helper's bash >= 4 guard precedes its first function"
+
+# The same guard, against a real bash 3.2 where the host has one (macOS's
+# /bin/bash; CI's macOS job runs this). Sourced, it must return before defining anything
+# and leave the shell running; executed, install must stop before writing to HOME.
+OLD_BASH=""
+# shellcheck disable=SC2016  # the single-quoted scripts expand in the probed bash
+for b in /bin/bash /usr/bin/bash; do
+  [[ -x "$b" ]] && (( $("$b" -c 'echo "${BASH_VERSINFO[0]}"') < 4 )) && { OLD_BASH="$b"; break; }
+done
+if [[ -n "$OLD_BASH" ]]; then
+  # shellcheck disable=SC2016  # expands in the probed bash, with the helper as $1
+  old_out="$("$OLD_BASH" --norc --noprofile -c \
+    'source "$1"; echo "RC:$?"; declare -F cdd-worktree-list >/dev/null || echo UNDEFINED' \
+    _ "$HELPER" </dev/null 2>&1)"
+  if ! { grep -qF 'bash >= 4 required' <<<"$old_out" && grep -qx 'RC:1' <<<"$old_out" \
+         && grep -qx UNDEFINED <<<"$old_out"; }; then
+    fail "sourcing the helper under $OLD_BASH did not refuse cleanly; got: $old_out"
+  fi
+  OLD_HOME="$BROKEN_ROOT/old-bash-home"
+  mkdir -p "$OLD_HOME"
+  old_rc=0
+  old_out="$(HOME="$OLD_HOME" "$OLD_BASH" "$HELPER" install </dev/null 2>&1)" || old_rc=$?
+  if [[ $old_rc -eq 0 ]] || ! grep -qF 'bash >= 4 required' <<<"$old_out"; then
+    fail "install under $OLD_BASH did not refuse (exit $old_rc); got: $old_out"
+  fi
+  [[ -z "$(ls -A "$OLD_HOME")" ]] || fail "install under $OLD_BASH wrote to HOME before refusing"
+  pass "helper refuses bash < 4 ($OLD_BASH): sourced defines nothing, install writes nothing"
+else
+  echo "note: no bash < 4 on this host; the helper's bash-version guard is exercised on macOS CI"
+fi
 
 # `stages` must answer BEFORE cdd-state's jq guard: behind it, a jq-less host reports an
 # empty enum, cdd-worktree's skew check fires on a current helper, and every run there

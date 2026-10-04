@@ -100,7 +100,7 @@ curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktr
   && bash ~/.cdd/tools/cdd-worktree.sh install
 ```
 
-CDD's scripts need bash >= 4; macOS ships 3.2, so install Homebrew bash first (`brew install bash`).
+CDD's scripts need bash >= 4; macOS ships 3.2, so install Homebrew bash first (`brew install bash`). On an older bash the helper refuses to load, with a one-line message.
 
 Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. A project whose `.cdd/` binds a tracker or code host also needs the adapter library at `~/.cdd/tools/adapters/`: the checkout form installs it, while the curl form fetches only the helper and prints the one-line fetch for each adapter (see `template/BOOTSTRAP.md`). It spins up and tears down the per-task git worktree that a task's plan and implementation sessions run in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch — so a task started elsewhere can be picked up to run `/cdd-implement`, `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`. The task's handoff, plan file and state record ride along too, synced through a per-task git ref (advisory — resume still works without them). `cdd-worktree-gc` periodically reaps the handoff, plan file, state record, and synced ref of tasks whose PR has merged (dry-run unless `--force`), so those artifacts don't accumulate across machines. Once a task's PR has merged, `cdd-worktree-done` (or, as backstop, `cdd-worktree-gc`) also closes the issues the task was sourced from, through the tracker, and links the merged PR on each it closes.
 

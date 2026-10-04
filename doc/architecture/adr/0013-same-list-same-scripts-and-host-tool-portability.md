@@ -40,7 +40,10 @@ The check runner (process doc §2.14) promised that a green local run meant a gr
 
 3. **CDD requires bash >= 4.** The runner and `tools/` already use bash-4 constructs (`mapfile`,
    `${var,,}`) and macOS ships 3.2; rewriting them for 3.2 buys nothing a Homebrew bash does not.
-   The runner stops with a one-line message on an older bash, and the macOS CI job installs
+   The runner stops with a one-line message on an older bash, and so does the worktree helper
+   (sourced, before defining any function; run as `install`, before writing anything) — it
+   otherwise fails mid-command, after side effects. zsh, which also sources the helper, is not
+   a bash and is left as it was. The macOS CI job installs
    Homebrew bash in an install-only setup step — the one kind of extra step the runner's
    contract lets the workflow carry.
 

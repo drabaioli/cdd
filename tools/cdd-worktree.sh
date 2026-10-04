@@ -92,6 +92,17 @@
 # The post-merge issue close in done / gc resolves the tracker adapter the same way,
 # only for a task that recorded issue refs. See shell-helpers.md, "Tracker resolution".
 
+# Needs bash >= 4 (mapfile, local -A, ${var,,}). On bash 3.2 — stock macOS — the
+# functions below would define fine and then fail mid-command, after side effects, so
+# refuse up front: sourced, return before defining anything (the dispatching shims then
+# report the missing function); executed, exit before install writes anything. Itself
+# parseable by bash 3.2. Another shell (zsh) has no BASH_VERSION and is left as it was.
+if [[ -n "${BASH_VERSION:-}" ]] && (( BASH_VERSINFO[0] < 4 )); then
+  echo "cdd-worktree.sh: bash >= 4 required (found $BASH_VERSION); on macOS: brew install bash" >&2
+  # shellcheck disable=SC2317  # the exit runs when executed rather than sourced
+  return 1 2>/dev/null || exit 1
+fi
+
 # Resolve the capability adapter for <capability> down the ladder: the project's
 # .cdd/<capability>, then the machine's ~/.cdd/adapters/<capability>; the first FILE
 # present wins, so a broken project adapter never falls through to a machine one.

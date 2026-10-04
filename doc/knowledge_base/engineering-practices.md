@@ -43,7 +43,7 @@ New behaviour in a script or the bootstrap path ships with the relevant smoke or
 
 The shell scripts — the gate scripts under `scripts/` and, more importantly, `tools/`, which runs on users' machines — may rely on these host tools, assumed present rather than pinned:
 
-- **bash >= 4** (`mapfile`, `${var,,}`). macOS ships 3.2, so CDD on macOS means Homebrew bash; `./scripts/ci.sh` stops at once with that message on an older bash.
+- **bash >= 4** (`mapfile`, `${var,,}`). macOS ships 3.2, so CDD on macOS means Homebrew bash; `./scripts/ci.sh` and `tools/cdd-worktree.sh` stop at once with that message on an older bash.
 - **git**, and **POSIX awk, sed and grep** — in any of the families in play: gawk, mawk and BWK awk; GNU and BSD sed/grep.
 - **jq** and **shellcheck** — optional; a gate needing one is skipped, loudly, where it is absent.
 - **gh** or **curl** — the capability adapters, per backend.
