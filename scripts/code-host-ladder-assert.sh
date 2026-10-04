@@ -209,7 +209,8 @@ grep -qF "$missing" "$WORK/err" || fail "no adapter: done should print the missi
 grep -q "is not merged into main" "$WORK/out" || fail "no adapter: done should fall to the keep/delete/abort prompt$(show)"
 git -C "$MACHINE" show-ref --verify --quiet "refs/heads/$MERGED" || fail "no adapter: done deleted the branch without asking"
 [[ -f "$DIR/$MERGED.md" ]] || fail "no adapter: done reaped the handoff without asking"
-git -C "$MACHINE" worktree prune
+# The abort leaves the worktree in place (done decides before removing); §7 re-adds it.
+git -C "$MACHINE" worktree remove --force "$WORK/machine-$MERGED"
 [[ ! -s "$GH_LOG" ]] || fail "no adapter: gh was called: $(cat "$GH_LOG")"
 pass "no adapter: one missing-adapter line; gc reaps nothing, list/resume show no PR, done asks; gh never called"
 
