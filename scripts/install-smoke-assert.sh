@@ -253,7 +253,7 @@ pass "cdd-state PATH shim written and resolves non-interactively"
 
 # `timeout` is GNU coreutils: macOS ships none, and Homebrew's coreutils names it gtimeout.
 # With neither, the bounded probes below run unbounded — a regressed guard then hangs the
-# gate until the CI job's own timeout fails it, slowly — so say so once rather than fail.
+# gate until the CI job's own 5-minute timeout fails it — so say so once rather than fail.
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT=(timeout)
 elif command -v gtimeout >/dev/null 2>&1; then
