@@ -211,21 +211,23 @@ verb_pr_reply() {
 }
 
 # --- pr-merged -----------------------------------------------------------------
-# Whether the branch's MOST RECENT PR (into --base, if given) has merged. `ref` and
-# `url` are present only when it has, per omit-don't-null.
+# Whether the branch's MOST RECENT PR (into --base, if given) has merged. `ref`, `url`
+# and `head_sha` are present only when it has, per omit-don't-null. `head_sha` is gh's
+# `headRefOid`: the branch tip the PR merged, not a squash commit.
 verb_pr_merged() {
-  local branch="$1" base="$2" line num state url
+  local branch="$1" base="$2" line num state head url
   local -a args=(--head "$branch" --state all)
   [[ -n "$base" ]] && args+=(--base "$base")
   require_gh
-  if ! line="$(gh pr list "${args[@]}" --json number,state,url \
-                 --jq '.[0] | select(.) | "\(.number) \(.state) \(.url)"' 2>/dev/null)"; then
+  if ! line="$(gh pr list "${args[@]}" --json number,state,headRefOid,url \
+                 --jq '.[0] | select(.) | "\(.number) \(.state) \(.headRefOid) \(.url)"' 2>/dev/null)"; then
     err "could not list GitHub pull requests for branch '$branch' (no access, or the request failed)"
     exit 1
   fi
-  read -r num state url <<<"$line" || true
+  read -r num state head url <<<"$line" || true
   if [[ "$state" == MERGED ]]; then
     printf '{"branch":"%s","merged":true,"ref":"%s"' "$(json_escape "$branch")" "$num"
+    [[ "$head" =~ ^[0-9a-f]{40,64}$ ]] && printf ',"head_sha":"%s"' "$head"
     [[ -n "$url" ]] && printf ',"url":"%s"' "$(json_escape "$url")"
     printf '}\n'
   else

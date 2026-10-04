@@ -225,10 +225,10 @@ Every PR whose head is the branch, **newest first**; `[]` when there is none, as
 ### `pr-merged <branch> [--base B]` → object
 
 ```json
-{"branch":"my_branch","merged":true,"ref":"42","url":"https://…"}
+{"branch":"my_branch","merged":true,"ref":"42","head_sha":"5276df1e…","url":"https://…"}
 ```
 
-**Whether the branch's most recent PR** (into `--base`, if given) **has merged.** It takes a branch because both of its callers start from one. `ref` and `url` (the PR's page, an additive field) are present only when `merged` is true; `url` is what the post-merge close links on the items it closes, and a caller without it names the PR by `ref` alone. This is deliberately conservative — it does not accept *any* merged PR into the base: a branch with an older merged PR and a newer open one reads as not merged, so `done` prompts instead of force-deleting.
+**Whether the branch's most recent PR** (into `--base`, if given) **has merged.** It takes a branch because both of its callers start from one. `ref` and `url` (the PR's page, an additive field) are present only when `merged` is true; `url` is what the post-merge close links on the items it closes, and a caller without it names the PR by `ref` alone. `head_sha` (also additive, so the contract stays `1`) is the PR's head commit as a full SHA: the source branch's tip that the PR merged, not a squash or merge commit. It is what tells this branch's PR from an old merged PR of a **reused branch name**: `cdd-worktree-done` force-deletes an unmerged-looking branch only when `head_sha` contains the local tip (is it, or descends from it — a branch behind its PR), and asks otherwise. An adapter that omits it still conforms and still resolves, but its answer can never confirm a force-delete — `done` then asks instead, and `gc` (which compares only when the branch still exists locally) behaves as without the check. The shipped code-host adapters always report it on a merged answer. This is deliberately conservative — it does not accept *any* merged PR into the base: a branch with an older merged PR and a newer open one reads as not merged, so `done` prompts instead of force-deleting; the head check backs the same rule for the case the branch name alone cannot tell apart.
 
 ### `pr-comments <pr>` → object
 
@@ -264,7 +264,7 @@ A bare branch name, never `origin/main`.
 
 This repo binds both GitHub adapters to itself by committing `.cdd/code-host` and `.cdd/tracker` as relative symlinks into `tools/adapters/` — dogfooding, and a symlink cannot drift from its target. A downstream project has no `tools/adapters/` of its own, so it binds by a shim onto the machine-global adapter library ([Installing a binding](#installing-a-binding)).
 
-It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` (asked for the PR's `url` too) are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline, and asks `gh repo view` only when `origin/HEAD` is unset — where the helpers' git fallback would guess `main`.
+It declares all six verbs. `describe` is a constant — it does not even need git. `pr-for-branch` and `pr-merged` (asked for the PR's `url` too, and `headRefOid` as `head_sha` — the branch head at merge time, not the squash commit) are `gh pr list --head <branch> --state all`, whose order is newest first. `pr-comments` is one GraphQL call (`reviewThreads`, `reviews`, `comments`, and `viewer`), with each thread's `id` taken from its first comment's REST id — the id GitHub's reply endpoint takes. `pr-reply --to` posts to that endpoint; without `--to` it is `gh pr comment`. `default-branch` reads the local `origin/HEAD` first, so on a normal clone it answers offline, and asks `gh repo view` only when `origin/HEAD` is unset — where the helpers' git fallback would guess `main`.
 
 ## The Jira adapter
 
@@ -330,7 +330,7 @@ A missing variable is exit 4 with one stderr line per variable, after argument v
 
 - **State.** `opened` and `locked` (an MR mid-merge) are `open`; `closed` and `merged` are themselves.
 - **`pr-create`** opens an MR from the current branch, which must already be pushed; without `--base` the target is the project's default branch, asked of GitLab. An existing open MR for the branch is GitLab's own refusal, exit 1.
-- **`pr-for-branch` / `pr-merged`** list the branch's MRs (into `--base`, if given) newest first.
+- **`pr-for-branch` / `pr-merged`** list the branch's MRs (into `--base`, if given) newest first. `pr-merged`'s `head_sha` is the MR's `sha`, its source branch's head commit — not `merge_commit_sha` or `squash_commit_sha`.
 - **`pr-comments`** reads the MR's discussions. A threaded discussion is a thread: its `id` is the **discussion id** — the reply target `pr-reply --to` takes — `resolved` is GitLab's flag, and an inline one carries the `path` and `line` of its position (both omitted for a general thread on the overview). A standalone note is a top-level comment; system notes ("added 1 commit") are dropped. `viewer` is the token's user (`/user`), omitted if GitLab does not say. **`outdated` and `reviews` are omitted**: GitLab has no "this hunk no longer applies" flag (a note on an older revision is a different fact), and no review object carrying a body — an approval has none, and a submitted review's summary is an ordinary note, already in `comments`.
 - **`pr-reply`** posts a note in the discussion (with `--to`) or on the MR; `url` is the MR page anchored on it.
 - **`default-branch`** reads the local `origin/HEAD` first, as the GitHub adapter does, and asks GitLab only when it is unset.
@@ -418,3 +418,5 @@ It is **offline by construction**, and backend-neutral: every probe runs with th
 **Its stated limit:** check 3 proves that dispatch *reaches* an implementation, not that the implementation is *correct*. Correctness needs a live call against a real backend, which the offline-only decision rules out on purpose — a gate that SKIPs on most hosts is a gate whose verdict nobody can rely on. Checks 1, 2 and 4–7 are exact; check 3 is a floor.
 
 Check 3 is only meaningful because of the dispatch-order rule above: an adapter that authenticated before parsing its arguments would exit 4 here for reasons that say nothing about dispatch. Such an adapter is non-conformant by construction, which is why the rule is stated as a rule and not as a hint.
+
+**The shipped code-host adapters' answers.** The same gate also runs `scripts/adapter-answers-assert.sh`, which narrows check 3's limit for the one answer a helper force-deletes on: each shipped code-host adapter's `pr-merged` runs over a stub `gh` or `curl` returning a canned backend response, offline and with the environment scrubbed, and must report `merged`, `ref`, `url` and `head_sha` when merged and none of them otherwise. It is a separate script rather than a check in the checker because it needs each backend's wire format, and the checker stays backend-neutral so a project can point it at its own adapter.

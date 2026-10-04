@@ -76,10 +76,11 @@ GATES=(
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
   "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
   "state-extension|jq|extension fields on the state record: unknown top-level keys survive every write"
-  "adapter-conformance|jq|the shipped capability adapters (tracker, code-host) against their contracts (offline)"
+  "adapter-conformance|jq|the shipped capability adapters (tracker, code-host) against their contracts, and the code-host adapters' pr-merged answers (offline)"
   "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
   "code-host-ladder|jq|code-host resolution: missing, broken and working adapters at every helper call site"
   "issue-close|jq|post-merge issue close from cdd-worktree-done and cdd-worktree-gc"
+  "worktree-done|jq|cdd-worktree-done's removal and branch-deletion paths"
   "adapter-bindings|jq|bootstrap with adapter bindings: .cdd/ shims resolve and pass describe from a fresh clone (offline)"
   "bootstrap||end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
@@ -173,6 +174,9 @@ gate_adapter_conformance() {
     ./scripts/adapter-conformance-check.sh "$adapter" || rc=1
   done
   [[ $n -gt 0 ]] || { echo "FAIL: no tools/adapters/*/*.sh adapter found"; return 1; }
+  # The checker is backend-neutral; the shipped code-host adapters' answer shapes are
+  # checked against canned backend responses by a script of their own.
+  ./scripts/adapter-answers-assert.sh || rc=1
   return "$rc"
 }
 
@@ -186,6 +190,10 @@ gate_code_host_ladder() {
 
 gate_issue_close() {
   ./scripts/issue-close-assert.sh
+}
+
+gate_worktree_done() {
+  ./scripts/worktree-done-assert.sh
 }
 
 gate_adapter_bindings() {
