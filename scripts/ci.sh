@@ -5,9 +5,9 @@
 # (the workflow holds no gate list at all), and `/cdd-pre-pr` invokes it too: same
 # list, same scripts. That is what "it passed locally" buys — CI runs the same gates
 # through the same scripts, not necessarily to the same verdict: the scripts call
-# host tools (sed, grep, awk, ...) whose implementations differ. The portability gate and the two-OS CI matrix narrow that gap.
-# Adding a gate here is the only way to add one — there is no second list to keep
-# in sync.
+# host tools (sed, grep, awk, ...) whose implementations differ. The portability
+# gate and the two-OS CI matrix narrow that gap. Adding a gate here is the only way
+# to add one — there is no second list to keep in sync.
 #
 # Usage:
 #   scripts/ci.sh                  run every gate, then print a summary
