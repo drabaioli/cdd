@@ -523,6 +523,18 @@ cdd-worktree-done() {
   # The worktree's top level, not $PWD: run from a subdirectory, $PWD would name only it.
   local feature_path
   feature_path="$(git rev-parse --show-toplevel)" || return 1
+  # A locked worktree would refuse the removal in step 3, after the issues are closed;
+  # refuse it here instead, before anything has moved. The lock is the `locked` file in
+  # this worktree's own git dir (its content is the reason, possibly empty).
+  local lock_file
+  lock_file="$(git rev-parse --absolute-git-dir)/locked" || return 1
+  if [[ -f "$lock_file" ]]; then
+    local lock_reason
+    lock_reason="$(head -n 1 "$lock_file")"
+    echo "Worktree $feature_path is locked${lock_reason:+ ($lock_reason)}." >&2
+    echo "Unlock it first (git worktree unlock \"$feature_path\"). Nothing was deleted." >&2
+    return 1
+  fi
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
@@ -623,9 +635,9 @@ cdd-worktree-done() {
   # 2. Close the task's issues (only once a merged PR is confirmed, and only for a
   # branch about to be deleted). A close that failed, or could not be attempted yet,
   # keeps the record and refs/cdd/<branch> — the only carriers of the refs — so
-  # cdd-worktree-gc can retry it. If step 3 then fails, the issues stay closed; a
-  # re-run finds them already closed and posts no second link.
-  local keep_for_gc=0
+  # cdd-worktree-gc can retry it. If step 3 then fails, the issues stay closed and
+  # step 3 says so; a re-run finds them already closed and posts no second link.
+  local keep_for_gc=0 closed_note=""
   if [[ -n "$delete_mode" ]]; then
     if (( refs_unread )); then
       echo "warning: the state record lists issue refs, but reading them needs jq; not closing them." >&2
@@ -636,6 +648,7 @@ cdd-worktree-done() {
         pr_num="${pr_line%% *}"
         [[ "$pr_line" == *" "* ]] && pr_url="${pr_line#* }"
         cdd-worktree-close-issues "$pr_num" "$pr_url" "${CDD_ISSUE_REFS[@]}" || keep_for_gc=1
+        closed_note="The issue close above has already run; re-run cdd-worktree-done once the worktree can be removed (a closed issue reads as already closed, and is not linked twice)."
       elif (( pr_unknown )); then
         echo "warning: could not confirm a merged PR for '$branch'; not closing ${CDD_ISSUE_REFS[*]} yet." >&2
         keep_for_gc=1
@@ -649,16 +662,20 @@ cdd-worktree-done() {
 
   # 3. Worktree removal. No adapter is called past this point. sudo is offered ONLY for
   # a permission error (root-owned build artefacts, which git deletes as ignored
-  # files); any other failure — a locked worktree, a path that is not one — aborts with
-  # nothing deleted. LC_ALL=C because git's and strerror's messages are localized, and
-  # the match below reads them.
+  # files); any other failure — a path that is not a worktree, a lock taken since the
+  # check above — aborts with nothing deleted locally. LC_ALL=C because git's and
+  # strerror's messages are localized, and the match below reads them.
   local rm_err
   if ! rm_err="$(LC_ALL=C git worktree remove "$feature_path" 2>&1)"; then
     case "$rm_err" in
       *"Permission denied"*|*"Operation not permitted"*) ;;
       *)
         echo "git worktree remove failed for $feature_path: $rm_err" >&2
-        echo "Nothing was deleted; worktree left in place." >&2
+        if [[ -n "$closed_note" ]]; then
+          echo "Worktree left in place; nothing local was deleted. $closed_note" >&2
+        else
+          echo "Nothing was deleted; worktree left in place." >&2
+        fi
         return 1
         ;;
     esac
@@ -670,10 +687,13 @@ cdd-worktree-done() {
     echo "Falling back to: sudo rm -rf \"$feature_path\" && git worktree prune"
     read -r -p "Proceed with sudo rm -rf? [y/N] " reply
     if [[ "$reply" != "y" && "$reply" != "Y" ]]; then
-      echo "Aborted. Worktree left in place." >&2
+      echo "Aborted. Worktree left in place.${closed_note:+ $closed_note}" >&2
       return 1
     fi
-    sudo rm -rf "$feature_path" || return 1
+    if ! sudo rm -rf "$feature_path"; then
+      [[ -n "$closed_note" ]] && echo "$closed_note" >&2
+      return 1
+    fi
     git worktree prune
   fi
 

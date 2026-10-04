@@ -25,6 +25,8 @@
 #   - a squash-merged branch is force-deleted with no prompt and no failed adapter call,
 #     its issue closed and its handoff, plan, state record and refs/cdd/<branch> reaped
 #   - a branch merged by ancestry, with issue refs, likewise
+#   - a locked worktree stops before any adapter call, so no issue closes
+#   - a removal that fails after the close says the issues were handled, keeps the rest
 #
 # Like issue-close-assert.sh it stands in a local bare repo for origin and gives the
 # helper its own $HOME. A stub code-host adapter (the machine rung) answers pr-merged
@@ -223,18 +225,18 @@ else
   pass "declining the sudo offer leaves the worktree and the branch"
 fi
 
-# 4. A locked worktree aborts with git's message: nothing deleted, no sudo.
+# 4. A locked worktree is refused up front, naming the lock: nothing deleted, no sudo.
 worktree d_locked zero
 git -C "$MACHINE" worktree lock --reason "smoke" "$WORK/wt-d_locked"
 run "y" "$WORK/wt-d_locked" cdd-worktree-done
 [[ $RC -eq 1 ]] || fail "locked: expected exit 1, got $RC$(show)"
-grep -q "locked" "$WORK/err" || fail "locked: git's message should be shown$(show)"
+grep -qF "is locked (smoke)" "$WORK/err" || fail "locked: the lock and its reason should be named$(show)"
 grep -q "Nothing was deleted" "$WORK/err" || fail "locked: should say nothing was deleted$(show)"
 no_sudo || fail "locked: sudo was called$(show)"
 { [[ -d "$WORK/wt-d_locked" ]] && listed "$WORK/wt-d_locked"; } || fail "locked: the worktree was touched$(show)"
 has_branch d_locked || fail "locked: the branch was deleted$(show)"
 git -C "$MACHINE" worktree unlock "$WORK/wt-d_locked"
-pass "a locked worktree aborts with git's message, nothing deleted, no sudo"
+pass "a locked worktree is refused up front, nothing deleted, no sudo"
 
 # 5. "Not a working tree" aborts the same way.
 worktree e_notwt zero
@@ -343,6 +345,7 @@ esac
 EOF
 
 # proj_worktree <branch> — a feature worktree whose one commit binds both adapters at
+# (or, once an earlier case merged them into main, keeps binding them at)
 # the project rung, plus a plan, a state record with issue #9, and refs/cdd/<branch>.
 proj_worktree() {
   worktree "$1" zero
@@ -350,9 +353,9 @@ proj_worktree() {
     mkdir -p tools/adapters/code-host tools/adapters/tracker .cdd
     install -m 755 "$WORK/code-host-stub" tools/adapters/code-host/stub.sh
     install -m 755 "$WORK/tracker-stub" tools/adapters/tracker/stub.sh
-    ln -s ../tools/adapters/code-host/stub.sh .cdd/code-host
-    ln -s ../tools/adapters/tracker/stub.sh .cdd/tracker
-    git add tools .cdd; git commit -q -m "$1" )
+    ln -sfn ../tools/adapters/code-host/stub.sh .cdd/code-host
+    ln -sfn ../tools/adapters/tracker/stub.sh .cdd/tracker
+    git add tools .cdd; git commit -q --allow-empty -m "$1" )
   printf '# Plan: %s\n' "$1" > "$DIR/$1.plan.md"
   printf '{"stage":"pr_open","issue_refs":["#9"]}\n' > "$DIR/$1.state.json"
   git -C "$MACHINE" push -q origin "refs/heads/$1:refs/cdd/$1"
@@ -395,5 +398,28 @@ git -C "$MACHINE" push -q origin main
 run "" "$WORK/wt-p_anc" cdd-worktree-done
 proj_check "project, ancestry" p_anc
 pass "project-rung adapters: an ancestry-merged branch with refs closes its issue, all reaped"
+
+# P3. Locked: refused before the pull and before any adapter call past describe.
+proj_worktree p_lock; echo p_lock >> "$MERGED"; echo match > "$HEADMODE"
+git -C "$MACHINE" worktree lock "$WORK/wt-p_lock"
+run "" "$WORK/wt-p_lock" cdd-worktree-done
+[[ $RC -eq 1 ]] || fail "project, locked: expected exit 1, got $RC$(show)"
+grep -qF "wt-p_lock is locked." "$WORK/err" || fail "project, locked: the lock should be named$(show)"
+! grep -qvE "^(code-host|tracker) describe$" "$PROJ_LOG" || fail "project, locked: an adapter was called$(cat "$PROJ_LOG")$(show)"
+{ has_branch p_lock && [[ -f "$DIR/p_lock.state.json" ]] && listed "$WORK/wt-p_lock"; } \
+  || fail "project, locked: something was removed$(show)"
+git -C "$MACHINE" worktree unlock "$WORK/wt-p_lock"
+pass "project-rung adapters: a locked worktree stops before any issue is closed"
+
+# P4. The removal fails after the close: said so, and the branch and records are kept.
+proj_worktree p_rmfail; echo p_rmfail >> "$MERGED"; echo match > "$HEADMODE"
+EXTRA_PATH="$WORK/gitwrap" run "" "$WORK/wt-p_rmfail" cdd-worktree-done
+[[ $RC -eq 1 ]] || fail "project, removal fails: expected exit 1, got $RC$(show)"
+grep -qx "issue #9: closed" "$WORK/out" || fail "project, removal fails: expected the closed line$(show)"
+grep -qF "The issue close above has already run" "$WORK/err" || fail "project, removal fails: the close should be owned up to$(show)"
+! grep -q "^Nothing was deleted" "$WORK/err" || fail "project, removal fails: 'Nothing was deleted' after a close$(show)"
+{ has_branch p_rmfail && [[ -f "$DIR/p_rmfail.state.json" ]] && listed "$WORK/wt-p_rmfail"; } \
+  || fail "project, removal fails: something local was removed$(show)"
+pass "project-rung adapters: a removal failing after the close says so and keeps the rest"
 
 echo "all worktree-done checks passed"
