@@ -104,7 +104,7 @@ fi
 
 # cdd-only fences belong in the repo copies only; strip_cdd_only runs on both sides,
 # so a marker in the template would silently hide the fenced content from the diff.
-if grep -rn 'cdd-only-\(begin\|end\)' template/.claude/commands/ >&2; then
+if grep -rnE 'cdd-only-(begin|end)' template/.claude/commands/ >&2; then
   echo "ERROR: cdd-only markers found in template/.claude/commands/ (see above); they belong in the repo copies only" >&2
   fail=1
 fi

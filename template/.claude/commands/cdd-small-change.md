@@ -50,7 +50,7 @@ The same obligation the standard lane carries: a change is not done until the do
 
 ## 6. Verify
 
-Run the project's check runner, whole — the same command CI runs, not a subset chosen for a small diff.
+Run the project's check runner, whole — the same gate list CI runs, not a subset chosen for a small diff.
 
 Report failures with their output rather than summarizing them away. A gate that skipped because its tool is missing is a skip, not a pass — say so.
 

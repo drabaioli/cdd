@@ -185,7 +185,9 @@ The `stage` field is an **open enum in one direction only**. Adding a stage is a
 
 ### 2.14 The check runner
 
-One command that runs every gate the project has, and is the **sole source of the gate sequence**. CI delegates to it, keeping only platform-specific setup in the CI config, and `/cdd-pre-pr` (§3.6) invokes the same command — so "it passed locally" means "it will pass CI", and there is no second list of checks to keep in sync. Adding a gate to the runner is the only way to add one.
+One command that runs every gate the project has, and is the **sole source of the gate sequence**. CI never holds a list of its own, and keeps only platform-specific setup in its config: it calls the runner whole, or — when gates are slow, container builds for instance — **fans out** over it, one job asking the runner for its gate list and one parallel job per gate running that gate alone, which needs the runner to have both a list mode and per-gate invocation. `/cdd-pre-pr` (§3.6) invokes the same runner. Adding a gate to the runner is the only way to add one, and there is no second list of checks to keep in sync.
+
+The guarantee is **same list, same scripts**: a green local run means CI runs the same gates through the same scripts — not that its verdict is identical, because the scripts call host tools whose implementations differ (one host's awk keeps an escape another strips), and a missing tool is a skipped gate. So gate scripts keep to behaviour every assumed tool shares, checked mechanically where that is cheap, and the project names the tools it assumes in its engineering-practices contract (§2.12).
 
 This exists for two reasons, and the second is the larger. A project's gates are otherwise written out once in the CI config, once in `CLAUDE.md`, and once in the pre-PR command — three lists that silently drift. And a pre-PR session that runs only *some* of the gates gives a green verdict that guarantees very little, so the rest of the failures surface after the PR is open, which is exactly when they are most expensive.
 
@@ -443,7 +445,7 @@ The approval between the two phases is **conditional** (checkpoint 4, §4). On t
 
 ### 3.6 Pre-PR session: `/cdd-pre-pr`
 
-A fresh session on the feature branch, started after the implementation session has closed — deliberately, so the implementation session never grades its own homework. It runs the project's check runner (§2.14) — the same command CI runs, so the verdict carries over — code-reviews the diff and checks it against the handoff's `## Requirements` (§2.6), and reconciles four things:
+A fresh session on the feature branch, started after the implementation session has closed — deliberately, so the implementation session never grades its own homework. It runs the project's check runner (§2.14) — the same gate list through the same scripts CI runs, so the verdict carries over unless a tool is missing or a host tool behaves differently — code-reviews the diff and checks it against the handoff's `## Requirements` (§2.6), and reconciles four things:
 
 - **Docs**: architecture and feature docs are compared against the actual code and fixed directly; roadmap checkboxes are ticked directly, while structural roadmap edits (add/modify/remove) are proposed to the human for approval before applying.
 - **Test coverage**: each behavioural change in the diff either has a test exercising it, or the reason it doesn't is recorded — the recurring guardrail behind §2.12's tested-behaviour row. If the project has no test harness yet, the step notes the untested change and confirms that standing up tests is tracked on the roadmap; it does not invent a framework.

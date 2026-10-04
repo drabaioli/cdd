@@ -35,7 +35,7 @@ Once a coding standard exists, link it from the Key references table and referen
 ## Build & test
 
 ```bash
-<check runner command>   # every gate, the one command CI runs (see below)
+<check runner command>   # every gate, the same list CI runs (see below)
 ```
 
 The individual gates the runner should call:
@@ -48,7 +48,7 @@ The individual gates the runner should call:
 <lint command>
 ```
 
-Keep the runner the **single source of the gate sequence**: CI delegates to it and `/cdd-pre-pr` invokes it, so a gate is never listed twice and a local pass means CI will pass.
+Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and `/cdd-pre-pr` invokes it, so a gate is never listed twice. Same list, same scripts: a local pass means CI runs the same gates through the same scripts, though a host tool that behaves differently, or one missing locally, can still make CI disagree.
 
 ## Module layout
 

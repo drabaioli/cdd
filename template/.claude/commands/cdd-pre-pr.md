@@ -38,7 +38,7 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Because it is the same command, a green run here means CI will be green too. **Capture only the last 40 lines + exit code, do not read the full output.**
+Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Same list, same scripts: a green run here means CI runs the same gates through the same scripts, though a missing tool (skipped) or a host tool that behaves differently can still make CI disagree. **Capture only the last 40 lines + exit code, do not read the full output.**
 
 ```bash
 <check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"

@@ -13,9 +13,10 @@ The process doc, template, architecture/feature docs, and roadmap are reconciled
 
 ## Tested behaviour — Enforced
 
-There is no unit-test suite; behaviour is exercised by integration-style smoke and consistency checks, all reachable from `./scripts/ci.sh` — the same command CI runs and `/cdd-pre-pr` invokes:
+There is no unit-test suite; behaviour is exercised by integration-style smoke and consistency checks, all reachable from `./scripts/ci.sh` — the same gate list CI runs and `/cdd-pre-pr` invokes:
 
 - `bash -n` over all shell scripts (syntax).
+- `./scripts/portability-check.sh` — the host-tool portability sweep over the same scope as shellcheck: four rules, each banning a construct one sed/grep/awk family reads differently from another — `sed -i`, a backslash in a literal `awk -v` value, the GNU BRE escapes `\?` `\+` `\|` on a sed or grep line, and `grep -P`. Whole-line comments are ignored; a line that must keep a construct carries `# portability-ok: <reason>`. Line-based, so a flag on a continuation line or a value built from variables is not seen — the macOS CI job backs it up. Carries an inline self-check: each rule's broken example is run through the real scan path and must be reported, so a rule whose pattern rotted cannot report clean.
 - `./scripts/command-drift-check.sh` — repo `.claude/commands/` vs the rendered template, plus the handoff-schema and worktree-helper assertions.
 - `./scripts/prompt-seam-check.sh` — deterministic seam contracts between the repo's own prompts: `/cdd-*` references resolve to a command file, the issue refs `/cdd-next-step` records are read back and turned into close lines by `/cdd-pre-pr`, backticked file paths resolve, each command keeps its load-bearing headings (matched by title, so renumbering a step is a no-op), the gate count stated in prose matches `./scripts/ci.sh list`, every open row of the template's engineering-practices contract is named in `/cdd-bootstrap`'s engineering-floor question, every plan-file section `/cdd-plan` writes is still named by `/cdd-implement`, the small-change lane's routing marker is still written and still read on both routing paths, the lane's eligibility heuristic is stated verbatim everywhere it is applied, and the seam-check count restated in prose in four files matches `./scripts/prompt-seam-check.sh list`.
 - `./scripts/roadmap-length-check.sh` — every item in all three roadmaps the repo ships (its own, the template's, the demo seed's), pending and completed alike, fits in 200 characters. The roadmap is loaded by every session, so an over-long item is a cost paid forever; the cap had been convention-only and 46 of 94 items had drifted past it. Carries an inline self-check (three fixtures either side of the cap, one multibyte) so a matcher that stopped matching cannot report clean. See ADR 0005.
@@ -24,20 +25,28 @@ There is no unit-test suite; behaviour is exercised by integration-style smoke a
 - `./scripts/adapter-conformance-assert.sh` — the conformance checker's own contract, by mutation: seventeen broken adapters, one defect each, every one of which the checker must *fail* on and name — including a Jira one that exports fake credentials to prove the environment scrub is what keeps them out. Three controls (an unmutated copy of each adapter passes; an adapter omitting the optional `create_target` passes) pin the other direction, and every mutation is verified to have actually changed the file, so an anchor that rotted away cannot masquerade as a detection. The argument is sharper here than for the two checkers above: the only adapters in this tree are conformant ones, so the gate passes on every run whether or not it still works.
 - End-to-end bootstrap smoke: `tools/bootstrap-cdd-project.sh` into a tmpdir + `scripts/template-smoke-assert.sh` (clean, link-valid tree) — in four shapes: plain, CamelCase dir, `--stage` render-only, and `--template-dir` snapshot.
 - Demo seed-overlay smoke: `demo/setup.sh … --local-only`.
-- `./scripts/ci-runner-assert.sh` — the check runner's own contract: registry and gate functions agree, an unknown gate is rejected, a missing tool yields a non-fatal SKIP, the workflow delegates instead of holding its own gate list, and gates are isolated — a gate cannot leak a shell variable or a cd into a later one.
+- `./scripts/ci-runner-assert.sh` — the check runner's own contract: registry and gate functions agree, an unknown gate is rejected, a missing tool yields a non-fatal SKIP, the workflow delegates instead of holding its own gate list (one runner step; any other step install-only), its matrix keeps both an Ubuntu and a macOS runner, the runner's bash >= 4 guard precedes its first bash-4 construct, and gates are isolated — a gate cannot leak a shell variable or a cd into a later one.
 - `./scripts/prompt-seam-assert.sh` — the seam checker's own contract, by mutation: each of its 11 checks is required to *fail* on a tree where that one seam is broken, in a throwaway copy. Three controls (an unmutated copy passes; a whitelisted dangling reference is silenced; a renumbered heading still passes) keep the 11 checks honest, and a structural assertion pairs the registry with the check functions both ways. A guard that only ever passes is indistinguishable from one that stopped working.
 
 New behaviour in a script or the bootstrap path ships with the relevant smoke or assertion extended to cover it.
 
 ## Continuous integration — Enforced
 
-`.github/workflows/template-smoke.yml` runs on every PR and holds **no gate list of its own**: it checks out and calls `./scripts/ci.sh`, the single source of the gate sequence (process doc §2.14). The same command is what `/cdd-pre-pr` invokes locally, so the local verdict is CI's verdict and no gate is ever listed twice. Mechanics in `doc/architecture/overview.md`.
+`.github/workflows/template-smoke.yml` runs on every PR and holds **no gate list of its own**: it checks out and calls `./scripts/ci.sh`, the single source of the gate sequence (process doc §2.14), as two pinned, blocking jobs — `ubuntu-24.04` (GNU sed/grep, gawk) and `macos-15` (BSD sed/grep, BWK awk, plus an install-only step for Homebrew bash). `/cdd-pre-pr` invokes the same runner locally: same list, same scripts, so no gate is ever listed twice — but a host tool that behaves differently, or a tool missing locally, can still make the local verdict differ from CI's; running CI on two tool families is what catches the former before merge. This repo does not fan its gates out across jobs (process doc §2.14): the whole run takes about half a minute. Mechanics in `doc/architecture/overview.md`.
 
 ## Lint & format — Enforced (lint); Expected (format)
 
 - Lint: `shellcheck` over all repo shell scripts, as the runner's `shellcheck` gate. On a host without `shellcheck` installed the gate reports SKIPPED — loudly and non-fatally, never silently passed — so a local run may be weaker than CI's; on CI, where `shellcheck` is preinstalled, it always runs. Same for `jq` and the three state-record gates.
 - Format: no automated formatter for Markdown or shell is enforced yet. *Expected.*
 
-## Dependency & toolchain hygiene — Expected
+## Dependency & toolchain hygiene — Enforced (host-tool portability); Expected (version pinning)
 
-The toolchain is bash + `gh` + standard POSIX tools, assumed present rather than pinned. Documenting or pinning the required tool versions is *expected*.
+The shell scripts — the gate scripts under `scripts/` and, more importantly, `tools/`, which runs on users' machines — may rely on these host tools, assumed present rather than pinned:
+
+- **bash >= 4** (`mapfile`, `${var,,}`). macOS ships 3.2, so CDD on macOS means Homebrew bash; `./scripts/ci.sh` stops at once with that message on an older bash.
+- **git**, and **POSIX awk, sed and grep** — in any of the families in play: gawk, mawk and BWK awk; GNU and BSD sed/grep.
+- **jq** and **shellcheck** — optional; a gate needing one is skipped, loudly, where it is absent.
+- **gh** or **curl** — the capability adapters, per backend.
+- **tar** — the `snapshot-render` gate. **timeout** — one assertion in `install-smoke`, which falls back to `gtimeout` and then to running without one.
+
+Off-limits, because the families above disagree about them: `sed -i` (BSD takes the next argument as a backup suffix); backslash escapes in `awk -v` values (gawk and mawk escape-process them differently); GNU-only regex escapes (`\?` `\+` `\|` in a BRE); and GNU-only flags (`grep -P`, `date -d`, `stat -c`, `readlink -f`, `head -n -N`). The `portability` gate enforces the first three and `grep -P` mechanically; the other GNU-only flags are convention, backed by the macOS CI job — which is also the backstop for whatever a line-based sweep cannot see. *Enforced* for portability. Pinning tool versions is still *expected*.

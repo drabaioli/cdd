@@ -2,9 +2,13 @@
 # The check runner: the single source of this repo's gate sequence (issue #36).
 #
 # One script, two callers. `.github/workflows/template-smoke.yml` delegates to it
-# (the workflow holds no gate list at all), and `/cdd-pre-pr` invokes the same
-# command, so "it passed locally" means "it will pass CI". Adding a gate here is
-# the only way to add one — there is no second list to keep in sync.
+# (the workflow holds no gate list at all), and `/cdd-pre-pr` invokes it too: same
+# list, same scripts. That is what "it passed locally" buys — CI runs the same gates
+# through the same scripts, not necessarily to the same verdict: the scripts call
+# host tools (sed, grep, awk, ...) whose implementations differ, and a skipped tool
+# is a weaker verdict. The portability gate and the two-OS CI matrix narrow that gap.
+# Adding a gate here is the only way to add one — there is no second list to keep
+# in sync.
 #
 # Usage:
 #   scripts/ci.sh                  run every gate, then print a summary
@@ -34,11 +38,17 @@
 #     directory. Do not write a gate that relies on either. ci-runner-assert.sh
 #     asserts this, so replacing the pipeline with a form that runs gates in the
 #     current shell fails the `runner` gate rather than silently changing it.
-#   - The lint gates glob tools/, scripts/, and demo/, so every script — including
-#     this one — is inside its own syntax and shellcheck scope, and a newly added
-#     script is covered without touching this file.
+#   - The lint gates (syntax, shellcheck, portability) glob tools/, scripts/, and
+#     demo/, so every script — including this one — is inside its own lint scope,
+#     and a newly added script is covered without touching this file.
 #   - Output folds into named groups under GitHub Actions (::group::) and into
 #     plain banners elsewhere; a failure also emits an ::error:: annotation.
+#   - Requires bash >= 4 (mapfile, among others); on an older bash it stops at once
+#     with a clear message. macOS ships 3.2, so there it means Homebrew bash.
+#   - CI runs this on two pinned OSes (Ubuntu and macOS), each with its own
+#     sed/grep/awk family, so a host-tool difference fails a PR instead of a
+#     contributor's run (issue #107). The workflow may carry install-only setup
+#     steps (macOS needs bash >= 4); ci-runner-assert.sh holds it to that.
 #   - Scratch space: one mktemp -d per run, removed on exit. Replaces the
 #     /tmp/smoke paths the workflow used to hardcode. CDD_CI_TMPDIR overrides the
 #     location and, deliberately, keeps it: that is the knob for inspecting what a
@@ -47,6 +57,10 @@
 #     throwaway config, as ref-sync-assert.sh and gc-assert.sh already do), so the
 #     bootstrap gates' scaffold commits need neither a preconfigured identity —
 #     the workflow no longer sets one — nor the caller's signing config.
+#   - TMPDIR is exported as a physical path (symlinks resolved) before the scratch
+#     dir is made, so every gate's own mktemp does too. macOS's /var is a symlink to
+#     /private/var and git reports physical paths, so a path compare would otherwise
+#     fail there spuriously.
 #   - The gates that bootstrap a real tree also get a throwaway HOME, so the
 #     per-repo marker a bootstrap writes (~/.cdd/handoffs/<repo>/repo.json) lands
 #     in the scratch dir instead of the caller's home.
@@ -55,6 +69,12 @@
 # §2.14.
 
 set -uo pipefail
+
+# Before any bash-4 construct, and itself parseable by bash 3.2.
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "error: bash >= 4 required (found $BASH_VERSION); on macOS: brew install bash" >&2
+  exit 2
+fi
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
@@ -65,6 +85,7 @@ cd "$REPO_ROOT" || exit 1
 GATES=(
   "syntax||bash -n over every shell script"
   "shellcheck|shellcheck|shellcheck over every shell script"
+  "portability||non-portable host-tool constructs (in-place sed, awk -v escapes, GNU regex escapes, grep -P) in every shell script"
   "drift||command-set drift: repo commands vs the rendered template"
   "drift-contract||the drift checker's own contract (mutation-tested)"
   "seams||prompt-seam contracts between the repo's own prompts"
@@ -116,6 +137,13 @@ gate_shellcheck() {
   local -a files
   mapfile -t files < <(lint_targets)
   shellcheck "${files[@]}"
+}
+
+gate_portability() {
+  # Same scope as shellcheck, by construction: the checker scans what it is handed.
+  local -a files
+  mapfile -t files < <(lint_targets)
+  ./scripts/portability-check.sh "${files[@]}"
 }
 
 gate_drift() {
@@ -300,7 +328,7 @@ usage() {
   # Read via the repo-relative path, not $BASH_SOURCE: we have already cd'd to
   # $REPO_ROOT, so a relative invocation path (../cdd/scripts/ci.sh) would no
   # longer resolve from here.
-  sed -n '2,/^[^#]/{ /^[^#]/q; s/^# \?//; p; }' scripts/ci.sh
+  sed -n '2,/^[^#]/{ /^[^#]/q; s/^# \{0,1\}//; p; }' scripts/ci.sh
 }
 
 # A slug is kebab-case; its gate function is snake_case.
@@ -336,11 +364,15 @@ registry_desc() {  # registry_desc <slug>
 }
 
 set_up_scratch() {
+  # Physical paths throughout (see the header): TMPDIR for every gate's own mktemp,
+  # and TMP itself, which an override may name through a symlink.
+  TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)" || return 1
+  export TMPDIR
   if [[ -n "${CDD_CI_TMPDIR:-}" ]]; then
-    TMP="$CDD_CI_TMPDIR"
-    mkdir -p "$TMP"
+    mkdir -p "$CDD_CI_TMPDIR"
+    TMP="$(cd "$CDD_CI_TMPDIR" && pwd -P)" || return 1
   else
-    TMP="$(mktemp -d)"
+    TMP="$(cd "$(mktemp -d)" && pwd -P)" || return 1
     trap 'rm -rf "$TMP"' EXIT
   fi
 
@@ -467,7 +499,7 @@ main() {
     done
   fi
 
-  set_up_scratch
+  set_up_scratch || { echo "error: could not set up the scratch dir" >&2; return 1; }
   echo "check runner: ${#selected[@]} gate(s), scratch dir $TMP"
   run_gates "${selected[@]}"
 }

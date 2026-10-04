@@ -9,8 +9,12 @@
 #   3. A gate whose tool is missing reports SKIP and still exits 0 — the
 #      degrade-gracefully decision behind #36, which must never regress into a
 #      silent pass or a hard failure.
-#   4. The workflow delegates: every `run:` line in template-smoke.yml invokes
-#      scripts/ci.sh, so a gate cannot be re-added to YAML behind the runner's back.
+#   4. The workflow delegates: exactly one `run:` line in template-smoke.yml
+#      invokes scripts/ci.sh, and every other is an install-only setup step (a
+#      package install naming no repo script), so a gate cannot be re-added to YAML
+#      behind the runner's back. Its matrix names an Ubuntu and a macOS runner —
+#      the two tool families (issue #107) — and the runner's bash >= 4 guard
+#      precedes its first bash-4 construct.
 #   5. The syntax gate checks *every* script in scope, not just the first. This is
 #      not hypothetical: `bash -n a.sh b.sh` parses only a.sh and turns the rest
 #      into positional parameters, so the pre-runner CI's `bash -n scripts/*.sh`
@@ -100,15 +104,39 @@ grep -q 'SKIPPED: shellcheck' <<<"$skip_out" \
 pass "missing tool reports a loud SKIP and exits 0"
 
 # --- 4. The workflow delegates, holding no gate list of its own --------------
+# Exactly one run: step invokes the runner; any other must be an install-only setup
+# step (a package install, naming no repo script), so no gate can hide in one.
 mapfile -t run_lines < <(grep -nE '^[[:space:]]*run:' "$WORKFLOW")
 [[ ${#run_lines[@]} -gt 0 ]] || fail "$WORKFLOW has no run: step"
+runner_steps=0
 for line in "${run_lines[@]}"; do
-  grep -qF 'scripts/ci.sh' <<<"$line" \
-    || fail "$WORKFLOW runs something other than the check runner: $line"
+  if grep -qF 'scripts/ci.sh' <<<"$line"; then
+    runner_steps=$((runner_steps + 1))
+    continue
+  fi
+  grep -qE '^[0-9]+:[[:space:]]*run:[[:space:]]+(brew install|sudo apt-get install)[[:space:]]' <<<"$line" \
+    || fail "$WORKFLOW runs something other than the check runner or a package install: $line"
+  grep -qE 'scripts/|tools/|demo/' <<<"$line" \
+    && fail "$WORKFLOW setup step names a repo script: $line"
 done
-[[ ${#run_lines[@]} -eq 1 ]] \
-  || fail "$WORKFLOW has ${#run_lines[@]} run: steps; the runner should be the only one"
+[[ $runner_steps -eq 1 ]] \
+  || fail "$WORKFLOW invokes $RUNNER from $runner_steps run: steps; it should be exactly one"
 pass "workflow delegates to $RUNNER and holds no gate list"
+
+# Both tool families stay in CI: an Ubuntu (GNU, gawk) and a macOS (BSD, BWK awk)
+# runner, so a host-tool difference fails the PR (issue #107).
+os_line="$(grep -E '^[[:space:]]*os:' "$WORKFLOW")"
+[[ "$os_line" == *ubuntu-* && "$os_line" == *macos-* ]] \
+  || fail "$WORKFLOW matrix must name an ubuntu- and a macos- runner; got: ${os_line:-<no os: line>}"
+pass "workflow matrix runs on Ubuntu and macOS"
+
+# The bash >= 4 guard sits before the runner's first bash-4 construct, or on bash 3.2
+# (stock macOS) it would never get the chance to explain itself.
+guard_at="$(grep -nF 'BASH_VERSINFO' "$RUNNER" | head -n 1 | cut -d: -f1)"
+mapfile_at="$(grep -nE '^[^#]*mapfile' "$RUNNER" | head -n 1 | cut -d: -f1)"
+[[ -n "$guard_at" && -n "$mapfile_at" && "$guard_at" -lt "$mapfile_at" ]] \
+  || fail "$RUNNER's bash >= 4 guard (line ${guard_at:-none}) must precede its first mapfile (line ${mapfile_at:-none})"
+pass "bash >= 4 guard precedes the first bash-4 construct"
 
 # --- 5. The syntax gate covers every script in scope --------------------------
 # The probe lives in the lint scope (scripts/*.sh) on purpose — that is the only

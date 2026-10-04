@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
     --public)     VISIBILITY="--public"; shift ;;
     --private)    VISIBILITY="--private"; shift ;;
     --local-only) LOCAL_ONLY=1; shift ;;
-    -h|--help)    grep '^#' "${BASH_SOURCE[0]}" | sed 's/^# \?//'; exit 0 ;;
+    -h|--help)    grep '^#' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     -*)           demo_die "unknown option: $1" ;;
     *)            [[ -z "$INSTANCE" ]] || demo_die "unexpected argument: $1"; INSTANCE="$1"; shift ;;
   esac
