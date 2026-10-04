@@ -143,8 +143,9 @@ pass "workflow matrix runs on Ubuntu and macOS"
 
 # The bash >= 4 guard sits before the runner's first bash-4 construct, or on bash 3.2
 # (stock macOS) it would never get the chance to explain itself.
-guard_at="$(grep -nF 'BASH_VERSINFO' "$RUNNER" | head -n 1 | cut -d: -f1)"
-mapfile_at="$(grep -nE '^[^#]*mapfile' "$RUNNER" | head -n 1 | cut -d: -f1)"
+# awk, not `grep | head -n 1`: head exiting early can SIGPIPE grep, fatal under pipefail.
+guard_at="$(awk '/BASH_VERSINFO/ { print NR; exit }' "$RUNNER")"
+mapfile_at="$(awk '/^[^#]*mapfile/ { print NR; exit }' "$RUNNER")"
 [[ -n "$guard_at" && -n "$mapfile_at" && "$guard_at" -lt "$mapfile_at" ]] \
   || fail "$RUNNER's bash >= 4 guard (line ${guard_at:-none}) must precede its first mapfile (line ${mapfile_at:-none})"
 pass "bash >= 4 guard precedes the first bash-4 construct"

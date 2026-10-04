@@ -127,16 +127,25 @@ pass "cdd-worktree* PATH shims written to ~/.local/bin and executable"
 # unconditional. Both, so neither is load-bearing alone.
 NOSHELLRC=(bash --norc --noprofile)
 
+# The probe PATH leads with this run's own bash (>= 4: the runner guarantees it), alone in
+# its dir so nothing else beside it leaks in. Without it `bash` — the probe shell and every
+# shim's `#!/usr/bin/env bash` — resolves through /usr/bin:/bin, which on macOS is the
+# stock 3.2 the helper refuses; a user there runs Homebrew bash ahead of it, as this does.
+BASH_BIN="$FAKE_HOME/bash-bin"
+mkdir -p "$BASH_BIN"
+ln -sf "$BASH" "$BASH_BIN/bash"
+PROBE_SYS_PATH="$BASH_BIN:/usr/bin:/bin"
+
 # Pin the no-rc property itself: drop --norc or the stdin redirect and every probe below goes
 # green again, passing for the reason it exists to rule out. In the probe shell a cdd-* name
 # must resolve to a FILE (the shim), never to a function.
-rc_leak="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+rc_leak="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'type -t cdd-worktree-list' </dev/null 2>&1)"
 [[ "$rc_leak" == "file" ]] \
   || fail "probe shell sourced a shell rc: cdd-worktree-list is a '$rc_leak', not the PATH shim"
 pass "probe shell sources no rc (shim names resolve to files, not functions)"
 
-env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'command -v cdd-worktree-list >/dev/null && cdd-worktree-list >/dev/null 2>&1' \
   </dev/null \
   || fail "cdd-worktree-list shim did not resolve/dispatch in a non-interactive shell"
@@ -146,7 +155,7 @@ pass "cdd-worktree-list shim resolves and dispatches non-interactively"
 # LOUDLY via the shim rather than dispatch into a subshell whose `cd` can't reach the caller.
 # Probe cdd-worktree-done: its shim exits before sourcing anything, so no git state is needed.
 # Same no-rc requirement as above, or the probe reaches the real function instead.
-done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+done_out="$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'cdd-worktree-done' </dev/null 2>&1)" && \
   fail "cdd-worktree-done shim succeeded silently (should refuse when unsourced)"
 grep -qF "must run as a sourced shell function" <<<"$done_out" \
@@ -245,7 +254,7 @@ STATE_SHIM="$FAKE_HOME/.local/bin/cdd-state"
 [[ -f "$STATE_SHIM" && -x "$STATE_SHIM" ]] || fail "cdd-state shim missing/not executable: $STATE_SHIM"
 # Resolution under a non-interactive, PATH-only shell is the property that keeps
 # `cdd-state set …` from silently no-oping when Claude Code's Bash tool runs it.
-resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
+resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:$PROBE_SYS_PATH" \
   "${NOSHELLRC[@]}" -c 'command -v cdd-state' </dev/null) \
   || fail "cdd-state shim did not resolve in a non-interactive shell"
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
@@ -280,7 +289,7 @@ probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|b
     rm)    rm -f "$broken/$rel" ;;
     blank) printf '# a helper that no longer defines the function\n' > "$broken/$rel" ;;
   esac
-  bounded 20 env -i HOME="$broken" PATH="$broken/.local/bin:/usr/bin:/bin" \
+  bounded 20 env -i HOME="$broken" PATH="$broken/.local/bin:$PROBE_SYS_PATH" \
     "${NOSHELLRC[@]}" -c "$name $arg" </dev/null 2>&1
   echo "STATUS:$?"
 }
@@ -301,8 +310,9 @@ pass "dispatching shims exit 127 with a reinstall hint instead of recursing (hel
 
 # The helper's bash >= 4 guard precedes its first function, so on bash 3.2 nothing is
 # defined; checked positionally on every host, behaviourally below where a 3.2 exists.
-guard_at="$(grep -nF 'BASH_VERSINFO' "$HELPER" | head -n 1 | cut -d: -f1)"
-fn_at="$(grep -nE '^[A-Za-z_][A-Za-z0-9_-]*\(\)' "$HELPER" | head -n 1 | cut -d: -f1)"
+# awk, not `grep | head -n 1`: head exiting early can SIGPIPE grep, fatal under pipefail.
+guard_at="$(awk '/BASH_VERSINFO/ { print NR; exit }' "$HELPER")"
+fn_at="$(awk '/^[A-Za-z_][A-Za-z0-9_-]*[(][)]/ { print NR; exit }' "$HELPER")"
 [[ -n "$guard_at" && -n "$fn_at" && "$guard_at" -lt "$fn_at" ]] \
   || fail "helper's bash >= 4 guard (line ${guard_at:-none}) must precede its first function (line ${fn_at:-none})"
 pass "helper's bash >= 4 guard precedes its first function"
@@ -344,7 +354,7 @@ fi
 # else; anything richer (/usr/bin) puts jq back and the case proves nothing.
 JQLESS_BIN="$FAKE_HOME/jqless-bin"
 mkdir -p "$JQLESS_BIN"
-ln -sf "$(command -v bash)" "$JQLESS_BIN/bash"
+ln -sf "$BASH" "$JQLESS_BIN/bash"
 JQLESS_PATH="$FAKE_HOME/.local/bin:$JQLESS_BIN"
 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" "${NOSHELLRC[@]}" \
   -c 'command -v jq' </dev/null >/dev/null 2>&1 \
