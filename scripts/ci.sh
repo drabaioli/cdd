@@ -57,10 +57,6 @@
 #     throwaway config, as ref-sync-assert.sh and gc-assert.sh already do), so the
 #     bootstrap gates' scaffold commits need neither a preconfigured identity —
 #     the workflow no longer sets one — nor the caller's signing config.
-#   - TMPDIR is exported as a physical path (symlinks resolved) before the scratch
-#     dir is made, so every gate's own mktemp does too. macOS's /var is a symlink to
-#     /private/var and git reports physical paths, so a path compare would otherwise
-#     fail there spuriously.
 #   - The gates that bootstrap a real tree also get a throwaway HOME, so the
 #     per-repo marker a bootstrap writes (~/.cdd/handoffs/<repo>/repo.json) lands
 #     in the scratch dir instead of the caller's home.
@@ -364,15 +360,11 @@ registry_desc() {  # registry_desc <slug>
 }
 
 set_up_scratch() {
-  # Physical paths throughout (see the header): TMPDIR for every gate's own mktemp,
-  # and TMP itself, which an override may name through a symlink.
-  TMPDIR="$(cd "${TMPDIR:-/tmp}" && pwd -P)" || return 1
-  export TMPDIR
   if [[ -n "${CDD_CI_TMPDIR:-}" ]]; then
-    mkdir -p "$CDD_CI_TMPDIR"
-    TMP="$(cd "$CDD_CI_TMPDIR" && pwd -P)" || return 1
+    TMP="$CDD_CI_TMPDIR"
+    mkdir -p "$TMP"
   else
-    TMP="$(cd "$(mktemp -d)" && pwd -P)" || return 1
+    TMP="$(mktemp -d)"
     trap 'rm -rf "$TMP"' EXIT
   fi
 
@@ -499,7 +491,7 @@ main() {
     done
   fi
 
-  set_up_scratch || { echo "error: could not set up the scratch dir" >&2; return 1; }
+  set_up_scratch
   echo "check runner: ${#selected[@]} gate(s), scratch dir $TMP"
   run_gates "${selected[@]}"
 }

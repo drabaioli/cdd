@@ -246,10 +246,26 @@ resolved=$(env -i HOME="$FAKE_HOME" PATH="$FAKE_HOME/.local/bin:/usr/bin:/bin" \
 [[ "$resolved" == "$STATE_SHIM" ]] || fail "cdd-state resolved to '$resolved', expected the shim $STATE_SHIM"
 pass "cdd-state PATH shim written and resolves non-interactively"
 
+# `timeout` is GNU coreutils: macOS ships none, and Homebrew's coreutils names it gtimeout.
+# With neither, the bounded probes below run unbounded — a regressed guard then hangs the
+# gate until the CI job's own timeout fails it, slowly — so say so once rather than fail.
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT=(timeout)
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT=(gtimeout)
+else
+  TIMEOUT=()
+  echo "note: neither timeout nor gtimeout is installed; the recursion probes run unbounded"
+fi
+bounded() {  # bounded <seconds> <cmd>...
+  local secs="$1"; shift
+  if [[ ${#TIMEOUT[@]} -gt 0 ]]; then "${TIMEOUT[@]}" "$secs" "$@"; else "$@"; fi
+}
+
 # Each shim sources the helper then calls the function by bare name; unguarded, a
 # missing/blank helper leaves that name resolving back through PATH to the shim —
 # unbounded recursion, not an error. Probed against a COPY, so a healthy install
-# survives. `timeout` is half the assertion: a regressed guard hangs rather than fails.
+# survives. The timeout is half the assertion: a regressed guard hangs rather than fails.
 probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|blank> <arg>
   local name="$1" rel="$2" how="$3" arg="$4"
   local broken="$BROKEN_ROOT/$name-$how"
@@ -259,7 +275,7 @@ probe_shim_guard() {  # probe_shim_guard <shim> <helper, relative to HOME> <rm|b
     rm)    rm -f "$broken/$rel" ;;
     blank) printf '# a helper that no longer defines the function\n' > "$broken/$rel" ;;
   esac
-  timeout 20 env -i HOME="$broken" PATH="$broken/.local/bin:/usr/bin:/bin" \
+  bounded 20 env -i HOME="$broken" PATH="$broken/.local/bin:/usr/bin:/bin" \
     "${NOSHELLRC[@]}" -c "$name $arg" </dev/null 2>&1
   echo "STATUS:$?"
 }
@@ -290,7 +306,7 @@ JQLESS_PATH="$FAKE_HOME/.local/bin:$JQLESS_BIN"
 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" "${NOSHELLRC[@]}" \
   -c 'command -v jq' </dev/null >/dev/null 2>&1 \
   && fail "probe setup: jq is still reachable on the stripped PATH, so this case proves nothing"
-stages_out="$(timeout 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
+stages_out="$(bounded 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
   "${NOSHELLRC[@]}" -c 'cdd-state stages' </dev/null 2>&1)" \
   || fail "cdd-state stages failed with no jq on PATH; got: $stages_out"
 grep -qx plan_written <<<"$stages_out" \

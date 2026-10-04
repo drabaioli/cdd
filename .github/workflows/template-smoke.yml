@@ -17,6 +17,9 @@ jobs:
         # rather than a contributor's run (issue #107). Pinned, not -latest.
         os: [ubuntu-24.04, macos-15]
     runs-on: ${{ matrix.os }}
+    # The full run takes about a minute; this bounds a hung gate (on macOS the
+    # install-smoke probes run without `timeout`, which the image does not ship).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 

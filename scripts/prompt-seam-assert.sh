@@ -303,7 +303,10 @@ sandbox_add_probe_check() {
 
 fresh_sandbox
 sandbox_add_probe_check
-"$SANDBOX/scripts/prompt-seam-check.sh" list | grep -qxF seam-probe \
+# Captured first, not piped: seam-probe is the list's first line, so `grep -q` would exit
+# before the rest is written, and under pipefail the writer's EPIPE fails the pipeline.
+probe_list="$("$SANDBOX/scripts/prompt-seam-check.sh" list)"
+grep -qxF seam-probe <<<"$probe_list" \
   || fail "check 11 setup: the probe check is not in the sandbox registry"
 expect_fail "check 11 catches a check added without updating the prose" \
   "seam-count drift in"

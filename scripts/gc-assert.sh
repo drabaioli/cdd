@@ -39,7 +39,9 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-WORK="$(mktemp -d)"
+# Physical path: on macOS mktemp hands out /var/..., a symlink to /private/var/..., while
+# git reports the resolved path, so the path compares below would fail spuriously.
+WORK="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$WORK"' EXIT
 
 export GIT_CONFIG_SYSTEM=/dev/null
