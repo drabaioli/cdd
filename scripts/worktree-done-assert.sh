@@ -12,6 +12,8 @@
 # Branch resolution:
 #   - merged by ancestry -> `git branch -d`, handoff removed
 #   - a merged PR whose head_sha is the local tip -> force-deleted, handoff removed
+#   - a merged PR whose head_sha descends from the local tip (the branch is behind its
+#     PR: commits pushed from elsewhere) -> force-deleted too, fetching the head
 #   - a merged PR at other commits (a reused branch name), or one reporting no
 #     head_sha -> never force-deleted: the keep/delete/abort prompt
 #   - no merged PR -> the prompt; abort keeps the branch
@@ -20,7 +22,8 @@
 # Like issue-close-assert.sh it stands in a local bare repo for origin and gives the
 # helper its own $HOME. A stub code-host adapter (the machine rung) answers pr-merged
 # for the branches in $MERGED, with head_sha chosen by $HEADMODE: match (the local
-# branch's tip), mismatch (a fixed foreign SHA), missing (no field). A logging `sudo`
+# branch's tip), mismatch (a fixed foreign SHA), missing (no field), or a literal SHA
+# (the PR's head on origin, ahead of the local branch). A logging `sudo`
 # stub on PATH restores write permission and runs its arguments, so the sudo path runs
 # without real sudo; a `git` wrapper fakes the "not a working tree" failure, which the
 # top-level removal target no longer reaches through normal use.
@@ -101,7 +104,8 @@ case "$1" in
       case "$(cat "$HEADMODE")" in
         match)    echo '{"merged":true,"ref":"7","head_sha":"'"$(git rev-parse "refs/heads/$2")"'"}' ;;
         mismatch) echo '{"merged":true,"ref":"7","head_sha":"'"$FOREIGN_SHA"'"}' ;;
-        *)        echo '{"merged":true,"ref":"7"}' ;;
+        missing)  echo '{"merged":true,"ref":"7"}' ;;
+        *)        echo '{"merged":true,"ref":"7","head_sha":"'"$(cat "$HEADMODE")"'"}' ;;
       esac
     else
       echo '{"merged":false}'
@@ -253,6 +257,21 @@ grep -q "squash-merged via PR #7, force-deleting" "$WORK/out" || fail "squash, m
 ! has_branch f_sq || fail "squash, match: the branch was not deleted$(show)"
 [[ ! -e "$DIR/f_sq.md" ]] || fail "squash, match: the handoff was kept$(show)"
 pass "a merged PR whose head is the local tip force-deletes the branch"
+
+# 7b. Squash-merged, the PR's head is ahead of the local tip (a commit pushed from
+# another clone, never fetched here): it contains every local commit, so force-deleted.
+worktree f_behind
+git -C "$WORK/wt-f_behind" push -q origin f_behind
+( cd "$WORK/seed"; git fetch -q origin f_behind; git checkout -q -b f_behind FETCH_HEAD
+  echo more > more.txt; git add more.txt; git commit -q -m more; git push -q origin f_behind; git checkout -q main )
+ahead="$(git -C "$WORK/seed" rev-parse refs/heads/f_behind)"
+! git -C "$MACHINE" cat-file -e "$ahead^{commit}" 2>/dev/null || fail "behind: fixture already has the PR head"
+echo f_behind >> "$MERGED"; echo "$ahead" > "$HEADMODE"
+run "" "$WORK/wt-f_behind" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "squash, behind: exited $RC$(show)"
+grep -q "squash-merged via PR #7, force-deleting" "$WORK/out" || fail "squash, behind: expected the force-delete line$(show)"
+! has_branch f_behind || fail "squash, behind: the branch was not deleted$(show)"
+pass "a merged PR whose head descends from the local tip force-deletes the branch"
 
 # 8. Merged PR at other commits (a reused name): the prompt; keep keeps everything.
 worktree f_mm; echo f_mm >> "$MERGED"; echo mismatch > "$HEADMODE"
