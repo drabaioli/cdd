@@ -67,7 +67,7 @@ It is guarded the same way the other two are, by `scripts/adapter-conformance-as
 
 ## The check runner (`scripts/ci.sh`)
 
-Both checks above, and every other gate, are reached through one script. `scripts/ci.sh` is this repo's instance of the check runner (process doc §2.14): the **sole source of the gate sequence**, invoked identically by `.github/workflows/template-smoke.yml` and by `/cdd-pre-pr`. The workflow is checkout, an install-only setup step where an OS needs one, then `./scripts/ci.sh` — and holds no gate list, so CI and a local run always agree on *which* gates run and *which scripts* run them. They can still disagree on the verdict, because those scripts call host tools whose implementations differ (process doc §2.14: same list, same scripts); the portability gate and the two-OS matrix below exist to narrow that gap.
+Both checks above, and every other gate, are reached through one script. `scripts/ci.sh` is this repo's instance of the check runner (process doc §2.14): the **sole source of the gate sequence**, invoked identically by `.github/workflows/template-smoke.yml` and by `/cdd-pre-pr`. The workflow is checkout, an install-only setup step where an OS needs one, then `./scripts/ci.sh` — and holds no gate list. Same list, same scripts, though host tools can still make the verdicts differ (process doc §2.14); the portability gate and the two-OS matrix below narrow that gap.
 
 Its mechanics:
 

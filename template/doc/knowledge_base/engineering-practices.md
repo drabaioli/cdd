@@ -20,7 +20,7 @@ New behaviour ships with a test, or an explicit, recorded reason it does not. `/
 
 ## Continuous integration — <Enforced once CI runs on every change; Expected until then>
 
-Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so no gate list is written twice. The guarantee is **same list, same scripts**: a green local run means CI runs the same gates through the same scripts, not that its verdict is identical — the scripts call host tools whose implementations differ between machines — so keep scripts to behaviour every assumed tool shares, and name those tools under dependency hygiene below. A missing tool is a failure, never a skip, locally and in CI: a gate whose tool is not installed fails without running and names the tool. Detection is per gate and the run is not fail-fast, so one run lists every tool to install and still reports every other gate.
+Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so no gate list is written twice. Host tools differ between machines, so a green local run can still fail CI: keep scripts to behaviour every tool named under dependency hygiene below shares. A missing tool fails its gate, never skips it, locally and in CI.
 
 - CI entry point: `<ci workflow / command>`
 - Check runner: `<check runner command>`

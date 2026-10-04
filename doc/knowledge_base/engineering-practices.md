@@ -13,7 +13,7 @@ The process doc, template, architecture/feature docs, and roadmap are reconciled
 
 ## Tested behaviour — Enforced
 
-There is no unit-test suite; behaviour is exercised by integration-style smoke and consistency checks, all reachable from `./scripts/ci.sh` — the same gate list CI runs and `/cdd-pre-pr` invokes:
+There is no unit-test suite; behaviour is exercised by integration-style smoke and consistency checks, all reachable from `./scripts/ci.sh`:
 
 - `bash -n` over all shell scripts (syntax).
 - `./scripts/portability-check.sh` — the host-tool portability sweep over the same scope as shellcheck: four rules, each banning a construct one sed/grep/awk family reads differently from another — `sed -i`, a backslash in a literal `awk -v` value, the GNU BRE escapes `\?` `\+` `\|` on a sed or grep line, and `grep -P`. Whole-line comments are ignored; a line that must keep a construct carries `# portability-ok: <reason>`. Line-based, so a flag on a continuation line or a value built from variables is not seen — the macOS CI job backs it up. Carries an inline self-check: each rule's broken example is run through the real scan path and must be reported, so a rule whose pattern rotted cannot report clean.
@@ -32,21 +32,21 @@ New behaviour in a script or the bootstrap path ships with the relevant smoke or
 
 ## Continuous integration — Enforced
 
-`.github/workflows/template-smoke.yml` runs on every PR and holds **no gate list of its own**: it checks out and calls `./scripts/ci.sh`, the single source of the gate sequence (process doc §2.14), as two pinned, blocking jobs — `ubuntu-24.04` (GNU sed/grep, gawk) and `macos-15` (BSD sed/grep, BWK awk, plus an install-only step for Homebrew bash). `/cdd-pre-pr` invokes the same runner locally: same list, same scripts, so no gate is ever listed twice — but a host tool that behaves differently can still make the local verdict differ from CI's; running CI on two tool families is what catches that before merge. A tool missing on either side fails its gate rather than skipping it. This repo does not fan its gates out across jobs (process doc §2.14): the whole run takes about half a minute. Mechanics in `doc/architecture/overview.md`.
+`.github/workflows/template-smoke.yml` runs `./scripts/ci.sh` on every PR, holding no gate list of its own, as two blocking jobs on two tool families: `ubuntu-24.04` (GNU sed/grep, gawk) and `macos-15` (BSD sed/grep, BWK awk). Not fanned out: the whole run takes about half a minute. Mechanics in `doc/architecture/overview.md`.
 
 ## Lint & format — Enforced (lint); Expected (format)
 
-- Lint: `shellcheck` over all repo shell scripts, as the runner's `shellcheck` gate. On a host without `shellcheck` installed the gate fails, naming the tool — a missing tool is a failure, never a skip, locally and in CI (the macOS job installs it; Ubuntu's image ships it). Same for `jq`, which most gates need.
+- Lint: `shellcheck` over all repo shell scripts, as the runner's `shellcheck` gate.
 - Format: no automated formatter for Markdown or shell is enforced yet. *Expected.*
 
 ## Dependency & toolchain hygiene — Enforced (host-tool portability); Expected (version pinning)
 
 The shell scripts — the gate scripts under `scripts/` and, more importantly, `tools/`, which runs on users' machines — may rely on these host tools, assumed present rather than pinned:
 
-- **bash >= 4** (`mapfile`, `${var,,}`). macOS ships 3.2, so CDD on macOS means Homebrew bash; `./scripts/ci.sh` and `tools/cdd-worktree.sh` stop at once with that message on an older bash.
+- **bash >= 4** (`mapfile`, `${var,,}`) — Homebrew bash on macOS, which ships 3.2.
 - **git**, and **POSIX awk, sed and grep** — in any of the families in play: gawk, mawk and BWK awk; GNU and BSD sed/grep.
-- **jq** and **shellcheck** — required to run the gates: a gate whose tool is absent fails, naming it. The shipped helpers still treat `jq` as advisory (issue #108).
+- **jq**, **shellcheck** and **tar** — required by the gates; a missing one fails its gate. The shipped helpers still treat `jq` as advisory (issue #108).
 - **gh** or **curl** — the capability adapters, per backend.
-- **tar** — the `snapshot-render` gate, which fails without it. **timeout** — one assertion in `install-smoke`, which falls back to `gtimeout` and then to running without one.
+- **timeout** — one `install-smoke` assertion; falls back to `gtimeout`, then to none.
 
 Off-limits, because the families above disagree about them: `sed -i` (BSD takes the next argument as a backup suffix); backslash escapes in `awk -v` values (gawk and mawk escape-process them differently); GNU-only regex escapes (`\?` `\+` `\|` in a BRE); and GNU-only flags (`grep -P`, `date -d`, `stat -c`, `readlink -f`, `head -n -N`). The `portability` gate enforces the first three and `grep -P` mechanically; the other GNU-only flags are convention, backed by the macOS CI job — which is also the backstop for whatever a line-based sweep cannot see. *Enforced* for portability. Pinning tool versions is still *expected*.
