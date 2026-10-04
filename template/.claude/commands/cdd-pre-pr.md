@@ -38,13 +38,13 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Same list, same scripts: a green run here means CI runs the same gates through the same scripts, though a missing tool (skipped) or a host tool that behaves differently can still make CI disagree. **Capture only the last 40 lines + exit code, do not read the full output.**
+Run the project's **check runner** — the single command that runs every gate, the same one CI invokes. Same list, same scripts: a green run here means CI runs the same gates through the same scripts, though a host tool that behaves differently can still make CI disagree. **Capture only the last 40 lines + exit code, do not read the full output.**
 
 ```bash
 <check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 ```
 
-Report each gate as pass ✓ / fail ✗ / skipped ⊘ from the runner's summary. On failure, include the captured tail. A **skipped** gate is not a pass: say which gate was skipped and why (usually a tool missing on this host), so the reader knows the local verdict is weaker than CI's.
+Report each gate as pass ✓ / fail ✗ from the runner's summary. On failure, include the captured tail. **A missing tool is a failure, never a skip**: a gate that could not run because its tool is not installed failed — say which tool to install. A runner that still reports a gate *skipped* predates that rule; count the skip as a failure all the same.
 
 If the project has no single runner yet, run each gate command in sequence instead — and note the gap for step 6, because a split gate list drifts and a pre-PR session that runs only some of the gates gives a green verdict that guarantees little:
 
@@ -154,7 +154,7 @@ Present a checklist summary:
 
 ```
 ## Pre-PR Checklist
-- [ ] Check runner passed (<N> gates: <N> passed, <N> skipped)
+- [ ] Check runner passed (<N> gates: <N> passed, <N> failed)
 - [ ] Code review: no issues / issues flagged (list them)
 - [ ] Handoff requirements met (or unmet/deviating criteria listed)
 - [ ] Architecture docs up to date

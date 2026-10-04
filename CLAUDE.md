@@ -40,7 +40,7 @@ Each doc directory keeps an `index.md` pointer list: read the index, then load o
 This repo is documentation and shell scripts; there is no build step. Every check runs from one command:
 
 ```bash
-./scripts/ci.sh                  # every gate, then a PASS/FAIL/SKIP summary
+./scripts/ci.sh                  # every gate, then a PASS/FAIL summary
 ./scripts/ci.sh list             # the gate slugs
 ./scripts/ci.sh <gate> [<gate>]  # rerun one gate while iterating on a failure
 ```
@@ -49,7 +49,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 
 The 26 gates: `syntax` and `shellcheck` over every shell script, and `portability` over the same scope (no `sed -i`, backslashes in `awk -v` values, GNU-only regex escapes or `grep -P`; inline self-check); `drift` (repo `.claude/commands/` and `.claude/settings.json` vs the rendered template) and `drift-contract` (the drift checker's own contract, mutation-tested), `seams` (prompt-seam contracts), `seams-contract` (the seam checker's own contract, mutation-tested) and `roadmap-length` (the 200-char-per-item cap on all three shipped roadmaps); the helper assertions `install-smoke`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension` (extension fields survive every write), `adapter-conformance` (the shipped capability adapters, tracker and code-host, against their contracts, plus the code-host adapters' `pr-merged` answers against canned backend responses, offline), `adapter-conformance-contract` (that checker's own contract, mutation-tested), `code-host-ladder` (code-host adapter resolution at every helper call site: missing, working, broken, unsupported verb), `issue-close` (the post-merge issue close from `cdd-worktree-done` and `cdd-worktree-gc`), `worktree-done` (`cdd-worktree-done`'s removal and branch-deletion paths) and `adapter-bindings` (a bootstrap with `--tracker`/`--code-host` yields `.cdd/` shims that pass `describe` from a fresh clone on a second machine, offline); the render smokes `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`; `demo-seed` (seed overlay, no GitHub side effects); and `runner` (the runner's own contract, `scripts/ci-runner-assert.sh`). Each gate's own script under `scripts/` still runs standalone if you want it directly.
 
-Two behaviours worth knowing: a gate whose tool is missing (`shellcheck`, `jq`) is reported **SKIPPED — loudly and non-fatally**, so a host without it gets a weaker verdict, not a wrong one; and the run is **not fail-fast**, so one invocation surfaces every problem. The runner provisions its own scratch dir and a throwaway git identity, so it needs no host setup and is unaffected by your git signing config.
+Two behaviours worth knowing: **a missing tool is a failure, never a skip** — a gate whose tool (`shellcheck`, `jq`, `tar`) is not installed fails, naming it, here and in CI alike; and the run is **not fail-fast**, so one invocation surfaces every problem, missing tools included. The runner provisions its own scratch dir and a throwaway git identity, so beyond those tools it needs no host setup and is unaffected by your git signing config.
 
 When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into `./scripts/ci.sh` plus a doc reconciliation pass.
 

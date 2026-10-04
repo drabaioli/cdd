@@ -23,10 +23,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Install-only: the runner needs bash >= 4 and the macOS image ships 3.2.
-      - name: Install bash >= 4 (macOS ships 3.2)
+      # Install-only: the runner needs bash >= 4 (the macOS image ships 3.2), and every
+      # tool a gate names — a missing one fails that gate. Ubuntu's image has them all;
+      # macOS lacks shellcheck. jq is preinstalled on both.
+      - name: Install bash >= 4 and shellcheck (macOS)
         if: runner.os == 'macOS'
-        run: brew install bash
+        run: brew install bash shellcheck
 
       # The gate sequence lives in scripts/ci.sh and nowhere else, so CI and
       # /cdd-pre-pr cannot drift apart. The runner folds each gate into a named

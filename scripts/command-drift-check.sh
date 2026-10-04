@@ -80,9 +80,12 @@ for name in "${names[@]}"; do
 done
 
 # The shipped settings file must parse: it is generated into every bootstrapped project,
-# where a stray comma silently costs the project its permissions. Opportunistic — a host
-# without jq keeps the diff below rather than turning this whole gate into a SKIP.
-if command -v jq >/dev/null 2>&1; then
+# where a stray comma silently costs the project its permissions. It needs jq, and a
+# missing tool is a failure, never a skip (scripts/ci.sh).
+if ! command -v jq >/dev/null 2>&1; then
+  echo "ERROR: jq is required to validate the settings JSON and is not installed" >&2
+  fail=1
+else
   for f in .claude/settings.json template/.claude/settings.json; do
     if ! jq empty "$f" 2>&1; then
       echo "ERROR: $f is not valid JSON (see above)" >&2

@@ -61,6 +61,9 @@ comment_block() {
 
 [[ -x "$HELPER" ]] || fail "helper not found/executable: $HELPER"
 [[ -x "$STATE_HELPER" ]] || fail "state helper not found/executable: $STATE_HELPER"
+# jq is required: the helper writes state records only with it, and the seed assertions
+# read them. A missing tool is a failure, never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 # A truncated helper passes the -x test above (truncation preserves the mode bit) and then
 # installs a 0-byte file, which surfaces a dozen lines down as the misleading "helper not
@@ -374,93 +377,88 @@ pass "install self-repairs a disabled state block (active again, still single)"
 # in the environment, the seeded record's first `sessions[]` entry is the current
 # session at stage `scoped`, carrying `dir` = the worktree root. Run it from this
 # repo (a real git repo) against FAKE_HOME so the record lands under the temp tree.
-# Guarded on jq, like the helper itself.
-if command -v jq >/dev/null 2>&1; then
-  SEED_BRANCH="issue51_seed_probe"
-  # The record path uses the repo name derived from git's common-dir (the main
-  # worktree), not this checkout's basename — mirror the helper's derivation.
-  REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
-  SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
-  EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
+SEED_BRANCH="issue51_seed_probe"
+# The record path uses the repo name derived from git's common-dir (the main
+# worktree), not this checkout's basename — mirror the helper's derivation.
+REPO_NAME="$(cd "$REPO_ROOT" && basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+SEED_FILE="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$SEED_BRANCH.state.json"
+EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
 
-  # `cdd-state seed` pushes refs/cdd/<branch> to `origin` — the repo's REAL remote, so this
-  # gate used to make live SSH round-trips and force-publish a test fixture to GitHub on every
-  # run. Point it at a throwaway bare repo instead: offline, deterministic, no side effects.
-  # Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
-  # helper's own `git push --force origin ...` is untouched, so the real path still runs.
-  # GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
-  FAKE_ORIGIN="$FAKE_HOME/origin.git"
-  git init -q --bare "$FAKE_ORIGIN"
-  PUSH_TO_FAKE=(
-    GIT_CONFIG_COUNT=1
-    GIT_CONFIG_KEY_0=remote.origin.pushurl
-    GIT_CONFIG_VALUE_0="$FAKE_ORIGIN"
-  )
-  # The helper is dual-mode: executed directly it only installs, so source it and
-  # call the function (the same path the PATH shim takes) to reach `seed`.
-  # SC2016: the single quotes are deliberate -- $1/$2 are `bash -c` positional parameters,
-  # bound from the trailing arguments, not variables to expand here.
-  # shellcheck disable=SC2016
+# `cdd-state seed` pushes refs/cdd/<branch> to `origin` — the repo's REAL remote, so this
+# gate used to make live SSH round-trips and force-publish a test fixture to GitHub on every
+# run. Point it at a throwaway bare repo instead: offline, deterministic, no side effects.
+# Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
+# helper's own `git push --force origin ...` is untouched, so the real path still runs.
+# GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
+FAKE_ORIGIN="$FAKE_HOME/origin.git"
+git init -q --bare "$FAKE_ORIGIN"
+PUSH_TO_FAKE=(
+  GIT_CONFIG_COUNT=1
+  GIT_CONFIG_KEY_0=remote.origin.pushurl
+  GIT_CONFIG_VALUE_0="$FAKE_ORIGIN"
+)
+# The helper is dual-mode: executed directly it only installs, so source it and
+# call the function (the same path the PATH shim takes) to reach `seed`.
+# SC2016: the single quotes are deliberate -- $1/$2 are `bash -c` positional parameters,
+# bound from the trailing arguments, not variables to expand here.
+# shellcheck disable=SC2016
+( cd "$REPO_ROOT" \
+  && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 "${PUSH_TO_FAKE[@]}" \
+     bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
+[[ -f "$SEED_FILE" ]] || fail "seed did not write $SEED_FILE"
+got="$(jq -r '.sessions[0] | "\(.id)|\(.stage)|\(.dir)"' "$SEED_FILE")"
+[[ "$got" == "seed-probe-123|scoped|$EXPECT_DIR" ]] \
+  || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
+pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
+
+# The push is now observable, so assert it instead of leaving it an unchecked side effect.
+git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$SEED_BRANCH" >/dev/null \
+  || fail "seed did not sync refs/cdd/$SEED_BRANCH to origin"
+pass "cdd-state seed syncs the task ref to origin (a throwaway one: no network, no side effects)"
+
+# Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
+# shellcheck disable=SC2016  # as above: `bash -c` positional parameters
+( cd "$REPO_ROOT" \
+  && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' "${PUSH_TO_FAKE[@]}" \
+     bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
+count="$(jq -r '.sessions | length' "$SEED_FILE")"
+[[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
+pass "cdd-state seed omits the session entry when no session id is set"
+
+# An option-shaped branch is rejected before anything is written or pushed. `cdd-state
+# seed --help` used to take "--help" as the branch, write --help.state.json, and
+# force-push refs/cdd/--help to the REAL origin -- which is how one appeared on the
+# shared repo. Assert both halves: no record, and no ref in the throwaway origin.
+for bad_arg in --help --bogus; do
+  # `|| true`: a rejected argument exits non-zero by design, and this script runs under
+  # `set -e`. What is asserted is the absence of effects, not the exit status.
+  # shellcheck disable=SC2016  # $1/$2 are `bash -c` positional parameters
   ( cd "$REPO_ROOT" \
-    && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID=seed-probe-123 "${PUSH_TO_FAKE[@]}" \
-       bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
-  [[ -f "$SEED_FILE" ]] || fail "seed did not write $SEED_FILE"
-  got="$(jq -r '.sessions[0] | "\(.id)|\(.stage)|\(.dir)"' "$SEED_FILE")"
-  [[ "$got" == "seed-probe-123|scoped|$EXPECT_DIR" ]] \
-    || fail "seed session entry = '$got', expected 'seed-probe-123|scoped|$EXPECT_DIR'"
-  pass "cdd-state seed records the handoff session {id, stage: scoped, dir}"
-
-  # The push is now observable, so assert it instead of leaving it an unchecked side effect.
-  git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$SEED_BRANCH" >/dev/null \
-    || fail "seed did not sync refs/cdd/$SEED_BRANCH to origin"
-  pass "cdd-state seed syncs the task ref to origin (a throwaway one: no network, no side effects)"
-
-  # Without a session id (older Claude Code), seed keeps sessions empty — no guessing.
-  # shellcheck disable=SC2016  # as above: `bash -c` positional parameters
-  ( cd "$REPO_ROOT" \
-    && env HOME="$FAKE_HOME" CLAUDE_CODE_SESSION_ID='' "${PUSH_TO_FAKE[@]}" \
-       bash -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$SEED_BRANCH" >/dev/null )
-  count="$(jq -r '.sessions | length' "$SEED_FILE")"
-  [[ "$count" -eq 0 ]] || fail "seed with no session id left $count session(s), expected 0"
-  pass "cdd-state seed omits the session entry when no session id is set"
-
-  # An option-shaped branch is rejected before anything is written or pushed. `cdd-state
-  # seed --help` used to take "--help" as the branch, write --help.state.json, and
-  # force-push refs/cdd/--help to the REAL origin -- which is how one appeared on the
-  # shared repo. Assert both halves: no record, and no ref in the throwaway origin.
-  for bad_arg in --help --bogus; do
-    # `|| true`: a rejected argument exits non-zero by design, and this script runs under
-    # `set -e`. What is asserted is the absence of effects, not the exit status.
-    # shellcheck disable=SC2016  # $1/$2 are `bash -c` positional parameters
-    ( cd "$REPO_ROOT" \
-      && env HOME="$FAKE_HOME" "${PUSH_TO_FAKE[@]}" \
-         "${NOSHELLRC[@]}" -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$bad_arg" \
-         </dev/null >/dev/null 2>&1 ) || true
-    [[ ! -f "$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$bad_arg.state.json" ]] \
-      || fail "cdd-state seed '$bad_arg' wrote a state record for an option-shaped branch"
-    if git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$bad_arg" >/dev/null; then
-      fail "cdd-state seed '$bad_arg' pushed refs/cdd/$bad_arg"
-    fi
-  done
-  pass "cdd-state seed rejects an option-shaped branch without writing or pushing"
-
-  # The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
-  # writer ran in. This assertion only bites when the two differ — i.e. whenever the
-  # check runs from a feature worktree, which is the case that regresses if someone
-  # swaps the derivation for `git rev-parse --show-toplevel`.
-  MARKER="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/repo.json"
-  MAIN_WT="$(cd "$REPO_ROOT" && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
-  [[ -f "$MARKER" ]] || fail "seed did not write the per-repo marker $MARKER"
-  got="$(jq -r '"\(.schema_version)|\(.name)|\(.path)"' "$MARKER")"
-  [[ "$got" == "1|$REPO_NAME|$MAIN_WT" ]] \
-    || fail "repo.json = '$got', expected '1|$REPO_NAME|$MAIN_WT'"
-  if [[ "$MAIN_WT" != "$EXPECT_DIR" ]]; then
-    pass "cdd-state seed writes repo.json with the MAIN worktree ($MAIN_WT), not this worktree ($EXPECT_DIR)"
-  else
-    pass "cdd-state seed writes repo.json {schema_version, name, path} (run from the main worktree)"
+    && env HOME="$FAKE_HOME" "${PUSH_TO_FAKE[@]}" \
+       "${NOSHELLRC[@]}" -c 'source "$1"; cdd-state seed "$2"' _ "$STATE_HELPER" "$bad_arg" \
+       </dev/null >/dev/null 2>&1 ) || true
+  [[ ! -f "$FAKE_HOME/.cdd/handoffs/$REPO_NAME/$bad_arg.state.json" ]] \
+    || fail "cdd-state seed '$bad_arg' wrote a state record for an option-shaped branch"
+  if git -C "$FAKE_ORIGIN" rev-parse --verify -q "refs/cdd/$bad_arg" >/dev/null; then
+    fail "cdd-state seed '$bad_arg' pushed refs/cdd/$bad_arg"
   fi
+done
+pass "cdd-state seed rejects an option-shaped branch without writing or pushing"
+
+# The per-repo marker (issue #58) records the MAIN worktree, not the worktree the
+# writer ran in. This assertion only bites when the two differ — i.e. whenever the
+# check runs from a feature worktree, which is the case that regresses if someone
+# swaps the derivation for `git rev-parse --show-toplevel`.
+MARKER="$FAKE_HOME/.cdd/handoffs/$REPO_NAME/repo.json"
+MAIN_WT="$(cd "$REPO_ROOT" && dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
+[[ -f "$MARKER" ]] || fail "seed did not write the per-repo marker $MARKER"
+got="$(jq -r '"\(.schema_version)|\(.name)|\(.path)"' "$MARKER")"
+[[ "$got" == "1|$REPO_NAME|$MAIN_WT" ]] \
+  || fail "repo.json = '$got', expected '1|$REPO_NAME|$MAIN_WT'"
+if [[ "$MAIN_WT" != "$EXPECT_DIR" ]]; then
+  pass "cdd-state seed writes repo.json with the MAIN worktree ($MAIN_WT), not this worktree ($EXPECT_DIR)"
 else
-  echo "skip: jq not found; seed assertions skipped (advisory)"
+  pass "cdd-state seed writes repo.json {schema_version, name, path} (run from the main worktree)"
 fi
 
 echo "all install smoke checks passed"

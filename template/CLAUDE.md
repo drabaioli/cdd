@@ -48,7 +48,7 @@ The individual gates the runner should call:
 <lint command>
 ```
 
-Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and `/cdd-pre-pr` invokes it, so a gate is never listed twice. Same list, same scripts: a local pass means CI runs the same gates through the same scripts, though a host tool that behaves differently, or one missing locally, can still make CI disagree.
+Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and `/cdd-pre-pr` invokes it, so a gate is never listed twice. Same list, same scripts: a local pass means CI runs the same gates through the same scripts, though a host tool that behaves differently can still make CI disagree. A missing tool fails its gate, never skips it.
 
 ## Module layout
 

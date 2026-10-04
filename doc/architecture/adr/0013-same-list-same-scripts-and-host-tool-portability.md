@@ -25,7 +25,7 @@ The check runner (process doc §2.14) promised that a green local run meant a gr
    list: it calls the runner whole, or fans out — one job reads the runner's list mode, one job
    per gate runs that gate — which needs the runner to have both modes. A green local run means
    CI runs the same gates through the same scripts, not that the verdict is identical: host
-   tools can differ, and a missing tool is a skipped gate. The template ships the fan-out shape
+   tools can differ. The template ships the fan-out shape
    as prose, not as a CI config. This repo still calls the runner whole; its full run is about
    half a minute.
 
@@ -47,6 +47,21 @@ The check runner (process doc §2.14) promised that a green local run meant a gr
    Homebrew bash in an install-only setup step — the one kind of extra step the runner's
    contract lets the workflow carry.
 
+4. **A missing tool is a failure, never a skip — locally and in CI.** This reverses the
+   skip-and-continue default the runner was built with (issue #36, process doc §2.14 before
+   this change), under which a gate whose tool was absent reported SKIP and the run stayed
+   green. That was argued as a weaker verdict rather than a wrong one, but a skip is read as a
+   pass, and CI is where it costs most: the first runs of the new macOS job passed with
+   `shellcheck` skipped, and a runner image that dropped `jq` would have skipped ten gates and
+   kept merging. Now a gate whose `needs` tool is absent fails, naming it; detection stays per
+   gate and the run stays non-fail-fast, so one run lists everything to install. Gate scripts
+   run standalone follow the same rule instead of exiting 0 on a "skip:" line, which
+   `ci-runner-assert.sh` rejects. The template's runner guidance changes with it, so a project
+   bootstrapped from here gets the same rule. A per-project opt-out (skip where tools are
+   independent and optional) was the old escape hatch and is dropped rather than kept: the
+   case it served — a contributor without `shellcheck` — is better served by being told to
+   install it.
+
 ## Consequences
 
 - A gate that leans on one tool family fails the PR rather than a contributor's run — on the
@@ -60,3 +75,7 @@ The check runner (process doc §2.14) promised that a green local run meant a gr
   hide in one. CI's job id changed (`bootstrap` → `checks`); the repo has no required status
   checks that named it.
 - A project with slow gates has a sanctioned way to parallelise CI without a second gate list.
+- Running this repo's gates now needs `shellcheck`, `jq` and `tar` on the host; a contributor
+  without one gets a red run that names it. CI installs whatever its image lacks in an
+  install-only step (`shellcheck` on macOS). Downstream runners built under the old guidance
+  may still print skips; `/cdd-pre-pr` counts those as failures.

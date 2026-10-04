@@ -87,13 +87,10 @@ pass() { echo "ok: $*"; }
 [[ -x "$GITLAB_TRACKER_ADAPTER" ]] || fail "adapter not found or not executable: $GITLAB_TRACKER_ADAPTER"
 [[ -x "$GITLAB_CODE_HOST_ADAPTER" ]] || fail "adapter not found or not executable: $GITLAB_CODE_HOST_ADAPTER"
 
-# The checker skips without jq, so every expect_fail below would see a clean exit 0 and
-# report a checker that has stopped firing. Skip loudly instead — the runner's posture
-# for a gate whose tool is missing.
-if ! command -v jq >/dev/null 2>&1; then
-  echo "skip: jq not available; the checker itself skips without it, so it cannot be mutation-tested"
-  exit 0
-fi
+# jq is required: the checker under test needs it, and without it every mutation would
+# fail for the wrong reason. A missing tool is a failure, never a skip
+# (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

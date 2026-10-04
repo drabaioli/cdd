@@ -5,8 +5,7 @@
 # (the workflow holds no gate list at all), and `/cdd-pre-pr` invokes it too: same
 # list, same scripts. That is what "it passed locally" buys — CI runs the same gates
 # through the same scripts, not necessarily to the same verdict: the scripts call
-# host tools (sed, grep, awk, ...) whose implementations differ, and a skipped tool
-# is a weaker verdict. The portability gate and the two-OS CI matrix narrow that gap.
+# host tools (sed, grep, awk, ...) whose implementations differ. The portability gate and the two-OS CI matrix narrow that gap.
 # Adding a gate here is the only way to add one — there is no second list to keep
 # in sync.
 #
@@ -21,14 +20,14 @@
 #     has a matching gate_<slug> function (kebab slug -> snake function name).
 #     scripts/ci-runner-assert.sh pins the two together so the list and the
 #     functions cannot drift apart.
-#   - Missing tools degrade gracefully. A gate whose `needs` tool is absent is
-#     reported SKIP — loudly, in the summary *and* in the closing line — and never
-#     fails the run. Host-direct by design: no container, no pinned toolchain.
-#     The motivating case is `shellcheck` (GitHub's runners preinstall it, a
-#     contributor's host may not); `jq` is the same story for the state-record
-#     gates, which already self-skip internally but do so with exit 0 — invisibly.
-#     (Note the deliberate backticks: an unquoted "shellcheck" opening a comment
-#     line would be parsed as a shellcheck directive.)
+#   - A missing tool is a failure, never a skip — here, in CI, and in each gate
+#     script run standalone. A gate whose `needs` tool is absent FAILs without running,
+#     naming the tool, so a host without `shellcheck` or `jq` cannot report green over
+#     checks that never ran. Detection stays per gate, so the summary names each gate a
+#     missing tool took down. Host-direct by design: no container, no pinned
+#     toolchain, so the host must carry every tool the registry names. (Note the
+#     deliberate backticks: an unquoted "shellcheck" opening a comment line would be
+#     parsed as a shellcheck directive.)
 #   - Not fail-fast: every gate runs, and the exit status is non-zero if any
 #     FAILed. One run surfaces every problem. The gates are independent, so
 #     nothing cascades.
@@ -77,18 +76,19 @@ cd "$REPO_ROOT" || exit 1
 
 # --- Gate registry -----------------------------------------------------------
 # "slug|needs|description", in run order. `needs` is a single command name that
-# must be on PATH, or empty when the gate needs nothing beyond bash and git.
+# must be on PATH, or empty when the gate needs nothing beyond bash, git and the POSIX
+# tools; a gate that uses jq anywhere, even for one assertion, declares it.
 GATES=(
   "syntax||bash -n over every shell script"
   "shellcheck|shellcheck|shellcheck over every shell script"
   "portability||non-portable host-tool constructs (in-place sed, awk -v escapes, GNU regex escapes, grep -P) in every shell script"
-  "drift||command-set drift: repo commands vs the rendered template"
-  "drift-contract||the drift checker's own contract (mutation-tested)"
+  "drift|jq|command-set drift: repo commands vs the rendered template"
+  "drift-contract|jq|the drift checker's own contract (mutation-tested)"
   "seams||prompt-seam contracts between the repo's own prompts"
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "roadmap-length||roadmap item length: the 200-char cap"
-  "install-smoke||worktree/state helper install, against a throwaway HOME"
-  "worktree-resume||worktree resume on an existing remote branch"
+  "install-smoke|jq|worktree/state helper install, against a throwaway HOME"
+  "worktree-resume|jq|worktree resume on an existing remote branch"
   "ref-sync|jq|refs/cdd/<branch> handoff + plan + state round-trip"
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
   "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
@@ -99,7 +99,7 @@ GATES=(
   "issue-close|jq|post-merge issue close from cdd-worktree-done and cdd-worktree-gc"
   "worktree-done|jq|cdd-worktree-done's removal and branch-deletion paths"
   "adapter-bindings|jq|bootstrap with adapter bindings: .cdd/ shims resolve and pass describe from a fresh clone (offline)"
-  "bootstrap||end-to-end bootstrap into a tmpdir"
+  "bootstrap|jq|end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
   "stage-render||render-only staging (--stage), no git tree"
   "snapshot-render|tar|render from an extracted template snapshot (--template-dir)"
@@ -233,15 +233,11 @@ gate_adapter_bindings() {
 # throwaway $home, pointing at $want. The bootstrap's writer is advisory end-to-end
 # (it sources tools/cdd-state.sh and warns rather than failing), so without this the
 # sourcing seam has no test: a rename fails the gate under `set -e`, but a silent
-# no-op would pass. jq-gated exactly like the writer — no jq means no marker was
-# written at all, which is the documented degradation, not a failure.
+# no-op would pass. The bootstrap gates declare `needs jq`, so jq is always present
+# here and a missing marker is a real failure.
 assert_repo_marker() {
   local home="$1" repo="$2" want="$3"
   local marker="$home/.cdd/handoffs/$repo/repo.json" got_ver got_name got_path
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "skip: jq absent, so the bootstrap wrote no marker; assertion skipped (advisory)"
-    return 0
-  fi
   [[ -f "$marker" ]] || { echo "FAIL: bootstrap wrote no per-repo marker at $marker" >&2; return 1; }
   got_ver="$(jq -r '.schema_version' "$marker")"
   got_name="$(jq -r '.name' "$marker")"
@@ -411,8 +407,8 @@ run_gates() {  # run_gates <slug>...
   local total=$#
   local slug needs desc started elapsed status log
   local -a summary=()
-  local -a skipped=()
   local -a failed_logs=()
+  local -a missing=()
   local passed=0 failed=0
 
   for slug in "$@"; do
@@ -420,9 +416,11 @@ run_gates() {  # run_gates <slug>...
     desc="$(registry_desc "$slug")"
 
     if [[ -n "$needs" ]] && ! command -v "$needs" >/dev/null 2>&1; then
-      echo "SKIP $slug — $needs is not installed (gate not run)"
-      summary+=("$(printf '  %-4s  %-20s  %s' SKIP "$slug" "$needs not installed")")
-      skipped+=("$slug ($needs)")
+      echo "FAIL $slug — $needs is not installed (gate not run); install it and rerun"
+      [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::error title=$slug failed::$needs is not installed"
+      summary+=("$(printf '  %-4s  %-20s  %s' FAIL "$slug" "$needs not installed")")
+      missing+=("$needs")
+      failed=$((failed + 1))
       continue
     fi
 
@@ -457,8 +455,10 @@ run_gates() {  # run_gates <slug>...
   printf '%s\n' "${summary[@]}"
   echo
 
-  local line="$total gate(s): $passed passed, $failed failed, ${#skipped[@]} skipped"
-  [[ ${#skipped[@]} -gt 0 ]] && line+=" — SKIPPED: ${skipped[*]}"
+  local line="$total gate(s): $passed passed, $failed failed"
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    line+=" — missing tools: $(printf '%s\n' "${missing[@]}" | sort -u | tr '\n' ' ' | sed 's/ $//')"
+  fi
   echo "$line"
 
   # Repeat each failure's tail after the summary, so a failed run is legible without

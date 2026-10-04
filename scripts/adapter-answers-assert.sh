@@ -24,10 +24,9 @@ GITLAB="$REPO_ROOT/tools/adapters/code-host/gitlab.sh"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "skip: jq not available; the answers are read with it (and the GitLab adapter needs it)"
-  exit 0
-fi
+# jq is required: the answers are read with it (and the GitLab adapter needs it). A
+# missing tool is a failure, never a skip (scripts/ci.sh).
+command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

@@ -6,9 +6,11 @@
 #   1. `ci.sh list` is non-empty and every slug resolves to a gate_<slug> function,
 #      so the registry and the functions cannot drift apart.
 #   2. An unknown gate name is rejected (non-zero) and the known slugs are listed.
-#   3. A gate whose tool is missing reports SKIP and still exits 0 — the
-#      degrade-gracefully decision behind #36, which must never regress into a
-#      silent pass or a hard failure.
+#   3. A gate whose tool is missing FAILs, naming the tool, while the other gates
+#      still run — a missing tool is a failure, never a skip, so a host without one
+#      cannot report green over checks that never ran. And no gate script carries a
+#      self-skip of its own (an `echo "skip: ..."` path), which would be the same
+#      silent pass one level down.
 #   4. The workflow delegates: exactly one `run:` line in template-smoke.yml
 #      invokes scripts/ci.sh, and every other is an install-only setup step (a
 #      package install naming no repo script), so a gate cannot be re-added to YAML
@@ -80,28 +82,37 @@ grep -q 'unknown gate' <<<"$out" || fail "unknown-gate error message missing: $o
 grep -q 'known gates' <<<"$out" || fail "unknown-gate error did not list the known gates"
 pass "unknown gate name rejected, known gates listed"
 
-# --- 3. Missing tool -> loud SKIP, exit 0 ------------------------------------
-# Stand in an empty bin dir as the whole PATH except the interpreters the runner
-# needs, so the `needs` tool genuinely cannot be found. `shellcheck` is the gate
-# whose tool is most often absent on a contributor's host, and the reason the
-# skip path exists at all.
+# --- 3. Missing tool -> FAIL, the rest still run --------------------------------
+# Stand in a bin dir holding only the tools the runner itself needs as the whole PATH,
+# so the `needs` tool genuinely cannot be found. `shellcheck` is the gate whose tool is
+# most often absent on a contributor's host. `syntax` rides along to prove the run is
+# not cut short: a missing tool fails its own gate and nothing else.
 STUB_HOME="$(mktemp -d)"
 trap 'rm -rf "$STUB_HOME"' EXIT
 mkdir -p "$STUB_HOME/bin"
-for tool in bash env sed grep mktemp rm cat git mkdir printf; do
+for tool in bash env sed grep mktemp rm cat git mkdir printf tee sort tr tail dirname basename; do
   src="$(command -v "$tool" 2>/dev/null)" || continue
   ln -sf "$src" "$STUB_HOME/bin/$tool"
 done
 
-skip_out="$(PATH="$STUB_HOME/bin" "$(command -v bash)" "./$RUNNER" shellcheck 2>&1)"
-skip_status=$?
-[[ $skip_status -eq 0 ]] \
-  || fail "a gate with a missing tool exited $skip_status; the skip must be non-fatal"
-grep -q 'SKIP shellcheck' <<<"$skip_out" \
-  || fail "missing-tool run did not report 'SKIP shellcheck': $skip_out"
-grep -q 'SKIPPED: shellcheck' <<<"$skip_out" \
-  || fail "missing-tool run did not repeat the skip in the closing line: $skip_out"
-pass "missing tool reports a loud SKIP and exits 0"
+miss_out="$(PATH="$STUB_HOME/bin" "$(command -v bash)" "./$RUNNER" shellcheck syntax 2>&1)"
+miss_status=$?
+[[ $miss_status -ne 0 ]] \
+  || fail "a gate with a missing tool let the run exit 0; a missing tool must fail it: $miss_out"
+grep -q 'FAIL shellcheck — shellcheck is not installed' <<<"$miss_out" \
+  || fail "missing-tool run did not report 'FAIL shellcheck — shellcheck is not installed': $miss_out"
+grep -q 'PASS syntax' <<<"$miss_out" \
+  || fail "a missing tool cut the run short: the syntax gate did not run and pass: $miss_out"
+grep -q '2 gate(s): 1 passed, 1 failed — missing tools: shellcheck' <<<"$miss_out" \
+  || fail "the closing line did not name the missing tool: $miss_out"
+pass "missing tool fails its gate, is named in the closing line, and the other gates still run"
+
+# A gate script that tests for its own tool and exits 0 on "skip:" is the same silent pass
+# one level down, and reachable whenever the script runs standalone.
+self_skips="$(grep -nE '(echo|printf)[^#]*["'"'"']skip:' scripts/*.sh | grep -v '^scripts/ci-runner-assert\.sh:' || true)"
+[[ -z "$self_skips" ]] \
+  || fail "gate scripts must fail on a missing tool, not skip:"$'\n'"$self_skips"
+pass "no gate script carries a self-skip"
 
 # --- 4. The workflow delegates, holding no gate list of its own --------------
 # Exactly one run: step invokes the runner; any other must be an install-only setup
