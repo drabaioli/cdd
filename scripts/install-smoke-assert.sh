@@ -40,10 +40,17 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HELPER="$REPO_ROOT/tools/cdd-worktree.sh"
-STATE_HELPER="$REPO_ROOT/tools/cdd-state.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
+
+# Install from a COPY of tools/ outside any git repo: run from the checkout itself,
+# install would also write its sync hooks into this repo's real .git/hooks
+# (toolchain-sync-assert.sh covers that path, against a throwaway clone).
+TOOLS_COPY="$(mktemp -d)"
+trap 'rm -rf "$TOOLS_COPY"' EXIT
+cp -R "$REPO_ROOT/tools" "$TOOLS_COPY/tools" || fail "could not copy tools/ to scratch"
+HELPER="$TOOLS_COPY/tools/cdd-worktree.sh"
+STATE_HELPER="$TOOLS_COPY/tools/cdd-state.sh"
 pass() { echo "ok: $*"; }
 
 # Disable a managed rc block by prefixing every line from BEGIN to END with "# ",
@@ -75,7 +82,7 @@ bash -n "$STATE_HELPER" || fail "state helper does not parse: $STATE_HELPER (tru
 FAKE_HOME="$(mktemp -d)"
 # Broken-install scratch, outside FAKE_HOME so copying FAKE_HOME never recurses.
 BROKEN_ROOT="$(mktemp -d)"
-trap 'rm -rf "$FAKE_HOME" "$BROKEN_ROOT"' EXIT
+trap 'rm -rf "$FAKE_HOME" "$BROKEN_ROOT" "$TOOLS_COPY"' EXIT
 
 # Seed a legacy handoff to exercise the migration branch.
 mkdir -p "$FAKE_HOME/.claude-handoffs/someproj"

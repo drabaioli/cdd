@@ -27,7 +27,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-HELPER="$REPO_ROOT/tools/cdd-worktree.sh"
 BOOTSTRAP="$REPO_ROOT/tools/bootstrap-cdd-project.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -39,6 +38,11 @@ command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
+
+# Install from a copy of tools/ outside any git repo: run from the checkout itself,
+# install would also write its sync hooks into this repo's real .git/hooks.
+cp -R "$REPO_ROOT/tools" "$WORK/tools" || fail "could not copy tools/ to scratch"
+HELPER="$WORK/tools/cdd-worktree.sh"
 
 export GIT_CONFIG_SYSTEM=/dev/null
 export GIT_CONFIG_GLOBAL="$WORK/gitconfig"
