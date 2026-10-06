@@ -30,6 +30,16 @@
 # committed .cdd/<cap> bindings exec, never a resolution-ladder rung (ADR 0011). The
 # curl form above fetches only this file, so it prints the per-adapter curl form.
 #
+# Staying current (ADR 0014): run from a CDD git checkout, install also writes a
+# post-merge + post-rewrite hook into it, so a pull that lands on its default branch
+# with different helpers reinstalls them (`cdd-worktree.sh sync`, one line). Without a
+# checkout, update on demand from upstream main (both helpers and the adapter library):
+#
+#   bash ~/.cdd/tools/cdd-worktree.sh update
+#
+# A shell that sourced the helpers before a reinstall re-sources them on its next
+# cdd-worktree* call (cdd-worktree-reload), silently.
+#
 # The helper is a machine-global toolchain dependency, like git or gh: one install
 # per machine, newest wins, install is idempotent (re-run to upgrade). Its contract
 # with projects is frozen and deliberately tiny -- the three command names below
@@ -102,6 +112,33 @@ if [[ -n "${BASH_VERSION:-}" ]] && (( BASH_VERSINFO[0] < 4 )); then
   # shellcheck disable=SC2317  # the exit runs when executed rather than sourced
   return 1 2>/dev/null || exit 1
 fi
+
+# Self-reload bookkeeping (bash only, like the guard above): the absolute path this file
+# was sourced from and its cksum at that moment. A long-lived shell keeps the functions
+# it sourced, so after a reinstall each public command re-sources the file and
+# re-dispatches (cdd-worktree-reload). -f, not -e: a file sourced from a pipe has no
+# stable path to come back to.
+if [[ -n "${BASH_VERSION:-}" && -f "${BASH_SOURCE[0]:-}" ]]; then
+  _CDD_WORKTREE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  _CDD_WORKTREE_SUM="$(cksum <"$_CDD_WORKTREE_FILE" 2>/dev/null)" || true
+fi
+
+# Re-source this file when it changed on disk since this shell sourced it (a reinstall),
+# so an open shell runs current code. Returns 0 when it reloaded — the caller then
+# re-dispatches to the fresh definition — and 1 when nothing changed or this shell has
+# no recorded source (zsh, a PATH shim's fresh source never differs). The new sum is
+# recorded BEFORE the source, so even a file without this bookkeeping cannot loop. Bash
+# runs the caller's in-flight (old) body to completion, so the re-dispatch happens in
+# the same shell and a `cd` still reaches it. Silent.
+cdd-worktree-reload() {
+  local sum
+  [[ -n "${_CDD_WORKTREE_FILE:-}" && -f "$_CDD_WORKTREE_FILE" ]] || return 1
+  sum="$(cksum <"$_CDD_WORKTREE_FILE" 2>/dev/null)" || return 1
+  [[ "$sum" != "${_CDD_WORKTREE_SUM:-}" ]] || return 1
+  _CDD_WORKTREE_SUM="$sum"
+  # shellcheck source=/dev/null
+  source "$_CDD_WORKTREE_FILE" || return 1
+}
 
 # Resolve the capability adapter for <capability> down the ladder: the project's
 # .cdd/<capability>, then the machine's ~/.cdd/adapters/<capability>; the first FILE
@@ -382,6 +419,7 @@ cdd-worktree-default-branch() {
 }
 
 cdd-worktree() {
+  if cdd-worktree-reload; then cdd-worktree "$@"; return; fi
   local branch="$1"
   if [[ -z "$branch" ]]; then
     echo "usage: cdd-worktree <branch>" >&2
@@ -458,7 +496,7 @@ cdd-worktree() {
     # would reject `set plan_written` and stall the task silently.
     if ! cdd-state stages 2>/dev/null | grep -qx plan_written; then
       echo "This project uses the plan/implement split, but your cdd-state helper is" >&2
-      echo "missing or predates it. Reinstall: ./tools/cdd-state.sh install" >&2
+      echo "missing or predates it. Update: bash ~/.cdd/tools/cdd-worktree.sh update (or re-run install from your CDD checkout)" >&2
     fi
     # Lane routing (§2.13): a task the human declared small at scoping replaces
     # plan+implement with the single /cdd-small-change session. Every miss — no jq,
@@ -480,6 +518,7 @@ cdd-worktree() {
 }
 
 cdd-worktree-done() {
+  if cdd-worktree-reload; then cdd-worktree-done "$@"; return; fi
   # Resolve the code-host adapter before anything else: a broken one must stop the
   # command before the cd, the pull, or the worktree removal below.
   local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
@@ -709,6 +748,7 @@ cdd-worktree-handoff-branches() {
 }
 
 cdd-worktree-list() {
+  if cdd-worktree-reload; then cdd-worktree-list "$@"; return; fi
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
@@ -810,6 +850,7 @@ cdd-worktree-list() {
 # without one a merged task can't be told from a fresh one, so it reaps nothing (one
 # advisory line, ADR 0012). See shell-helpers.md.
 cdd-worktree-gc() {
+  if cdd-worktree-reload; then cdd-worktree-gc "$@"; return; fi
   local force=0
   case "${1:-}" in
     --force|-f) force=1 ;;
@@ -1077,6 +1118,7 @@ cdd-worktree-materialize-ref() {
 # (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read PR/branch state from git and
 # the code host, not the handoff, so its absence is still fine.
 cdd-worktree-resume() {
+  if cdd-worktree-reload; then cdd-worktree-resume "$@"; return; fi
   local branch="${1:-}"
   # No argument is the discovery mode, so only option-shaped input is rejected here.
   case "$branch" in
@@ -1230,11 +1272,145 @@ cdd-worktree-resume() {
   fi
 }
 
+# Whether the helpers under <tools-dir> differ from the install: returns 0 iff any of its
+# cdd-worktree.sh, cdd-state.sh or adapters/*/*.sh (those present) is not byte-identical
+# to its counterpart under ~/.cdd/tools/ — a missing counterpart counts as different.
+# Content, never a recorded version (§2.8). Extra installed files never count: install
+# deletes nothing, so they would differ forever.
+cdd-worktree-tools-differ() {
+  local dir="$1" inst="$HOME/.cdd/tools" f
+  shopt -s nullglob
+  for f in "$dir/cdd-worktree.sh" "$dir/cdd-state.sh" "$dir"/adapters/*/*.sh; do
+    [[ -f "$f" ]] || continue
+    if ! cmp -s "$f" "$inst/${f#"$dir"/}"; then
+      shopt -u nullglob
+      return 0
+    fi
+  done
+  shopt -u nullglob
+  return 1
+}
+
+# `cdd-worktree.sh sync`: what the checkout's post-merge / post-rewrite hook runs (see
+# cdd-worktree-install-hooks), with cwd = the worktree's top level. When the pull landed
+# on the default branch and left this checkout's tools/ differing from the install, it
+# re-runs both installs from here and prints one line; otherwise it prints nothing and
+# changes nothing. Pulls on other branches (a feature worktree's /cdd-merge-base shares
+# the hook) never install. Always returns 0: a hook must never fail the git command.
+#
+# The default branch comes from git alone, not cdd-worktree-default-branch: that one
+# resolves the code-host adapter and would announce it inside every pull.
+cdd-worktree-sync() {
+  local top ref default_branch
+  top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
+  # Nothing installed, nothing to keep in step.
+  [[ -n "$top" && -f "$HOME/.cdd/tools/cdd-worktree.sh" ]] || return 0
+  if ref="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
+    default_branch="${ref#origin/}"
+  else
+    default_branch=main
+  fi
+  [[ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" == "$default_branch" ]] || return 0
+  cdd-worktree-tools-differ "$top/tools" || return 0
+  if bash "$top/tools/cdd-worktree.sh" install >/dev/null 2>&1 \
+     && bash "$top/tools/cdd-state.sh" install >/dev/null 2>&1; then
+    echo "cdd: updated the installed CDD helpers from this pull ($top); open shells pick it up on their next command." >&2
+  else
+    echo "cdd: this pull changed the CDD helpers, but reinstalling failed; run: bash $top/tools/cdd-worktree.sh install && bash $top/tools/cdd-state.sh install" >&2
+  fi
+  return 0
+}
+
+# Write the managed sync hooks (post-merge, post-rewrite: between them every `git pull`
+# variant) into the CDD checkout at <top>, so a pull of the default branch keeps the
+# install current. Called by install only when it runs from a CDD git checkout. The
+# hooks dir is the common one, shared by every worktree of the clone. Never overwrites a
+# hook it did not write (no marker line): it says what to add instead. Under
+# core.hooksPath it writes nothing and says so. A hook is replaced by rename, never
+# rewritten in place, so a hook running this very install (via sync) keeps reading
+# its old file.
+cdd-worktree-install-hooks() {
+  local top="$1" hooks_dir name hook tmp
+  local marker="# Managed by cdd-worktree.sh install (CDD toolchain sync)"
+  local -a written=()
+  if [[ -n "$(git -C "$top" config core.hooksPath 2>/dev/null)" ]]; then
+    echo "Note: core.hooksPath is set for $top, so no sync hook was written; pulls there will not update the install (after one, run: bash $top/tools/cdd-worktree.sh install)." >&2
+    return 0
+  fi
+  hooks_dir="$(git -C "$top" rev-parse --path-format=absolute --git-path hooks 2>/dev/null)" || return 0
+  mkdir -p "$hooks_dir" || return 0
+  for name in post-merge post-rewrite; do
+    hook="$hooks_dir/$name"
+    if [[ -e "$hook" ]] && ! grep -qF "$marker" "$hook" 2>/dev/null; then
+      echo "Note: $hook is not CDD's, so it was left alone; to keep the install current on pull, add to it: bash \"\$(git rev-parse --show-toplevel)/tools/cdd-worktree.sh\" sync" >&2
+      continue
+    fi
+    tmp="$(mktemp "$hook.XXXXXX")" || continue
+    # The hook stays a stable few lines: all logic is in the checkout's own `sync`, so a
+    # pull always runs the code it just pulled.
+    cat >"$tmp" <<HOOK
+#!/bin/sh
+${marker} -- regenerated on each install.
+# After a pull lands on the default branch, reinstalls the CDD helpers when this checkout's
+# tools/ differ from ~/.cdd/tools. Never fails the git command. To opt out, replace this
+# file with your own: install never overwrites a hook it did not write.
+[ "\$1" = amend ] && exit 0
+# git exports GIT_DIR to a hook in a linked worktree; let git find the repo from the cwd.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+top="\$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+# A checkout whose helper predates \`sync\` (an old branch) has nothing to run.
+grep -q '^cdd-worktree-sync()' "\$top/tools/cdd-worktree.sh" 2>/dev/null \\
+  && bash "\$top/tools/cdd-worktree.sh" sync
+exit 0
+HOOK
+    chmod +x "$tmp"
+    if cmp -s "$tmp" "$hook"; then
+      rm -f "$tmp"
+    else
+      mv -f "$tmp" "$hook"
+    fi
+    written+=("$name")
+  done
+  (( ${#written[@]} )) \
+    && echo "Installed sync hooks (${written[*]}) in $hooks_dir: a pull of the default branch keeps the install current."
+  return 0
+}
+
+# `cdd-worktree.sh update`: bring the install up to date with upstream main, for a
+# machine with no CDD checkout (or one that wants it now). On demand only — no command
+# ever reaches the network on its own. Fetches just tools/ (a shallow, blobless, sparse
+# clone into a temp dir), compares it with the install, and runs the normal installs
+# from that clone when anything differs. One result line; an unreachable upstream is
+# one line, exit 1, and changes nothing. CDD_UPSTREAM_URL overrides the upstream (a test
+# knob: the toolchain-sync gate points it at a local stub).
+cdd-worktree-update() {
+  local url="${CDD_UPSTREAM_URL:-https://github.com/drabaioli/cdd.git}" tmp rc=0
+  tmp="$(mktemp -d)" || return 1
+  if ! GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 --filter=blob:none --sparse "$url" "$tmp/cdd" >/dev/null 2>&1 \
+     || ! git -C "$tmp/cdd" sparse-checkout set tools >/dev/null 2>&1; then
+    echo "cdd: could not fetch $url; nothing changed." >&2
+    rm -rf "$tmp"
+    return 1
+  fi
+  if ! cdd-worktree-tools-differ "$tmp/cdd/tools"; then
+    echo "CDD helpers are up to date with upstream main."
+  elif bash "$tmp/cdd/tools/cdd-worktree.sh" install >/dev/null 2>&1 \
+       && bash "$tmp/cdd/tools/cdd-state.sh" install >/dev/null 2>&1; then
+    # Installing from the clone also hooks the clone itself; harmless, it is deleted below.
+    echo "Updated the CDD helpers from upstream main; open shells pick it up on their next command."
+  else
+    echo "cdd: fetched upstream main, but installing it failed, so the install may be partly updated; re-run: bash ~/.cdd/tools/cdd-worktree.sh update" >&2
+    rc=1
+  fi
+  rm -rf "$tmp"
+  return "$rc"
+}
+
 # Install this helper to its stable home and wire it into the user's shells.
 # Run directly (`tools/cdd-worktree.sh install`), never sourced. Idempotent.
 cdd-worktree-install() {
   if [[ $# -gt 0 && "$1" != "install" ]]; then
-    echo "usage: cdd-worktree.sh [install]" >&2
+    echo "usage: cdd-worktree.sh [install|update|sync]" >&2
     return 2
   fi
 
@@ -1276,6 +1452,16 @@ cdd-worktree-install() {
   elif [[ ! -d "$lib_dir" ]]; then
     echo "Note: no adapters/ beside $src, so no adapter library is installed. A project binding (.cdd/<cap>) needs it; fetch each adapter it names with:" >&2
     echo "  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/adapters/<cap>/<backend>.sh --create-dirs -o ~/.cdd/tools/adapters/<cap>/<backend>.sh && chmod +x ~/.cdd/tools/adapters/<cap>/<backend>.sh" >&2
+  fi
+
+  # Run from a CDD git checkout, hook it so a pull of its default branch keeps this
+  # install current (cdd-worktree-install-hooks). -ef, not a string compare: $src is
+  # built from the logical pwd, --show-toplevel answers the physical path. Never from
+  # the installed copy, nor from a copy of tools/ that merely sits inside some repo.
+  local src_top
+  src_top="$(git -C "$src_dir" rev-parse --show-toplevel 2>/dev/null)" || src_top=""
+  if [[ -n "$src_top" && "$src_top/tools/cdd-worktree.sh" -ef "$src" ]]; then
+    cdd-worktree-install-hooks "$src_top"
   fi
 
   # Wire each shell rc that exists; create ~/.bashrc if neither exists so there
@@ -1395,8 +1581,15 @@ SHIM
   echo "Done. Open a new shell (or 'source' your rc) so cdd-worktree* are available."
 }
 
-# Dual-mode: when executed directly, run the installer; when sourced, only the
-# functions above are defined.
+# Dual-mode: when executed directly, run the installer (or `update` / `sync`); when
+# sourced, only the functions above are defined. The explicit exit is load-bearing:
+# `update` run as `bash ~/.cdd/tools/cdd-worktree.sh update` overwrites this very file,
+# and bash reads a script as it goes, so it must never read past this block afterwards.
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  cdd-worktree-install "$@"
+  case "${1:-}" in
+    sync)   cdd-worktree-sync ;;
+    update) cdd-worktree-update ;;
+    *)      cdd-worktree-install "$@" ;;
+  esac
+  exit $?
 fi

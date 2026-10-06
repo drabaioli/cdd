@@ -23,6 +23,11 @@
 #     --create-dirs -o ~/.cdd/tools/cdd-state.sh \
 #     && bash ~/.cdd/tools/cdd-state.sh install
 #
+# Kept current alongside cdd-worktree.sh (ADR 0014): a pull of a CDD checkout that
+# install hooked reinstalls both, and `bash ~/.cdd/tools/cdd-worktree.sh update`
+# updates both from upstream main. A shell that sourced this file before a reinstall
+# re-sources it on its next `cdd-state` call (cdd-state-reload), silently.
+#
 # Provides (when sourced):
 #   cdd-state seed <branch>        Create the record beside the handoff, at stage
 #                                      `scoped`. Used by /cdd-next-step on the
@@ -99,9 +104,36 @@ CDD_STATE_SCHEMA_VERSION=1
 # record's: the two files carry unrelated shapes and can evolve apart.
 CDD_REPO_MARKER_SCHEMA_VERSION=1
 
+# Self-reload bookkeeping (bash only), as in cdd-worktree.sh: the absolute path this
+# file was sourced from and its cksum then, so `cdd-state` can pick up a reinstall in a
+# long-lived shell. Must not fail: bootstrap-cdd-project.sh sources this under set -e.
+if [[ -n "${BASH_VERSION:-}" && -f "${BASH_SOURCE[0]:-}" ]]; then
+  _CDD_STATE_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  _CDD_STATE_SUM="$(cksum <"$_CDD_STATE_FILE" 2>/dev/null)" || true
+fi
+
+# Re-source this file when it changed on disk since this shell sourced it; returns 0
+# when it reloaded (the caller re-dispatches), 1 otherwise. Same contract as
+# cdd-worktree-reload: the new sum is recorded before the source, so it cannot loop.
+cdd-state-reload() {
+  local sum
+  [[ -n "${_CDD_STATE_FILE:-}" && -f "$_CDD_STATE_FILE" ]] || return 1
+  sum="$(cksum <"$_CDD_STATE_FILE" 2>/dev/null)" || return 1
+  [[ "$sum" != "${_CDD_STATE_SUM:-}" ]] || return 1
+  _CDD_STATE_SUM="$sum"
+  # shellcheck source=/dev/null
+  source "$_CDD_STATE_FILE" || return 1
+}
+
 cdd-state-stages() {
   printf '%s\n' scoped plan_written implementation_done merged checks_passed \
                 pr_open addressed
+}
+
+# The one line after an unknown verb or stage: the usual cause is a project's commands
+# that are newer than this installed helper, so name the remedy.
+cdd-state-update-hint() {
+  echo "cdd-state: if this project's commands need it, your installed helper may be older than them; update: bash ~/.cdd/tools/cdd-worktree.sh update" >&2
 }
 
 # The MAIN worktree of the current repo — the dirname of git's common dir, NOT
@@ -215,6 +247,7 @@ cdd-state-push-ref() {
 }
 
 cdd-state() {
+  if cdd-state-reload; then cdd-state "$@"; return; fi
   # `stages` is a pure read of the lifecycle enum — no record, no jq. It is answered
   # BEFORE the jq guard below so that a capability probe (cdd-worktree's skew check,
   # §2.8) reads the real answer on a host without jq instead of an empty one.
@@ -451,6 +484,7 @@ cdd-state() {
       done
       if [[ -z "$stage" ]] || ! cdd-state-stages | grep -qx "$stage"; then
         echo "cdd-state set: invalid stage '$stage' (one of: $(cdd-state-stages | paste -sd' '))" >&2
+        cdd-state-update-hint
         return 2
       fi
       # Refresh the per-repo marker first, deliberately BEFORE the absent-record
@@ -518,6 +552,7 @@ cdd-state() {
       ;;
     *)
       echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
+      cdd-state-update-hint
       return 2
       ;;
   esac

@@ -88,6 +88,7 @@ GATES=(
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "roadmap-length||roadmap item length: the 200-char cap"
   "install-smoke|jq|worktree/state helper install, against a throwaway HOME"
+  "toolchain-sync|jq|keeping the install current: the checkout's sync hook, self-reloading shells, update (stub upstream)"
   "worktree-resume|jq|worktree resume on an existing remote branch"
   "ref-sync|jq|refs/cdd/<branch> handoff + plan + state round-trip"
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
@@ -165,6 +166,10 @@ gate_roadmap_length() {
 
 gate_install_smoke() {
   ./scripts/install-smoke-assert.sh
+}
+
+gate_toolchain_sync() {
+  ./scripts/toolchain-sync-assert.sh
 }
 
 gate_worktree_resume() {
