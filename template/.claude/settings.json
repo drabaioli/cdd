@@ -23,7 +23,6 @@
       "Bash(which *)",
       "Bash(realpath *)",
       "Bash(tree *)",
-      "Bash(find *)",
       "Bash(git status *)",
       "Bash(git log *)",
       "Bash(git diff *)",
