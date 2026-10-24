@@ -42,7 +42,7 @@ Exploration is a named step, not an implied one. Read the source you will change
 
 Hard ceiling, whatever the depth: 10 researchers, 20 tool calls each.
 
-**Spawn.** One `cdd-researcher` subagent (`.claude/agents/cdd-researcher.md`) per independent question, all launched together in one message. Its tools are read and web only, so it cannot edit anything. Brief each one with exactly these fields, and nothing else of your context — the brief is a firewall:
+**Spawn.** One `cdd-researcher` subagent (`.claude/agents/cdd-researcher.md`) per independent question, all launched together in one message. Its tools are web only: it cannot read the repo or edit anything, so it holds nothing worth leaking but its brief. That is why its fetches are approved without a prompt (a hook in `.claude/settings.json`) and yours are not. Brief each one with exactly these fields, and nothing else of your context — the brief is a firewall. Put in the repo facts it needs, and never a secret:
 
 - **Objective** — what to find out.
 - **Decision** — the plan decision the answer serves.
@@ -52,9 +52,9 @@ Hard ceiling, whatever the depth: 10 researchers, 20 tool calls each.
 - **Budget** — its tool-call cap from the table above.
 - **Return format** — as in its definition.
 
-If that agent file is missing (a project not yet upgraded), say so in one line and research inline, keeping the same rules: a source fetched in this run for every claim, verbatim quotes, the same caps.
+If that agent file is missing (a project not yet upgraded), say so in one line and research inline, keeping the same rules: a source fetched in this run for every claim, verbatim quotes, the same caps. Each fetch then asks for approval.
 
-**Verify.** Before a finding shapes the plan — adopted, or the reason for rejecting something — re-fetch its source with a narrow question ("does this page contain this text? quote it") and confirm the quote. Research agents cite pages that do not say what they claim, or do not exist. Drop a finding that does not verify, or keep it marked as unverified.
+**Verify.** Before a finding shapes the plan — adopted, or the reason for rejecting something — have its quote confirmed against its source: one fresh `cdd-researcher` takes the findings to check, each as a URL and a quote, re-fetches each page with a narrow question ("does this page contain this text? quote it") and reports which match. Do not fetch them yourself — you hold the repo, so your fetches are not pre-approved. Research agents cite pages that do not say what they claim, or do not exist. Drop a finding that does not verify, or keep it marked as unverified.
 
 **Disposition.** Give each kept finding exactly one:
 

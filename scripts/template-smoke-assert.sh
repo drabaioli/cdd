@@ -8,6 +8,8 @@
 #   - .claude/commands/ and .claude/agents/ contain no <...> tokens outside the whitelist
 #   - .claude/agents/cdd-researcher.md is present, and every shipped agent definition
 #     names its tools and none that can write, run a shell or spawn subagents
+#   - cdd-researcher has no file tools, and .claude/settings.json pre-approves WebFetch
+#     only through the hook that names it, never with a bare allow rule
 #   - the baseline marker .claude/cdd-baseline is present and well-formed
 #
 # Usage: scripts/template-smoke-assert.sh /path/to/bootstrapped/tree
@@ -114,6 +116,25 @@ for agent in .claude/agents/*.md; do
   done
 done
 pass ".claude/agents/ definitions are all read-only"
+
+# 4b. Unprompted fetches only where nothing is worth leaking (ADR 0015). The researcher
+# holds no file tools, so its auto-approved fetches carry at most its brief; any other
+# fetch prompts. A bare "WebFetch" allow, or file tools on the researcher, would put the
+# repo, untrusted pages and an unprompted way out back in one context.
+researcher_tools="$(awk 'NR == 1 && /^---$/ { fm = 1; next }
+                         fm && /^---$/ { exit }
+                         fm && /^tools:/ { print; exit }' .claude/agents/cdd-researcher.md)"
+for t in Read Grep Glob; do
+  if grep -qwF -- "$t" <<<"${researcher_tools#tools:}"; then
+    fail "cdd-researcher grants the file tool $t; its fetches are pre-approved, so it must hold no repo data"
+  fi
+done
+jq -e '(.permissions.allow // []) | index("WebFetch") | not' .claude/settings.json >/dev/null \
+  || fail ".claude/settings.json allows WebFetch for every session; only the cdd-researcher hook may pre-approve it"
+jq -e '[.hooks.PreToolUse[]? | select(.matcher == "WebFetch") | .hooks[]?.command
+        | select(contains("cdd-researcher"))] | length == 1' .claude/settings.json >/dev/null \
+  || fail ".claude/settings.json lacks the WebFetch hook that pre-approves the cdd-researcher's fetches"
+pass "WebFetch is pre-approved for the file-less cdd-researcher only"
 
 # 5. Baseline marker: present, single line, a commit hash or "unknown".
 [[ -f .claude/cdd-baseline ]] || fail ".claude/cdd-baseline marker missing"
