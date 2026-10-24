@@ -18,7 +18,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── .claude/
 │   ├── commands/                             # this repo's slash commands
 │   ├── agents/                               # this repo's subagent definitions (cdd-researcher, spawned by /cdd-plan)
-│   └── settings.json                         # auto-allows sessions to read the handoff, run the cdd-state helper, run read-only shell commands, and search the web
+│   └── settings.json                         # auto-allows sessions to read the handoff, run the cdd-state helper, run read-only shell commands, and search and fetch the web; denies reads of common secret files
 ├── .github/
 │   └── workflows/                            # CI (template-smoke; Ubuntu + macOS, delegates to scripts/ci.sh)
 ├── demo/                                     # filled-in seed + create/teardown automation (third artifact)

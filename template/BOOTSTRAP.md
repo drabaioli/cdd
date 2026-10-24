@@ -16,7 +16,7 @@ After bootstrap, the new project directory contains:
 │   └── code-host                             # where code review lives (same)
 ├── .claude/
 │   ├── cdd-baseline                          # CDD repo commit the template was rendered from
-│   ├── settings.json                         # auto-allows sessions to read the handoff, write the plan file, run cdd-state, run read-only shell commands, and search the web
+│   ├── settings.json                         # auto-allows sessions to read the handoff, write the plan file, run cdd-state, run read-only shell commands, and search and fetch the web; denies reads of common secret files
 │   ├── agents/
 │   │   └── cdd-researcher.md                     # read-only researcher subagent, spawned by /cdd-plan
 │   └── commands/

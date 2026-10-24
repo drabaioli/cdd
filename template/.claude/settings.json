@@ -40,7 +40,16 @@
       "Bash(.cdd/code-host describe)",
       "Bash(.cdd/code-host pr-for-branch *)",
       "Bash(.cdd/code-host pr-comments *)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)"
     ]
   }
 }

@@ -59,9 +59,14 @@ puts an ADR into the plan's doc edits, under the existing ADR rule; no new task 
 **The small-change lane never researches.** A task that needs anything looked up fails the
 discovery bound, so it takes the off-ramp to `/cdd-plan`.
 
-**`WebSearch` is pre-allowed; `WebFetch` is not.** Searching is low-risk and constant; a fetch
-names a domain the human should see, and a fully-allowed fetch would let a malicious page steer the
-agent into sending data out through a URL of its choosing.
+**`WebSearch` and `WebFetch` are pre-allowed, and reads of common secret files are denied.**
+Research fetches constantly, and a prompt per page turns the research phase into a stream of
+approvals nobody reads. The cost of removing the prompt is real: a malicious page could steer the
+agent into fetching a URL of its choosing with data embedded in it, and nothing stops that request
+for review. So the shipped settings pair the allow with `Read` deny rules for the files most worth
+stealing — `.env` and `.env.*` at any depth, `*.pem` and `*.key`, `~/.ssh/` and `~/.aws/` — which
+shrinks what such a request could carry without restricting where the agent may look. The deny
+rules also block Claude's own edits to those paths, `.env.example` included.
 
 ## Alternatives considered
 
@@ -82,7 +87,10 @@ agent into sending data out through a URL of its choosing.
 - **Spec Kit's Decision / Rationale / Alternatives as the finding format.** In this split the
   decision and its rationale belong to the plan's Approach, not to a researcher's output; the
   disposition plays the "what was chosen" role and rejected alternatives go to Dead ends.
-- **Fully allowing `WebFetch`.** See the last decision paragraph.
+- **Leaving `WebFetch` to prompt per page**, so the human sees every domain. Safest, but the
+  approvals come too often to be read, which makes them a rubber stamp rather than a check.
+- **Allowing `WebFetch` only for listed domains.** Safe, but a generic template cannot know which
+  documentation sites a project needs; a project can still narrow the bare allow to its own list.
 
 ## Consequences
 
@@ -97,6 +105,11 @@ agent into sending data out through a URL of its choosing.
   researches inline under the same rules.
 - **A project may extend the researcher's tools** — most usefully with its docs MCP server — and a
   retrofit upgrade keeps that as a local customization.
+- **Unprompted fetches are a residual exfiltration channel.** The secret-file deny rules narrow it
+  but do not close it: they cover Claude's file tools and the shell file commands Claude Code
+  recognizes, not a command that reads files without naming them (`grep -r` over a directory) or
+  anything a project keeps under another name. A project with sensitive data in its tree should add
+  its own deny rules, narrow `WebFetch` to a domain list, or enable the sandbox.
 - **The budgets are judgement, not measurement.** They come from published multi-agent research
   practice, not from CDD's own usage; real tasks may show them to be wrong, and they live in one
   place (`/cdd-plan`) so that changing them is one edit.
