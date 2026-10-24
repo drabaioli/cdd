@@ -79,6 +79,9 @@ Schema:
 ## Implementation prompt
 <self-contained prompt for the plan session>
 
+## Research
+<depth: none | light | standard | deep, and the questions research must answer — or omit the section to leave it to /cdd-plan>
+
 ## Notes
 <open questions deferred to the plan session, caveats, or "None">
 ```
@@ -86,6 +89,8 @@ Schema:
 The implementation prompt is self-contained: it includes only context the plan session cannot recover from CLAUDE.md, the roadmap, or the architecture docs. Restating project conventions is forbidden; those are inferable from the repo. Open questions deferred to the plan session are listed in Notes so it can address them up front rather than mid-plan. The prompt carries no standing instructions about planning, committing, or advancing the state record: once the implementation cycle has command files of its own (§3.3, §3.4), those live there and are improved once rather than regenerated into every handoff.
 
 **Requirements** are the one artifact that survives *both* halves of the split implementation cycle and is checkable against each: `/cdd-plan` checks its plan against them, `/cdd-implement` treats them as the done-test, and `/cdd-pre-pr` reconciles the diff against them instead of inferring intent. They are observable acceptance criteria — what a reader could check on the finished change — never design. The **cap is load-bearing**: as few as possible, typically 3–6, and never more than 10. It is what stops the handoff session inflating into a requirements interview, which the cheap/expensive split (§3.1) exists to prevent; a criterion that cannot be stated cheaply here is a deferred question for the plan session, recorded in Notes. So is the **floor of 1**: `/cdd-pre-pr` reconciles the diff *against* this section, so an empty one leaves it inferring intent — exactly what the section exists to prevent. Even "tick one box" gets a criterion, and it is a real check rather than a restatement, because it says what must *not* also change. A small-change handoff (§3.2a) normally carries one or two.
+
+**`## Research`** sizes the plan session's research phase (§3.3): a depth tier — `none`, `light`, `standard` or `deep` — and the questions research must answer. It is **optional**. The handoff session recommends it and the human sets it at handoff approval (checkpoint 2), the same way the lane is set; leaving it to the plan session is a valid answer, and an absent section means exactly that — the planner decides, as it did before the section existed. A small-change handoff never carries one: a task that needs research is not small (§3.2a).
 
 A **small-change handoff omits `## Implementation prompt` entirely**: on that lane the requirements already say everything a change whose diff fits in one sentence has to say, and a section restating them is a place for the two to drift apart. Frozen (below) means never renamed, not always present.
 
@@ -104,6 +109,8 @@ Project-level Claude Code slash commands. They are declarative — they describe
 - `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed: reads the review comments, addresses them, posts replies, commits + pushes. (See §4.1 for the deliberate checkpoint exception it carries.)
 
 Three further commands — `/cdd-bootstrap` (greenfield setup), `/cdd-retrofit` (install or upgrade CDD on an existing project), and `/cdd-quick-create` (lightweight one-off deliverable) — exist in the CDD repo only and are deliberately not shipped in the template: each operates *on* a target from a CDD-repo session, so downstream projects have no use for a copy. This justified one-sided drift is recorded in `scripts/command-drift-whitelist.txt`. The commands are described in `doc/features/template.md`; their place in the workflow is in Section 6.
+
+Beside the commands, the template ships one subagent definition, which `/cdd-plan` spawns for its research phase; it is described in §2.17.
 
 ### 2.8 The worktree shell helper (`cdd-worktree`)
 
@@ -218,7 +225,7 @@ Schema:
 <path -> what changes, plus the distilled fact: file:line + the one-line conclusion>
 
 ## External findings
-<facts from outside the repo, quoted verbatim, each with its source and version (release, page version, or retrieval date) — or "None">
+<facts from outside the repo, quoted verbatim, each with its source, its date or version, and its disposition — adopted (step), rejected (reason), to verify, or context only — or "None">
 
 ## Dead ends
 <what was tried and why it failed, so it is not re-explored — or "None">
@@ -238,6 +245,8 @@ The plan is written **for the implementing session, not for the human** — the 
 > **Cite what's in the repo, quote what isn't.** A fact from repo source is cheap for the next session to re-derive, so the plan records a `file:line` pointer plus the one-line conclusion drawn from it. A fact from outside the repo — a web search, vendor documentation, an API's semantics, a version quirk — cannot be recovered without repeating the search, so it is recorded verbatim with its source. Dead ends are the same class: unwritten, they are re-explored at full cost.
 
 The rule is what makes the split safe rather than lossy, and it usefully bounds the plan's length: everything the plan session learned and did not write down dies with it.
+
+Each external finding also carries a **disposition** — what the plan does with it: *adopted* (naming the Approach step it shapes), *rejected* (with the reason; a rejected finding that represents an approach also gets a `## Dead ends` line), *to verify* (with a matching `## Verification` line, so the implementing session checks it), or *context only*. A finding without one is not done: the implementing session cannot tell a fact the plan rests on from background it may ignore.
 
 Two properties follow from the plan being a file rather than a transcript. It is **human-editable** before implementing — the reason the implementation session is started by hand rather than chained automatically. And it is **durable**: a session that dies after plan approval loses nothing, where before it lost all of the exploration. Unlike the handoff, it is mutable, so a machine picking the task up takes the plan whenever it takes the state record it travels with.
 
@@ -266,6 +275,14 @@ The rule falls out of invariants already stated rather than out of taste. Issues
 The one piece that does ship ahead of the adapters is the **`x-` extension namespace** on the per-task state record, so an extension has somewhere to keep what only it knows — a notification's message id, a requirements-tracker link — that is neither derivable from the repo nor re-fetchable from the backend. It is specified in §2.13, which owns the record's schema.
 
 Two capabilities are live: the **tracker**, with a GitHub reference adapter, a Jira adapter and a GitLab adapter, and the **code host**, with a GitHub reference adapter and a GitLab adapter, all under one conformance gate. Every code-host caller is routed through it — merge state, PR lookup, the default branch, and opening a PR and processing its review — so a project on another code host can do all of that through its adapter, and with none installed those steps skip or stop with one line. The decision and its reasoning are recorded in `doc/architecture/adr/0007-extend-cdd-through-capability-adapters.md`, and the broken-adapter rule and the code-host name in `doc/architecture/adr/0010-code-host-rename-and-broken-adapter-rule.md`; the verb contracts, JSON shapes and exit codes are pinned in `doc/architecture/capability-adapters.md`, which is what an adapter author reads, and which also carries the recipe for serving docs over MCP.
+
+### 2.17 Subagent definitions (`.claude/agents/`)
+
+Claude Code subagent definitions the project ships beside its commands. CDD ships one, **`cdd-researcher`**, which the plan session spawns for its research phase (§3.3): it receives a bounded brief, researches the web and the project's docs, and returns a short cited digest. Nothing else it does reaches the planner's context.
+
+It is **read-only by its tool allowlist**: read and web tools only — no edit, no shell, no subagents of its own. The allowlist is the enforcement, deliberately, not a permission mode: a subagent's permission mode is overridden by a more permissive one in the session that spawns it, while a tool the definition does not list is simply unavailable. That is also why the definition names its tools explicitly — a definition that names none inherits every tool its parent has.
+
+Agent definitions are CDD-managed files exactly like the commands: the repo's own copy and the template's are held in agreement by the same drift check, the bootstrapped tree is checked for agents that could write, and `/cdd-retrofit` installs and upgrades them. A project may extend the researcher's allowlist — most usefully with the tools of an MCP server holding its reference docs (§2.16) — and an upgrade keeps that as a local customization. A project whose tree predates the definition loses nothing: the plan session researches inline, under the same rules. The mechanics live in `doc/architecture/overview.md`; the decision in `doc/architecture/adr/0015-research-as-a-phase-of-planning.md`.
 
 ## 3. Lifecycle
 
@@ -393,6 +410,8 @@ Before reading any context, the session verifies its checkout is current: if the
 
 The session clarifies requirements that are cheap to resolve here and explicitly defers harder ones to the **plan session** (§3.3). Two rationales drive this split: context economy — this session's context is spent on cross-phase reasoning, while the plan session's is clean, dedicated to one task, and running in the real worktree — and structure — this session runs on main, which is protected from direct edits, so it cannot edit the roadmap even by accident; desired roadmap edits are recorded in the handoff instead. The split is also what keeps the handoff's `## Requirements` (§2.6) honest: criteria that are cheap to state belong here, and a criterion that is not is a deferred question, not a reason to hold a requirements interview.
 
+For a standard-lane task the session also recommends how much research the plan session should do — a depth tier and the questions to answer — and the human decides it at handoff approval, alongside the lane; it is recorded in the handoff's optional `## Research` section (§2.6).
+
 Before asking for approval the session prints a **bounded digest** of the handoff in chat — a hard-capped bullet list, one line each — so the human approves against something readable rather than skimming the artifact. The cap is the feature. It ends by writing the handoff file and printing the `cdd-worktree <branch>` command.
 
 ### 3.2 Worktree creation
@@ -411,7 +430,7 @@ Which lane a task takes is decided once, by the human, at the end of the handoff
 
 > If you can state the finished diff in one sentence, before any exploration, it's small. If in doubt, take the standard lane.
 
-Two bounds, and both must hold. **Discovery**: there is nothing to find out — that is the one-sentence test. **Durability**: there is no reasoning worth carrying into the next window, since this lane writes no plan file and only the requirements plus the diff reach `/cdd-pre-pr` and the reviewer. The bar is **not line count**. Qualifying work: ticking a roadmap box; a typo; adding a roadmap phase; adding a small utility script whose behaviour you can state in full; a mechanical rename across a few files. Not qualifying: a three-line change whose consequence you would want reasoned about; a multi-file change you can specify in a sentence but could not justify without explanation.
+Two bounds, and both must hold. **Discovery**: there is nothing to find out — that is the one-sentence test. **Durability**: there is no reasoning worth carrying into the next window, since this lane writes no plan file and only the requirements plus the diff reach `/cdd-pre-pr` and the reviewer. The bar is **not line count**. Qualifying work: ticking a roadmap box; a typo; adding a roadmap phase; adding a small utility script whose behaviour you can state in full; a mechanical rename across a few files. Not qualifying: a three-line change whose consequence you would want reasoned about; a multi-file change you can specify in a sentence but could not justify without explanation. A task that needs research — anything to look up outside the repo — fails the discovery bound by definition, so this lane never researches; such a task takes the off-ramp below.
 
 The session **recommends and the human decides**, in either direction and unconditionally — including declaring small a task the heuristic did not. That is the same posture every other structural choice in CDD takes, and it is safe both ways: a task wrongly declared small takes the off-ramp below, at the cost of one session start, and one wrongly kept standard costs a window. Neither is destructive, which is why the heuristic is allowed to be this short.
 
@@ -421,9 +440,11 @@ Otherwise the session states the concrete change file by file, takes approval �
 
 ### 3.3 Plan session: `/cdd-plan` (on the new worktree)
 
-Reads the handoff and rebuilds its context from the roadmap and the architecture/feature docs. It then **explores** — reading the source it will change, searching the web, consulting vendor and library documentation as the task needs. Exploration is a named step rather than an implied one, because after the split its only output is the plan file: anything this session learns and does not write down is destroyed when it ends.
+Reads the handoff and rebuilds its context from the roadmap and the architecture/feature docs. It then **explores** — reading the source it will change, as the task needs. Exploration is a named step rather than an implied one, because after the split its only output is the plan file: anything this session learns and does not write down is destroyed when it ends.
 
-It surfaces deferred or freshly-discovered open questions, confirms scope, checks its plan against the handoff's `## Requirements`, and prints a **bounded digest** in chat — one short bullet per fixed topic — immediately before asking for approval. That digest exists so the checkpoint stays a real gate: the plan file itself is written for the next session rather than for the human, and asking a human to approve a document written for a machine would weaken the very checkpoint the workflow leans on hardest.
+What lies outside the repo — the web, vendor and library documentation, the state of the art on the task's topic — is the **research phase**, the step after exploration. Its depth comes from the handoff's `## Research` section (§2.6), set by the human at checkpoint 2; when the handoff is silent, the planner chooses and says so. The research itself runs in read-only `cdd-researcher` subagents (§2.17), one per independent question, each given a firewalled brief — its objective, the decision it serves, the questions it owns, what is out of scope, a budget — and nothing else of the planner's context. Each depth tier carries hard caps on researchers and tool calls, and the caps are limits, not targets: a question one researcher can answer is never fanned out. Before a finding shapes the plan, the planner re-fetches its source and confirms the quote, because research agents cite pages that do not say what they claim, or do not exist. Each kept finding then lands in the plan's `## External findings` with a disposition (§2.15); the raw digests are not kept anywhere. The rationale is context isolation: a researcher may read tens of thousands of tokens, and the planner receives only the distilled, checkable part. Reasoning in `doc/architecture/adr/0015-research-as-a-phase-of-planning.md` (CDD repo).
+
+It surfaces deferred or freshly-discovered open questions, confirms scope, checks its plan against the handoff's `## Requirements`, and prints a **bounded digest** in chat — one short bullet per fixed topic, including what research changed — immediately before asking for approval. That digest exists so the checkpoint stays a real gate: the plan file itself is written for the next session rather than for the human, and asking a human to approve a document written for a machine would weaken the very checkpoint the workflow leans on hardest.
 
 The handoff is immutable (§2.6), so a `## Requirements` criterion the human agrees to amend or drop here is recorded in the plan instead. That record is the channel to `/cdd-pre-pr` (§3.6), which otherwise re-checks the diff against wording nobody stands behind any more and reports the amendment as a miss.
 
@@ -471,7 +492,7 @@ The human runs `cdd-worktree-done` from the feature worktree (§2.8), ending bac
 Six explicit checkpoints. The human is also free to interject at any other point.
 
 1. **Task selection** (end of `/cdd-next-step`): the human chooses among proposed candidates.
-2. **Handoff approval** (end of `/cdd-next-step`): the human approves the drafted implementation prompt and notes.
+2. **Handoff approval** (end of `/cdd-next-step`): the human approves the drafted implementation prompt and notes, the lane, and — on the standard lane — the research depth.
 3. **Approval of the work** (end of the plan session, or mid-session on the small-change lane): the human approves the plan before any file is written — or, on the small-change lane where there is no plan, the concrete change itself, stated file by file, before the first edit.
 4. **Merge-base approval** (between dry run and merge in `/cdd-merge-base`) — *conditional*: the human approves after seeing conflict complexity, whenever there is complexity to see. Skipped only on the mechanically-trivial path (below).
 5. **Roadmap edit approval** (during `/cdd-pre-pr`): the human approves proposed add/modify/remove edits before they are applied.
@@ -482,6 +503,8 @@ These six are the gates. The agent should never proceed past a gate without expl
 Splitting the implementation cycle into a plan session and an implementation session (§3.3, §3.4) does not change this count either. Checkpoint 3 does not move: it is still plan approval, and the plan file is written *because* it was approved. The manual step between the two sessions — the human opening a fresh session and running `/cdd-implement` — is ceremony, and a place to read or edit the plan, but it is not a gate: nothing waits on a decision there.
 
 The **small-change lane (§3.2a) does not change this count either, and changes only checkpoint 3's form**. Checkpoints 1, 2, 4, 5 and 6 fire exactly as they do on the standard lane: `/cdd-next-step` and `/cdd-pre-pr` both still run, the PR is still opened and still reviewed. Checkpoint 2 in fact does one more thing — it is where the lane itself is chosen. Checkpoint 3 still fires, still before anything is written, and is still an explicit ask; what changes is what the human is approving, a stated diff rather than a plan file, because on that lane there is no plan file to approve. Say this plainly, because the next reader will otherwise read the lane as erosion: a lane that skipped a checkpoint would be a different proposal, and was not this one. Reasoning in `doc/architecture/adr/0006-small-change-lane.md` (CDD repo).
+
+The **research phase (§3.3) does not change this count either.** It runs inside the plan session, before checkpoint 3, which still fires and still gates the plan; its digest now also says what research changed — which findings moved the plan, or that none did, or that research was skipped and why. A research line that is wrong can mislead every step built on it, so checkpoint 3 is where it surfaces. The researchers write nothing, so no gate is passed unseen; how much research to do is itself decided at checkpoint 2.
 
 The auto-commits some sessions make at their gates (§2.11) do not change this count. A local commit with no push is reversible from git history, so it adds no checkpoint and removes none — it is not a seventh gate. The only gate that pushes is `/cdd-process-pr`, and its single up-front checkpoint is described in §4.1.
 
@@ -511,7 +534,7 @@ The matrix below resolves any ambiguity about which session is allowed to touch 
 | Plan file               | no           | yes (write)     | no (never written) | no (read-only)     | no            | no                     | no                     |
 | CI config               | no           | no              | yes if in scope    | yes if in scope    | no            | yes (human-approved)   | yes if review-driven   |
 
-The small-change column is the implementation column: the two sessions differ in what authorizes them, not in what they may touch. The handoff and plan sessions are both read-only on the repo, and each produces exactly one artifact — the handoff file and the plan file respectively. This keeps their jobs narrow: read, discuss, write the one file. Everything else happens in the implementing and review-side sessions. "Review-driven" in the PR-review column means the edit was requested by a reviewer and covered by the approved triage plan (Section 3.8); the PR-review session initiates no edits of its own.
+The small-change column is the implementation column: the two sessions differ in what authorizes them, not in what they may touch. The plan session's researcher subagents (§2.17) are part of the plan column and edit nothing at all — not even the plan file — which their tool allowlist enforces rather than this table. The handoff and plan sessions are both read-only on the repo, and each produces exactly one artifact — the handoff file and the plan file respectively. This keeps their jobs narrow: read, discuss, write the one file. Everything else happens in the implementing and review-side sessions. "Review-driven" in the PR-review column means the edit was requested by a reviewer and covered by the approved triage plan (Section 3.8); the PR-review session initiates no edits of its own.
 
 ## 6. Known gaps and deferred design
 
@@ -531,7 +554,7 @@ Still deferred:
 
 ## 7. The template
 
-The template ships as a directory (`template/`) copied into a new project root by `tools/bootstrap-cdd-project.sh`: the `CLAUDE.md` skeleton, the seven lifecycle commands, the doc skeletons, `.claude/settings.json`, and the baseline marker written at render time. The full contents are enumerated in `doc/features/template.md`; the bootstrapped tree layout and the bootstrap procedure — including the one-time helper install — are in `template/BOOTSTRAP.md`. The bootstrapped tree ships no `tools/` directory: the shell helpers are machine-global installs (§2.8), not per-project files. It may carry a `.cdd/` directory of capability bindings (§2.16) — the backend choice and its coordinates, never the adapter code. `template/BOOTSTRAP.md` itself is meta-documentation and is not copied into the bootstrapped project.
+The template ships as a directory (`template/`) copied into a new project root by `tools/bootstrap-cdd-project.sh`: the `CLAUDE.md` skeleton, the seven lifecycle commands, the `cdd-researcher` subagent definition (§2.17), the doc skeletons, `.claude/settings.json`, and the baseline marker written at render time. The full contents are enumerated in `doc/features/template.md`; the bootstrapped tree layout and the bootstrap procedure — including the one-time helper install — are in `template/BOOTSTRAP.md`. The bootstrapped tree ships no `tools/` directory: the shell helpers are machine-global installs (§2.8), not per-project files. It may carry a `.cdd/` directory of capability bindings (§2.16) — the backend choice and its coordinates, never the adapter code. `template/BOOTSTRAP.md` itself is meta-documentation and is not copied into the bootstrapped project.
 
 ### 7.1 The CDD repo as its own project
 

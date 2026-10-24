@@ -164,6 +164,19 @@ Qualifies: ticking a roadmap box; a typo; adding a roadmap phase; adding a small
 
 The lane changes three things downstream, and nothing else: the handoff is thinner (§5), the state record carries a marker (§7), and `cdd-worktree` opens the worktree on `/cdd-small-change` instead of `/cdd-plan` (§8).
 
+## 4c. Scope the research
+
+Standard lane only. The plan session has a research phase for whatever lies outside the repo — the web, vendor and library documentation, the state of the art on the task's topic — and how much of it to do is decided here, by the human, next to the lane. The tiers:
+
+- **none** — the repo answers everything; research is skipped.
+- **light** — one focused lookup: a version quirk, an API's semantics.
+- **standard** — a few independent questions, each worth its own look.
+- **deep** — a wide question where the state of the art should shape the design.
+
+The budgets behind each tier live in `/cdd-plan`, not here. **Recommend a depth and the questions research must answer, in a line or two** — then do as the user says, with the same posture as the lane. "Leave it to the planner" is a valid answer, and means the handoff carries no `## Research` section: the planner then decides, as it always has.
+
+Never scope research on the small-change lane. A task that needs anything looked up outside the repo is not small — it fails the discovery bound — so if research seems needed, that is a reason to recommend the standard lane instead.
+
 ## 5. Draft the handoff
 
 When the user signals they're ready, draft:
@@ -191,7 +204,7 @@ Do **not** restate project conventions, coding style, build commands, or anythin
 
 The prompt is a plain task spec. It carries no standing instructions about planning, committing, or advancing the state record: those live in `/cdd-plan` and `/cdd-implement`, where they are improved once instead of regenerated into every handoff.
 
-**On the small-change lane, omit the `## Implementation prompt` section entirely.** The requirements already say everything there is to say about a change whose diff fits in a sentence, and a section restating them is the drift risk this lane exists to avoid. The heading itself stays frozen — frozen means never renamed, not always present.
+**On the small-change lane, omit the `## Implementation prompt` and `## Research` sections entirely.** The requirements already say everything there is to say about a change whose diff fits in a sentence, and a section restating them is the drift risk this lane exists to avoid. The heading itself stays frozen — frozen means never renamed, not always present.
 
 Show the draft to the user for approval, after the digest below. Iterate if needed.
 
@@ -199,7 +212,7 @@ Show the draft to the user for approval, after the digest below. Iterate if need
 
 Immediately before asking for approval, print a short summary of the handoff in chat: what the task is about, and the details that bear on approving it. Follow the rule in `CLAUDE.md` — short, plain, only what changes the answer. The human should be able to approve or push back on this alone, without opening the handoff.
 
-What usually earns a line: what the task is and which lane it takes, why it is worth doing now, what "done" means, anything deliberately out of scope, and any question being deferred to `/cdd-plan`. Say what applies and drop the rest — this is a summary, not a form to fill in.
+What usually earns a line: what the task is and which lane it takes, how much research the plan session should do (or that it is left to the planner), why it is worth doing now, what "done" means, anything deliberately out of scope, and any question being deferred to `/cdd-plan`. Say what applies and drop the rest — this is a summary, not a form to fill in.
 
 ## 6. Note any roadmap edits implied
 
@@ -224,9 +237,14 @@ On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
 ## Implementation prompt
 <the self-contained prompt from step 5>
 
+## Research
+<depth: none | light | standard | deep, and the questions research must answer — or omit the section to leave it to /cdd-plan>
+
 ## Notes
 <deferred open questions for /cdd-plan, proposed roadmap edits, caveats — or "None" if clean>
 ```
+
+`## Research` is optional: write it only when the user set a depth in §4c, and omit it on the small-change lane. An absent section means the planner decides.
 
 Create the per-repo handoff directory if it doesn't exist:
 

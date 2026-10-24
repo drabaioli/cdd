@@ -363,8 +363,8 @@ There is no `.cdd/docs`. An adapter is justified only when a CDD script or struc
 
 1. **The store's MCP server** goes in the project's `.mcp.json`. Authentication is that server's own; CDD holds no credential for it.
 2. **One `CLAUDE.md` paragraph** says what lives in the store and when to look: the task links a page, or the work codes against one of the integrations the store documents.
-3. **A subagent reads the page** and returns only the relevant section, so a long page never lands whole in the session's context.
-4. **What was used is recorded** under the plan's `## External findings`, with the page link and its version.
+3. **A subagent reads the page** and returns only the relevant section, so a long page never lands whole in the session's context. The shipped `cdd-researcher` can be that subagent once the project adds the docs server's MCP tools to its `tools` list.
+4. **What was used is recorded** under the plan's `## External findings`, with the page link, its version, and its disposition (what the plan does with it).
 5. **Page content is never copied** into the repo's docs. The repo stays the source of its own docs (replace-vs-mirror).
 
 ## Resolution, the broken-adapter rule, and the announcement rule

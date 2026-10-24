@@ -39,7 +39,8 @@
       "Bash(.cdd/tracker issue-list *)",
       "Bash(.cdd/code-host describe)",
       "Bash(.cdd/code-host pr-for-branch *)",
-      "Bash(.cdd/code-host pr-comments *)"
+      "Bash(.cdd/code-host pr-comments *)",
+      "WebSearch"
     ]
   }
 }

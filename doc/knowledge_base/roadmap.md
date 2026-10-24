@@ -51,6 +51,7 @@ Refine the template and commands from real usage; tasks here are driven by frict
 - [x] Add shellcheck to CI over all repo shell scripts.
 - [x] Worktree helpers: main-worktree guard on `cdd-worktree`; default branch derived from origin's HEAD (fallback `main`), `origin` assumption documented in BOOTSTRAP.md.
 - [x] Restrict bootstrap placeholder substitution to text files so binary overlay assets survive.
+- [x] Add a research phase to `/cdd-plan`: scoped at handoff, read-only researcher subagents, dispositioned findings in the plan
 
 **Milestone:** template is ergonomic enough that bootstrapping a new project takes under five minutes.
 

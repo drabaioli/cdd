@@ -5,7 +5,9 @@
 #   - no <PROJECT_NAME> or <PROJECT_DIR> literals remain
 #   - BOOTSTRAP.md was not copied
 #   - relative markdown links in CLAUDE.md and the roadmap resolve
-#   - .claude/commands/ contains no <...> tokens outside the whitelist
+#   - .claude/commands/ and .claude/agents/ contain no <...> tokens outside the whitelist
+#   - .claude/agents/cdd-researcher.md is present, and every shipped agent definition
+#     names its tools and none that can write, run a shell or spawn subagents
 #   - the baseline marker .claude/cdd-baseline is present and well-formed
 #
 # Usage: scripts/template-smoke-assert.sh /path/to/bootstrapped/tree
@@ -70,11 +72,13 @@ check_links doc/index.md
 check_links doc/knowledge_base/project-overview.md
 check_links doc/knowledge_base/roadmap.md
 
-# 4. .claude/commands/*.md: no <...> tokens outside the whitelist.
+# 4. .claude/commands/*.md and .claude/agents/*.md: no <...> tokens outside the whitelist.
 [[ -f "$WHITELIST" ]] || fail "whitelist not found at $WHITELIST"
 
-# Build a sorted-unique list of tokens appearing in slash commands.
-mapfile -t found_tokens < <(grep -ohrE '<[^<>]+>' .claude/commands/ | sort -u)
+# Build a sorted-unique list of tokens appearing in slash commands and agent definitions.
+token_dirs=(.claude/commands/)
+[[ -d .claude/agents ]] && token_dirs+=(.claude/agents/)
+mapfile -t found_tokens < <(grep -ohrE '<[^<>]+>' "${token_dirs[@]}" | sort -u)
 
 # Whitelisted tokens: strip comments and blank lines.
 mapfile -t whitelisted < <(grep -vE '^\s*(#|$)' "$WHITELIST")
@@ -86,12 +90,30 @@ for tok in "${found_tokens[@]}"; do
     if [[ "$tok" == "$w" ]]; then hit=1; break; fi
   done
   if [[ $hit -eq 0 ]]; then
-    echo "  unexpected <...> token in .claude/commands/: $tok" >&2
+    echo "  unexpected <...> token in ${token_dirs[*]}: $tok" >&2
     unexpected=$((unexpected + 1))
   fi
 done
-[[ $unexpected -eq 0 ]] || fail "$unexpected unexpected <...> token(s) in .claude/commands/ — update scripts/template-smoke-whitelist.txt if intentional"
-pass ".claude/commands/ tokens all whitelisted"
+[[ $unexpected -eq 0 ]] || fail "$unexpected unexpected <...> token(s) in ${token_dirs[*]} — update scripts/template-smoke-whitelist.txt if intentional"
+pass "${token_dirs[*]} tokens all whitelisted"
+
+# 4a. Shipped agent definitions are read-only. CDD ships only read-only agents today
+# (process doc §2.17), so a future write-capable agent changes this assertion
+# deliberately rather than slipping through. The `tools:` frontmatter line is the
+# enforcement, and an omitted one inherits every tool — so a missing line fails too.
+[[ -f .claude/agents/cdd-researcher.md ]] || fail ".claude/agents/cdd-researcher.md missing from the bootstrapped tree"
+for agent in .claude/agents/*.md; do
+  tools_line="$(awk 'NR == 1 && /^---$/ { fm = 1; next }
+                     fm && /^---$/ { exit }
+                     fm && /^tools:/ { print; exit }' "$agent")"
+  [[ -n "$tools_line" ]] || fail "$agent has no tools: frontmatter line, so it would inherit every tool"
+  for t in Write Edit MultiEdit NotebookEdit Bash Agent Task; do
+    if grep -qwF -- "$t" <<<"${tools_line#tools:}"; then
+      fail "$agent grants the write-capable tool $t ($tools_line); shipped agents are read-only"
+    fi
+  done
+done
+pass ".claude/agents/ definitions are all read-only"
 
 # 5. Baseline marker: present, single line, a commit hash or "unknown".
 [[ -f .claude/cdd-baseline ]] || fail ".claude/cdd-baseline marker missing"
