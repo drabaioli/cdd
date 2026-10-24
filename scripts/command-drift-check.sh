@@ -19,9 +19,8 @@
 #     .claude/commands/cdd-plan.md, the same way. Both carry the schema, so either can
 #     drift from the other; the seam checker only pins cdd-plan.md against cdd-implement.md.
 #   - no cdd-only markers appear in template/.claude/commands/ or template/.claude/agents/
-#     — they belong in the
-#     repo copies only; a marker in the template would be stripped from both sides
-#     of the comparison above and hide real drift.
+#     — they belong in the repo copies only; a marker in the template would be
+#     stripped from both sides of the comparison above and hide real drift.
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
 #     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
 #     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
