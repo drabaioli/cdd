@@ -16,7 +16,7 @@ branch="$(git rev-parse --abbrev-ref HEAD)"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
 ```
 
-Read it in full. A small-change handoff is deliberately thin: its `## Requirements` are the done-test (normally one or two criteria), and `## Notes` carries any caveat or roadmap edit agreed at scoping. It carries no `## Implementation prompt` — on this lane there is nothing to say that the requirements do not already say.
+Read it in full. A small-change handoff is deliberately thin: its `## Requirements` are the done-test (normally one or two criteria), and `## Notes` carries any caveat or roadmap edit agreed at scoping. It carries no `## Implementation prompt` — on this lane there is nothing to say that the requirements do not already say — and no `## Research`, because this lane never researches.
 
 Then read only what the change itself touches. Do not rebuild the project's full context: a task that needs it is not small, which is what step 2 is for.
 
@@ -28,7 +28,7 @@ The eligibility heuristic, as it was applied at scoping:
 
 Two bounds, and both must hold. **Discovery**: there is nothing to find out — that is the one-sentence test. **Durability**: there is no reasoning worth carrying into the next window, because this lane writes no plan file and only the requirements plus the diff reach `/cdd-pre-pr` and the reviewer. The bar is **not** line count.
 
-Judge it again now that you have the handoff in front of you. If the task turns out not to be small — the diff cannot be stated, a design question is hiding in it, the reasoning behind it would be worth reading later — then **stop, write nothing, and tell the user to run `/cdd-plan` in this same worktree**. Say in one line which bound failed. `/cdd-plan` works from this handoff as it stands; it reads `## Requirements` and `## Notes` and never needs an `## Implementation prompt`.
+Judge it again now that you have the handoff in front of you. If the task turns out not to be small — the diff cannot be stated, a design question is hiding in it, the reasoning behind it would be worth reading later — then **stop, write nothing, and tell the user to run `/cdd-plan` in this same worktree**. Say in one line which bound failed. A task that needs research — anything to look up outside the repo — fails the discovery bound: take the off-ramp, and never spawn researchers on this lane. `/cdd-plan` works from this handoff as it stands; it reads `## Requirements` and `## Notes` and never needs an `## Implementation prompt`.
 
 The off-ramp costs one session start. It is the safety net that lets the heuristic stay this short, so take it rather than talk yourself past it.
 

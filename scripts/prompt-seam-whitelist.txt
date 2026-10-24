@@ -9,6 +9,8 @@
 /cdd-state
 # Baseline marker file path (.claude/cdd-baseline), not a command.
 /cdd-baseline
+# Subagent definition path (.claude/agents/cdd-researcher.md), not a command.
+/cdd-researcher
 # Smoke-test temp dir (/tmp/cdd-demo-smoke in demo/README.md), not a command.
 # The check runner provisions its own scratch dir, so /tmp/cdd-smoke is gone.
 /cdd-demo-smoke

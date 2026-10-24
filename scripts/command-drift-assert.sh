@@ -9,8 +9,10 @@
 # So this script mutation-tests it: break one thing at a time in a throwaway copy of the
 # tree and require the checker to notice, naming what it noticed. Each of the checker's
 # six checks gets at least one mutation:
-#   1. Command-set diff        — a repo command copy diverges from its template counterpart.
-#   2. Command-set membership  — a command exists on only one side.
+#   1. Command-set diff        — a repo command copy diverges from its template counterpart;
+#      likewise a repo agent definition (.claude/agents/).
+#   2. Command-set membership  — a command exists on only one side; likewise an agent
+#      definition.
 #   3. Settings JSON validity  — both settings files gain the same syntax error, so they
 #      still match each other and only the jq parse can catch it.
 #   4. Settings diff           — .claude/settings.json diverges from the rendered template.
@@ -57,6 +59,8 @@ SETTINGS=".claude/settings.json"
 TPL_SETTINGS="template/.claude/settings.json"
 # A command the template ships, so it exists on both sides of every comparison below.
 SHARED_CMD="cdd-plan.md"
+# Likewise an agent definition the template ships.
+SHARED_AGENT="cdd-researcher.md"
 
 # --- The throwaway tree -------------------------------------------------------
 # Everything but .git, which in a worktree is a *file* pointing elsewhere — copying it
@@ -132,6 +136,18 @@ fresh_sandbox
 printf '# assert-only probe command\n' > "$SANDBOX/.claude/commands/cdd-probe.md"
 expect_fail "check 2 catches a command present on only one side" \
   "DRIFT: cdd-probe.md exists only in .claude/commands/"
+
+# --- Checks 1 and 2 cover agent definitions too ---------------------------------
+fresh_sandbox
+printf '\nassert-only drift probe.\n' >> "$SANDBOX/.claude/agents/$SHARED_AGENT"
+expect_fail "check 1 catches a repo agent definition diverging from the template" \
+  "template/.claude/agents/$SHARED_AGENT (rendered)"
+
+fresh_sandbox
+rm "$SANDBOX/template/.claude/agents/$SHARED_AGENT" \
+  || fail "could not remove the template agent definition in the sandbox"
+expect_fail "check 2 catches an agent definition present on only one side" \
+  "DRIFT: $SHARED_AGENT exists only in .claude/agents/"
 
 # --- Control: the command whitelist silences it --------------------------------
 fresh_sandbox

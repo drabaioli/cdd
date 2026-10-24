@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Render-then-diff drift check between the CDD repo's own .claude/commands/ and
-# .claude/settings.json and the template/.claude/ copies it ships.
+# Render-then-diff drift check between the CDD repo's own .claude/commands/,
+# .claude/agents/ and .claude/settings.json and the template/.claude/ copies it ships.
 #
 # The template is rendered via tools/bootstrap-cdd-project.sh --stage with this repo's own
 # identifier (dir "cdd"), so expected substitution drift cancels out mechanically
 # and only real divergence survives. Remaining divergence is a defect unless:
-#   - the file is listed in scripts/command-drift-whitelist.txt (one-sided by design), or
+#   - the file is listed in scripts/command-drift-whitelist.txt (one-sided by design;
+#     command and agent entries match by basename), or
 #   - the diverging region in the repo copy sits between `<!-- cdd-only-begin -->` and
 #     `<!-- cdd-only-end -->` lines (CDD-meta content), which are stripped before the
 #     comparison.
@@ -17,9 +18,9 @@
 #   - the plan-file schema headings match between the process doc (section 2.15) and
 #     .claude/commands/cdd-plan.md, the same way. Both carry the schema, so either can
 #     drift from the other; the seam checker only pins cdd-plan.md against cdd-implement.md.
-#   - no cdd-only markers appear in template/.claude/commands/ — they belong in the
-#     repo copies only; a marker in the template would be stripped from both sides
-#     of the comparison above and hide real drift.
+#   - no cdd-only markers appear in template/.claude/commands/ or template/.claude/agents/
+#     — they belong in the repo copies only; a marker in the template would be
+#     stripped from both sides of the comparison above and hide real drift.
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
 #     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
 #     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
@@ -39,7 +40,6 @@ trap 'rm -rf "$TMP"' EXIT
 
 ./tools/bootstrap-cdd-project.sh --stage --name "CDD" --dir cdd \
   --path "$TMP/render" >/dev/null
-RENDERED_CMDS="$TMP/render/.claude/commands"
 
 whitelisted() {
   grep -v '^[[:space:]]*#' "$WHITELIST" | grep -v '^[[:space:]]*$' | grep -qxF "$1"
@@ -51,32 +51,38 @@ strip_cdd_only() {
 
 fail=0
 
-mapfile -t names < <(
-  { ls -1 "$REPO_CMDS"; ls -1 "$RENDERED_CMDS"; } | sort -u
-)
+# Commands and agent definitions get the same treatment. A directory missing on one
+# side reads as empty, so every file on the other side is reported as one-sided.
+for sub in commands agents; do
+  repo_dir=".claude/$sub"
+  rendered_dir="$TMP/render/.claude/$sub"
+  mapfile -t names < <(
+    { ls -1 "$repo_dir" 2>/dev/null; ls -1 "$rendered_dir" 2>/dev/null; } | sort -u
+  )
 
-for name in "${names[@]}"; do
-  if whitelisted "$name"; then
-    continue
-  fi
-  repo_f="$REPO_CMDS/$name"
-  rendered_f="$RENDERED_CMDS/$name"
-  if [[ ! -f "$repo_f" ]]; then
-    echo "DRIFT: $name exists only in template/.claude/commands/" >&2
-    fail=1
-    continue
-  fi
-  if [[ ! -f "$rendered_f" ]]; then
-    echo "DRIFT: $name exists only in .claude/commands/" >&2
-    fail=1
-    continue
-  fi
-  if ! diff -u \
-      --label "$REPO_CMDS/$name (cdd-only sections stripped)" \
-      --label "template/.claude/commands/$name (rendered)" \
-      <(strip_cdd_only "$repo_f") <(strip_cdd_only "$rendered_f"); then
-    fail=1
-  fi
+  for name in "${names[@]}"; do
+    if whitelisted "$name"; then
+      continue
+    fi
+    repo_f="$repo_dir/$name"
+    rendered_f="$rendered_dir/$name"
+    if [[ ! -f "$repo_f" ]]; then
+      echo "DRIFT: $name exists only in template/.claude/$sub/" >&2
+      fail=1
+      continue
+    fi
+    if [[ ! -f "$rendered_f" ]]; then
+      echo "DRIFT: $name exists only in .claude/$sub/" >&2
+      fail=1
+      continue
+    fi
+    if ! diff -u \
+        --label "$repo_dir/$name (cdd-only sections stripped)" \
+        --label "template/.claude/$sub/$name (rendered)" \
+        <(strip_cdd_only "$repo_f") <(strip_cdd_only "$rendered_f"); then
+      fail=1
+    fi
+  done
 done
 
 # The shipped settings file must parse: it is generated into every bootstrapped project,
@@ -107,10 +113,13 @@ fi
 
 # cdd-only fences belong in the repo copies only; strip_cdd_only runs on both sides,
 # so a marker in the template would silently hide the fenced content from the diff.
-if grep -rnE 'cdd-only-(begin|end)' template/.claude/commands/ >&2; then
-  echo "ERROR: cdd-only markers found in template/.claude/commands/ (see above); they belong in the repo copies only" >&2
-  fail=1
-fi
+for sub in commands agents; do
+  [[ -d "template/.claude/$sub" ]] || continue
+  if grep -rnE 'cdd-only-(begin|end)' "template/.claude/$sub/" >&2; then
+    echo "ERROR: cdd-only markers found in template/.claude/$sub/ (see above); they belong in the repo copies only" >&2
+    fail=1
+  fi
+done
 
 # Handoff-schema consistency: print the `## ` headings inside the handoff schema block
 # (from the "# Task:" line to the end of its fenced code block) and compare.

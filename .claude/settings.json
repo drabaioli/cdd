@@ -39,7 +39,37 @@
       "Bash(.cdd/tracker issue-list *)",
       "Bash(.cdd/code-host describe)",
       "Bash(.cdd/code-host pr-for-branch *)",
-      "Bash(.cdd/code-host pr-comments *)"
+      "Bash(.cdd/code-host pr-comments *)",
+      "WebSearch"
+    ],
+    "deny": [
+      "Read(//**/.env)",
+      "Read(//**/.env.*)",
+      "Read(//**/*.pem)",
+      "Read(//**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.kube/**)",
+      "Read(~/.azure/**)",
+      "Read(~/.docker/config.json)",
+      "Read(~/.npmrc)",
+      "Read(~/.pypirc)",
+      "Read(~/.git-credentials)",
+      "Read(~/.config/gh/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -e '.agent_type == \"cdd-researcher\"' >/dev/null && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"fetch by the cdd-researcher subagent\"}}' || true"
+          }
+        ]
+      }
     ]
   }
 }

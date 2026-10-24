@@ -26,7 +26,7 @@ One full turn around the cycle:
 
 1. **Select a task** — one, or several to run in parallel.
 2. **Write the handoff and create a git worktree** for the task, isolated from your main checkout.
-3. **Plan the task.** The worktree opens on `/cdd-plan`: it explores, shows you a short digest, and on your approval writes the plan to a file and stops. Read or edit that file if you want to.
+3. **Plan the task.** The worktree opens on `/cdd-plan`: it explores, researches outside the repo as deeply as the handoff set, shows you a short digest, and on your approval writes the plan to a file and stops. Read or edit that file if you want to.
 4. **Implement it.** Open a fresh session in the same worktree and run `/cdd-implement`. It builds from the plan — not from the exploration that produced it — so you know what to expect, because you approved the plan.
 5. **Merge from the base branch if it moved** while you were working, approving the merge plan.
 6. **Let an agent review the code before the PR opens** — this is also where tests run and the docs are checked, linted, and formatted. It opens the PR at the end.

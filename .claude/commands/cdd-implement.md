@@ -20,7 +20,7 @@ Then read the handoff, for its `## Requirements` — those acceptance criteria a
 The plan's sections carry different weights, by design:
 
 - `## File map` names the files to open and the conclusion already reached about each. Re-read those files — the plan cites repo facts rather than copying them because they are cheap for you to re-derive.
-- `## External findings` is quoted verbatim because it **cannot** be re-derived here. Trust it; do not go re-run the searches.
+- `## External findings` is quoted verbatim because it **cannot** be re-derived here. Trust it; do not go re-run the searches. Each finding names what it is for — act on its disposition, and check a "to verify" finding the way `## Verification` says.
 - `## Dead ends` records approaches already tried and rejected. Do not re-explore them.
 - `## Open questions resolved` records what the handoff deferred and what was agreed. Those answers are settled; do not reopen them unilaterally.
 
