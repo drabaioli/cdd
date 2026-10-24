@@ -173,7 +173,7 @@ Standard lane only. The plan session has a research phase for whatever lies outs
 - **standard** — a few independent questions, each worth its own look.
 - **deep** — a wide question where the state of the art should shape the design.
 
-The budgets behind each tier live in `/cdd-plan`, not here. **Recommend a depth and the questions research must answer, in a line or two** — then do as the user says, with the same posture as the lane. "Leave it to the planner" is a valid answer, and means the handoff carries no `## Research` section: the planner then decides, as it always has.
+The budgets behind each tier live in `/cdd-plan`, not here. **Recommend a depth and the questions research must answer, in a line or two.** Worth asking is only what the repo cannot answer: what nobody here knows how to do, and — where the task holds a real design choice — how others solve it. Then do as the user says, with the same posture as the lane. "Leave it to the planner" is a valid answer, and means the handoff carries no `## Research` section: the planner then decides, as it always has.
 
 Never scope research on the small-change lane. A task that needs anything looked up outside the repo is not small — it fails the discovery bound — so if research seems needed, that is a reason to recommend the standard lane instead.
 

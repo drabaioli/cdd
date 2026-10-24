@@ -42,6 +42,11 @@ Exploration is a named step, not an implied one. Read the source you will change
 
 Hard ceiling, whatever the depth: 10 researchers, 20 tool calls each.
 
+**What to ask.** Only what the repo cannot answer, and only where it applies:
+
+- **Unknowns** — what the plan needs and nobody here knows how to do.
+- **The approach** — when the task holds a real design choice: how others solve this problem, with the options, their tradeoffs and their known pitfalls. A wrong approach sinks more plans than a wrong fact. Ask it blind: do not tell the researcher which option you lean toward, and do not ask it to find faults with yours. A model drifts toward an answer it is shown, and one asked for faults reports some whether or not they are there. Compare what comes back with your own option yourself.
+
 **Spawn.** One `cdd-researcher` subagent (`.claude/agents/cdd-researcher.md`) per independent question, all launched together in one message. Its tools are web only: it cannot read the repo or edit anything, so it holds nothing worth leaking but its brief. That is why its fetches are approved without a prompt (a hook in `.claude/settings.json`) and yours are not. Brief each one with exactly these fields, and nothing else of your context — the brief is a firewall. Put in the repo facts it needs, and never a secret:
 
 - **Objective** — what to find out.
@@ -54,7 +59,12 @@ Hard ceiling, whatever the depth: 10 researchers, 20 tool calls each.
 
 If that agent file is missing (a project not yet upgraded), say so in one line and research inline, keeping the same rules: a source fetched in this run for every claim, verbatim quotes, the same caps. Each fetch then asks for approval.
 
-**Verify.** Before a finding shapes the plan — adopted, or the reason for rejecting something — have its quote confirmed against its source: one fresh `cdd-researcher` takes the findings to check, each as a URL and a quote, re-fetches each page with a narrow question ("does this page contain this text? quote it") and reports which match. Do not fetch them yourself — you hold the repo, so your fetches are not pre-approved. Research agents cite pages that do not say what they claim, or do not exist. Drop a finding that does not verify, or keep it marked as unverified.
+**Verify.** Once you have a draft approach, and before you present it, have it checked by one fresh `cdd-researcher`, so the agent that drafted the plan is not the one grading it. It is not counted in the tier's researchers, but stays under the hard ceiling. It takes two lists:
+
+- **The findings the draft rests on** — adopted, or the reason something was rejected — each as a URL and a quote. It re-fetches each page with a narrow question ("does this page contain this text? quote it") and reports which match. Research agents cite pages that do not say what they claim, or do not exist.
+- **The fragile assumptions** — facts about something outside the repo that the draft relies on, that no finding sources, and that are new, rarely used or version-specific: an API's behaviour, a tool's flag, a field a payload carries. Send each as a neutral question, not as your claim ("which fields does X's input carry?", not "confirm X carries Y"). Leave out what is common and stable: checking everything adds noise, not accuracy.
+
+Do not fetch any of it yourself — you hold the repo, so your fetches are not pre-approved. Revise the draft by what comes back. Drop a finding that does not verify, or keep it marked as unverified. An assumption the check refutes changes the draft; one it cannot settle is recorded as a finding with the disposition **to verify**. At depth `none` no researcher runs, so record each fragile assumption as **to verify** and name it in the digest.
 
 **Disposition.** Give each kept finding exactly one:
 
@@ -79,7 +89,7 @@ The handoff is immutable, so a criterion the human agrees to amend or drop is **
 
 Immediately before asking for approval, print a short summary of the plan in chat: what you intend to do, and the details that bear on approving it. Follow the rule in `CLAUDE.md` — short, plain, only what changes the answer. The plan file itself is written for the next session, so this summary is the whole of what the human approves against; it has to carry the plan at high altitude without becoming the plan.
 
-What usually earns a line: the approach, roughly what it touches, the riskiest step, what research changed (which findings moved the plan, that research found nothing that changed it, or that it was skipped and why), anything you investigated and rejected that the human might otherwise suggest, how it will be verified, and any deviation from the handoff's `## Requirements`. Say what applies and drop the rest. No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file.
+What usually earns a line: the approach, roughly what it touches, the riskiest step, what research changed (which findings moved the plan, that research found nothing that changed it, or that it was skipped and why), any outside assumption the plan rests on that could not be checked, anything you investigated and rejected that the human might otherwise suggest, how it will be verified, and any deviation from the handoff's `## Requirements`. Say what applies and drop the rest. No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file.
 
 ## 6. Checkpoint: plan approval
 

@@ -49,8 +49,36 @@ this run, publisher, date or version, access date, confidence and which question
 what it looked for and did not find, and any conflicts or version caveats. It may not conclude from
 training data.
 
-**Verify, then disposition.** Before a finding shapes the plan, a fresh researcher re-fetches its
-source with a narrow prompt and confirms the quote; the planner does not fetch. Each kept finding lands in `## External findings` with
+**Research asks only what the repo cannot answer**, in two kinds of question, each only where it
+applies: unknowns — what nobody here knows how to do — and, when the task holds a real design
+choice, how others solve the problem, with the options, tradeoffs and known pitfalls. The second is
+there because a wrong approach sinks more plans than a wrong fact: a manual study of 150 failed
+SWE-bench Verified issues puts about 65% of root causes in flawed reasoning and about 25% in
+knowledge deficiency ([arXiv 2509.13941](https://arxiv.org/html/2509.13941v1)). It is asked
+**blind** — the brief does not say which option the planner leans toward, and does not ask the
+researcher to find faults with it. A model shown an answer drifts toward it: feedback is "more
+positive when the user states they like or wrote the passage", and a user suggesting a wrong
+answer cut accuracy by up to 27% for one model (Sharma et al.,
+[arXiv 2310.13548](https://arxiv.org/html/2310.13548v4)). A model asked for faults reports them
+anyway: "A reviewer prompted to find gaps will usually report some, even when the work is sound"
+([Claude Code best practices](https://code.claude.com/docs/en/best-practices), checked
+2026-10-24), and model critics produce "nitpicks and hallucinated bugs" at a much higher rate than
+humans ([arXiv 2407.00215](https://arxiv.org/html/2407.00215v1)). The researcher reports the
+options its sources describe; the planner compares them with its own.
+
+**Verify after drafting, then disposition.** Once the approach is drafted, one fresh researcher
+checks it, so the agent that drafted the plan is not the one grading it; the planner does not
+fetch. It re-fetches each finding the draft rests on and confirms the quote, and it answers the
+draft's **fragile assumptions** — outside facts the draft relies on without a source that are new,
+rarely used or version-specific — sent as neutral questions, not as claims to confirm. This is
+Chain-of-Verification's shape — draft, plan verification questions, answer them "independently so
+the answers are not biased by other responses", revise
+([arXiv 2309.11495](https://arxiv.org/abs/2309.11495)) — applied to a plan. It is selective
+because blanket checking costs accuracy as well as time: retrieving documentation for every API
+call cost GPT-4o 39 points on common APIs with a weak retriever, while retrieving only for rare
+ones gained 8.2 points overall ([arXiv 2407.09726](https://arxiv.org/html/2407.09726v1)). An
+assumption the check cannot settle becomes a *to verify* finding; at depth `none` every fragile
+assumption does, and the digest names it. Each kept finding lands in `## External findings` with
 a disposition: adopted (which step), rejected (why — and a Dead ends line if it was an approach),
 to verify (with a Verification line), or context only. A finding that settles a structural decision
 puts an ADR into the plan's doc edits, under the existing ADR rule; no new task type is needed.
@@ -90,6 +118,14 @@ also block Claude's own edits to those paths, `.env.example` included.
   cross-phase reasoning; research there pollutes the wrong window and happens before the task is
   scoped.
 - **Always-on research.** Over-invests in simple tasks — the failure mode the tier caps exist for.
+- **Asking a researcher to review the planner's approach**, or to look for evidence against it.
+  The first anchors the researcher on the planner's answer; the second invites invented faults.
+  The blind question gets an independent answer without either bias.
+- **A best-practices question for every dependency**, as Spec Kit's plan phase does ("For each
+  dependency → best practices task"). Thorough, but it spends research where nothing is uncertain;
+  CDD asks about the approach only when the task holds a real design choice.
+- **Checking every outside fact the plan uses.** Common, stable facts rarely go wrong, and checking
+  them adds noise; the check targets what is new, rarely used or version-specific.
 - **Spec Kit's Decision / Rationale / Alternatives as the finding format.** In this split the
   decision and its rationale belong to the plan's Approach, not to a researcher's output; the
   disposition plays the "what was chosen" role and rejected alternatives go to Dead ends.
@@ -132,6 +168,11 @@ also block Claude's own edits to those paths, `.env.example` included.
 - **The hook needs `jq`.** Without it the hook exits quietly and researcher fetches prompt like any
   other — degraded, never unsafe. It matches the agent's frontmatter `name`, which is what the hook
   input reports for a custom subagent; renaming the agent means editing the hook.
+- **The post-draft check is CDD's own.** None of the workflows surveyed (Claude Code's best
+  practices, HumanLayer's research / plan / implement, Spec Kit) checks a plan's outside
+  assumptions after drafting; the step rests on Chain-of-Verification and claim-level fact-checking
+  results from question answering, not from code plans. Which assumptions count as fragile is the
+  planner's judgement.
 - **The budgets are judgement, not measurement.** They come from published multi-agent research
   practice, not from CDD's own usage; real tasks may show them to be wrong, and they live in one
   place (`/cdd-plan`) so that changing them is one edit.
