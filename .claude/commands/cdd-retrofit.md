@@ -233,7 +233,7 @@ For each file, with `old` = staged old render, `current` = staged current render
 | --- | --- | --- |
 | target == old, current != old | template evolved, project untouched | batch entry `upgrade` |
 | target != old, current == old | local customization, template unchanged | preserve; assess for upstreaming (4.6) |
-| target != old, current != old | both changed | three-way text merge (below): clean → batch entry `auto-merged` with the merged result; conflict → per file: show both diffs, propose a merge that keeps the local intent while adopting the template improvement, apply on approval |
+| target != old, current != old | both changed | three-way merge (below — as text, or as JSON for `.claude/settings.json`): clean → batch entry `auto-merged` with the merged result; conflict → per file: show both diffs, propose a merge that keeps the local intent while adopting the template improvement, apply on approval |
 | all equal | nothing to do | skip silently |
 | file absent in old render | newer than the project's baseline | add it as a new file — batch entry `new`, or per file, per "Added files" below |
 | file absent in target | project deleted it | per file — ask: deliberate removal (respect it) or accident (restore)? |
@@ -245,7 +245,28 @@ mkdir -p "$(dirname "$STAGE/merged/<path>")"
 git merge-file -p "$WT/<path>" "$STAGE/old/<path>" "$STAGE/current/<path>" > "$STAGE/merged/<path>"
 ```
 
-`-p` prints the result instead of overwriting the target. Exit 0 means conflict-free; a positive exit is the number of conflicts, a negative one an error — either goes per file. A conflict-free result still goes per file when a local hunk is a backend swap (migrate into `.cdd/`, below), or when the path is `.claude/settings.json` and the result no longer parses (`jq empty`).
+`-p` prints the result instead of overwriting the target. Exit 0 means conflict-free; a positive exit is the number of conflicts, a negative one an error — either goes per file. A conflict-free result still goes per file when a local hunk is a backend swap (migrate into `.cdd/`, below).
+
+`.claude/settings.json` is merged as JSON instead of as text, so a rule the project added does not collide with the template's edits to neighbouring lines. A value only one side changed takes that side's. A list merges as a set, in the template's order: the template's entries, minus those the project removed, plus those the project added. A value both sides changed differently is a conflict:
+
+```bash
+mkdir -p "$STAGE/merged/.claude"
+jq -n --slurpfile o "$STAGE/old/.claude/settings.json" \
+      --slurpfile c "$STAGE/current/.claude/settings.json" \
+      --slurpfile t "$WT/.claude/settings.json" '
+  def m3($o; $c; $t):
+    if $t == $o then $c
+    elif $c == $o or $c == $t then $t
+    elif ($c|type) == "object" and ($t|type) == "object" and (($o|type) == "object" or $o == null) then
+      reduce (($o // {}) + $c + $t | keys_unsorted[]) as $k ({};
+        m3($o[$k]; $c[$k]; $t[$k]) as $v | if $v == null then . else .[$k] = $v end)
+    elif ($c|type) == "array" and ($t|type) == "array" and (($o|type) == "array" or $o == null) then
+      ($o // []) as $o | ($c - ($o - $t)) + (($t - $o) - $c)
+    else error("both sides changed this value differently") end;
+  m3($o[0]; $c[0]; $t[0])' > "$STAGE/merged/.claude/settings.json"
+```
+
+Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not parse — goes per file.
 
 **Project-owned files** go through the same table, with two differences:
 

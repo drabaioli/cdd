@@ -52,9 +52,13 @@ ADR 0004 set for `/cdd-merge-base`.
   (migrate into `.cdd/`), template changes to a project-owned file the project has also changed,
   renames, legacy-sweep patches, capability bindings, and install-mode collisions with the project's
   own docs.
-- **Two guards keep a merge out of the batch even when git reports it clean:** a both-changed file
-  with a backend-swap hunk always goes per file, and a merged `.claude/settings.json` that no longer
-  parses goes per file.
+- **A guard keeps a merge out of the batch even when git reports it clean:** a both-changed file
+  with a backend-swap hunk always goes per file.
+- **`.claude/settings.json` is merged as JSON, not as text.** A value only one side changed takes
+  that side's, a list merges as a set (the template's entries, minus those the project removed, plus
+  those it added), and a value both sides changed differently is a conflict that goes per file. A
+  rule the project added therefore no longer collides with the template's edits to neighbouring
+  lines.
 - **Every file the template ships is compared**, in one of two sets. *Project-owned* files are the
   ones bootstrap fills with the project's own content (`CLAUDE.md`, the roadmap,
   `engineering-practices.md`, `project-overview.md`). A both-changed one never auto-merges: the
@@ -89,6 +93,9 @@ summary plus the PR is retrofit's review.
 - **Batch conflicting merges too, with an agent-proposed resolution.** "Git found no conflict" is a
   mechanical fact; "this conflict is easy" is the agent's own judgement — the same line ADR 0004
   draws for merge-base. A conflict stays per file.
+- **Merge `.claude/settings.json` as text, like the other files.** A trial retrofit showed a single
+  permission rule the project had added conflicting with the template's edits to the lines around
+  it — a question with no decision in it. The file is structured data, so it can be merged as such.
 - **Auto-merge project-owned files like the rest.** A clean text merge into a `CLAUDE.md` or a
   roadmap the project has rewritten can land template skeleton text in the middle of the project's
   prose. Adapting a template change to a project's own words is judgement.
@@ -105,7 +112,7 @@ summary plus the PR is retrofit's review.
 - **The residual risk is a conflict-free merge that is semantically wrong**: a local hunk and a
   template hunk that never touch the same lines can still contradict each other. This is the same
   risk ADR 0004 accepted for merge-base. It is bounded by auto-merged entries being their own kind
-  with their diff one request away, by the two guards above, by §4.6 still assessing the local hunks
+  with their diff one request away, by the backend-swap guard, by §4.6 still assessing the local hunks
   an auto-merge kept, and by the PR.
 - A `no-op` entry is the agent's judgement that a template change carries nothing. It is listed in
   the batch rather than asked, so a wrong call is visible and can be pulled out before anything is
