@@ -18,9 +18,15 @@ that the project never touched the file, or that the file did not exist at the b
 sensible answer is yes, and asking it twenty times teaches the user to stop reading. That is the
 shape process doc §1 names as a gap rather than a gate: "automate everything except decisions."
 
-The pre-marker (two-way) fallback had the same problem in a worse form: with no baseline, *every*
-difference was presented for classification, including files the project had simply never touched
-since an older bootstrap.
+Reviewing the change surfaced the opposite failure too: files that silently stay at an older
+template version. The comparison covered only part of what the template ships — the commands, the
+agent definition, `settings.json` and the four `index.md` files. Once a project had
+`engineering-practices.md`, `project-overview.md` or the ADR template, later template changes to
+them were never compared or reported, and `CLAUDE.md` and the roadmap were looked at only when the
+agent judged a change "structural". A declined upgrade disappeared too: it was listed once, and the
+next upgrade, anchored on the advanced marker, read it as a local customization. The stated policy
+is that every project tracks the template: most upgrades are automatic, a doubt is asked, and
+nothing stays behind unseen.
 
 The counter-pressure is `CLAUDE.md`'s standing constraint that the six checkpoints are load-bearing
 and are not to be weakened without explicit discussion. This ADR is that discussion, in the shape
@@ -36,23 +42,33 @@ ADR 0004 set for `/cdd-merge-base`.
   three-way text merge is conflict-free; and, in install mode, files the project lacks plus the
   union merge into an existing `.claude/settings.json`.
 - **The batch is shown once, before any write** — one line per path with its kind (`upgrade`,
-  `new`, `new (filled: …)`, `auto-merged`, `settings union`) — and **one approval writes it all.**
-  Auto-merged entries are their own kind, grouped apart, so the one entry that a machine produced
-  rather than copied is visible as such. Any entry's diff is available on request, and any entry can
-  be pulled out into the per-file queue. Declining the batch sends every entry to the per-file
-  queue — today's behaviour — never drops it.
+  `new`, `new (filled: …)`, `auto-merged`, `no-op: …`, `settings union`) — and **one approval
+  writes it all.** Auto-merged entries are their own kind, grouped apart, so the one entry that a
+  machine produced rather than copied is visible as such. Any entry's diff is available on request,
+  and any entry can be pulled out into the per-file queue. Declining the batch sends every entry to
+  the per-file queue, never drops it.
 - **The per-file queue** holds everything that needs judgement: merge conflicts, project-deleted
   files, new files still carrying residual placeholders, local hunks that swap in another backend
-  (migrate into `.cdd/`), structural `CLAUDE.md` or roadmap edits, renames, legacy-sweep patches,
-  capability bindings, install-mode collisions with the project's own docs, and in two-way mode any
-  file that matches no past template version or that the project lacks.
+  (migrate into `.cdd/`), template changes to a project-owned file the project has also changed,
+  renames, legacy-sweep patches, capability bindings, and install-mode collisions with the project's
+  own docs.
 - **Two guards keep a merge out of the batch even when git reports it clean:** a both-changed file
   with a backend-swap hunk always goes per file, and a merged `.claude/settings.json` that no longer
   parses goes per file.
-- **Pre-marker projects get past-version matching.** The template is rendered at every CDD commit
-  that touched `template/`, through the same bootstrap script, and a target file identical to the
-  render of that path at any past commit counts as untouched — upgraded through the batch like a
-  three-way "project untouched" file. Everything else in two-way mode stays per file.
+- **Every file the template ships is compared**, in one of two sets. *Project-owned* files are the
+  ones bootstrap fills with the project's own content (`CLAUDE.md`, the roadmap,
+  `engineering-practices.md`, `project-overview.md`). A both-changed one never auto-merges: the
+  template's change is shown and its adaptation proposed per file. The exception is a change that
+  touches only skeleton text the project has since replaced: it is listed in the batch as `no-op`
+  with its reason, so it is seen rather than asked. *CDD-managed* is every other file, including any
+  the template adds later — the default is to compare, so a new template file cannot fall outside.
+- **Nothing stays behind unseen.** Whatever a run leaves un-upgraded — a declined question, a
+  deleted file left deleted, a project-owned change not carried over — is listed as *behind the
+  template* in the summary, with its reason, and copied into the retrofit commit's body. The commit
+  body is the durable record, because the next upgrade reads the same file as a local customization.
+- **Upgrade mode requires the baseline marker.** A missing marker, `unknown`, or a hash the CDD
+  checkout lacks stops the run, before the worktree is created, with how to fix it. Every existing
+  CDD project carries a marker, so a marker-less fallback would be machinery with no user.
 
 **Why this weakens none of the six §4 checkpoints.** Retrofit is not one of the six; it runs from a
 CDD-repo session on someone else's project, outside the task lifecycle the checkpoints gate. Its
@@ -73,13 +89,14 @@ summary plus the PR is retrofit's review.
 - **Batch conflicting merges too, with an agent-proposed resolution.** "Git found no conflict" is a
   mechanical fact; "this conflict is easy" is the agent's own judgement — the same line ADR 0004
   draws for merge-base. A conflict stays per file.
-- **Infer one baseline commit for a pre-marker project from the past-version matches**, then run
-  the full three-way comparison. Different files can match different past commits — a project
-  upgraded by hand, piecemeal — so a single inferred baseline would misclassify some of them.
-  Matching per file needs no such guess.
-- **Treat a pre-marker file the project lacks as "new since bootstrap".** Without a marker, a file
-  the project deleted and a file it never had look the same. Guessing between them is judgement
-  dressed up as mechanics; it stays per file.
+- **Auto-merge project-owned files like the rest.** A clean text merge into a `CLAUDE.md` or a
+  roadmap the project has rewritten can land template skeleton text in the middle of the project's
+  prose. Adapting a template change to a project's own words is judgement.
+- **Keep a marker-less fallback, matching each file against renders of every past template
+  version.** It was built during this change, and it worked: about fifty renders in a few seconds,
+  and a file identical to some past render counted as untouched. It was dropped because every
+  existing project carries a marker, and because a file that matches an *older* version would be
+  upgraded with no way to tell a deliberate pin from staleness.
 
 ## Consequences
 
@@ -90,11 +107,11 @@ summary plus the PR is retrofit's review.
   risk ADR 0004 accepted for merge-base. It is bounded by auto-merged entries being their own kind
   with their diff one request away, by the two guards above, by §4.6 still assessing the local hunks
   an auto-merge kept, and by the PR.
-- Past-version matching **errs toward asking**: a match is byte-for-byte. Files from projects
-  bootstrapped before the two-identifier model (#24) never match, because the old renders leave
-  legacy tokens unsubstituted, so those projects see more per-file questions. Its one blind spot is
-  a file the project deliberately kept at an older template version: it matches that version and is
-  listed as a batch `upgrade`, where the user can pull it out. Its cost grows with the template's
-  history; at the time of writing it is about fifty renders and a few seconds.
-- Retrofit's summary now separates what was applied in the batch from what was approved
-  individually, so the record of what the user decided stays readable after the fact.
+- A `no-op` entry is the agent's judgement that a template change carries nothing. It is listed in
+  the batch rather than asked, so a wrong call is visible and can be pulled out before anything is
+  written. "When in doubt, ask" is the rule.
+- A project with no usable marker cannot be upgraded until someone writes one by hand: the CDD
+  commit it was bootstrapped or last upgraded from. That is a one-line fix, and it beats a guess.
+- Retrofit's summary now separates what was applied in the batch, what was approved individually,
+  what was preserved, and what is behind the template, so the record of what the user decided stays
+  readable after the fact.
