@@ -95,9 +95,9 @@ Group the `auto-merged` entries apart from the rest — they are the only entrie
 - new files still carrying residual `<...>` placeholders after the best-effort fill (section 4.4);
 - local hunks that swap in another backend — migrate into `.cdd/` (section 4.4);
 - structural `CLAUDE.md` or roadmap edits (section 4.4);
-- template renames (section 4.4);
+- template renames (section 4.4) — asked before the batch, above, not again;
 - legacy-sweep patches and the legacy helper (section 4.5);
-- capability bindings (section 2.6);
+- capability bindings (section 2.6) — asked before the batch, above, not again;
 - install-mode collisions other than `.claude/settings.json` — `CLAUDE.md`, pre-existing `doc/` files, anything else (section 3.3);
 - in two-way mode, a file matching no past template version, and a file the project lacks (section 4.1);
 - anything the user pulled out of the batch.
@@ -214,7 +214,7 @@ done
 #   cmp -s "$WT/<path>" "$PAST/<commit>/<path>"
 ```
 
-It costs one render per commit that touched `template/` — a few seconds. The match is exact, so it can only under-claim "untouched", never over-claim it: a project bootstrapped before the two-identifier model (#24) matches nothing, because those renders keep their legacy tokens, and simply gets more per-file questions.
+It costs one render per commit that touched `template/` — a few seconds. The match is exact, so it errs toward asking: a project bootstrapped before the two-identifier model (#24) matches nothing, because those renders keep their legacy tokens, and simply gets more per-file questions. Its one blind spot is a file the project deliberately kept at an older template version: that matches too and is listed as a batch `upgrade`, where the user can pull it out.
 
 ### 4.4 Three-way comparison, per CDD-managed file
 

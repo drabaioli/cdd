@@ -90,10 +90,11 @@ summary plus the PR is retrofit's review.
   risk ADR 0004 accepted for merge-base. It is bounded by auto-merged entries being their own kind
   with their diff one request away, by the two guards above, by §4.6 still assessing the local hunks
   an auto-merge kept, and by the PR.
-- Past-version matching can only **under-claim** "untouched", never over-claim it: a match is
-  byte-for-byte. Files from projects bootstrapped before the two-identifier model (#24) never match,
-  because the old renders leave legacy tokens unsubstituted, so those projects see more per-file
-  questions — never a wrong overwrite. Its cost grows with the template's history; at the time of
-  writing it is about fifty renders and a few seconds.
+- Past-version matching **errs toward asking**: a match is byte-for-byte. Files from projects
+  bootstrapped before the two-identifier model (#24) never match, because the old renders leave
+  legacy tokens unsubstituted, so those projects see more per-file questions. Its one blind spot is
+  a file the project deliberately kept at an older template version: it matches that version and is
+  listed as a batch `upgrade`, where the user can pull it out. Its cost grows with the template's
+  history; at the time of writing it is about fifty renders and a few seconds.
 - Retrofit's summary now separates what was applied in the batch from what was approved
   individually, so the record of what the user decided stays readable after the fact.
