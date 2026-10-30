@@ -138,6 +138,8 @@ Defects and gaps surfaced by retrofitting CDD onto real existing projects. Each 
 - [x] **Retrofit doc-reconciliation playbook for common pre-existing layouts** (split architecture docs, a future-work/backlog doc, an oversized CLAUDE.md), in `/cdd-retrofit` and the process doc.
 - [x] Retrofit upgrade mode sweeps project-owned scripts for legacy CDD tokens and migrates a project-local `tools/<slug>-worktree.sh` off the pre-global helper model (issue #44)
 - [x] **Two template defaults every project fixed by hand** (issues #73, #74): the knowledge base's pointer list is now `index.md`, and `.claude/settings.json` ships a read-only Bash allowlist
+- [x] **Retrofit applies clean changes as one approved batch**; asks only where judgement is needed, lists anything left behind the template, and requires the baseline marker
+- [x] Retrofit upgrade mode merges a both-changed `.claude/settings.json` as JSON, lists as sets, not as text, so one added rule no longer forces a per-file question
 
 **Milestone:** CDD retrofits cleanly onto a project regardless of default-branch name, repo directory name/location, or pre-existing doc layout, without per-project manual fixes to the scaffolding.
 

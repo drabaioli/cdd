@@ -2,7 +2,7 @@ Install CDD into an existing project, or upgrade a project already running CDD, 
 
 Run this command from a CDD-repo session (it needs the CDD repo's `template/`, `bootstrap-cdd-project.sh`, and git history). The mode — **install** or **upgrade** — is auto-detected from the target. This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* target projects, so downstream projects have no use for it — see the process doc, Section 2.7).
 
-**Checkpoint discipline:** every write that touches a pre-existing file in the target is approved per file by the user. Never overwrite a project file silently. Identifier choices (name/slug/dir) are confirmed before anything is rendered.
+**Checkpoint discipline:** nothing is written before the user has seen it. Clean, mechanical writes are collected into one batch, shown once before anything is written, and applied on a single approval; everything that needs judgement is approved per file (section 2.7). Never overwrite a project file silently. Identifier choices (name/slug/dir) are confirmed before anything is rendered. One approval is enough for the batch because every write lands on the dedicated retrofit branch (section 2.5) and reaches the project only through `/cdd-pre-pr` and a PR.
 
 Target path: `$ARGUMENTS`
 
@@ -18,7 +18,7 @@ git -C <target> status --porcelain 2>/dev/null
 ```
 
 - If the target is not a git repo, warn the user (retrofit changes won't be revertable via git, and the isolated-worktree step in section 2.5 won't run) and ask whether to proceed.
-- A **dirty working tree no longer blocks the retrofit**: section 2.5 writes into a fresh worktree branched from HEAD, so the target's current checkout is untouched. Do *not* hard-stop on a dirty tree. There is one nuance to warn about: because the worktree is taken from HEAD, any **uncommitted local edits to CDD-managed files** (the set listed in section 4.4) are invisible to the upgrade comparison. If `git status --porcelain` shows uncommitted changes to those files, tell the user to commit them first or they won't be considered, then let them decide whether to proceed.
+- A **dirty working tree no longer blocks the retrofit**: section 2.5 writes into a fresh worktree branched from HEAD, so the target's current checkout is untouched. Do *not* hard-stop on a dirty tree. There is one nuance to warn about: because the worktree is taken from HEAD, any **uncommitted local edits to the files the template ships** (the two sets listed in section 4.4) are invisible to the upgrade comparison. If `git status --porcelain` shows uncommitted changes to those files, tell the user to commit them first or they won't be considered, then let them decide whether to proceed.
 
 Also note `<target>/.gitignore`: if any path the retrofit will write (`.claude/`, `doc/`, `tools/`) is gitignored, warn that those writes will not show in `git status` (and won't be staged by the retrofit commit in sections 3.4 / 4.7), and include this in the final summary.
 
@@ -30,7 +30,7 @@ Probe for CDD scaffolding in the target:
 ls <target>/.claude/commands/cdd-next-step.md <target>/doc/knowledge_base/roadmap.md 2>/dev/null
 ```
 
-- Either file present → **upgrade mode** (section 4).
+- Either file present → **upgrade mode** (section 4). Check its baseline marker now, against section 4.1: an unusable one stops the run here, before section 2.5 creates anything.
 - Neither present → **install mode** (section 3).
 
 State the detected mode and the evidence to the user before proceeding, and let them override if the detection is wrong (e.g. a half-finished previous install).
@@ -73,6 +73,38 @@ git -C <target> log -n 500 --format='%D %s %b'
 
 Approve each binding as its own file, render it with the matching flags on the section 3.2 / 4.3 render (never hand-write one), and never overwrite an existing `.cdd/<capability>`.
 
+## 2.7 The batch and the per-file queue
+
+Both modes write in the same shape. Sections 3 and 4 say which of their writes are batch entries and which are per-file items; this section is how both are presented and applied.
+
+**Classify first, write nothing.** Walk every proposed write and sort it into the batch or the per-file queue before touching `$WT`. Two answers are taken before classification, because they decide what gets rendered or compared: the section 2.6 binding approvals and the section 4.4 rename pre-pass. Their writes (the `git mv`, the shim copy) run with the others, the `git mv` first.
+
+**Show the batch once, before any write.** One line per entry — the path and its kind:
+
+- install mode: `new`, `settings union`;
+- upgrade mode: `upgrade`, `new`, `new (filled: <fields>)`, `auto-merged`, `no-op: <why>`.
+
+Group the `auto-merged` entries apart from the rest — they are the only entries a merge produced rather than copied. A `no-op` entry writes nothing: it is a template change to a project-owned file that carries nothing for this project (section 4.4), listed so that it is seen rather than skipped. Put any caveat on the line under its entry (the section 3.3 `WebFetch` line, for one). End with how many per-file questions follow.
+
+**One approval writes the whole batch into `$WT`.** Before answering, the user may ask for any entry's diff, or pull entries out — each pulled entry joins the per-file queue. Declining the batch sends every entry to the per-file queue, never drops it. An empty batch is one line saying so, then straight to the queue.
+
+**Then the per-file queue, one file at a time:** show the diff (or both versions), propose, write into `$WT` on approval. The queue holds exactly:
+
+- merge conflicts (section 4.4);
+- files the project deleted (section 4.4);
+- new files still carrying residual `<...>` placeholders after the best-effort fill (section 4.4);
+- local hunks that swap in another backend — migrate into `.cdd/` (section 4.4);
+- template changes to a project-owned file the project has also changed — `CLAUDE.md`, the roadmap, the filled-in knowledge-base docs (section 4.4);
+- template renames (section 4.4) — asked before the batch, above, not again;
+- legacy-sweep patches and the legacy helper (section 4.5);
+- capability bindings (section 2.6) — asked before the batch, above, not again;
+- install-mode collisions other than `.claude/settings.json` — `CLAUDE.md`, pre-existing `doc/` files, anything else (section 3.3);
+- anything the user pulled out of the batch.
+
+Whatever the queue leaves un-upgraded — a declined question, a deleted file left deleted — is listed as **behind the template** in section 5. Nothing stays at an older template version without being named.
+
+A conflict-free merge can still be semantically wrong — two hunks that never touch the same lines can contradict each other — which is why `auto-merged` is its own kind; the PR is the backstop.
+
 ## 3. Install mode
 
 A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/cdd-next-step` picks those up as the next unchecked tasks.
@@ -98,16 +130,18 @@ STAGE=$(mktemp -d)
 
 The staging tree is fully substituted, has no `.git`, and contains the baseline marker `.claude/cdd-baseline`, plus a `.cdd/<capability>` shim for each binding passed.
 
-### 3.3 Copy staging → worktree, per file
+### 3.3 Copy staging → worktree
 
-Walk every file in `$STAGE/render`. All writes go into `$WT` (the isolated worktree from section 2.5), and presence is judged against `$WT` — which, for a fresh worktree, mirrors the target's HEAD:
+Walk every file in `$STAGE/render` and classify it (section 2.7). All writes go into `$WT` (the isolated worktree from section 2.5), and presence is judged against `$WT` — which, for a fresh worktree, mirrors the target's HEAD:
 
-- **Absent in `$WT`** → copy it directly (create parent dirs as needed). This covers the slash commands, the agent definitions, doc skeletons, `.claude/settings.json`, and the marker in the common case. A `.cdd/<capability>` binding is the exception: it is copied only under its own approval, and never over an existing one (section 2.6).
-- **Present in `$WT`** (collision — typically `CLAUDE.md`, sometimes `doc/` files or `.claude/settings.json`) → propose a merge interactively, one file at a time:
+- **Absent in `$WT`** → batch entry `new` (copied with parent dirs created as needed). This covers the slash commands, the agent definitions, doc skeletons, `.claude/settings.json`, and the marker in the common case. A `.cdd/<capability>` binding is the exception: it is copied only under its own approval, and never over an existing one (section 2.6).
+- **`.claude/settings.json` present in `$WT`** → batch entry `settings union`: merge the `permissions.allow` arrays and the `permissions.deny` arrays (each a union), and add the template's `hooks.PreToolUse` entries the project lacks, keeping its own. The merged result must still parse (`jq empty`); if it does not, it goes per file. If the project allows `WebFetch` outright, put one line under the entry saying this pre-approves every session's fetches, not only the researcher's, and leave the choice to the user.
+- **Any other file present in `$WT`** (collision — typically `CLAUDE.md`, sometimes `doc/` files) → per file:
   - `CLAUDE.md`: keep the project's existing content; propose adding the CDD pieces it lacks (the Key references table rows for `doc/`, and the Workflow section referencing `/cdd-next-step`, `/cdd-pre-pr`, `/cdd-merge-base`). Show the proposed result; apply only on approval.
-  - `.claude/settings.json`: merge the `permissions.allow` arrays and the `permissions.deny` arrays (each a union), and add the template's `hooks.PreToolUse` entries the project lacks, keeping its own; show the result before writing. If the project allows `WebFetch` outright, say in one line that this pre-approves every session's fetches, not only the researcher's, and leave the choice to the user.
   - Anything else: show both versions and propose the merge; the user decides per file.
 - Never delete or move existing files.
+
+Once every file is classified, apply section 2.7: show the batch, write it on approval, then walk the per-file queue.
 
 ### 3.4 Finish
 
@@ -128,10 +162,14 @@ Sync improvements the CDD template has accrued into the target **without changin
 
 ### 4.1 Establish the baseline
 
-Read `$WT/.claude/cdd-baseline` (the section 2.5 worktree, which mirrors HEAD).
+Read `$WT/.claude/cdd-baseline` (the section 2.5 worktree, which mirrors HEAD). It must name a commit in this CDD repo (`git cat-file -e <hash>^{commit}`): that commit is the merge base for the three-way comparison in section 4.4. Section 2 has already checked this against the target, before anything was created.
 
-- **Present and a valid commit in this CDD repo** (`git cat-file -e <hash>^{commit}`) → three-way mode.
-- **Missing, `unknown`, or not a known commit** → pre-marker fallback: two-way mode (target vs. current template only), where *every* difference is presented to the user to classify as "apply the template's version", "keep local", or "merge". Be conservative; when in doubt, keep local. The marker is written at the end regardless, so the next upgrade gets the three-way path.
+There is no fallback mode. A marker that is missing, reads `unknown` (the bootstrap script writes that when run from a copy of CDD that is not a git checkout), or names a commit this repo lacks stops the run. Say which in one line, with the fix:
+
+- **Unknown commit:** `git fetch` in this CDD repo — the project may come from a newer commit than this checkout has — then rerun.
+- **Missing or `unknown`:** write the CDD commit the project was bootstrapped or last upgraded from into `.claude/cdd-baseline` on the project's default branch, then rerun.
+
+Never guess a baseline. Every project bootstrapped or upgraded since the marker was introduced carries one.
 
 ### 4.2 Recover the target's identifiers
 
@@ -165,13 +203,16 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
   --path "$STAGE/old"
 ```
 
-(Skip the old render in two-way fallback mode.)
+### 4.4 Three-way comparison, per template file
 
-### 4.4 Three-way comparison, per CDD-managed file
+Every file the template ships is compared, in one of two sets:
 
-The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json`, `doc/index.md`, `doc/architecture/index.md`, `doc/features/index.md`, `doc/knowledge_base/index.md`. (The worktree helper is no longer part of this set — it is a single project-independent script installed once, not a per-project template file. `CLAUDE.md` and `doc/knowledge_base/roadmap.md` are project-owned content after bootstrap — leave them out unless a structural template change clearly applies, and then only with explicit per-file approval.)
+- **Project-owned** — the template files a project fills with its own content: `CLAUDE.md`, `doc/knowledge_base/roadmap.md`, `doc/knowledge_base/engineering-practices.md`, `doc/knowledge_base/project-overview.md`.
+- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json`, the four `index.md` files under `doc/`, and `doc/architecture/adr/0000-template.md`. A file the template adds later joins this set by default.
 
-**DEPRECATION SEAM — the plan/implement split is exactly such a structural change, so the exception applies; do not skip it. Delete this paragraph once every project has been retrofitted past the split — issue #90, which also covers the matching fallback in `cdd-worktree.sh`.** The upgrade adds `cdd-plan.md` and `cdd-implement.md` to `.claude/commands/` for free (they are absent from any older baseline render, so the "file absent in old render" row below covers them), but the procedure change is not a file change: a project whose `CLAUDE.md` Workflow section still describes a single implementation session ends up with the commands installed and nothing telling anyone to use them. So when the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — propose the `CLAUDE.md` Workflow edit too, with its own diff and its own approval: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Take the current template's `CLAUDE.md` Workflow bullets as the wording to adapt.
+(The worktree helper is in neither set: it is a single project-independent script installed once, not a per-project template file.)
+
+**DEPRECATION SEAM — the plan/implement split reaches a project through the project-owned `CLAUDE.md` rule below the table; make sure that proposal carries it, and never list it as `no-op`. Delete this paragraph once every project has been retrofitted past the split — issue #90, which also covers the matching fallback in `cdd-worktree.sh`.** The upgrade adds `cdd-plan.md` and `cdd-implement.md` to `.claude/commands/` for free (they are absent from any older baseline render, so the "file absent in old render" row below covers them), but the procedure change is not a file change: a project whose `CLAUDE.md` Workflow section still describes a single implementation session ends up with the commands installed and nothing telling anyone to use them. So when the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — the `CLAUDE.md` proposal must include the Workflow edit: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Take the current template's `CLAUDE.md` Workflow bullets as the wording to adapt.
 
 **Template path renames.** A file the template renamed between the baseline and now is a rename, not a delete plus an add, but the table below has no rename row: run untreated, it asks whether the project deliberately deleted the old path, and offers the new one as a file a project that already renamed it by hand has. So resolve each row below against the target *first*, then compare on the new path only.
 
@@ -179,7 +220,7 @@ The CDD-managed set is what the template ships: `.claude/commands/*.md`, `.claud
 | --- | --- | --- |
 | `doc/knowledge_base/README.md` | `doc/knowledge_base/index.md` | #73 |
 
-- **old present, new absent** → propose `git -C "$WT" mv <old> <new>` under the usual per-file approval, then compare the new path.
+- **old present, new absent** → propose `git -C "$WT" mv <old> <new>` under the usual per-file approval, then compare the new path. Take this answer before classifying anything; the `git mv` runs as the first write (section 2.7).
 - **new present, old absent** → the project already renamed it; say so and compare the new path.
 - **both present** → do not guess: report both and ask which to keep.
 - **neither present** → fall through to the table's "file absent in target" row on the new path.
@@ -190,21 +231,56 @@ For each file, with `old` = staged old render, `current` = staged current render
 
 | Comparison | Meaning | Action |
 | --- | --- | --- |
-| target == old, current != old | template evolved, project untouched | propose applying the upgrade (show the diff; apply on approval) |
+| target == old, current != old | template evolved, project untouched | batch entry `upgrade` |
 | target != old, current == old | local customization, template unchanged | preserve; assess for upstreaming (4.6) |
-| target != old, current != old | both changed | show both diffs; propose a merge that keeps the local intent while adopting the template improvement; apply on approval |
+| target != old, current != old | both changed | three-way merge (below — as text, or as JSON for `.claude/settings.json`): clean → batch entry `auto-merged` with the merged result; conflict → per file: show both diffs, propose a merge that keeps the local intent while adopting the template improvement, apply on approval |
 | all equal | nothing to do | skip silently |
-| file absent in old render | newer than the project's baseline | propose adding it as a new file |
-| file absent in target | project deleted it | ask: deliberate removal (respect it) or accident (restore)? |
+| file absent in old render | newer than the project's baseline | add it as a new file — batch entry `new`, or per file, per "Added files" below |
+| file absent in target | project deleted it | per file — ask: deliberate removal (respect it) or accident (restore)? |
 
-Every application is per-file interactive: show the diff, get approval, write into `$WT`.
+For a both-changed file, merge the template's change into the project's file without touching `$WT`:
 
-**Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" or "both changed" rows) that swaps `gh issue …` / `gh pr …` for another backend (`jira`, `acli`, `glab`, `curl …atlassian.net/…`) is a backend to bind, not a customization to keep. Propose, per file: restore the template's hunk and bind the capability instead — a shipped adapter if CDD has one (section 2.6), otherwise a project adapter written against `doc/architecture/capability-adapters.md`. If declined, preserve it like any customization.
+```bash
+mkdir -p "$(dirname "$STAGE/merged/<path>")"
+git merge-file -p "$WT/<path>" "$STAGE/old/<path>" "$STAGE/current/<path>" > "$STAGE/merged/<path>"
+```
+
+`-p` prints the result instead of overwriting the target. Exit 0 means conflict-free; a positive exit is the number of conflicts, a negative one an error — either goes per file. A conflict-free result still goes per file when a local hunk is a backend swap (migrate into `.cdd/`, below).
+
+`.claude/settings.json` is merged as JSON instead of as text, so a rule the project added does not collide with the template's edits to neighbouring lines. A value only one side changed takes that side's. A list merges as a set, in the template's order: the template's entries, minus those the project removed, plus those the project added. A value both sides changed differently is a conflict:
+
+```bash
+mkdir -p "$STAGE/merged/.claude"
+jq -n --slurpfile o "$STAGE/old/.claude/settings.json" \
+      --slurpfile c "$STAGE/current/.claude/settings.json" \
+      --slurpfile t "$WT/.claude/settings.json" '
+  def m3($o; $c; $t):
+    if $t == $o then $c
+    elif $c == $o or $c == $t then $t
+    elif ($c|type) == "object" and ($t|type) == "object" and (($o|type) == "object" or $o == null) then
+      reduce (($o // {}) + $c + $t | keys_unsorted[]) as $k ({};
+        m3($o[$k]; $c[$k]; $t[$k]) as $v | if $v == null then . else .[$k] = $v end)
+    elif ($c|type) == "array" and ($t|type) == "array" and (($o|type) == "array" or $o == null) then
+      ($o // []) as $o | ($c - ($o - $t)) + (($t - $o) - $c)
+    else error("both sides changed this value differently") end;
+  m3($o[0]; $c[0]; $t[0])' > "$STAGE/merged/.claude/settings.json"
+```
+
+Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not parse — goes per file.
+
+**Project-owned files** go through the same table, with two differences:
+
+- **A both-changed one never auto-merges.** It goes per file: show the template's change (old → current render), propose how to carry it into the project's version, and apply on approval. A clean `git merge-file` result makes a fair first draft. The exception is a template change that touches only skeleton text the project has since replaced, such as a placeholder it filled or the pre-filled bootstrap phase its roadmap no longer has. That carries nothing, so list it in the batch as `no-op: <why>` instead of asking. When in doubt, ask.
+- **Section 4.6 does not assess them:** their local content is the project's own by definition.
+
+Batch rows are collected, not written. Once every file is classified, apply section 2.7: show the batch, write it on approval, then walk the per-file queue — show the diff, get approval, write into `$WT`.
+
+**Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" or "both changed" rows) that swaps `gh issue …` / `gh pr …` for another backend (`jira`, `acli`, `glab`, `curl …atlassian.net/…`) is a backend to bind, not a customization to keep. Check for it before a both-changed file can join the batch. Propose, per file: restore the template's hunk and bind the capability instead — a shipped adapter if CDD has one (section 2.6), otherwise a project adapter written against `doc/architecture/capability-adapters.md`. If declined, preserve it like any customization.
 
 **Added files — reconcile fill-in skeletons, don't ship them raw.** A file absent from the old render is newer than the project's baseline, and it may be a fill-in skeleton whose placeholder defaults would make false claims about a mature project (the motivating case: `engineering-practices.md` arriving with `<test command>` / `<lint command>` / `<ci workflow / command>` placeholders and provisional `<Enforced once …; Expected until then>` markers, claiming no gate exists in a project that already runs pytest, ruff, and CI). For every file you propose adding:
 
 - **Scan the staged render for residual `<...>` tokens.** The render already substituted the two identifiers (`<PROJECT_NAME>`/`<PROJECT_DIR>`), so any remaining `<...>` is genuine fill-in content — a placeholder field or a provisional status marker.
-- **If it carries residual placeholders, reconcile before writing.** Make a best-effort pass to fill the fields you can confidently detect from the target's actual state, and propose the filled result under the same per-file approval as any other write. Keep this lightweight: fill what you can confidently detect and leave the rest — do **not** build a general reconciliation engine (`/cdd-pre-pr` is the systematic backstop). Never fabricate a value to clear a placeholder; if you can't confidently determine it, leave the placeholder and let the summary flag it.
+- **If it carries residual placeholders, reconcile before writing.** Make a best-effort pass to fill the fields you can confidently detect from the target's actual state. A file left with no residual placeholder joins the batch as `new (filled: <fields>)` (plain `new` if nothing needed filling); one still carrying residual placeholders is proposed per file. Keep this lightweight: fill what you can confidently detect and leave the rest — do **not** build a general reconciliation engine (`/cdd-pre-pr` is the systematic backstop). Never fabricate a value to clear a placeholder; if you can't confidently determine it, leave the placeholder and let the summary flag it.
 - **Worked example — `engineering-practices.md`.** Fill `<test command>` / `<integration test command>` / `<lint command>` / `<format check command>` / `<ci workflow / command>` from the commands you can detect (a `Makefile`/`pyproject.toml`/`package.json` test or lint target, a test-runner or linter config), and flip each provisional status marker to **Enforced** or **Expected** according to whether that gate actually exists — CI judged by a `.github/workflows/*.yml`, tests/lint by the presence of the corresponding runner or linter config. Apply the same shape to any other added fill-in doc.
 - Anything left unreconciled after the approved edit still counts as residual and is carried into the section 5 summary flag.
 
@@ -233,7 +309,7 @@ ls "$WT"/tools/*-worktree.sh "$WT"/tools/*-state.sh 2>/dev/null   # the legacy h
 
 Both narrowings are load-bearing: unbounded, the second pattern matches `css/bootstrap.min.css`-shaped paths, and bare `PROJECT` is swept only as an identifier because alone it is an ordinary English word. If `$WT` is **not a git repo** (section 2.5's fallback, or a hand-copied install), `git grep` fails outright — degrade rather than skip: rerun both as `grep -rnI ... "$WT"`, and report in section 5 that the sweep covered the whole tree, so gitignored and build-output paths may appear among the hits.
 
-**Classify every hit; suppress none** — a hit you decide not to act on is still reported, because a misclassification is only recoverable while it is visible. **Actionable** (a live reference a project-owned script, doc or `.claude/settings.json` actually follows) → propose the patch, per-file approval as everywhere in section 4. **Historical** (a changelog, ADR or roadmap line *recording* the old name rather than using it) → report it, propose nothing, let the human judge. **Surviving in a CDD-managed file** → say so plainly: 4.4 should have migrated it, so that is a defect in this command, not in the project.
+**Classify every hit; suppress none** — a hit you decide not to act on is still reported, because a misclassification is only recoverable while it is visible. **Actionable** (a live reference a project-owned script, doc or `.claude/settings.json` actually follows) → propose the patch, approved per file (section 2.7). **Historical** (a changelog, ADR or roadmap line *recording* the old name rather than using it) → report it, propose nothing, let the human judge. **Surviving in a CDD-managed file** → say so plainly: 4.4 should have migrated it, so that is a defect in this command, not in the project.
 
 **The legacy worktree helper — the loudest hit.** If the `ls` probe finds one, the project predates the machine-global helper. State the recommendation, don't offer a neutral menu:
 
@@ -244,7 +320,7 @@ Either way it is an outcome, not a silent success — section 5 reports it.
 
 ### 4.6 Upstream candidates
 
-For each preserved local customization, judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Do not silently keep general improvements local: collect them into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as an extension**: a new shipped adapter, not a prompt change. Do not auto-apply anything to the CDD repo in this session.
+For each preserved local customization in a CDD-managed file — including the local hunks an `auto-merged` file kept — judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Do not silently keep general improvements local: collect them into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as an extension**: a new shipped adapter, not a prompt change. Do not auto-apply anything to the CDD repo in this session.
 
 ### 4.7 Update the marker and commit
 
@@ -258,7 +334,7 @@ Then **commit on the retrofit branch** (skip if section 2.5 fell back to in-plac
 
 ```bash
 git -C "$WT" add -A
-git -C "$WT" commit -m "Upgrade CDD scaffolding to $(git rev-parse --short HEAD)" -m "<short body: files upgraded/merged/preserved>"
+git -C "$WT" commit -m "Upgrade CDD scaffolding to $(git rev-parse --short HEAD)" -m "<short body: files upgraded/merged/preserved, and the section 5 behind-the-template list>"
 ```
 
 (The `$(git rev-parse --short HEAD)` runs in the CDD repo before `-C "$WT"` takes effect — capture it into a variable first if needed.) Commit only on this dedicated branch; never onto the target's existing branches. Then clean up `$STAGE` and `$OLD_TPL`.
@@ -269,7 +345,13 @@ Report, in both modes:
 
 - Mode detected, identifiers used.
 - The isolation: the worktree path (`$WT`), the branch name, and the commit hash made on it — or, if section 2.5 fell back, that writes landed in place with no commit and why.
-- Files copied / upgraded / merged / preserved (and any the user declined).
+- The files, in four lists kept apart:
+  - **applied in the batch** — path and kind;
+  - **approved individually** — path and what was done, including entries pulled out of the batch;
+  - **preserved** — each local customization kept, with one line on what it changes;
+  - **behind the template** — every file the template would have changed that this run left as it was: a declined question, a deleted file left deleted, a project-owned change not carried over. Give each one's reason.
+
+  Print the last list even when it is empty ("none"). It is the only record: the marker still advances, so the next upgrade reads a declined change as a local customization. Section 4.7 copies it into the commit body for the same reason.
 - **Added — needs reconciliation** (upgrade mode): any added file that still contains residual `<...>` placeholders or provisional status markers after all approved edits, listed by path. Keep this as a distinct category from clean adds so it reads as an action item, not a silent success — the user must finish these, and the recommended `/cdd-pre-pr` pass below will also catch them.
 - **Legacy migration** (upgrade mode): the sweep's outcome as a distinct category — *swept* (what was found, including the historical hits deliberately left alone), *patched* (files brought back into agreement, listed), and *recommended for removal* (a project-local worktree/state helper, with the exact shell rc line the user still has to delete by hand). An empty sweep says so in one line. Keep it separate from the file lists above: a legacy hit the user declined is an action item they carry away, not a closed row.
 - **Capability bindings**: each `.cdd/<capability>` written (with its evidence), declined, or already present; each "no adapter for this backend" line; any upgrade-mode "migrate into `.cdd/`" hunk and its outcome; for Jira, the env vars the user sets; and, if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing on this machine, that the bound capability stops until `./tools/cdd-worktree.sh install` runs.
