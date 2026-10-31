@@ -42,6 +42,7 @@ CHECKS=(
   "lane-marker|the small-change lane's routing marker is written and read"
   "heuristic|the lane eligibility heuristic is stated verbatim everywhere"
   "code-host-callers|the commands routed through the code host still name the verbs they call"
+  "retrofit-record|cdd-retrofit leaves its branch a task record and recommends cdd-worktree-done"
   "check-count|the seam-check count stated in prose matches this registry"
 )
 
@@ -334,6 +335,27 @@ check_code_host_callers() {
     grep -qF -- "$verb" <<<"$process" \
       || note "code-host caller broken: $REPO_CMDS/cdd-process-pr.md no longer calls \`$verb\`"
   done
+  return 0
+}
+
+# --- Check: retrofit task record ---------------------------------------------
+# /cdd-retrofit commits on a branch of its own in another repo, then has to leave that
+# branch the same trail /cdd-next-step leaves every other task: a seeded state record,
+# advanced to implementation_done, so /cdd-pre-pr, cdd-worktree-resume and
+# cdd-worktree-done treat it as a task already built. Drop either call and the branch
+# silently becomes an orphan again — pre-PR falls back on the base branch, resume sends
+# the user to the review-side commands with no record behind them, and cleanup is back
+# to a bare `git worktree remove` that leaves the merged branch behind. So the producer
+# side is pinned, and the advice it replaced is pinned out.
+check_retrofit_record() {
+  local retro="$REPO_CMDS/cdd-retrofit.md" needle
+  for needle in 'cdd-state seed' 'cdd-state set implementation_done' 'cdd-worktree-done'; do
+    grep -qF -- "$needle" "$retro" \
+      || note "retrofit task record broken: $retro no longer names \`$needle\`"
+  done
+  if grep -qF -- 'worktree remove' "$retro"; then
+    note "retrofit task record broken: $retro recommends \`git worktree remove\` again instead of cdd-worktree-done"
+  fi
   return 0
 }
 
