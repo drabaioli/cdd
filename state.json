@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "branch": "adr_single_home",
+  "stage": "pr_open",
+  "pr": 136,
+  "base_branch": "main",
+  "sessions": [
+    {
+      "id": "88ce6935-2786-4a40-b07e-0889bb2de87d",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    },
+    {
+      "id": "704e520b-836a-4663-abe2-24f117f51500",
+      "stage": "implementation_done",
+      "dir": "/home/diego/Code/cdd-adr_single_home"
+    },
+    {
+      "id": "d31d6e48-0d8a-44d2-97b9-9f3c1688eed5",
+      "stage": "checks_passed",
+      "dir": "/home/diego/Code/cdd-adr_single_home"
+    },
+    {
+      "id": "312536d7-72ee-4cd7-a4d9-c34fbeb93d63",
+      "stage": "merged",
+      "dir": "/home/diego/Code/cdd-adr_single_home"
+    },
+    {
+      "id": "7296a901-ca92-48bf-ab9d-1924877d0f97",
+      "stage": "checks_passed",
+      "dir": "/home/diego/Code/cdd-adr_single_home"
+    }
+  ],
+  "lane": "small",
+  "issue_refs": [
+    "129"
+  ]
+}
