@@ -29,7 +29,7 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 │   ├── index.md                              # documentation map
 │   ├── architecture/                         # how this repo is structured
 │   ├── features/                             # what this repo provides
-│   └── knowledge_base/                       # process doc, roadmap, engineering practices, decisions
+│   └── knowledge_base/                       # process doc, roadmap, engineering practices
 ├── scripts/                                  # ci.sh (the check runner) + the gate scripts it calls: smoke assertions, drift check, prompt-seam check, roadmap-length check (with whitelists), host-tool portability check, adapter-conformance check + its mutation harness
 ├── template/                                 # copy-paste material for new projects
 └── tools/

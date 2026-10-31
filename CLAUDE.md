@@ -12,7 +12,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Documentation map                                    | `doc/index.md`                                    |
 | Architecture of this repo                            | `doc/architecture/index.md`                       |
 | Capability adapter contract (tracker and code-host verbs, shapes) | `doc/architecture/capability-adapters.md`         |
-| Architecture decision records                        | `doc/architecture/adr/` (Nygard style)            |
+| Decision records (ADRs, every kind of decision)      | `doc/architecture/adr/` (Nygard style)            |
 | Features of this repo                                | `doc/features/index.md`                           |
 | Template (what gets copied into new projects)        | `template/`                                       |
 | Bootstrap procedure for new projects                 | `template/BOOTSTRAP.md`                           |
@@ -53,7 +53,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 
 | Directory                          | Purpose                                                   |
 | ---------------------------------- | --------------------------------------------------------- |
-| `doc/knowledge_base/`              | Process doc, roadmap, engineering practices, decision records |
+| `doc/knowledge_base/`              | Process doc, roadmap, engineering practices               |
 | `doc/architecture/`                | How this repo is structured                               |
 | `doc/features/`                    | What this repo provides (process + template)              |
 | `template/`                        | Copy-paste material for new projects                      |

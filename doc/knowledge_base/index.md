@@ -10,6 +10,6 @@ Project metadata, history, and foundational documents for the CDD project.
 
 ## Conventions
 
-- This directory is mostly append-only. Decision records, once written, are not rewritten; new decisions that supersede old ones are added with a reference back.
+- This directory is mostly append-only. Decisions do not live here: every decision record is an ADR in `doc/architecture/adr/`.
 - The roadmap is the exception: it is edited continuously, but only via the rules defined in the process document (section 5).
-- New foundational documents (coding standards, decision records, investigation notes) land here as they arise.
+- New foundational documents (coding standards, investigation notes) land here as they arise.

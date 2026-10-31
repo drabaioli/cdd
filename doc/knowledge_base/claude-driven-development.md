@@ -46,7 +46,7 @@ Three rules govern it:
 
 The directory is an index plus per-topic documents. **`index.md` is a pointer list only** — one link per document with a one-line summary; the content lives in the per-topic docs. A session reads the index, then loads only the documents relevant to its task — the context-economy counterpart of CLAUDE.md staying thin. An index that accumulates content defeats this selective-loading model. A top-level `doc/index.md` points at the architecture, features, and knowledge-base directories so a session can navigate the whole doc tree from one file.
 
-Architecture decision records (ADRs, Nygard style: Title, Status, Context, Decision, Consequences) live at `doc/architecture/adr/NNNN-short-title.md` and are listed from the index. Write one for any structural decision not recoverable from the code or the existing docs. ADRs are append-only: a superseded decision gets a new ADR and a Status update, not a rewrite.
+Architecture decision records (ADRs, Nygard style: Title, Status, Context, Decision, Consequences) live at `doc/architecture/adr/NNNN-short-title.md` and are listed from the index. They are the one home for decision records, whatever the decision's kind — structural, design or tooling: write one for any decision not recoverable from the code or the existing docs. ADRs are append-only: a superseded decision gets a new ADR and a Status update, not a rewrite.
 
 ### 2.4 Feature docs (`doc/features/`)
 
@@ -54,7 +54,7 @@ Architecture decision records (ADRs, Nygard style: Title, Status, Context, Decis
 
 ### 2.5 Knowledge base (`doc/knowledge_base/`)
 
-Project metadata and history: the roadmap, the project overview, decision records, coding standards, the engineering-practices contract (§2.12), and investigation notes. Mostly append-only — decisions are superseded by new records referencing the old, preserving the reasoning trail.
+Project metadata and history: the roadmap, the project overview, coding standards, the engineering-practices contract (§2.12), and investigation notes. Decisions do not live here: they go in ADRs (§2.3). Mostly append-only — investigation notes stay as written even when a later decision overturns their conclusion.
 
 The **project overview** (`project-overview.md`) is the exception to append-only: a living charter — what the project is, why it exists, what it does and explicitly does not do, its constraints, its architecture intentions — read first by a fresh session and kept current. A **founding document**, by contrast, is the investigation that led to creating the project; after bootstrap it is *not* kept current — its purpose shifts to preserving the reasoning trail, and durable structural description migrates into `doc/architecture/` as the structure stabilises. The two coexist: the overview says what the project is today; the founding document records why it was shaped that way. (This repo's own `claude-driven-development.md` is the special case where the founding document is also the shipped product, so it *is* kept current.)
 
