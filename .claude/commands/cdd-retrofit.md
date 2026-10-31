@@ -2,7 +2,7 @@ Install CDD into an existing project, or upgrade a project already running CDD, 
 
 Run this command from a CDD-repo session (it needs the CDD repo's `template/`, `bootstrap-cdd-project.sh`, and git history). The mode — **install** or **upgrade** — is auto-detected from the target. This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* target projects, so downstream projects have no use for it — see the process doc, Section 2.7).
 
-**Checkpoint discipline:** nothing is written before the user has seen it. Clean, mechanical writes are collected into one batch, shown once before anything is written, and applied on a single approval; everything that needs judgement is approved per file (section 2.7). Never overwrite a project file silently. Identifier choices (name/slug/dir) are confirmed before anything is rendered. One approval is enough for the batch because every write lands on the dedicated retrofit branch (section 2.5) and reaches the project only through `/cdd-pre-pr` and a PR.
+**Checkpoint discipline:** nothing is written before the user has seen it. Clean, mechanical writes are collected into one batch, shown once before anything is written, and applied on a single approval; everything that needs judgement is approved per file (section 2.7). Never overwrite a project file silently. Identifier choices (name/dir) are confirmed before anything is rendered — in upgrade mode, recovered from the project's own files and stated, so the user can still correct them (section 4.2). One approval is enough for the batch because every write lands on the dedicated retrofit branch (section 2.5) and reaches the project only through `/cdd-pre-pr` and a PR.
 
 Target path: `$ARGUMENTS`
 
@@ -44,9 +44,13 @@ Derive the branch and path (mirroring `tools/cdd-worktree.sh` conventions — si
 ```bash
 BRANCH=cdd-retrofit
 WT="$(dirname "<target>")/$(basename "<target>")-$BRANCH"
+REPO_NAME="$(basename "$(dirname "$(git -C <target> rev-parse --path-format=absolute --git-common-dir)")")"
+BASE="$(git -C <target> symbolic-ref --quiet --short HEAD)"   # the branch the worktree is cut from
 ```
 
-- **Collision:** if `$BRANCH` already exists (`git -C <target> rev-parse --verify --quiet "$BRANCH"`) or `$WT` already exists, append a numeric suffix (`cdd-retrofit-2`, `-3`, …) until both are free, or ask the user for a name. Never reuse or clobber an existing branch or worktree.
+`REPO_NAME` names the target's handoff directory, `~/.cdd/handoffs/$REPO_NAME/`, and `BASE` becomes the task record's base branch (section 2.8). A detached HEAD leaves `BASE` empty: say so in one line — the record then carries no base, and the downstream sessions fall back to the default branch.
+
+- **Collision:** if `$BRANCH` already exists (`git -C <target> rev-parse --verify --quiet "$BRANCH"`), `$WT` already exists, or `~/.cdd/handoffs/$REPO_NAME/$BRANCH.md` or `.state.json` exists (leftovers of an earlier task under that name, never overwritten), append a numeric suffix (`cdd-retrofit-2`, `-3`, …) until all are free, or ask the user for a name. Never reuse or clobber an existing branch, worktree or task record.
 - **Create it** from the target's HEAD:
 
   ```bash
@@ -105,6 +109,52 @@ Whatever the queue leaves un-upgraded — a declined question, a deleted file le
 
 A conflict-free merge can still be semantically wrong — two hunks that never touch the same lines can contradict each other — which is why `auto-merged` is its own kind; the PR is the backstop.
 
+## 2.8 Leave the task record
+
+Both modes end here, after their commit (sections 3.4 / 4.7). The retrofit branch is a task already built, so it gets the trail any task built through `/cdd-next-step` has — a handoff and a state record in the **target's** handoff directory — and `/cdd-pre-pr`, `cdd-worktree-resume`, `cdd-worktree-done` and `cdd-worktree-gc` then treat it as one.
+
+- **Only on a committed worktree.** If section 2.5 fell back (in-place writes, or the `switch -c` branch in the existing checkout), or the commit did not land, print one line — "no task record: retrofit fell back to <in-place writes | a branch in the existing checkout>" — and skip this section.
+- **Probe the helper:**
+
+  ```bash
+  command -v cdd-state >/dev/null && cdd-state stages 2>/dev/null | grep -qx implementation_done
+  ```
+
+  On failure print one line — "no task record: `cdd-state` is missing or too old on this machine; run `./tools/cdd-worktree.sh install` and `./tools/cdd-state.sh install` in this CDD repo" — and finish normally. (A helper that knows `stages` also knows `seed --base`.)
+- **Write the handoff first**, so the record's sync carries it: `mkdir -p ~/.cdd/handoffs/$REPO_NAME`, then `~/.cdd/handoffs/$REPO_NAME/$BRANCH.md`:
+
+  ```markdown
+  # Task: CDD retrofit (<install|upgrade>) of <PROJECT_NAME>
+
+  ## Branch
+  <$BRANCH>
+
+  ## Roadmap reference
+  None — produced by /cdd-retrofit from the CDD repo.
+
+  ## Requirements
+  1. <Mode>: the scaffolding is at CDD commit <hash>, recorded in `.claude/cdd-baseline`.
+  2. <one line per file applied in the batch: path — kind>
+  3. <one line per file approved individually: path — what was done>
+  4. <one line per `.cdd/<capability>` binding written>
+
+  ## Notes
+  - Built in one /cdd-retrofit session: there is no plan file.
+  - Behind the template: <the section 5 list, or "none">.
+  - <any "needs reconciliation" files and legacy-migration action items>
+  ```
+
+  No `## Implementation prompt` and no `## Research`: the task is already built.
+- **Seed and advance the record from the worktree**, with the session id blanked — this session ran in the CDD repo, so recording it with the worktree as its directory would point a resume at the wrong place:
+
+  ```bash
+  ( cd "$WT" && CLAUDE_CODE_SESSION_ID= cdd-state seed "$BRANCH" ${BASE:+--base "$BASE"} \
+             && CLAUDE_CODE_SESSION_ID= cdd-state set implementation_done )
+  ```
+
+  `cdd-state` derives the repo and the branch from the directory it runs in, which is why it runs inside `$WT`. No lane marker: the retrofit took no lane, and a record without one resumes into the review-side commands. Both calls also push the handoff and the record to the target's `origin` as `refs/cdd/$BRANCH`, so `cdd-worktree-resume` can pick the task up on another machine; with no `origin`, or offline, the helper says so in its own line, and nothing else changes.
+- **Check it landed:** `~/.cdd/handoffs/$REPO_NAME/$BRANCH.state.json` exists. If not (no `jq` on this machine, for one — `cdd-state` then prints its own line and writes nothing), say so in one line and finish normally.
+
 ## 3. Install mode
 
 A files-only install of the template. No codebase survey, no generated architecture doc or roadmap — the template roadmap ships with a pre-filled bootstrap phase (survey the codebase, draft the initial architecture docs, write the feature docs, fill in the roadmap), so the project's first `/cdd-next-step` picks those up as the next unchecked tasks.
@@ -154,7 +204,8 @@ Once every file is classified, apply section 2.7: show the batch, write it on ap
   ```
 
   Stage with `add -A` — the worktree was fresh, so this captures exactly the retrofit's writes. Gitignored paths won't be staged (see the section 1 gitignore warning). Commit only on this dedicated branch; never commit onto the target's existing branches.
-- Print next steps: the one-time worktree-helper install (`./tools/cdd-worktree.sh install` in the CDD repo — project-independent, only needed if the user hasn't installed it before; nothing is added per project; re-run it if it predates the adapter library a `.cdd/` binding runs); how to review and merge the branch (`git -C "$WT" show`, then — before opening the PR — `cd "$WT"` and start a fresh Claude session there to run `/cdd-pre-pr`, which reconciles and reviews the retrofit's own edits and catches doc skeletons left with unfilled placeholders; then open a PR from `cdd-retrofit`); and that once merged they can remove the worktree with `git -C <target> worktree remove "$WT"`. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting; the roadmap's Phase 1 intro carries a seed set of common fold-in patterns (split architecture docs → `doc/architecture/`, a `future-work.md`/TODO/backlog doc → the roadmap, an oversized `CLAUDE.md` → slim to pointers) so the reconciliation session has them on hand.
+- Leave the task record (section 2.8).
+- Print next steps: the one-time worktree-helper install (`./tools/cdd-worktree.sh install` in the CDD repo — project-independent, only needed if the user hasn't installed it before; nothing is added per project; re-run it if it predates the adapter library a `.cdd/` binding runs); how to review and merge the branch (`git -C "$WT" show`, then — before opening the PR — `cd "$WT"` and start a fresh Claude session there to run `/cdd-pre-pr`, which reconciles and reviews the retrofit's own edits and catches doc skeletons left with unfilled placeholders; then open a PR from `cdd-retrofit`); and that once merged they run `cdd-worktree-done` from `$WT` — it pulls the default branch in the checkout that has it, removes the worktree, deletes the merged branch and reaps the task record; it stops if no checkout of the target is on the default branch, so switch one there first. Then run `/cdd-next-step` in the target — it will pick up the roadmap's pre-filled bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) as the first task. Warn the user: on an existing project without prior doc discipline this first task is a doc reconciliation that forces the docs to match the code for the first time, so it may be slow and span several early PRs — that is expected, not a fault. Where docs already exist, it reconciles and adopts them rather than overwriting; the roadmap's Phase 1 intro carries a seed set of common fold-in patterns (split architecture docs → `doc/architecture/`, a `future-work.md`/TODO/backlog doc → the roadmap, an oversized `CLAUDE.md` → slim to pointers) so the reconciliation session has them on hand.
 
 ## 4. Upgrade mode
 
@@ -173,10 +224,14 @@ Never guess a baseline. Every project bootstrapped or upgraded since the marker 
 
 ### 4.2 Recover the target's identifiers
 
-The marker stores only the hash, so re-infer and confirm with the user:
+The marker stores only the hash, but the project's rendered files still carry both identifiers. Recover each from two sources:
 
-- `<PROJECT_DIR>`: basename of the target path.
-- `<PROJECT_NAME>`: from the title of `$WT/CLAUDE.md` if recognizable; otherwise ask.
+- `<PROJECT_DIR>`: the handoff path rendered into `$WT/.claude/commands/cdd-next-step.md` (`~/.cdd/handoffs/<dir>/`), cross-checked against the `Read(~/.cdd/handoffs/<dir>/**)` entry in `$WT/.claude/settings.json`.
+- `<PROJECT_NAME>`: the title of `$WT/CLAUDE.md` (`# <name> — Claude Code Context`), cross-checked against the title of `$WT/doc/knowledge_base/roadmap.md` (`# <name> Implementation Roadmap`).
+
+When a value is found and its sources agree, use it without waiting for confirmation, and state both in one line: "Identifiers (from the project's files): name <X>, dir <Y> — say if either is wrong." Ask only for a value that cannot be recovered, or whose sources disagree (a hand-retitled `CLAUDE.md`, say).
+
+If the recovered `<PROJECT_DIR>` differs from the target's folder name, warn in one line: CDD keys the handoff directory on the folder name, so the project's handoff permissions and rendered paths point somewhere else. Warn only; this run does not fix it.
 
 ### 4.3 Render both template versions with the target's identifiers
 
@@ -337,7 +392,7 @@ git -C "$WT" add -A
 git -C "$WT" commit -m "Upgrade CDD scaffolding to $(git rev-parse --short HEAD)" -m "<short body: files upgraded/merged/preserved, and the section 5 behind-the-template list>"
 ```
 
-(The `$(git rev-parse --short HEAD)` runs in the CDD repo before `-C "$WT"` takes effect — capture it into a variable first if needed.) Commit only on this dedicated branch; never onto the target's existing branches. Then clean up `$STAGE` and `$OLD_TPL`.
+(The `$(git rev-parse --short HEAD)` runs in the CDD repo before `-C "$WT"` takes effect — capture it into a variable first if needed.) Commit only on this dedicated branch; never onto the target's existing branches. Then leave the task record (section 2.8), and clean up `$STAGE` and `$OLD_TPL`.
 
 ## 5. Summary
 
@@ -345,6 +400,7 @@ Report, in both modes:
 
 - Mode detected, identifiers used.
 - The isolation: the worktree path (`$WT`), the branch name, and the commit hash made on it — or, if section 2.5 fell back, that writes landed in place with no commit and why.
+- **Task record**: the handoff and state-record paths written (section 2.8), or the one-line reason none was.
 - The files, in four lists kept apart:
   - **applied in the batch** — path and kind;
   - **approved individually** — path and what was done, including entries pulled out of the batch;
@@ -358,4 +414,4 @@ Report, in both modes:
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), each with its destination (port into `template/`, or propose as an extension), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.
-- The next steps for the user: review the retrofit branch, then — before opening the PR — `cd "$WT"` and run `/cdd-pre-pr` from a fresh Claude session there (its reconciliation + review pass catches doc inconsistencies the retrofit introduced, in both modes); then open a PR from it; remove the worktree once merged (`git -C <target> worktree remove "$WT"`); `/cdd-next-step` for fresh installs — noting that for a first-time install without prior doc discipline that first `/cdd-next-step` is a doc reconciliation that may be slow and span several early PRs (expected, not a fault).
+- The next steps for the user: review the retrofit branch, then — before opening the PR — `cd "$WT"` and run `/cdd-pre-pr` from a fresh Claude session there (its reconciliation + review pass catches doc inconsistencies the retrofit introduced, in both modes); then open a PR from it; once merged, run `cdd-worktree-done` from `$WT` (it removes the worktree, deletes the merged branch and reaps the task record; it needs a checkout of the target on the default branch, so switch one there first if none is); `/cdd-next-step` for fresh installs — noting that for a first-time install without prior doc discipline that first `/cdd-next-step` is a doc reconciliation that may be slow and span several early PRs (expected, not a fault).
