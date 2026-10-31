@@ -10,7 +10,7 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's 11 checks gets at least one mutation:
+# checker's 12 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Issue-ref contract      — three cases, one per half of the seam: cdd-next-step.md
 #      stops recording the refs with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving
@@ -32,7 +32,9 @@
 #      words of its own instead of the pinned sentence.
 #  10. Code-host callers     — cdd-process-pr.md stops naming `pr-comments`, as an edit
 #      that dropped the adapter path would.
-#  11. Seam-check count       — a check is added to the checker's own registry without
+#  11. Retrofit task record  — cdd-retrofit.md goes back to recommending
+#      `git worktree remove`, as an edit reverting the cleanup advice would.
+#  12. Seam-check count       — a check is added to the checker's own registry without
 #      updating the prose that restates how many checks there are. Self-referential, so
 #      the mutation has to add a registry entry AND a check function, not just a number.
 #
@@ -284,7 +286,20 @@ sandbox_sed 's/pr-comments/pr-xomments/g' "$CMDS/cdd-process-pr.md"
 expect_fail "check 10 catches a code-host caller that stopped naming its verb" \
   "no longer calls \`pr-comments\`"
 
-# --- Check 11: seam-check count ------------------------------------------------
+# --- Check 11: retrofit task record -------------------------------------------
+# Revert the cleanup advice only, leaving the seed and the stage write in place: the
+# record calls are the half a reviewer would notice, the stale advice the half they
+# would not.
+fresh_sandbox
+# shellcheck disable=SC2016  # literal markdown backticks and `$WT`, not shell expansions
+sandbox_sed 's/run `cdd-worktree-done` from `\$WT`/run `git -C <target> worktree remove "$WT"`/' \
+  "$CMDS/cdd-retrofit.md"
+grep -qF 'worktree remove' "$SANDBOX/$CMDS/cdd-retrofit.md" \
+  || fail "check 11 setup: cdd-retrofit.md does not recommend worktree remove after mutation"
+expect_fail "check 11 catches retrofit recommending git worktree remove again" \
+  "recommends \`git worktree remove\` again"
+
+# --- Check 12: seam-check count ------------------------------------------------
 # Self-referential, so the mutation is a real check rather than an edited number: give
 # the sandbox checker one more registry entry and a matching no-op body, and the four
 # prose sites (this file among them) are now one short. Two insertion points, hence awk
@@ -307,8 +322,8 @@ sandbox_add_probe_check
 # before the rest is written, and under pipefail the writer's EPIPE fails the pipeline.
 probe_list="$("$SANDBOX/scripts/prompt-seam-check.sh" list)"
 grep -qxF seam-probe <<<"$probe_list" \
-  || fail "check 11 setup: the probe check is not in the sandbox registry"
-expect_fail "check 11 catches a check added without updating the prose" \
+  || fail "check 12 setup: the probe check is not in the sandbox registry"
+expect_fail "check 12 catches a check added without updating the prose" \
   "seam-count drift in"
 
 echo "prompt-seam contract: clean"
