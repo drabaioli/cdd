@@ -42,7 +42,7 @@ The **actions pipeline** is the central structural idea. `ACTIONS` is a single o
 ## What does not belong here
 
 - **User-visible behaviour**: that goes in `doc/features/`.
-- **Decision rationale** (e.g. why a library parser): `doc/knowledge_base/` as a decision record.
+- **Decision rationale** (e.g. why a library parser): an ADR in `doc/architecture/adr/`.
 - **Coding style**: the coding standard under `doc/knowledge_base/`.
 
 ## Maintenance
