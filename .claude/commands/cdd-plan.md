@@ -73,7 +73,7 @@ Do not fetch any of it yourself — you hold the repo, so your fetches are not p
 - **to verify** — the implementing session checks it; it also gets a `## Verification` line;
 - **context only** — background the plan does not rest on.
 
-A finding that settles a structural decision puts an ADR into `## Doc and roadmap edits`, as any structural decision does.
+A finding that settles a decision puts an ADR into `## Doc and roadmap edits`, as any decision not recoverable from the code does.
 
 The researchers' digests are not written anywhere. What matters lands in the plan's `## External findings`, with its disposition; the rest is discarded with this session.
 
