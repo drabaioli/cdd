@@ -61,7 +61,11 @@
 #                                      the record is absent (writers never fabricate
 #                                      one). Appends a {id, stage, dir} entry for
 #                                      $CLAUDE_CODE_SESSION_ID unless it is empty or
-#                                      already the last entry's id.
+#                                      already the last entry's id. PR floor: once the
+#                                      record has a PR (--pr in the same call counts),
+#                                      a stage below pr_open keeps the current stage,
+#                                      prints a "stays" line, and still appends the
+#                                      session entry with the requested stage.
 #   cdd-state set-field <x-key> <json-value> [--branch <branch>]
 #                                  Set one extension field on an existing record.
 #                                      The key must start with `x-`: that namespace is
@@ -96,6 +100,8 @@
 # Stages (a single enum; the record carries no separate status):
 #   scoped  plan_written  implementation_done  merged  checks_passed
 #   pr_open  addressed
+# Once a PR is recorded the stage never drops below pr_open (`set` holds it); before
+# a PR there is no floor, so `merged` after `checks_passed` and a re-plan still write.
 
 # The schema version this helper writes; consumers version their parser on it.
 CDD_STATE_SCHEMA_VERSION=1
@@ -128,6 +134,18 @@ cdd-state-reload() {
 cdd-state-stages() {
   printf '%s\n' scoped plan_written implementation_done merged checks_passed \
                 pr_open addressed
+}
+
+# The 0-based position of <stage> in cdd-state-stages, or nothing for an unknown
+# stage. Stage order is compared here in shell so jq only ever sees a boolean
+# (jq's array `index` varies across versions).
+cdd-state-stage-index() {
+  local want="$1" s i=0
+  while IFS= read -r s; do
+    if [[ "$s" == "$want" ]]; then printf '%s\n' "$i"; return 0; fi
+    i=$((i + 1))
+  done < <(cdd-state-stages)
+  return 1
 }
 
 # The one line after an unknown verb or stage: the usual cause is a project's commands
@@ -499,11 +517,22 @@ cdd-state() {
         echo "cdd-state: no record at $file; skipping (advisory)." >&2
         return 0
       fi
-      # $stage/$pr/$sid below are jq variables (passed via --arg), not shell
-      # expansions, so the single-quoted filter is intentional.
+      # The PR floor: once the record has a PR, the stage never drops below pr_open.
+      # `below` says whether the requested stage sits under pr_open; the filter applies
+      # --pr FIRST so a PR given in this same call counts, then writes the stage only
+      # when no floor applies. A held write still appends the session entry with the
+      # requested stage (what actually ran) and still syncs. Hold, not raise: the record
+      # never claims a stage nothing wrote. Hold, not reject: this writer is advisory.
+      local below=false
+      if (( $(cdd-state-stage-index "$stage") < $(cdd-state-stage-index pr_open) )); then
+        below=true
+      fi
+      # $stage/$pr/$sid/$below below are jq variables (passed via --arg/--argjson), not
+      # shell expansions, so the single-quoted filter is intentional.
       # shellcheck disable=SC2016
-      local filter='.stage = $stage'
-      [[ -n "$pr" ]] && filter="$filter | .pr = (\$pr | tonumber)"
+      local filter='(if $pr != "" then .pr = ($pr | tonumber) else . end)'
+      # shellcheck disable=SC2016
+      filter="$filter"' | (if .pr != null and $below then . else .stage = $stage end)'
       # Append this session unless CLAUDE_CODE_SESSION_ID is empty or already the
       # last entry's id (dedups repeated writes within one session). `dir` is the
       # worktree root this session ran in — the `cd` target for `claude --resume`.
@@ -518,9 +547,18 @@ cdd-state() {
         --arg pr "$pr" \
         --arg sid "$sid" \
         --arg dir "$toplevel" \
+        --argjson below "$below" \
         "$filter" "$file")" || { echo "cdd-state: failed to update $file" >&2; return 1; }
+      # "Held" follows from the condition, not from comparing old and new stage: a
+      # record already below pr_open with a PR, asked for that same stage, is held too.
+      local held_pr=""
+      [[ "$below" == true ]] && held_pr="$(jq -r '.pr // empty' <<<"$content")"
       if cdd-state-write "$file" "$content"; then
-        echo "State: $(basename "$file") -> $stage${pr:+ (pr #$pr)}"
+        if [[ -n "$held_pr" ]]; then
+          echo "State: $(basename "$file") stays $(jq -r '.stage' <<<"$content") (PR #$held_pr open; $stage not recorded as stage)"
+        else
+          echo "State: $(basename "$file") -> $stage${pr:+ (pr #$pr)}"
+        fi
         # Refresh the state .json on the ref (bundling the handoff .md if present).
         # $file is <dir>/<branch>.state.json → strip the suffix for branch/handoff.
         local base="${file%.state.json}"
