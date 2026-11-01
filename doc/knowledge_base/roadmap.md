@@ -164,6 +164,7 @@ Elevate the two under-guarded founding objectives — instilling engineering bes
 - [x] Fix the flaky `install-smoke`: bash sourced the fake HOME's rc under socket stdin, so its shim probes tested functions. Also made it hermetic and gave the runner per-gate logs.
 - [x] Make the seam checker self-pinning: a check registry with a `list` mode pins its own count in four prose sites, and headings match by title so renumbering is a no-op (#92, #64)
 - [x] `/cdd-process-pr` stages by name and pushes before replying; a `staging` gate bans `git add -A` in command shell blocks (#139)
+- [x] Rationale lives once (#102): one full statement per argument, at its altitude, a pointer everywhere else; docs swept, stale pointers fixed; no gate (ADR 0018)
 
 **Milestone:** all three founding objectives are named commitments in §1, each with at least one recurring guardrail or a tracked plan to add one.
 

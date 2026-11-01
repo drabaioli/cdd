@@ -32,7 +32,7 @@
 #
 # Usage: scripts/worktree-launch-assert.sh
 # Takes no arguments; provisions and tears down its own temp tree. Requires jq
-# (base_branch lives under cdd-state's jq guard); without it the test skips.
+# (base_branch lives under cdd-state's jq guard).
 
 set -euo pipefail
 

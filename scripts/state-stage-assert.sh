@@ -7,11 +7,6 @@
 # PR there is no floor, so the meaningful pre-PR regressions (`merged` after
 # `checks_passed`, a re-plan to `plan_written`) keep writing.
 #
-# Why it matters: consumers compare stages by index and the cross-machine sync keeps the
-# most advanced record; both are wrong the moment an open PR's record regresses. Commands
-# legitimately re-run after a PR exists (/cdd-pre-pr after a review round, /cdd-merge-base
-# under an open PR), so the floor is the only thing standing between them and the record.
-#
 # Assertions are against behaviour (the record's fields, the printed line, the ref), never
 # against the helper's filter.
 #

@@ -40,10 +40,9 @@
 #                                      `standard` (`standard` renders null, i.e. the
 #                                      default). Used by /cdd-next-step right after
 #                                      `seed`, on the default branch, which is why the
-#                                      branch is positional. A separate subcommand
-#                                      rather than a `seed` flag so an older helper
-#                                      meeting a newer /cdd-next-step fails this one
-#                                      call and still keeps the seeded record.
+#                                      branch is positional. A separate subcommand,
+#                                      not a `seed` flag, for failure isolation
+#                                      (doc/architecture/shell-helpers.md).
 #   cdd-state issue-refs <branch> <ref>...
 #                                  Record the issue reference(s) the task was sourced
 #                                      from, as a JSON array of strings, on an existing

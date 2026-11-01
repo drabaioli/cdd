@@ -81,10 +81,10 @@ CDD ships ten slash commands, all prefixed `cdd-` so they autocomplete as a grou
 | `/cdd‑implement` | Started by hand in the same worktree: build from the plan file, update the docs, commit locally. Stops and reports rather than improvising when reality contradicts the plan. |
 | `/cdd‑small‑change` | The small-change lane, in place of plan + implement: for a task whose finished diff you can state in one sentence. Takes its own approval of the concrete change, makes it, commits — or hands back to `/cdd‑plan` if the task turns out not to be small. |
 | `/cdd‑merge‑base` | Integrate the base branch into a feature branch when the base has advanced under you (dry-run first, then apply). |
-| `/cdd‑pre‑pr` | Pre-PR checklist: the project's check runner (the one command CI runs, so a green run here means a green CI), code review, and doc/roadmap reconciliation; ends with an opt-in step to open the PR. |
+| `/cdd‑pre‑pr` | Pre-PR checklist: the project's check runner (the same gate list CI runs), code review, and doc/roadmap reconciliation; ends with an opt-in step to open the PR. |
 | `/cdd‑process‑pr` | Triage and address the open PR's review feedback, reply in-thread, and commit and push. |
 
-**CDD-repo-only**, run from a session inside this repo; they operate *on* a target, so the template ships no copy:
+**CDD-repo-only**, run from a session inside this repo on a target; the template ships no copy (`doc/architecture/overview.md`):
 
 | Command | What it does |
 | --- | --- |
