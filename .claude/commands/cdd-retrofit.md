@@ -199,7 +199,7 @@ Once every file is classified, apply section 2.7: show the batch, write it on ap
 - **Commit on the retrofit branch** (skip this if section 2.5 fell back to in-place writes with no branch). The retrofit session holds the context for a good message, so write a real one:
 
   ```bash
-  git -C "$WT" add -A
+  git -C "$WT" add -A  # stage-all-ok: fresh retrofit worktree, every change in it is this run's
   git -C "$WT" commit -m "Install CDD scaffolding" -m "<short body: files added/merged>"
   ```
 
@@ -388,7 +388,7 @@ git rev-parse HEAD > "$WT/.claude/cdd-baseline"
 Then **commit on the retrofit branch** (skip if section 2.5 fell back to in-place writes with no branch):
 
 ```bash
-git -C "$WT" add -A
+git -C "$WT" add -A  # stage-all-ok: fresh retrofit worktree, every change in it is this run's
 git -C "$WT" commit -m "Upgrade CDD scaffolding to $(git rev-parse --short HEAD)" -m "<short body: files upgraded/merged/preserved, and the section 5 behind-the-template list>"
 ```
 
