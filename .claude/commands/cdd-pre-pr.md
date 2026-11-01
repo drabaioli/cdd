@@ -57,7 +57,7 @@ If the project has no single runner yet, run each gate command in sequence inste
 ```
 <!-- cdd-only-begin -->
 
-**In this repo the runner is `./scripts/ci.sh`** — 27 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. Not fail-fast. Two of its gates need interpretation rather than a rerun; see the sections below.
+**In this repo the runner is `./scripts/ci.sh`** — 28 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. Not fail-fast. Two of its gates need interpretation rather than a rerun; see the sections below.
 <!-- cdd-only-end -->
 
 ## 3. Code review
@@ -225,6 +225,8 @@ After the checklist, offer to open the PR. This is human-gated — never open a 
 ```
 
 If `$CODE_HOST` is set, check it as §0 does: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path and **do not open the PR**; do not route around it, because an installed adapter declares which code host this project uses. The checklist above still stands. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **skip this step** (the checklist above still stands). An adapter carries its own authentication: when it is missing, the adapter's own error line is what the user sees.
+
+**If the branch already has an open PR, stop here.** If the adapter's `describe.verbs` has `pr-for-branch`, run `"$CODE_HOST" pr-for-branch "$(git rev-parse --abbrev-ref HEAD)"` (a JSON array, newest first) and keep the entries whose `state` is `open` — this also catches a PR opened by hand. If the verb is undeclared, it exits 3, or it fails, fall back to `cdd-state get pr` (empty when there is no record or no PR). If either finds a PR, print `PR #<ref> is already open — push to update it.` and skip the rest of this step: no offer to open a PR, no close lines. The checklist above still stands.
 
 If §8 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
 

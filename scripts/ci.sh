@@ -94,6 +94,7 @@ GATES=(
   "gc|jq|worktree GC: reap merged tasks, keep scoped ones"
   "worktree-launch|jq|the cdd-state record -> cdd-worktree launch seam: base branch, first prompt, lane"
   "state-extension|jq|extension fields on the state record: unknown top-level keys survive every write"
+  "state-stage|jq|the PR floor: once a PR is recorded, cdd-state set never drops the stage below pr_open"
   "adapter-conformance|jq|the shipped capability adapters (tracker, code-host) against their contracts, and the code-host adapters' pr-merged answers (offline)"
   "adapter-conformance-contract|jq|the conformance checker's own contract (mutation-tested)"
   "code-host-ladder|jq|code-host resolution: missing, broken and working adapters at every helper call site"
@@ -190,6 +191,10 @@ gate_worktree_launch() {
 
 gate_state_extension() {
   ./scripts/state-extension-assert.sh
+}
+
+gate_state_stage() {
+  ./scripts/state-stage-assert.sh
 }
 
 # Every shipped adapter of every capability, found by glob so a new one is covered
