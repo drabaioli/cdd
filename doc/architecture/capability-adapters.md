@@ -196,7 +196,7 @@ $ .cdd/code-host describe
 | `pr-create --title T --body B [--base B]`    | `/cdd-pre-pr`'s `gh pr create`                               | `/cdd-pre-pr` §11                              |
 | `pr-for-branch <branch>`                     | `gh pr list --head B --state all`, `/cdd-process-pr` §1's `gh pr view` | `cdd-worktree-list`, the `cdd-worktree-resume` picker, `/cdd-process-pr` §1, `/cdd-pre-pr` §11 |
 | `pr-comments <pr>`                           | `/cdd-process-pr` §2's GraphQL and REST reads                | `/cdd-process-pr` §2–3                         |
-| `pr-reply <pr> [--to <thread-id>] --body B`  | `/cdd-process-pr` §6's replies and `gh pr comment`           | `/cdd-process-pr` §6                           |
+| `pr-reply <pr> [--to <thread-id>] --body B`  | `/cdd-process-pr` §7's replies and `gh pr comment`           | `/cdd-process-pr` §7                           |
 | `pr-merged <branch> [--base B]`              | `gh pr list --state merged` (done), `state == MERGED` (gc)   | `cdd-worktree-done`, `cdd-worktree-gc`         |
 | `default-branch`                             | `git symbolic-ref refs/remotes/origin/HEAD`                  | `cdd-worktree-default-branch`, `/cdd-pre-pr` §0, `/cdd-merge-base` §0 |
 

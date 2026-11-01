@@ -106,7 +106,7 @@ Project-level Claude Code slash commands. They are declarative — they describe
 - `/cdd-small-change`, small-change session, auto-started in the feature worktree in place of the two above when the task was declared small at scoping (§3.2a): takes its own approval of the concrete change, builds it, updates docs, commits locally.
 - `/cdd-pre-pr`, verification session, run on the feature branch, runs the check runner (§2.14) and reconciles docs.
 - `/cdd-merge-base`, side-loop, run on a feature branch when main has advanced: conflict assessment, then merge.
-- `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed: reads the review comments, addresses them, posts replies, commits + pushes. (See §4.1 for the deliberate checkpoint exception it carries.)
+- `/cdd-process-pr`, side-loop, run on a feature branch after the PR is opened and reviewed: reads the review comments, addresses them, commits + pushes, then posts replies. (See §4.1 for the deliberate checkpoint exception it carries.)
 
 Three further commands — `/cdd-bootstrap` (greenfield setup), `/cdd-retrofit` (install or upgrade CDD on an existing project), and `/cdd-quick-create` (lightweight one-off deliverable) — exist in the CDD repo only and are deliberately not shipped in the template: each operates *on* a target from a CDD-repo session, so downstream projects have no use for a copy. This justified one-sided drift is recorded in `scripts/command-drift-whitelist.txt`. The commands are described in `doc/features/template.md`; their place in the workflow is in Section 6.
 
@@ -155,7 +155,7 @@ Every bootstrapped or retrofitted project carries a one-line marker file holding
 
 Several sessions auto-commit at their gate so that a session never leaves a dirty tree for the next one to inherit. Five rules keep this non-disruptive:
 
-1. **A gate commits only the changes it produced** — never `git add -A`. If the tree is already dirty on entry with changes the gate did not create, it stops and surfaces them instead of committing.
+1. **A gate commits only the changes it produced** — never `git add -A`. If the tree is already dirty on entry with changes the gate did not create, it stops and surfaces them instead of committing. Where the project has a check runner the rule can be a gate (§2.14); this repo's is `scripts/staging-check.sh`, which scans its prompts' shell blocks.
 2. **Auto-commits are local — no push.** The sole exception is `/cdd-process-pr` (§3.8), the one auto-push gate.
 3. **Messages follow the project's own commit conventions** from `CLAUDE.md`, including the `Co-Authored-By` trailer.
 4. **Each gate surfaces a short summary** of what it committed (subject and files).
@@ -387,8 +387,8 @@ Three further session types sit outside the per-task lifecycle, each run as a on
             │ Read the PR's review comments.     │
             │ Triage; human approves the plan.   │
             │ Address them, pushing back         │
-            │ where warranted. Auto-post         │
-            │ replies, commit + push.            │
+            │ where warranted. Commit +          │
+            │ push, then post replies.           │
             │ Back to PR review.                 │
             └────────────────────────────────────┘
                             │
@@ -485,7 +485,7 @@ The PR is opened from §3.6's opt-in step or by the human opening it by hand. Th
 
 ### 3.8 PR-review session (optional): `/cdd-process-pr`
 
-Run on the feature branch when a review has left comments. A fresh session reads the open PR's unresolved review comments and triages them: change-request, question, nit, discussion, or workflow-gap — the last being a comment that points at the project's own substrate rather than this diff, routed, with the human choosing the destination from a recommendation, into an edit folded into this PR, a roadmap item, or a CDD-repo issue. That route is the review-time arm of §1's self-improvement commitment: the review is where a gap becomes visible from outside the session that caused it. It presents the triage plan — the session's single checkpoint — then implements the change-requests and nits, answers the questions, pushes back in the reply on any change-request it judges wrong or risky rather than implementing it blindly, and commits + pushes to the open PR branch (the auto-push exception of §2.11; rationale in §4.1). Review threads are never resolved by the command — that is the human's call during re-review. The loop can repeat across review rounds.
+Run on the feature branch when a review has left comments. A fresh session reads the open PR's unresolved review comments and triages them: change-request, question, nit, discussion, or workflow-gap — the last being a comment that points at the project's own substrate rather than this diff, routed, with the human choosing the destination from a recommendation, into an edit folded into this PR, a roadmap item, or a CDD-repo issue. That route is the review-time arm of §1's self-improvement commitment: the review is where a gap becomes visible from outside the session that caused it. It presents the triage plan — the session's single checkpoint — then implements the change-requests and nits, answers the questions, pushes back in the reply on any change-request it judges wrong or risky rather than implementing it blindly, and commits + pushes to the open PR branch (the auto-push exception of §2.11; rationale in §4.1), then posts the in-thread replies, which cite the pushed commit. Review threads are never resolved by the command — that is the human's call during re-review. The loop can repeat across review rounds.
 
 ### 3.9 Worktree teardown
 
@@ -516,7 +516,7 @@ Checkpoint 4's conditionality does not change the count either. It fires wheneve
 
 ### 4.1 The `/cdd-process-pr` exception
 
-In `/cdd-process-pr` (Section 3.8) the gate sits up front rather than on each action: the human approves the triage plan (which comments will be addressed, and how) before any file is edited, and that single approval authorizes everything that follows — the edits, the in-thread replies, the commit, and the push. There is no second confirmation before the GitHub-side actions. This is a conscious trade-off, not an oversight: in a single-user, fast review-iteration loop the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Re-confirming each reply or push after the plan was already approved would defeat the purpose of a tight address-and-re-review cycle. One thing does fall outside that authorization: where a triaged workflow gap is routed — folded into this PR, a roadmap item, or an issue on the CDD repo — is asked once, with a recommendation, because the approved plan settles which comments get addressed, not where a gap that outlives this diff should land.
+In `/cdd-process-pr` (Section 3.8) the gate sits up front rather than on each action: the human approves the triage plan (which comments will be addressed, and how) before any file is edited, and that single approval authorizes everything that follows — the edits, the commit, the push, and the in-thread replies. There is no second confirmation before the GitHub-side actions. This is a conscious trade-off, not an oversight: in a single-user, fast review-iteration loop the PR is already open, the human is actively reviewing it, and every change the command makes is visible in the PR diff and revertable from git history. Re-confirming each reply or push after the plan was already approved would defeat the purpose of a tight address-and-re-review cycle. One thing does fall outside that authorization: where a triaged workflow gap is routed — folded into this PR, a roadmap item, or an issue on the CDD repo — is asked once, with a recommendation, because the approved plan settles which comments get addressed, not where a gap that outlives this diff should land.
 
 Human-in-the-loop judgment is preserved where it matters: the plan is approved before execution, and the command pushes back on change-requests it judges wrong rather than implementing them blindly. What is dropped is only repeated confirmation of the outbound actions that execute the approved plan. Review threads are also never auto-resolved — the human resolves them during re-review.
 

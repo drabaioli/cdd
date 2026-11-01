@@ -66,7 +66,7 @@ Offer — don't force — a minimal check that the deliverable works: run the sc
 Only if the user wants it — confirm first; it is not the default:
 
 ```bash
-( cd "$TARGET" && git init -b main && git add -A && git commit -m "Add <name>" )
+( cd "$TARGET" && git init -b main && git add -A && git commit -m "Add <name>" )  # stage-all-ok: fresh repo, every file in it is this deliverable
 ```
 
 A single, clean commit. Keep the message a one-liner describing the deliverable.

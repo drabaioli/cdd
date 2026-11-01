@@ -45,7 +45,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 ./scripts/ci.sh <gate> [<gate>]  # rerun one gate while iterating on a failure
 ```
 
-`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 28 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` — **a missing tool fails its gate, never skips it**. The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
+`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 29 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` — **a missing tool fails its gate, never skips it**. The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
 
 When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates collapse into `./scripts/ci.sh` plus a doc reconciliation pass.
 
@@ -70,7 +70,7 @@ When `/cdd-pre-pr` runs in this repo, the "build / format / lint / test" gates c
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, toolchain-sync assertion, host-tool portability check, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), adapter-conformance check, code-host ladder assertion, adapter-bindings assertion |
+| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, toolchain-sync assertion, host-tool portability check, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), staging check, adapter-conformance check, code-host ladder assertion, adapter-bindings assertion |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`     |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `.claude/agents/`                  | This repo's own subagent definitions (`cdd-researcher`, spawned by `/cdd-plan`) |

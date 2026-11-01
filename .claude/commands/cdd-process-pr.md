@@ -1,8 +1,8 @@
-Address the open PR's review feedback: read the review comments for the current branch, triage them, implement the change-requests (pushing back where warranted), then auto-post in-thread replies and auto-commit + push the result.
+Address the open PR's review feedback: read the review comments for the current branch, triage them, implement the change-requests (pushing back where warranted), then auto-commit + push the result and auto-post in-thread replies.
 
 Run this command on the feature branch (not on main), after a PR has been opened and someone has reviewed it. It is a post-review side-loop, analogous in position to `/cdd-merge-base`.
 
-**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, in-thread replies, commit, push — executes without further confirmation gates. Do not add per-action gates after the plan is approved — the one exception is where step 5 routes a workflow gap (folded into this PR, a roadmap item, or an issue on another repo), which the triage plan does not settle and which is asked once, with a recommendation. Review threads are never resolved by this command; the user resolves them.
+**Note on automation:** this command has a single checkpoint, placed up front: the triage plan in step 4. Once the user approves that plan, the rest of the run — edits, commit, push, in-thread replies — executes without further confirmation gates. Do not add per-action gates after the plan is approved — the one exception is where step 5 routes a workflow gap (folded into this PR, a roadmap item, or an issue on another repo), which the triage plan does not settle and which is asked once, with a recommendation. Review threads are never resolved by this command; the user resolves them.
 
 ## 1. Discover the open PR
 
@@ -43,7 +43,7 @@ One call returns all three:
 "$CODE_HOST" pr-comments NUMBER
 ```
 
-Its `threads[]` carry `id` (the reply target for step 6), `resolved`, `outdated`, `path`, `line` (absent when outdated) and `comments[]` with each `author`; `reviews[]` are the summary bodies, already limited to non-empty ones; `comments[]` are the general conversation comments; `viewer` is who the adapter acts as, when it can tell. If `pr-comments` is not in the adapter's `describe.verbs` (or it exits 3), say in one line that this code host's adapter cannot read review feedback, and stop — there is nothing to triage. Any other failure → say so in one line, quoting the adapter's error line, and stop.
+Its `threads[]` carry `id` (the reply target for step 7), `resolved`, `outdated`, `path`, `line` (absent when outdated) and `comments[]` with each `author`; `reviews[]` are the summary bodies, already limited to non-empty ones; `comments[]` are the general conversation comments; `viewer` is who the adapter acts as, when it can tell. If `pr-comments` is not in the adapter's `describe.verbs` (or it exits 3), say in one line that this code host's adapter cannot read review feedback, and stop — there is nothing to triage. Any other failure → say so in one line, quoting the adapter's error line, and stop.
 
 ## 3. Scope: only unresolved / open feedback
 
@@ -79,13 +79,13 @@ Present the plan compactly, e.g.:
 5. [workflow-gap]   src/baz.ts:8 — third PR asked for the same import order → will add the rule to the coding standard.
 ```
 
-This is the one human checkpoint in this command. Wait for the user to confirm the triage before proceeding to edit. That approval covers the rest of the run, including the replies and push in steps 6–7.
+This is the one human checkpoint in this command. Wait for the user to confirm the triage before proceeding to edit. That approval covers the rest of the run, including the push and replies in steps 6–7.
 
 ## 5. Address the feedback
 
 Implement the change-requests and nits. Apply project conventions from CLAUDE.md.
 
-**Push back, do not blindly execute.** When a change-request is wrong, risky, or conflicts with a project constraint, do **not** implement it. Decide to decline it, and prepare a short reasoned explanation for the reply in step 6. Human-in-the-loop reasoning lives at the code level even though posting and pushing are automated.
+**Push back, do not blindly execute.** When a change-request is wrong, risky, or conflicts with a project constraint, do **not** implement it. Decide to decline it, and prepare a short reasoned explanation for the reply in step 7. Human-in-the-loop reasoning lives at the code level even though posting and pushing are automated.
 
 For questions, prepare the answer text. For discussion comments, prepare a brief reply.
 
@@ -98,9 +98,21 @@ For questions, prepare the answer text. For discussion comments, prepare a brief
   This repo *is* CDD, so the third route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
 <!-- cdd-only-end -->
 
-Say in the reply (step 6) where the gap was routed, so the reviewer sees the comment produced a rule and not just a patch. The default here is still silence: most review comments are about the diff and nothing else.
+Say in the reply (step 7) where the gap was routed, so the reviewer sees the comment produced a rule and not just a patch. The default here is still silence: most review comments are about the diff and nothing else.
 
-## 6. Post replies
+## 6. Commit and push
+
+Commit the code changes in logical groups, with messages referencing what each addressed. Follow the repo's commit conventions from CLAUDE.md. Commit only the files you changed, adding them by path; never `git add -A`. If the tree holds changes you did not make, surface them rather than committing them.
+
+```bash
+git add <file>...   # only the files this session changed
+git commit -m '...'
+git push
+```
+
+Push to the PR branch **before** posting any reply, so step 7 can cite the pushed commit's sha. If nothing was changed (only answers or declines), there is no commit; go to step 7. If the push fails, say so in one line and do not post replies that cite a commit — print them for the user instead, as step 7 does when `pr-reply` is unavailable.
+
+## 7. Post replies
 
 Reply **in-thread** to each processed review thread — reply to the specific comment, not just a top-level PR comment.
 
@@ -110,11 +122,11 @@ Using the thread's `id` from step 2:
 "$CODE_HOST" pr-reply NUMBER --to THREAD_ID --body '...'
 ```
 
-If `pr-reply` is not in the adapter's `describe.verbs` (or it exits 3), say so in one line and print each prepared reply instead — with its thread's `path:line`, or "top-level" — for the user to post; step 7 still runs. If a single reply fails, say which in one line and carry on with the rest.
+If `pr-reply` is not in the adapter's `describe.verbs` (or it exits 3), say so in one line and print each prepared reply instead — with its thread's `path:line`, or "top-level" — for the user to post. If a single reply fails, say which in one line and carry on with the rest.
 
 Keep every reply short — a sentence or two. Content by triage class:
 
-- **change-request (implemented):** a short "Addressed in `<sha>`." (reference the commit from step 7; if you commit first, you will have the sha; otherwise post the reply after committing).
+- **change-request (implemented):** a short "Addressed in `<sha>`.", citing the commit pushed in step 6.
 - **question:** the answer, briefly.
 - **declined change-request:** the reason for declining in a few plain sentences — direct, not dismissive, no essays.
 - **nit / discussion:** a one-line acknowledgement or reply.
@@ -127,18 +139,6 @@ For review-summary bodies and general conversation comments that have no inline 
 ```bash
 "$CODE_HOST" pr-reply NUMBER --body '...'
 ```
-
-## 7. Commit and push
-
-Commit the code changes in logical groups, with messages referencing what each addressed. Follow the repo's commit conventions from CLAUDE.md.
-
-```bash
-git add -A
-git commit -m '...'
-git push
-```
-
-Push to the PR branch. Sequencing note: if you want the reply in step 6 to cite the commit sha, commit first, then post replies; otherwise post replies and follow with the commit. Either order is fine as long as both happen.
 
 ## 8. Follow-up
 

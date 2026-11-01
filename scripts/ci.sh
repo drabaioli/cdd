@@ -87,6 +87,7 @@ GATES=(
   "seams||prompt-seam contracts between the repo's own prompts"
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "roadmap-length||roadmap item length: the 200-char cap"
+  "staging||gate commands stage by name: no git add -A/--all/. in a command's or agent's shell blocks"
   "install-smoke|jq|worktree/state helper install, against a throwaway HOME"
   "toolchain-sync|jq|keeping the install current: the checkout's sync hook, self-reloading shells, update (stub upstream)"
   "worktree-resume|jq|worktree resume on an existing remote branch"
@@ -163,6 +164,10 @@ gate_seams_contract() {
 
 gate_roadmap_length() {
   ./scripts/roadmap-length-check.sh
+}
+
+gate_staging() {
+  ./scripts/staging-check.sh
 }
 
 gate_install_smoke() {
