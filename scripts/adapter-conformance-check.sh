@@ -28,8 +28,7 @@
 # can point it at its own .cdd/tracker or .cdd/code-host. The capability to check
 # against comes from the second argument, else from the path (tools/adapters/<cap>/*,
 # .cdd/<cap>, ~/.cdd/adapters/<cap>), else from the adapter's own describe — which
-# then has to name a capability this checker knows. Requires jq; without it the check
-# skips (advisory), matching the runner's posture for a gate whose tool is absent.
+# then has to name a capability this checker knows. Requires jq.
 
 set -euo pipefail
 

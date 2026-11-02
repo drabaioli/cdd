@@ -42,7 +42,7 @@
 #
 # The helper is a machine-global toolchain dependency, like git or gh: one install
 # per machine, newest wins, install is idempotent (re-run to upgrade). Its contract
-# with projects is frozen and deliberately tiny -- the three command names below
+# with projects is frozen and deliberately tiny -- the five command names below
 # plus the ~/.cdd/handoffs/<repo>/<branch>.md layout -- so a single current copy
 # stays compatible with every project version. See the process doc section 2.8.
 #

@@ -28,7 +28,7 @@ The same table for every verb of every capability:
 4  not configured / auth missing → actionable message on stderr
 ```
 
-The distinction that earns its keep is **3 vs 1**. A verb absent from `describe.verbs` is unsupported, and calling it exits 3 — which is what lets a prompt tell "GitHub has no transitions, carry on" apart from "Jira is down, stop." Without a distinct code every caller has to guess, and they will guess differently.
+**3 vs 1** is the distinction callers branch on: a verb absent from `describe.verbs` is unsupported, and calling it exits 3, never 1 ([ADR 0007](adr/0007-extend-cdd-through-capability-adapters.md)).
 
 Two rules bound the codes, and the offline conformance gate exists because of them:
 
@@ -89,7 +89,7 @@ Seven verbs, of which one (`describe`) is mandatory and the other six are declar
 
 Four shape rules, all of which generalize past this verb:
 
-- **`ref` vs `id`.** `ref` is the human handle — what a user types and what the branch name embeds. `id` is the backend's internal key, emitted only when it differs from `ref`. For GitHub `ref` is the bare number as a string (`"42"`, accepted as `42` or `#42`) and `id` is the GraphQL node id, so both are present and distinct.
+- **`ref` vs `id`.** `ref` is the human handle — what a user types. `id` is the backend's internal key, emitted only when it differs from `ref`. For GitHub `ref` is the bare number as a string (`"42"`, accepted as `42` or `#42`) and `id` is the GraphQL node id, so both are present and distinct.
 - **`state` is normalized to `open` or `closed`**; `state_raw` keeps the backend's own value (`In Review`, `CLOSED`). A caller that only needs "is this still live" reads `state`; one showing the user a status reads `state_raw`.
 - **`raw`** is an optional passthrough of the backend's native payload. Nothing in CDD reads it; it exists so an adapter never has to choose between the contract and the truth.
 - **Omit, don't null** (above).
@@ -172,7 +172,7 @@ names the PR that closed it.
 
 Shipped adapters live at `tools/adapters/<capability>/<backend>.sh` — one directory per capability, mirroring the machine rung `~/.cdd/adapters/<capability>` — so a new backend is one new file, which the lint and conformance gates pick up by glob.
 
-`tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it with a committed `.cdd/tracker` shim onto the adapter library (see [Installing a binding](#installing-a-binding)). **It never installs itself as a ladder rung**: the machine rung binds every repository on the machine, GitHub or not, so only a project's own committed shim binds it. `cdd-worktree.sh install` does copy it machine-globally — but into the adapter library, which is not a rung and binds nothing on its own. That is the difference from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which self-install as sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
+`tools/adapters/tracker/github.sh` is the reference implementation, and the conformance gate's subject. A project binds to it with a committed `.cdd/tracker` shim onto the adapter library (see [Installing a binding](#installing-a-binding)). **It never installs itself as a ladder rung**: the machine rung binds every repository on the machine, GitHub or not, so only a project's own committed shim binds it ([ADR 0011](adr/0011-bind-adapters-through-a-machine-global-library.md)). The machine-global copy `cdd-worktree.sh install` makes goes to the adapter library, which is not a rung ([Installing a binding](#installing-a-binding)). That is the difference from `tools/cdd-worktree.sh` and `tools/cdd-state.sh`, which self-install as sourced shell libraries wired through an rc block, a different shape entirely (see [Shell helpers](shell-helpers.md)).
 
 It **declares all six verbs**. `issue-transition` reverses issue #86's "unsupported on GitHub" verdict: GitHub has no workflow states beyond open/closed, but open/closed is all the verb needs, and the post-merge close calls it on every backend — consistency rather than detecting GitHub-on-GitHub and skipping it. `closed` is `gh issue close`, `open` is `gh issue reopen`; it reads the issue's state first, so an issue already there is `changed: false` and no write. `issue-comment` is `gh issue comment`, whose printed URL becomes `url`. With no shipped adapter now omitting a contract verb, the live exit-3 case is the nonsense verb, and the undeclared-contract-verb path is kept tested by a mutation in `scripts/adapter-conformance-assert.sh`.
 
@@ -260,7 +260,7 @@ A bare branch name, never `origin/main`.
 
 ## The GitHub code-host adapter
 
-`tools/adapters/code-host/github.sh` is the reference implementation and the code-host conformance subject. It follows the tracker adapter line for line — dispatch before any backend work, `gh`'s own authentication (absent or unauthenticated is exit 4), no JSON dependency beyond `gh --jq`, and **never a ladder rung**, for the same reason: the built-in rung already is GitHub. A project binds to it with a committed `.cdd/code-host` shim onto the adapter library.
+`tools/adapters/code-host/github.sh` is the reference implementation and the code-host conformance subject. It follows the tracker adapter line for line — dispatch before any backend work, `gh`'s own authentication (absent or unauthenticated is exit 4), no JSON dependency beyond `gh --jq`, and **never a ladder rung** ([as above](#the-github-reference-adapter)). A project binds to it with a committed `.cdd/code-host` shim onto the adapter library.
 
 This repo binds both GitHub adapters to itself by committing `.cdd/code-host` and `.cdd/tracker` as relative symlinks into `tools/adapters/` — dogfooding, and a symlink cannot drift from its target. A downstream project has no `tools/adapters/` of its own, so it binds by a shim onto the machine-global adapter library ([Installing a binding](#installing-a-binding)).
 
@@ -300,7 +300,7 @@ It **declares all six verbs**. Its `ref_pattern` is `^[A-Z][A-Z0-9_]+-[0-9]+$` �
 
 ## The GitLab adapters
 
-`tools/adapters/tracker/gitlab.sh` (issues) and `tools/adapters/code-host/gitlab.sh` (merge requests) answer the two contracts against **GitLab's REST API v4**, with `curl` and `jq` — no `glab`. Both work against gitlab.com and a self-managed instance. They follow the Jira adapter's posture — env-configured, never a ladder rung, a binding being per-project by nature — and share one configuration vocabulary, so a project may bind either, both, or GitLab for one capability and another backend for the other. Each is a single standalone file, so the small config and HTTP helpers are duplicated between them on purpose: the library installs, and the shim's hint `curl`-fetches, one file per adapter. A project binds them through shims onto the adapter library, each exporting the same non-secret coordinates (abridged — see [Installing a binding](#installing-a-binding)):
+`tools/adapters/tracker/gitlab.sh` (issues) and `tools/adapters/code-host/gitlab.sh` (merge requests) answer the two contracts against **GitLab's REST API v4**, with `curl` and `jq` — no `glab`. Both work against gitlab.com and a self-managed instance. They follow the Jira adapter's posture — env-configured, never a ladder rung — and share one configuration vocabulary, so a project may bind either, both, or GitLab for one capability and another backend for the other. Each is a single standalone file, so the small config and HTTP helpers are duplicated between them on purpose: the library installs, and the shim's hint `curl`-fetches, one file per adapter. A project binds them through shims onto the adapter library, each exporting the same non-secret coordinates (abridged — see [Installing a binding](#installing-a-binding)):
 
 ```bash
 #!/usr/bin/env bash
@@ -373,7 +373,7 @@ Resolution is the ladder from §2.16 — project `.cdd/<capability>`, then machi
 
 - **Missing** — no file at the rung: the next rung.
 - **Nothing installed** — no file at any rung: the feature is skipped with one line naming `/cdd-retrofit`, except where the feature is the whole point of the invocation (issue-driven `/cdd-next-step`, `/cdd-process-pr`), which stops with the same line. No caller falls back to `gh`. Prompts print `No <capability> adapter is installed; run /cdd-retrofit in this project to install one.`; the helpers print `<capability>: no adapter installed; run /cdd-retrofit in this project to install one`, then what was skipped.
-- **Installed but broken** — the file is not executable; `describe` exits non-zero, does not parse as JSON, reports another `capability`, or a `contract` outside N / N-1; or `jq` is absent, so the caller cannot read `describe`: **one line naming the adapter and why, and no lower rung.** When `describe` exits non-zero, the "why" carries the first line it printed on stderr, so an adapter's own diagnosis (a binding's "adapter library missing … install with …") reaches the user. A broken project adapter does not fall to a working machine one, and neither falls to `gh`. An installed adapter declares the backend, so any lower rung would answer from the wrong system.
+- **Installed but broken** — the file is not executable; `describe` exits non-zero, does not parse as JSON, reports another `capability`, or a `contract` outside N / N-1; or `jq` is absent, so the caller cannot read `describe`: **one line naming the adapter and why, and no lower rung.** When `describe` exits non-zero, the "why" carries the first line it printed on stderr, so an adapter's own diagnosis (a binding's "adapter library missing … install with …") reaches the user. A broken project adapter does not fall to a working machine one, and neither falls to `gh`.
 - **Verb unsupported** — absent from `describe.verbs`, or exit 3: not an error. The caller skips the feature, exactly as when the backend has no answer.
 
 Once an adapter serves, a call that **fails** (exit 1, 4, anything but 0 or 3) is reported in one line and treated as "no answer" — never retried against a lower rung.

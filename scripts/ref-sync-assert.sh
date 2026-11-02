@@ -18,7 +18,7 @@
 #
 # Usage: scripts/ref-sync-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. Requires jq
-# (the push lives under cdd-state's jq guard); without it the test skips (advisory).
+# (the push lives under cdd-state's jq guard).
 
 set -euo pipefail
 

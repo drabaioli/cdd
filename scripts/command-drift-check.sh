@@ -24,7 +24,7 @@
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
 #     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
 #     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
-#   - both settings.json files parse as JSON (when jq is present) — the template's copy
+#   - both settings.json files parse as JSON (requires jq) — the template's copy
 #     is generated into every bootstrapped project, so a syntax error ships silently.
 set -euo pipefail
 
