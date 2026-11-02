@@ -1,40 +1,40 @@
 Produce a small, self-contained deliverable — a script plus a README, not a full CDD project: `/cdd-quick-create` (takes an optional one-line description of what to build).
 
-Run this command from a CDD-repo session. It is the third sibling of `/cdd-bootstrap` and `/cdd-retrofit`: `/cdd-bootstrap` creates a new CDD *project*, `/cdd-retrofit` adapts an *existing* one, and `/cdd-quick-create` creates a lightweight *deliverable* — a one-off artifact with none of the project substrate (no roadmap, no `doc/` tree, no `.claude/commands/`, no worktree helper, no baseline marker, no `/cdd-pre-pr` lifecycle). Like its siblings it exists only in the CDD repo and has no counterpart in `template/.claude/commands/`; unlike them it needs neither `template/` nor the bootstrap script, because a one-off has no template — it writes plain files directly (see `doc/features/template.md`).
+Run this from a CDD-repo session. Sibling of `/cdd-bootstrap` (new project) and `/cdd-retrofit` (existing project): this one creates a one-off *deliverable* with no project substrate — no roadmap, no `doc/` tree, no `.claude/commands/`, no worktree helper, no baseline marker, no `/cdd-pre-pr` lifecycle. It uses neither `template/` nor the bootstrap script; it writes plain files directly (`doc/features/template.md`).
 
-This is a **guided** command, but deliberately lighter than `/cdd-bootstrap`: a few natural questions, not the seven discovery headings. What it keeps from CDD is the part that pays off even for a one-off — a little guided discovery, clean single-purpose code, and a README so future-you can use it. What it drops is everything a single artifact doesn't need.
+Guided but light: a few natural questions, not `/cdd-bootstrap`'s full discovery.
 
-**Checkpoint discipline:** confirm the scope (step 1), then the captured definition (step 2), then the name and target (step 3) — each before moving on. The deliverable is written **files-first** (step 4), before any version control. The two outward-facing actions — a local commit (step 6) and a GitHub repo (step 7) — are offered separately, confirmed individually, and never done silently or by default.
+**Checkpoints:** scope (step 1), definition (step 2), name and target (step 3), each confirmed before moving on. Files are written first (step 4), before any version control. The local commit (step 6) and GitHub repo (step 7) are each offered separately and confirmed individually; never done silently or by default.
 
 ## 1. Scope check (the gate)
 
-Before discovery, confirm this is actually a deliverable and not a project. Apply the shared scope-triage heuristic (`doc/features/template.md`, "Deliverable or project?"): a task is a **project** (→ `/cdd-bootstrap`) when any of these hold — it is expected to evolve across many sessions and needs a roadmap; it has more than one cooperating component or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features. It is a **deliverable** (→ `/cdd-quick-create`) when none hold: a single self-contained artifact, finished in essentially one sitting, used as-is by future-you.
+Confirm this is a deliverable, not a project, using the shared heuristic (`doc/features/template.md`, "Deliverable or project?"). It is a **project** (→ `/cdd-bootstrap`) when any of these hold: it will evolve across many sessions and needs a roadmap; it has more than one cooperating component or an architecture worth documenting; it involves multiple collaborators or handoffs; it is long-lived and will accrete features. It is a **deliverable** when none hold: one self-contained artifact, finished in essentially one sitting, used as-is by future-you.
 
-If, from the description (`$ARGUMENTS`) or an opening exchange, project-signals trip, **surface them and offer to switch to `/cdd-bootstrap`** rather than proceeding. The human decides.
+If the description (`$ARGUMENTS`) or an opening exchange trips a project-signal, **surface it and offer to switch to `/cdd-bootstrap`** rather than proceeding. The human decides.
 
 **Checkpoint:** if any project-signal is present, name it and get an explicit "stay lightweight" or "switch to `/cdd-bootstrap`" before continuing.
 
 ## 2. Lightweight discovery
 
-Have a short conversation — not a questionnaire. Cover only:
+A short conversation, not a questionnaire. Cover only:
 
 - **What it is** — one or two sentences, plain terms.
 - **Its goal** — the problem it solves or the output it produces; what "done" looks like.
-- **Its non-goals** — what it deliberately won't do, so the artifact stays single-purpose. Push briefly for this; it keeps the deliverable small.
+- **Its non-goals** — what it deliberately won't do. Push briefly for these.
 
-Probe vague answers and reflect back what you heard, but keep it brief — this is a one-off, not a project charter.
+Probe vague answers and reflect back what you heard, briefly.
 
 **Checkpoint:** restate the captured definition (what / goal / non-goals) and get confirmation or corrections before writing anything.
 
 ## 3. Confirm the name and target location
 
-Propose a short `<name>` for the deliverable (a directory/repo slug, `^[a-z][a-z0-9_-]*$`), then propose the target location. The default is a **sibling of the CDD repo** — the parent of the current CDD checkout:
+Propose a short `<name>` for the deliverable (a directory/repo slug, `^[a-z][a-z0-9_-]*$`), then the target location. Default: a **sibling of the CDD repo** (the parent of the current checkout):
 
 ```bash
 TARGET="$(dirname "$(git rev-parse --show-toplevel)")/<name>"
 ```
 
-(From the canonical `$HOME/Code/cdd` checkout or any of its worktrees, this resolves to `$HOME/Code/<name>`.) Let the user override the location freely.
+The user may override the location freely.
 
 Refuse a path that already exists and is non-empty:
 
@@ -50,16 +50,14 @@ If it exists and is non-empty, stop and ask for a different location. An absent 
 
 Write the artifact(s) and a README directly into the target — no overlay, no substitution, no template machinery. The engineering floor:
 
-- **Clean, single-purpose code (required).** One focused artifact that does the one thing the goal describes. Resist scope creep toward the non-goals from step 2.
-- **A focused README (required).** Short and usable: what it is, how to run it, and any prerequisites. Match the deliverable's size — a one-screen README for a one-file script, not a project's worth of docs.
-- **Inline dependency metadata where the language supports it (offer).** For a Python `uv` script, PEP723 inline metadata (a `# /// script` block) keeps dependencies self-contained and the script runnable with no separate install. Use the equivalent idiom for other languages where one exists; don't force a packaging story onto a language that doesn't want one.
-- **A license / authorship header (offer).** A short header or `LICENSE` file if the user wants one. Skip if they don't.
-
-Don't over-prescribe by language: required items are the README and clean code; the rest are offered and applied only if they fit.
+- **Clean, single-purpose code (required).** One focused artifact doing the one thing the goal describes; nothing toward the step-2 non-goals.
+- **A focused README (required).** What it is, how to run it, any prerequisites. Sized to the deliverable — one screen for a one-file script.
+- **Inline dependency metadata where the language supports it (offer).** For a Python `uv` script, PEP723 inline metadata (a `# /// script` block); the equivalent idiom elsewhere where one exists. Don't force a packaging story onto a language that doesn't want one.
+- **A license / authorship header (offer).** A short header or `LICENSE` file if the user wants one.
 
 ## 5. Offer a smoke test
 
-Offer — don't force — a minimal check that the deliverable works: run the script once on a representative input, or a tiny invocation that exercises the happy path. This is skippable; respect a "no". If it runs, note that in the summary; if it fails, fix it before moving on.
+Offer — don't force — a minimal check that it works: run it once on a representative input, or a tiny happy-path invocation. Respect a "no". If it runs, note that in the summary; if it fails, fix it before moving on.
 
 ## 6. Offer git init and one local commit
 
@@ -69,17 +67,17 @@ Only if the user wants it — confirm first; it is not the default:
 ( cd "$TARGET" && git init -b main && git add -A && git commit -m "Add <name>" )  # stage-all-ok: fresh repo, every file in it is this deliverable
 ```
 
-A single, clean commit. Keep the message a one-liner describing the deliverable.
+A single commit; the message a one-liner describing the deliverable.
 
 ## 7. Offer a GitHub repo (separately)
 
-A separate decision from step 6 and outward-facing, so confirm explicitly (name, visibility) before running, and only if the user asked for it:
+Only if the user asked for it; confirm name and visibility explicitly before running:
 
 ```bash
 ( cd "$TARGET" && gh repo create <name> --source . --push --private )   # or --public
 ```
 
-Requires an authenticated `gh` and a local commit from step 6. Skip entirely if the user wants to stay local — local-only is a perfectly good end state for a one-off.
+Requires an authenticated `gh` and the step-6 commit. Skip entirely if the user wants to stay local.
 
 ## 8. Summary
 

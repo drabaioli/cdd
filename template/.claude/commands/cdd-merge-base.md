@@ -1,9 +1,6 @@
 Integrate the current state of the base branch into the feature branch. Two phases: a **dry-run conflict assessment** first, then the actual merge with conflict resolution. The approval between the two phases is conditional — the merge runs automatically when the dry run proves the case mechanically trivial (step 4), and stops for approval otherwise.
 
-Run this command on the feature branch (not on the base branch). Use it when:
-
-- The base branch has advanced under your feature branch and you want to integrate before opening or merging the PR.
-- Something useful has landed on the base branch (a new utility, a refactor, an updated convention) that this branch should pick up without a separate roadmap task.
+Run this command on the feature branch (not on the base branch), when the base branch has advanced under it or has something this branch should pick up (a new utility, a refactor, an updated convention).
 
 ## 0. Resolve the base branch
 
@@ -13,7 +10,7 @@ BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
 [ -z "$BASE_BRANCH" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not fall back to git, because an installed adapter declares which code host this project uses. If it is usable, say in one line which adapter serves, then take its answer:
+If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not fall back to git. If it is usable, say in one line which adapter serves and its `backend`, then take its answer:
 
 ```bash
 BASE_BRANCH=$("$CODE_HOST" default-branch | jq -r '.branch // empty')   # exit 3 (unsupported) or a failure leaves it empty
@@ -26,7 +23,7 @@ BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origi
 BASE_BRANCH=${BASE_BRANCH:-main}
 ```
 
-This reads the task's recorded base branch — the branch it was cut from and merges back into. When no base was recorded (every single-integration-branch project), it falls back to the code host's default branch — through the code-host adapter when one is installed, else from git — so behaviour is unchanged there. Use `$BASE_BRANCH` everywhere `main`/`origin/main` appeared in earlier versions of this command. All git commands below use this variable.
+This reads the task's recorded base branch, falling back to the code host's default branch when none was recorded. All git commands below use `$BASE_BRANCH`.
 
 ## 1. Sanity check
 
@@ -97,22 +94,21 @@ Record the outcome of this scan as an explicit count — "flagged N items" or "f
 
 ## 4. Decide the path, then report
 
-**The merge proceeds automatically, with no approval prompt, when all of these hold:**
+**The merge proceeds automatically, with no approval prompt, when all of these hold**:
 
 1. The worktree was clean (step 1).
 2. Step 3's `git merge-tree` reported **zero** conflicting files.
 3. Step 3's non-conflict scan flagged **nothing**.
-4. The post-merge verify (step 7) passes. This one is a *safety net, not a precondition* — it is checked after the merge exists, and step 7 says what to do when it fails.
 
-Criteria 1–3 are mechanical facts, not judgement calls. If all three hold, print a single line naming them and go straight to step 5:
+If all three hold, print this single line and go straight to step 5:
 
 ```
 Trivial merge: worktree clean, 0 conflicting files, nothing flagged to adopt — merging without asking. Verify follows in step 7.
 ```
 
-Do **not** present the assessment block below as a prompt on this path and do not wait for a reply; step 8's summary reports the assessment afterwards.
+Do **not** present the assessment block below on this path and do not wait for a reply; step 8's summary reports the assessment afterwards.
 
-**If any of criteria 1–3 fails**, present the assessment to the user:
+**If any criterion fails**, present the assessment to the user:
 
 ```
 ## Merge-base assessment
@@ -135,7 +131,7 @@ Commits unique to this branch:                     <M>
   - Logical/structural conflicts present; recommend discussing approach before merging.
 ```
 
-Then **stop and wait for explicit user approval**. Do not begin the merge. This is the point where the human sees the conflict complexity, so the wait is the whole purpose of reaching this branch.
+Then **stop and wait for explicit user approval**. Do not begin the merge.
 
 ## 5. Perform the merge
 
@@ -145,9 +141,9 @@ On user approval, or automatically via step 4's trivial path:
 git merge --no-edit "origin/$BASE_BRANCH"
 ```
 
-`--no-edit` takes the default merge message: on the trivial path nobody is watching, and a merge that drops into an editor would hang the session.
+`--no-edit` keeps the merge from opening an editor, which would hang the session.
 
-On the trivial path there is nothing to resolve — step 4's criterion 2 established zero conflicting files — so the merge command is the whole step. Otherwise resolve conflicts file by file:
+On the trivial path there is nothing to resolve, so the merge command is the whole step. Otherwise resolve conflicts file by file:
 
 - For mechanical conflicts, resolve directly and explain each resolution in one line.
 - For logical conflicts, propose a resolution and ask the user before applying. Do not silently pick a side.
@@ -167,7 +163,7 @@ git merge --continue
 
 ## 6. Adopt non-conflict improvements (optional)
 
-**On the trivial path this step is a no-op, by construction** — step 4's criterion 3 requires that the scan flagged nothing, so there is nothing here to adopt. That is intended, not an oversight: an automatic merge never adopts improvements, and anything worth adopting sends the run down the approval path instead. Skip to step 7.
+On the trivial path there is nothing flagged, so skip to step 7.
 
 Otherwise, for each non-conflict item flagged in step 3 (new conventions, helpers, refactored interfaces), ask the user whether to apply now in a follow-up commit on this branch. Default to asking, not assuming.
 
@@ -179,17 +175,17 @@ adopt: <one-line description of what was adopted from the base branch>
 
 ## 7. Verify
 
-Run the project build and tests to confirm the merged state is healthy. Use the same commands as `/cdd-pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern. This is step 4's criterion 4, and it runs on both paths.
+Runs on both paths. Run the project build and tests to confirm the merged state is healthy. Use the same commands as `/cdd-pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern.
 
 If anything fails, report the failure — naming the failing gate and including the captured tail — and stop. Do not push.
 
-**If the merge was automatic**, say so explicitly in the same breath: the tree now holds a merge nobody approved and the verify is red. Offer the undo, and let the user choose:
+**If the merge was automatic**, say so explicitly in the same report: the tree now holds a merge nobody approved and the verify is red. Offer the undo, and let the user choose:
 
 ```bash
 git reset --hard ORIG_HEAD   # discards the merge commit; safe because step 1 proved the tree clean
 ```
 
-Do not run it unasked, and do not go quiet — never leave a broken tree without saying it is broken and how to get out.
+Do not run it unasked, and never leave a broken tree without saying it is broken and how to get out.
 
 ## 8. Summary
 
@@ -208,8 +204,8 @@ Present a final summary:
 Next: re-run /cdd-pre-pr before opening or updating the PR.
 ```
 
-On the automatic path this summary is where the assessment lands, since step 4 skipped its report: state the commit counts and that zero files conflicted and nothing was flagged to adopt, so the run is legible after the fact without re-deriving it.
+On the automatic path, also state the commit counts and that zero files conflicted and nothing was flagged to adopt, since step 4 printed no assessment.
 
 Then advance the task **state record** (advisory): run `cdd-state set merged`. It skips silently if the record is absent.
 
-The user should re-run `/cdd-pre-pr` in a fresh session after `/cdd-merge-base` to ensure the merged state passes all gates.
+Tell the user to run `/cdd-pre-pr` in a fresh session.

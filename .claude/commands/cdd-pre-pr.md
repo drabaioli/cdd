@@ -1,16 +1,18 @@
 Run a pre-PR checklist for the current branch. Compare against the base branch to identify all changes. This is a verification session: it runs CI gates, code-reviews the diff, and reconciles documentation against the changes.
 
-This session is **fresh and separate** from the implementation session by design, so that the verification work is not biased by the context that produced the change. Any "propose to the user" step in this command is a proposal to the user running this session.
+This session is fresh and separate from the implementation session. Any "propose to the user" step in this command is a proposal to the user running this session.
 
 ## 0. Resolve the base branch
 
 ```bash
 BASE_BRANCH=$(cdd-state get base_branch 2>/dev/null)
-# With no base recorded, look for a code-host adapter: project, then machine; the first file present wins.
-[ -z "$BASE_BRANCH" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
+# The code-host adapter: project, then machine; the first file present wins.
+for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-If `$CODE_HOST` is set, check it before using it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path, and **stop**; do not fall back to git, because an installed adapter declares which code host this project uses. If it is usable, say in one line which adapter serves, then take its answer:
+**The code-host adapter is resolved once, here, and checked once, at its first use** — below when no base is recorded, else in §11. The check: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If it passes, say in one line which adapter serves and its `backend`; it is not announced again. If it fails, the adapter is installed but broken: say so in **one line** naming its path. Here that **stops the session**; in §11 it only blocks the PR. Never fall back to git or route around it.
+
+If `$BASE_BRANCH` is empty and `$CODE_HOST` is set, check the adapter now, then take its answer:
 
 ```bash
 BASE_BRANCH=$("$CODE_HOST" default-branch | jq -r '.branch // empty')   # exit 3 (unsupported) or a failure leaves it empty
@@ -23,7 +25,7 @@ BASE_BRANCH=${BASE_BRANCH:-$(git symbolic-ref --quiet --short refs/remotes/origi
 BASE_BRANCH=${BASE_BRANCH:-main}
 ```
 
-This reads the task's recorded base branch — the branch it was cut from and merges back into — and falls back to the code host's default branch when none was recorded — through the code-host adapter when one is installed, else from git (unchanged behaviour for single-integration-branch projects). Use `$BASE_BRANCH` wherever `main`/`origin/main` appears in git commands below.
+`$BASE_BRANCH` is the branch the task was cut from and merges back into. Use it wherever `main`/`origin/main` appears in git commands below.
 
 ## 1. Identify changes
 
@@ -34,11 +36,11 @@ git status --porcelain
 
 Capture the list of changed files. Use it as the scope for steps 3 and 4.
 
-Also record the `git status --porcelain` output as the **entry snapshot**. The tree should be clean here (the implementation session commits its own work). If it is already dirty, those are changes this session did not create — note them now; step 10 must not sweep them into the auto-commit.
+Also record the `git status --porcelain` output as the **entry snapshot**. The tree should be clean here. If it is already dirty, those are changes this session did not create — note them now; step 10 must not sweep them into the auto-commit.
 
 ## 2. Build & QA
 
-Run the project's **check runner** — the single command that runs every gate, the same gate list CI runs (a host tool that behaves differently can still make CI disagree). **Capture only the last 40 lines + exit code, do not read the full output.**
+Run the project's **check runner** — the single command that runs every gate, the same gate list CI runs. **Capture only the last 40 lines + exit code, do not read the full output.**
 
 ```bash
 <check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
@@ -46,7 +48,7 @@ Run the project's **check runner** — the single command that runs every gate, 
 
 Report each gate as pass ✓ / fail ✗ from the runner's summary. On failure, include the captured tail. **A missing tool is a failure, never a skip** — say which tool to install; an older runner's *skipped* counts as failed too.
 
-If the project has no single runner yet, run each gate command in sequence instead — and note the gap for step 6, because a split gate list drifts and a pre-PR session that runs only some of the gates gives a green verdict that guarantees little:
+If the project has no single runner yet, run each gate command in sequence instead, and note the gap for step 6:
 
 ```bash
 <build command>          2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
@@ -57,7 +59,7 @@ If the project has no single runner yet, run each gate command in sequence inste
 ```
 <!-- cdd-only-begin -->
 
-**In this repo the runner is `./scripts/ci.sh`** — 29 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. Not fail-fast. Two of its gates need interpretation rather than a rerun; see the sections below.
+**In this repo the runner is `./scripts/ci.sh`** — 29 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. Not fail-fast. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. The `drift` and `seams` gates need interpretation rather than a rerun; see their triage section after step 8.
 <!-- cdd-only-end -->
 
 ## 3. Code review
@@ -70,9 +72,9 @@ Review for:
 - Design issues (coupling, responsibility boundaries, API shape).
 - Compliance with the project coding standard linked from CLAUDE.md.
 
-Flag any issues found. If new conventions are established during this review (something the change does that should become the project norm), update the coding standard accordingly.
+Flag any issues found. If the change establishes a convention that should become the project norm, update the coding standard accordingly.
 
-**Then check the diff against the handoff's acceptance criteria.** The handoff carries a `## Requirements` section: the observable done-test, written before a plan existed and the one artifact that survives both the plan and the implementation window — so it is what catches a plan that misread the intent and an implementation that faithfully built the wrong thing.
+**Then check the diff against the handoff's acceptance criteria** — its `## Requirements` section.
 
 ```bash
 repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
@@ -81,9 +83,9 @@ echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
 echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 ```
 
-Read it and check the diff criterion by criterion. Report any criterion the diff does not satisfy, and any it satisfies differently than stated — the deviation may be right, but it should be named rather than discovered at review.
+Read it and check the diff criterion by criterion. Report any criterion the diff does not satisfy, and any it satisfies differently than stated — name the deviation even if it looks right.
 
-**Read the plan file's `## Open questions resolved` before judging a miss.** The handoff is immutable, so a criterion the human agreed to amend or drop during planning is recorded there rather than edited into the handoff. A criterion the plan records as amended is not a miss — report it as an approved amendment, with what replaced it, so the change is visible without being an alarm. A criterion the diff simply does not satisfy, with no such record, still is.
+**Read the plan file's `## Open questions resolved` before judging a miss.** A criterion the plan records as amended or dropped is not a miss — report it as an approved amendment, with what replaced it. A criterion the diff does not satisfy, with no such record, still is.
 
 This is a check, not a gate: if the handoff is absent, or carries no `## Requirements` (an older task), or there is no plan file, say so in one line and move on.
 
@@ -91,45 +93,47 @@ This is a check, not a gate: if the handoff is absent, or carries no `## Require
 
 Check and **update** documentation based on the changes:
 
-- **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc to reflect it. Edit directly.
+- **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc. Edit directly.
 - **Feature docs** (`doc/features/`): if user-visible behaviour changed or a new feature landed, update or add the relevant feature doc. Edit directly.
-- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly. It stays an index, not a knowledge dump — do not add detail a slash command already injects into the sessions that need it.
+- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly. Keep it an index: do not add detail a slash command already injects into the sessions that need it.
 - **README.md**: if anything it states — quick start, layout, status, links — went stale relative to the change, update it. Edit directly.
 - **Roadmap** (`doc/knowledge_base/roadmap.md`):
   1. Tick any newly completed checkboxes directly.
   2. Identify items that should be **added, modified, or removed** based on what was implemented. Present these suggestions explicitly to the user **before** making any edits. Apply only on approval.
-  3. Keep every annotation at the roadmap's own bar — read "Annotation conventions" in the roadmap file itself. A ticked item reads like a PR title or barely more; the default is no annotation at all, and at most one short clause for what no other artifact carries (a deferred sub-item, a caveat, a scope change). The implementation detail, the rejected alternatives, and the reasoning belong in the PR description, an ADR, and the docs — not here.
+  3. Keep every annotation at the bar set by "Annotation conventions" in the roadmap itself: a ticked item reads like a PR title or barely more; the default is no annotation, at most one short clause for what no other artifact carries (a deferred sub-item, a caveat, a scope change). Implementation detail, rejected alternatives and reasoning go in the PR description, an ADR, or the docs.
 
-Read each relevant doc and compare against the actual code changes. Fix discrepancies directly when they are reconciliation (the doc is out of date relative to what landed). Ask before applying structural changes (adding new doc files, restructuring an existing doc).
+Read each relevant doc and compare against the actual code changes. Fix reconciliation discrepancies (the doc is out of date relative to what landed) directly. Ask before structural changes (adding doc files, restructuring a doc).
+
+Rationale lives once: where the change touches a rule whose argument already has a home, shrink any other restatement of it to the rule plus a pointer there, rather than rewriting it at full length.
 
 ## 5. Test coverage reconciliation
 
-For each behavioural change in the diff (a new function, a new branch, changed output, a fixed bug), check whether it is covered by a test. This is the recurring guardrail behind the "tested behaviour" row of `doc/knowledge_base/engineering-practices.md`.
+For each behavioural change in the diff (a new function, a new branch, changed output, a fixed bug), check whether a test covers it (the "tested behaviour" row of `doc/knowledge_base/engineering-practices.md`).
 
-- **If the project has a test command** ("tested behaviour" marked *enforced*): confirm a test exercises the new behaviour. If a behavioural change landed with no accompanying test, flag it — the default expectation is that new behaviour ships with a test.
-- **If a change is deliberately untested** (a throwaway script, generated code, a spike): that is allowed, but it must be *intentional and recorded*, not silent. State the reason in the PR summary.
-- **If the project has no test command yet** ("tested behaviour" still *expected*): do not invent a framework. Note that the change shipped untested because there is no test harness, and confirm that standing one up is tracked as a roadmap task. If this change is exactly the kind of behaviour that motivates a first test, say so and let the user decide whether to pull that task forward.
+- **If the project has a test command** ("tested behaviour" marked *enforced*): confirm a test exercises the new behaviour. Flag a behavioural change that landed with no test.
+- **If a change is deliberately untested** (a throwaway script, generated code, a spike): allowed, but state the reason in the PR summary.
+- **If the project has no test command yet** ("tested behaviour" still *expected*): do not invent a framework. Note that the change shipped untested for lack of a harness, and confirm that standing one up is tracked as a roadmap task. If this change is exactly the kind of behaviour that motivates a first test, say so and let the user decide whether to pull that task forward.
 
-This step asks a question and records the answer; it does not mandate a specific framework, a coverage threshold, or that every change be tested. "Not tested, and here is why" is a valid, recorded outcome. Surface it — do not block on it.
+Do not mandate a framework, a coverage threshold, or that every change be tested; "not tested, and here is why" is a valid recorded outcome. Surface it — do not block on it.
 
 ## 6. CI improvement check (conditional)
 
-If, and only if, the change introduces a category of work that the existing CI does not cover, propose specific improvements to the user. Examples that should trigger a proposal:
+If, and only if, the change introduces a category of work the existing CI does not cover, propose specific improvements to the user. Examples that should trigger a proposal:
 
-- A new file type or language is being committed that no existing job builds, lints, or formats.
-- A new test category is introduced (e.g. first integration test in a project that only had unit tests until now) and there is no CI job that runs it.
+- A new file type or language is committed that no existing job builds, lints, or formats.
+- A new test category is introduced (e.g. the first integration test) and no CI job runs it.
 - A new external tool is invoked in build/test scripts but is not pinned or version-checked.
-- A new convention was established during the code review in step 3 that could be enforced mechanically.
+- A convention established in the step 3 review could be enforced mechanically.
 
-Do **not** propose generic CI improvements every run. The default is silence. If you do propose, the user has two options: apply now in this PR, or defer as a new roadmap task. Apply only on approval.
+Do **not** propose generic CI improvements every run. The default is silence. If you propose, the user chooses: apply now in this PR, or defer as a new roadmap task. Apply only on approval.
 
 ## 7. Workflow improvement check (conditional)
 
-If, and only if, this task surfaced something about *how the project works* that no artifact captures, route it. This is the recurring channel behind the "the workflow improves itself" commitment. Concrete triggers:
+If, and only if, this task surfaced something about *how the project works* that no artifact captures, route it. Concrete triggers:
 
-- A step in this task had to be done by hand that no artifact describes: a command not in `CLAUDE.md`'s build/test section, a file hand-edited that the docs imply is generated, a setup detail rediscovered from scratch.
-- The code review in step 3 enforced a rule that is written down nowhere — a convention applied from inference rather than from `CLAUDE.md` or the coding standard.
-- The handoff was materially wrong or incomplete: the diff contains work the handoff did not scope, or a constraint it missed cost rework.
+- A step had to be done by hand that no artifact describes: a command not in `CLAUDE.md`'s build/test section, a file hand-edited that the docs imply is generated, a setup detail rediscovered from scratch.
+- The step 3 review enforced a rule written down nowhere — inferred rather than taken from `CLAUDE.md` or the coding standard.
+- The handoff was materially wrong or incomplete: the diff contains work it did not scope, or a constraint it missed cost rework.
 - Step 4 had to update a doc that no pointer in `doc/index.md` or `CLAUDE.md` would have led you to.
 - A slash command's own instructions were ambiguous or wrong for this task and had to be worked around.
 
@@ -142,11 +146,11 @@ Route each one by scope; never leave it as a remark that dies with the session:
   This repo *is* CDD, so the third route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
 <!-- cdd-only-end -->
 
-Do **not** manufacture an improvement every run. The default is silence, and "nothing surfaced" is the common, correct outcome. The bar is judgement, not a checklist sweep: raise it only if it would change how a future session behaves, and only if it is a pattern rather than a one-off annoyance — a friction hit twice, or one that would cost the next session the same rework. Surface at most one item per run; if two look worth it, take the stronger one. This step records; it never blocks the PR, and it is not a checkpoint.
+Do **not** manufacture an improvement every run; "nothing surfaced" is the common, correct outcome. Raise it only if it would change how a future session behaves and is a pattern, not a one-off — a friction hit twice, or one that would cost the next session the same rework. At most one item per run; if two qualify, take the stronger. This step records; it never blocks the PR, and it is not a checkpoint.
 
 ## 8. Upstream drift check
 
-Step 1 diffed against the *local* `$BASE_BRANCH`; this step needs the remote, so it fetches first:
+Fetch the remote base first (step 1 diffed against the local one):
 
 ```bash
 git fetch origin "$BASE_BRANCH"
@@ -154,22 +158,20 @@ git rev-list --count "HEAD..origin/$BASE_BRANCH"
 git log --oneline "HEAD..origin/$BASE_BRANCH"
 ```
 
-Report the count. If it is non-zero, `origin/$BASE_BRANCH` has advanced beyond the branch point: say by how many commits, summarize what landed, and recommend running `/cdd-merge-base` in a fresh session before opening the PR. This is advisory — it never blocks the checklist, and this session neither merges nor invokes `/cdd-merge-base` itself.
+Report the count. If it is non-zero, say by how many commits `origin/$BASE_BRANCH` has advanced, summarize what landed, and recommend running `/cdd-merge-base` in a fresh session before opening the PR. Advisory only — it never blocks the checklist, and this session neither merges nor invokes `/cdd-merge-base` itself.
 
 <!-- cdd-only-begin -->
 ## Triaging the `drift` and `seams` gates (CDD repo only)
 
-Two of the runner's gates are specific to the CDD repo (the meta-project) and, unlike the rest, a failure is a **judgement call, not a bug to fix blindly**. Step 2 already ran both; these notes are for reading a failure.
+A failure of either gate is a **judgement call, not a bug to fix blindly**. Step 2 already ran both; these notes are for reading a failure.
 
-**`drift` — `scripts/command-drift-check.sh`.** Surfaces unintended divergence between the repo's own `.claude/commands/` and `.claude/agents/` and the `template/.claude/` copies it ships downstream. It renders the template through `bootstrap-cdd-project.sh --stage` with this repo's own identifiers, so expected substitution drift cancels out mechanically. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-meta-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. The same gate asserts that the handoff schema headings match between the process doc (Section 2.6) and `cdd-next-step.md`, and that no `cdd-only` markers leak into the template itself.
+**`drift` — `scripts/command-drift-check.sh`.** Diffs this repo's `.claude/commands/` and `.claude/agents/` against the `template/.claude/` copies, rendered with this repo's identifiers so substitution drift cancels out. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. It also asserts that the handoff schema headings match between the process doc (Section 2.6) and `cdd-next-step.md`, and that no `cdd-only` markers leak into the template.
 
-On divergence, present each diff to the user; for each, the user decides whether to reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence).
+On divergence, present each diff to the user; for each, the user decides: reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence).
 
-**`seams` — `scripts/prompt-seam-check.sh`.** Deterministic seam-contract checks over the repo's own prompts, guarding against a one-sided edit silently stranding a downstream prompt-driven step. It verifies 12 seams with grep only (no LLM, no API key): every `/cdd-*` reference across the repo's markdown resolves to an existing command file (known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`); the issue references `cdd-next-step.md` records with `cdd-state issue-refs` are still read back with `cdd-state get issue_refs` and turned into close lines through `issue-close-token` in `cdd-pre-pr.md`; backticked file paths in the command files, `CLAUDE.md`, `README.md` and the process doc resolve to real files; each `cdd-*.md` still carries its load-bearing headings, matched by title so that renumbering a step is a no-op while a dropped heading still fails; the gate count stated in prose here and in `CLAUDE.md` matches what `./scripts/ci.sh list` registers; every open row of the template's engineering-practices contract is named in the engineering-floor question `/cdd-bootstrap` asks, so a practice added there cannot ship resolved by guess; every `## ` section `cdd-plan.md` writes into the plan file is still named in `cdd-implement.md`, which reads it; the small-change lane's routing marker is still written by `cdd-next-step.md` and still read by `tools/cdd-worktree.sh` on both the launch and the resume path; the lane's one-sentence eligibility heuristic is stated verbatim in the process doc and in both commands that apply it; `cdd-pre-pr.md` still opens the PR through the code host's `pr-create`, and `cdd-process-pr.md` still finds, reads and answers it through `pr-for-branch`, `pr-comments` and `pr-reply`; `cdd-retrofit.md` still seeds its branch a task record with `cdd-state seed` and `cdd-state set implementation_done`, and recommends `cdd-worktree-done` rather than `git worktree remove` for the cleanup; and the number of seam checks stated in prose here and in three other files matches the checker's own `CHECKS` registry, which `./scripts/prompt-seam-check.sh list` prints.
+**`seams` — `scripts/prompt-seam-check.sh`.** Verifies 12 seams between the repo's prompts with grep only; `./scripts/prompt-seam-check.sh list` names them and each failure line names its seam. Known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`. The issue-ref and code-host-caller checks strip this file's `cdd-only` regions first: a needle of theirs satisfied only inside this section does not count.
 
-Note that the issue-ref/branch-token check reads this file with its `cdd-only` regions **stripped**: the paragraph above quotes all six of that check's tokens while describing it, so grepping the raw file would let the §11 close-line block be deleted outright and still report clean. A needle satisfied only by this section does not count.
-
-On a broken seam, present each one to the user; for each, the user decides whether to fix the reference/heading/path or record a justified exception (a whitelist entry).
+On a broken seam, present each one to the user; for each, the user decides: fix the reference/heading/path, or record a justified exception (a whitelist entry).
 
 For both: apply fixes only on user approval, and do not auto-edit either tree from this step.
 <!-- cdd-only-end -->
@@ -198,11 +200,11 @@ Mark each item as pass ✓ or needs attention ✗ with details.
 
 ## 10. Commit reconciliation edits
 
-Commit the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). This is a local commit only — **no push**. Pushing happens, if at all, in step 11.
+Commit the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). Local commit only — **no push**; pushing happens, if at all, in step 11.
 
 First check the entry snapshot from step 1:
 
-- **If the tree was already dirty on entry** (changes this session did not create), **stop and surface** them: list those paths, state that the auto-commit is skipped so unrelated work isn't swept in, and let the user resolve it. The checklist above still stands on its own.
+- **If the tree was already dirty on entry**, **stop and surface** it: list those paths, state that the auto-commit is skipped, and let the user resolve it. The checklist above still stands.
 - **Otherwise**, commit only the files this session edited. Add them by path — do not `git add -A`:
 
 ```bash
@@ -210,7 +212,7 @@ git add <files reconciled in steps 3–8>
 git commit -m '<message>'
 ```
 
-Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled (no edits this session), say so and skip the commit.
+Follow the repo's commit conventions from CLAUDE.md. Print a one-line summary of the commit (subject + files included). If nothing was reconciled, say so and skip the commit.
 
 Then advance the task **state record** (advisory): run `cdd-state set checks_passed`. It skips silently if the record is absent.
 
@@ -218,25 +220,19 @@ Then advance the task **state record** (advisory): run `cdd-state set checks_pas
 
 After the checklist, offer to open the PR. This is human-gated — never open a PR without explicit confirmation.
 
-**Resolve the code host** — here even if §0 did not, since §0 looks only when no base was recorded. If §0 already resolved and checked an adapter, reuse it without announcing it again:
+**Code host.** Use the adapter §0 resolved. If §0 did not check it (a base was recorded), check it now as §0 describes (announcing it once if usable); broken → say so in one line naming its path and **do not open the PR** (the checklist still stands). With none resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **skip this step** (the checklist still stands). An adapter carries its own authentication: when that is missing, the adapter's own error line is what the user sees.
 
-```bash
-[ -z "$CODE_HOST" ] && for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
-```
-
-If `$CODE_HOST` is set, check it as §0 does: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, the adapter is installed but broken — say so in **one line** naming its path and **do not open the PR**; do not route around it, because an installed adapter declares which code host this project uses. The checklist above still stands. If it is usable, say in one line which adapter serves and its `backend`. With nothing resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **skip this step** (the checklist above still stands). An adapter carries its own authentication: when it is missing, the adapter's own error line is what the user sees.
-
-**If the branch already has an open PR, stop here.** If the adapter's `describe.verbs` has `pr-for-branch`, run `"$CODE_HOST" pr-for-branch "$(git rev-parse --abbrev-ref HEAD)"` (a JSON array, newest first) and keep the entries whose `state` is `open` — this also catches a PR opened by hand. If the verb is undeclared, it exits 3, or it fails, fall back to `cdd-state get pr` (empty when there is no record or no PR). If either finds a PR, print `PR #<ref> is already open — push to update it.` and skip the rest of this step: no offer to open a PR, no close lines. The checklist above still stands.
+**If the branch already has an open PR, stop here.** If the adapter's `describe.verbs` has `pr-for-branch`, run `"$CODE_HOST" pr-for-branch "$(git rev-parse --abbrev-ref HEAD)"` (a JSON array, newest first) and keep the entries whose `state` is `open`. If the verb is undeclared, it exits 3, or it fails, fall back to `cdd-state get pr` (empty when there is no record or no PR). If either finds a PR, print `PR #<ref> is already open — push to update it.` and skip the rest of this step: no offer to open a PR, no close lines. The checklist still stands.
 
 If §8 found upstream drift, restate the recommendation to run `/cdd-merge-base` before opening the PR, and let the user decide whether to proceed anyway.
 
 Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manual PR instructions — just ask whether to proceed.
 
-- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##'`, a bare name like `$BASE_BRANCH`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a local base branch that was never pushed), **stop and ask** the user how to proceed: push the base branch first, retarget the PR at the default branch, or abort. Derive the body's close lines as described under **Close lines** below, so every issue the task was sourced from auto-closes on merge. Then open it, adding `--base "$BASE_BRANCH"` when the base differs from the default:
+- **On yes**: derive a title from the branch/commits and a body from the change summary. **Target the PR at the task's base branch:** if `$BASE_BRANCH` differs from the platform default (`git symbolic-ref --quiet --short refs/remotes/origin/HEAD | sed 's#^origin/##'`, a bare name like `$BASE_BRANCH`), the PR must set `--base "$BASE_BRANCH"` — but first confirm the base exists on the remote (`git ls-remote --exit-code --heads origin "$BASE_BRANCH"`). If it does not (e.g. the task stacks on a never-pushed local base branch), **stop and ask** the user: push the base branch first, retarget the PR at the default branch, or abort. Derive the body's close lines as described under **Close lines** below. Then open it, adding `--base "$BASE_BRANCH"` when the base differs from the default:
   If the adapter's `describe.verbs` lacks `pr-create`, say in one line that this code host's adapter cannot open PRs, and do not open one. Otherwise run `"$CODE_HOST" pr-create --title "<title>" --body "<body>"` and print the returned `.url`; the new PR's number is its `.ref`. An exit 3 reads as the undeclared case; any other failure → say in one line that the PR was not opened, quoting the adapter's error line, and never retry another way.
 
-  Once a PR is open, advance the task **state record**, passing the new PR's number: run `cdd-state set pr_open --pr NN` with the new PR's number.
-- **On no**: stop. The checklist above already stands on its own.
+  Once a PR is open, advance the task **state record**: run `cdd-state set pr_open --pr NN` with the new PR's number.
+- **On no**: stop. The checklist already stands on its own.
 
 **Close lines.** The body carries one close line per reference the task was sourced from. Read the recorded references first:
 
@@ -250,9 +246,9 @@ cdd-state get issue_refs    # one reference per line; empty when none were recor
   for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
   ```
 
-  If one resolved but is broken — not executable, or its `describe` exits non-zero, does not parse, or reports another `capability` or an unsupported `contract` — say so in one line naming it and emit **no close lines**; do not guess a `Closes #` syntax, which would be the wrong tracker's. The PR itself can still be opened.
+  If one resolved but is broken — not executable, or its `describe` exits non-zero, does not parse, or reports another `capability` or an unsupported `contract` — say so in one line naming it and emit **no close lines**; do not guess a `Closes #` syntax. The PR itself can still be opened.
 
-  **Announce the rung in one line, once**, before the first call: the announcement rule is per call, but N identical lines is noise, and noise is how a load-bearing line stops being read. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved there is no tracker to ask: emit **no close lines** and say in one line `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` — the PR still opens, and the issues stay open for someone to close by hand. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line and leave them out rather than guessing a syntax for it.
+  **Announce the rung in one line, once**, before the first call — not once per reference. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved, emit **no close lines** and say in one line `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` — the PR still opens, and the issues stay open to close by hand. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line rather than guessing a syntax.
 
-  **Then say what those lines will actually do**, once, before asking to open the PR. A close line is a string in the PR body, and who acts on it depends on where the issue lives. When the tracker's and the code host's `describe.backend` are the same (`github`, `gitlab`), the code host that hosts the PR also hosts the issue and closes it on merge — say that plainly, adding GitLab's caveat when it is `gitlab`: it closes only on a merge into the default branch, and only while the project's "Auto-close referenced issues on default branch" setting is on (the default). Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close. CDD emits the token and has no way to check that anything is listening, so the one thing it can honestly do is not overstate it.
-- **Empty** (no record, an unsynced or reaped one, or no `jq`): **no close lines.** The record is the only place a reference is kept, and a branch name is not a second one. Say so in one line at the confirmation step rather than opening a silently incomplete PR — the PR itself is fine, and the issues simply stay open for someone to close by hand.
+  **Then say what those lines will actually do**, once, before asking to open the PR. When the tracker's and the code host's `describe.backend` are the same (`github`, `gitlab`), the code host closes the issue on merge — say that plainly, adding GitLab's caveat when it is `gitlab`: it closes only on a merge into the default branch, and only while the project's "Auto-close referenced issues on default branch" setting is on (the default). Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close.
+- **Empty** (no record, an unsynced or reaped one, or no `jq`): **no close lines.** Do not derive references from the branch name. Say so in one line at the confirmation step; the PR still opens, and the issues stay open to close by hand.

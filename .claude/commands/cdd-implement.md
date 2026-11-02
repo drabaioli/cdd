@@ -1,6 +1,6 @@
 Implement the task from its approved plan file, update the docs, and commit locally: `/cdd-implement` (takes no argument).
 
-This is the second half of the implementation cycle, run in a **fresh** context in the same feature worktree that `/cdd-plan` ran in. Its input is the plan file. That file exists because a human approved it at checkpoint 3, which is why this session needs no gate of its own — and why it must not quietly decide something the plan does not say.
+Run in a **fresh** context in the feature worktree. The plan was approved at checkpoint 3: take no approval of your own, and do not quietly decide anything the plan does not say.
 
 ## 1. Read the plan
 
@@ -13,27 +13,25 @@ echo "plan:    ~/.cdd/handoffs/$repo/$branch.plan.md"
 echo "handoff: ~/.cdd/handoffs/$repo/$branch.md"
 ```
 
-Read the plan first, in full. Its `## Summary` is your orientation; the rest is the detail.
+Read the plan first, in full; its `## Summary` orients you. Then read the handoff's `## Requirements`: those acceptance criteria are the done-test.
 
-Then read the handoff, for its `## Requirements` — those acceptance criteria are the done-test, and they survived both windows precisely so that a plan which misread the intent is still caught here.
+How to treat the plan's sections:
 
-The plan's sections carry different weights, by design:
-
-- `## File map` names the files to open and the conclusion already reached about each. Re-read those files — the plan cites repo facts rather than copying them because they are cheap for you to re-derive.
-- `## External findings` is quoted verbatim because it **cannot** be re-derived here. Trust it; do not go re-run the searches. Each finding names what it is for — act on its disposition, and check a "to verify" finding the way `## Verification` says.
-- `## Dead ends` records approaches already tried and rejected. Do not re-explore them.
-- `## Open questions resolved` records what the handoff deferred and what was agreed. Those answers are settled; do not reopen them unilaterally.
+- `## File map` names the files to open and the conclusion reached about each. Re-read those files.
+- `## External findings` is quoted verbatim. Trust it; do not re-run the searches. Act on each finding's disposition, and check a "to verify" finding the way `## Verification` says.
+- `## Dead ends` lists rejected approaches. Do not re-explore them.
+- `## Open questions resolved` answers are settled; do not reopen them unilaterally.
 
 ## 2. Deviation rule: stop and report, never improvise
 
-If reality contradicts the plan, **stop and report to the human**. Do not silently pick a different approach, and do not fall back to re-deriving the task from the handoff. The plan was the thing that was approved; departing from it unsupervised discards the checkpoint.
+If reality contradicts the plan, **stop and report to the human**. Do not silently pick a different approach, and do not re-derive the task from the handoff.
 
-Two cases must be handled explicitly, because both are expected rather than hypothetical:
+Two expected cases:
 
-- **The plan's anchors no longer match the tree.** The gap between planning and implementing is human-paced, so a `/cdd-merge-base` may have run in between and moved everything the plan's `file:line` pointers refer to. If the cited lines no longer say what the plan says they say, stop and report which anchors drifted; offer to re-run `/cdd-plan` against the merged tree.
-- **The plan file is not there.** A machine running an older worktree helper materializes only the handoff and the state record from the task's sync ref, so a plan written elsewhere may never have landed here. Say plainly that the plan was not materialized on this machine, and offer to re-run `/cdd-plan`. **Never improvise the work from the handoff alone** — that silently reverts the task to the un-split flow with no approved plan behind it.
+- **The plan's anchors no longer match the tree** (e.g. a `/cdd-merge-base` ran since planning). If the cited `file:line` lines no longer say what the plan says, stop, report which anchors drifted, and offer to re-run `/cdd-plan` against the merged tree.
+- **The plan file is not there** (an older worktree helper does not sync it). Say plainly the plan was not materialized on this machine, and offer to re-run `/cdd-plan`. **Never improvise the work from the handoff alone.**
 
-Anything smaller — a stale line number, a file renamed, a step that turns out to be a no-op — is a judgement call you may make and must mention in the final summary.
+Anything smaller — a stale line number, a renamed file, a step that turns out to be a no-op — is your judgement call; mention it in the final summary.
 
 ## 3. Implement
 
@@ -43,9 +41,11 @@ Work the plan's `## Approach` steps in order.
 
 Apply the plan's `## Doc and roadmap edits`: the architecture and feature docs, `CLAUDE.md` where the change alters what it describes, and the roadmap (ticking the completed checkbox and applying any pre-approved edits). A change is not done until the docs match it.
 
+Rationale lives once: where the change touches a rule whose argument already has a home, shrink any other restatement of it to the rule plus a pointer there, rather than rewriting it at full length.
+
 ## 5. Verify
 
-Run what the plan's `## Verification` section names — the project's check runner, plus any assertions or tests the plan says to add or extend. Report failures with their output rather than summarising them away.
+Run what the plan's `## Verification` names — the project's check runner, plus any assertions or tests the plan says to add or extend. Report failures with their output, not a summary of them.
 
 ## 6. Commit
 

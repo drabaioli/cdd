@@ -220,7 +220,7 @@ Without `--base`, the backend's default branch is the target.
 [ {"ref":"42","state":"merged","state_raw":"MERGED","url":"https://…","head":"my_branch","base":"main"} ]
 ```
 
-Every PR whose head is the branch, **newest first**; `[]` when there is none, as with `issue-list`.
+Every PR whose head is the branch, **newest first**; `[]` when there is none, as with `issue-list`. `/cdd-pre-pr` §11 asks it before the state record's `pr` when checking for an open PR, since a PR opened by hand never reaches the record (ADR 0017).
 
 ### `pr-merged <branch> [--base B]` → object
 
