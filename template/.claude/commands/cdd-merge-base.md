@@ -175,7 +175,7 @@ adopt: <one-line description of what was adopted from the base branch>
 
 ## 7. Verify
 
-Runs on both paths. Run the project build and tests to confirm the merged state is healthy. Use the same commands as `/cdd-pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern.
+Runs on both paths. Run the project's check runner to confirm the merged state is healthy — the same commands as `/cdd-pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern.
 
 If anything fails, report the failure — naming the failing gate and including the captured tail — and stop. Do not push.
 

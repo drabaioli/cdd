@@ -85,7 +85,7 @@ Schema:
 <depth: none | light | standard | deep, and the questions research must answer — or omit the section to leave it to /cdd-plan>
 
 ## Notes
-<open questions deferred to the plan session, caveats, or "None">
+<deferred open questions for /cdd-plan, proposed roadmap edits, caveats — or "None" if clean>
 ```
 
 The implementation prompt is self-contained: it includes only context the plan session cannot recover from CLAUDE.md, the roadmap, or the architecture docs. Restating project conventions is forbidden; those are inferable from the repo. Open questions deferred to the plan session are listed in Notes so it can address them up front rather than mid-plan. The prompt carries no standing instructions about planning, committing, or advancing the state record: once the implementation cycle has command files of its own (§3.3, §3.4), those live there and are improved once rather than regenerated into every handoff.
@@ -224,7 +224,7 @@ Schema:
 <one paragraph, then the ordered steps; each step names the files it touches>
 
 ## File map
-<path -> what changes, plus the distilled fact: file:line + the one-line conclusion>
+<path → what changes, plus the distilled fact: `file:line` + the one-line conclusion>
 
 ## External findings
 <facts from outside the repo, quoted verbatim, each with its source, its date or version, and its disposition — adopted (step), rejected (reason), to verify, or context only — or "None">
@@ -233,10 +233,10 @@ Schema:
 <what was tried and why it failed, so it is not re-explored — or "None">
 
 ## Open questions resolved
-<the handoff's deferred questions, the answers agreed, and any amended `## Requirements` criterion — or "None">
+<the handoff's deferred questions and the answers agreed here, plus any `## Requirements` criterion amended or dropped with the human's agreement — or "None">
 
 ## Doc and roadmap edits
-<the doc and roadmap changes the implementation must apply>
+<architecture/feature/CLAUDE.md edits and roadmap ticks the implementation must apply>
 
 ## Verification
 <which check-runner gates to run, which assertions or tests to add or extend>

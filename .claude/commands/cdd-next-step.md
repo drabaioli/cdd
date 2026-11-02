@@ -190,7 +190,7 @@ The prompt is a plain task spec: no standing instructions about planning, commit
 
 **On the small-change lane, omit the `## Implementation prompt` and `## Research` sections entirely** (the headings stay frozen: never renamed, but not always present).
 
-**Notes**: deferred questions (§4), the roadmap-belonging verdict (§3-intent), and any roadmap changes the discussion surfaced (tasks to add, split, remove, or reword), as instructions to the implementation session. **Do not edit the roadmap file in this session.** `/cdd-implement` makes the edits.
+**Notes**: deferred questions (§4), the roadmap-belonging verdict (§3-intent), and any roadmap changes the discussion surfaced (tasks to add, split, remove, or reword), as instructions to the implementation session. **Do not edit the roadmap file in this session.** The implementing session makes the edits: `/cdd-implement`, or `/cdd-small-change` on the small-change lane.
 
 Then, immediately before asking for approval, print a short digest of the handoff in chat, following the `CLAUDE.md` rule — short, plain, only what changes the answer — so the human can approve or push back without opening the handoff. What usually earns a line: what the task is and which lane it takes, how much research the plan session should do (or that it is left to the planner), why it is worth doing now, what "done" means, anything deliberately out of scope, and any question deferred to `/cdd-plan`. Say what applies and drop the rest.
 
@@ -213,7 +213,7 @@ On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
 <observable acceptance criteria, as few as possible — minimum 1, typically 3-6, hard cap 10; no design>
 
 ## Implementation prompt
-<the self-contained prompt from step 5>
+<self-contained prompt for the plan session>
 
 ## Research
 <depth: none | light | standard | deep, and the questions research must answer — or omit the section to leave it to /cdd-plan>

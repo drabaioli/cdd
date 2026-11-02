@@ -109,13 +109,13 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 # Plan: <short title>
 
 ## Summary
-<the same bounded digest printed above>
+<the bounded digest the session printed at the checkpoint>
 
 ## Approach
 <one paragraph, then the ordered steps; each step names the files it touches>
 
 ## File map
-<path → what changes, plus the distilled fact: `file:line` + your one-line conclusion>
+<path → what changes, plus the distilled fact: `file:line` + the one-line conclusion>
 
 ## External findings
 <facts from outside the repo, quoted verbatim, each with its source, its date or version, and its disposition — adopted (step), rejected (reason), to verify, or context only — or "None">

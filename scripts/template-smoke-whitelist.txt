@@ -36,7 +36,7 @@
 <one-line description of what was adopted from the base branch>
 <one-line implication>
 <one of:>
-<path → what changes, plus the distilled fact: `file:line` + your one-line conclusion>
+<path → what changes, plus the distilled fact: `file:line` + the one-line conclusion>
 <ref>
 <repo-name>
 <repo>
@@ -45,8 +45,8 @@
 <short title>
 <slug>
 <the handoff's deferred questions and the answers agreed here, plus any `## Requirements` criterion amended or dropped with the human's agreement — or "None">
-<the same bounded digest printed above>
-<the self-contained prompt from step 5>
+<the bounded digest the session printed at the checkpoint>
+<self-contained prompt for the plan session>
 <title>
 <unit test command>
 <url>
