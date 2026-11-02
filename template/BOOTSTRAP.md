@@ -140,5 +140,5 @@ A few things you'll want to add or change as the project takes shape:
 ## Required CLI tools
 
 - `git` (with worktree support, any modern version).
-- Whatever the bound adapters run on: `gh` (GitHub CLI) for the GitHub adapters, `curl` and `jq` for the Jira and GitLab ones. The worktree helpers reach PR state and issues only through the `.cdd/` bindings — `cdd-worktree-done` and `cdd-worktree-list` query PR state, and `cdd-worktree-done` / `cdd-worktree-gc` close a merged task's issues and link the merged PR on each; with no binding those steps are skipped, said in one line. Optional but recommended.
+- The tools your bound adapters (`.cdd/`) run on, e.g. `gh`, or `curl` and `jq`. The worktree helpers reach PR state and issues only through those bindings; with none bound, those steps are skipped with one line. Optional but recommended.
 - `claude` (Claude Code CLI).
