@@ -227,15 +227,15 @@ On approval, write `~/.cdd/handoffs/<PROJECT_DIR>/<branch>.md` with this structu
 Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
-mkdir -p ~/.cdd/handoffs/cdd
+mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>
 ```
 
 Then seed the task **state record** beside the handoff, with the **base branch** agreed in §4 (substitute it for the `$(…)` default when the task stacks on a branch not checked out here). The second call runs **on the small-change lane only** (it is what `cdd-worktree` routes on; on the standard lane do not call it — an absent marker *is* the standard lane). The third runs **in issue-driven mode only**, with the references in the order given, each exactly as the tracker reports it (the adapter's `.ref`):
 
 ```bash
 cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"
-cdd-state lane <branch> small
-cdd-state issue-refs <branch> <ref> [<ref>...]
+cdd-state lane <branch> small                    # small-change lane only
+cdd-state issue-refs <branch> <ref> [<ref>...]   # issue-driven mode only
 ```
 
 Run each as its own call, not chained, so a `cdd-state` too old for `lane` or `issue-refs` fails only that call and keeps the seeded record. If `lane` fails, the task runs the standard lane. If `issue-refs` fails, say so in one line: the task still runs, but `/cdd-pre-pr` will open the PR with no close lines and the issues stay open.

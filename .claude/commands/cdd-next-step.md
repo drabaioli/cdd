@@ -234,8 +234,8 @@ Then seed the task **state record** beside the handoff, with the **base branch**
 
 ```bash
 cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"
-cdd-state lane <branch> small
-cdd-state issue-refs <branch> <ref> [<ref>...]
+cdd-state lane <branch> small                    # small-change lane only
+cdd-state issue-refs <branch> <ref> [<ref>...]   # issue-driven mode only
 ```
 
 Run each as its own call, not chained, so a `cdd-state` too old for `lane` or `issue-refs` fails only that call and keeps the seeded record. If `lane` fails, the task runs the standard lane. If `issue-refs` fails, say so in one line: the task still runs, but `/cdd-pre-pr` will open the PR with no close lines and the issues stay open.

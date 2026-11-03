@@ -15,7 +15,7 @@ for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST
 If `$BASE_BRANCH` is empty and `$CODE_HOST` is set, check the adapter now, then take its answer:
 
 ```bash
-BASE_BRANCH=$("$CODE_HOST" default-branch | jq -r '.branch // empty')   # exit 3 (unsupported) or a failure leaves it empty
+[ -z "$BASE_BRANCH" ] && BASE_BRANCH=$("$CODE_HOST" default-branch | jq -r '.branch // empty')   # exit 3 (unsupported) or a failure leaves it empty
 ```
 
 Whatever is still empty falls back to git, as a bare branch name:
