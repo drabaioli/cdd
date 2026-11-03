@@ -21,6 +21,8 @@
 #   - no cdd-only markers appear in template/.claude/commands/ or template/.claude/agents/
 #     — they belong in the repo copies only; a marker in the template would be
 #     stripped from both sides of the comparison above and hide real drift.
+#   - no file under template/ hardcodes this repo's handoff directory (handoffs/cdd):
+#     rendered with dir "cdd", it is indistinguishable from handoffs/<PROJECT_DIR>.
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
 #     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
 #     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
@@ -120,6 +122,14 @@ for sub in commands agents; do
     fail=1
   fi
 done
+
+# The render above uses this repo's own dir, `cdd`, so a template line that hardcodes
+# `handoffs/cdd` where it should say `handoffs/<PROJECT_DIR>` renders identically and
+# slips past every diff. Scan the template itself for this repo's handoff directory.
+if grep -rnE 'handoffs/cdd([^A-Za-z0-9_-]|$)' template/ >&2; then
+  echo "ERROR: this repo's handoff directory (handoffs/cdd) is hardcoded in template/ (see above); use handoffs/<PROJECT_DIR>" >&2
+  fail=1
+fi
 
 # Schema consistency: print a schema block whole, from its marker line (`# Task:` or
 # `# Plan:`) to the end of its fenced code block, and compare. Whole, not just its

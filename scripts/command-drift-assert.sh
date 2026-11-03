@@ -8,7 +8,7 @@
 #
 # So this script mutation-tests it: break one thing at a time in a throwaway copy of the
 # tree and require the checker to notice, naming what it noticed. Each of the checker's
-# six checks gets at least one mutation:
+# seven checks gets at least one mutation:
 #   1. Command-set diff        — a repo command copy diverges from its template counterpart;
 #      likewise a repo agent definition (.claude/agents/).
 #   2. Command-set membership  — a command exists on only one side; likewise an agent
@@ -17,8 +17,11 @@
 #      still match each other and only the jq parse can catch it.
 #   4. Settings diff           — .claude/settings.json diverges from the rendered template.
 #   5. Template fence rejection — a cdd-only marker appears in the template itself.
-#   6. Schema-heading contracts — the process doc's handoff and plan-file schema blocks
-#      each lose a heading the command file still writes.
+#   6. Schema-block contracts  — the process doc's handoff and plan-file schema blocks
+#      each lose a heading, or have a placeholder line reworded, that the command file
+#      still carries.
+#   7. Template slug leak      — the template hardcodes this repo's handoff directory
+#      (handoffs/cdd), which the render with dir "cdd" cannot tell from the placeholder.
 #
 # Plus four controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
@@ -175,6 +178,15 @@ sandbox_awk 'NR == 1 { print; print "<!-- cdd-only-begin -->"; print "<!-- cdd-o
   "template/.claude/commands/$SHARED_CMD"
 expect_fail "check 5 catches a cdd-only marker in the template" \
   "cdd-only markers found in template/.claude/commands/"
+
+# --- Check 7: this repo's handoff slug hardcoded in the template ---------------
+# Only the template copy changes, and it renders back to what the repo copy says, so the
+# command-set diff stays clean and the slug scan is the only thing that can fail.
+fresh_sandbox
+sandbox_awk '!done && sub(/handoffs\/<PROJECT_DIR>/, "handoffs/cdd") { done = 1 } { print }' \
+  "template/.claude/commands/cdd-next-step.md"
+expect_fail "check 7 catches this repo's handoff directory hardcoded in the template" \
+  "handoff directory (handoffs/cdd) is hardcoded in template/"
 
 # --- Check 4: settings divergence ----------------------------------------------
 fresh_sandbox
