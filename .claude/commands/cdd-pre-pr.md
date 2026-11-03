@@ -165,7 +165,7 @@ Report the count. If it is non-zero, say by how many commits `origin/$BASE_BRANC
 
 A failure of either gate is a **judgement call, not a bug to fix blindly**. Step 2 already ran both; these notes are for reading a failure.
 
-**`drift` — `scripts/command-drift-check.sh`.** Diffs this repo's `.claude/commands/` and `.claude/agents/` against the `template/.claude/` copies, rendered with this repo's identifiers so substitution drift cancels out. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. It also asserts that the handoff schema headings match between the process doc (Section 2.6) and `cdd-next-step.md`, and that no `cdd-only` markers leak into the template.
+**`drift` — `scripts/command-drift-check.sh`.** Diffs this repo's `.claude/commands/` and `.claude/agents/` against the `template/.claude/` copies, rendered with this repo's identifiers so substitution drift cancels out. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. It also asserts that the handoff and plan-file schema blocks are identical between the process doc (Sections 2.6 and 2.15) and `cdd-next-step.md` / `cdd-plan.md`, and that no `cdd-only` markers leak into the template.
 
 On divergence, present each diff to the user; for each, the user decides: reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence).
 

@@ -121,6 +121,12 @@ drop_schema_heading() {  # drop_schema_heading <block marker> <repo-relative pat
   sandbox_awk "/^$1/ { in_schema = 1 } in_schema && /^## / && !dropped { dropped = 1; next } { print }" "$2"
 }
 
+# Reword the first non-heading, non-blank line after the block's first `## ` heading:
+# a placeholder edit that leaves every heading intact.
+reword_schema_line() {  # reword_schema_line <block marker> <repo-relative path>
+  sandbox_awk "/^$1/ { in_schema = 1 } in_schema && /^## / { seen = 1; print; next } in_schema && seen && !done && NF { print \"<assert-only reworded placeholder>\"; done = 1; next } { print }" "$2"
+}
+
 # --- Control: an unmutated copy passes ----------------------------------------
 fresh_sandbox
 expect_pass "control: an unmutated tree passes"
@@ -191,17 +197,27 @@ insert_after_allow ',' "$TPL_SETTINGS"
 expect_fail "check 3 catches a syntax error present in both settings copies" \
   "is not valid JSON"
 
-# --- Check 6: schema-heading contracts -----------------------------------------
+# --- Check 6: schema-block contracts -------------------------------------------
 # Mutating the *process doc* rather than the command file, so the command-set diff stays
 # clean and the schema check is the only thing that can fire.
 fresh_sandbox
 drop_schema_heading '# Task:' "$PROCESS_DOC"
 expect_fail "check 6 catches a dropped handoff schema heading" \
-  "handoff schema headings differ"
+  "handoff schema block differs"
 
 fresh_sandbox
 drop_schema_heading '# Plan:' "$PROCESS_DOC"
 expect_fail "check 6 catches a dropped plan-file schema heading" \
-  "plan-file schema headings differ"
+  "plan-file schema block differs"
+
+fresh_sandbox
+reword_schema_line '# Task:' "$PROCESS_DOC"
+expect_fail "check 6 catches a reworded handoff schema placeholder" \
+  "handoff schema block differs"
+
+fresh_sandbox
+reword_schema_line '# Plan:' "$PROCESS_DOC"
+expect_fail "check 6 catches a reworded plan-file schema placeholder" \
+  "plan-file schema block differs"
 
 echo "command-drift contract: clean"

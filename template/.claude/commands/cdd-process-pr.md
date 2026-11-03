@@ -1,15 +1,16 @@
 Address the open PR's review feedback: read the review comments for the current branch, triage them, implement the change-requests (pushing back where warranted), then auto-commit + push the result and auto-post in-thread replies.
 
-Run on the feature branch (not on main), after a PR has been opened and reviewed.
+Run on the feature branch (not on the default branch), after a PR has been opened and reviewed.
 
 **Automation:** one checkpoint, up front — the triage plan in step 4. Once it is approved, edits, commit, push and in-thread replies run without further confirmation; add no per-action gates. The one exception: routing a workflow gap (step 5), which the triage plan does not settle and which is asked once, with a recommendation. Never resolve review threads; the user does.
 
 ## 1. Discover the open PR
 
-Confirm the current branch is not `main`:
+Confirm the current branch is not the default branch (`origin`'s HEAD, else `main`):
 
 ```bash
 git rev-parse --abbrev-ref HEAD
+git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##'
 ```
 
 Resolve the code host down the ladder — project, then machine; the first file present wins:
