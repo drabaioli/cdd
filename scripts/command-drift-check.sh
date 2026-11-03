@@ -12,15 +12,17 @@
 #     comparison.
 #
 # Also asserts:
-#   - the handoff schema headings match between the process doc (section 2.6) and
-#     .claude/commands/cdd-next-step.md; the template copy of cdd-next-step.md is already
-#     covered by the render-diff.
-#   - the plan-file schema headings match between the process doc (section 2.15) and
+#   - the handoff schema block is identical, line for line, between the process doc
+#     (section 2.6) and .claude/commands/cdd-next-step.md; the template copy of
+#     cdd-next-step.md is already covered by the render-diff.
+#   - the plan-file schema block is identical between the process doc (section 2.15) and
 #     .claude/commands/cdd-plan.md, the same way. Both carry the schema, so either can
 #     drift from the other; the seam checker only pins cdd-plan.md against cdd-implement.md.
 #   - no cdd-only markers appear in template/.claude/commands/ or template/.claude/agents/
 #     — they belong in the repo copies only; a marker in the template would be
 #     stripped from both sides of the comparison above and hide real drift.
+#   - no file under template/ hardcodes this repo's handoff directory (handoffs/cdd):
+#     rendered with dir "cdd", it is indistinguishable from handoffs/<PROJECT_DIR>.
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
 #     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
 #     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
@@ -121,21 +123,30 @@ for sub in commands agents; do
   fi
 done
 
-# Handoff-schema consistency: print the `## ` headings inside the handoff schema block
-# (from the "# Task:" line to the end of its fenced code block) and compare.
-schema_headings() {
-  awk '/^# Task:/ { in_schema = 1 }
-       in_schema && /^## / { print }
-       in_schema && /^```/ { exit }' "$1"
+# The render above uses this repo's own dir, `cdd`, so a template line that hardcodes
+# `handoffs/cdd` where it should say `handoffs/<PROJECT_DIR>` renders identically and
+# slips past every diff. Scan the template itself for this repo's handoff directory.
+if grep -rnE 'handoffs/cdd([^A-Za-z0-9_-]|$)' template/ >&2; then
+  echo "ERROR: this repo's handoff directory (handoffs/cdd) is hardcoded in template/ (see above); use handoffs/<PROJECT_DIR>" >&2
+  fail=1
+fi
+
+# Schema consistency: print a schema block whole, from its marker line (`# Task:` or
+# `# Plan:`) to the end of its fenced code block, and compare. Whole, not just its
+# headings: a placeholder line drifts as easily as a heading does.
+schema_block() {  # schema_block <marker> <file>
+  awk -v marker="$1" 'index($0, marker) == 1 { in_schema = 1 }
+       in_schema && /^```/ { exit }
+       in_schema { print }' "$2"
 }
 
-doc_schema="$(schema_headings "$PROCESS_DOC")"
-cmd_schema="$(schema_headings "$REPO_CMDS/cdd-next-step.md")"
+doc_schema="$(schema_block '# Task:' "$PROCESS_DOC")"
+cmd_schema="$(schema_block '# Task:' "$REPO_CMDS/cdd-next-step.md")"
 if [[ -z "$doc_schema" ]]; then
   echo "ERROR: could not locate the handoff schema block in $PROCESS_DOC" >&2
   fail=1
 elif [[ "$doc_schema" != "$cmd_schema" ]]; then
-  echo "DRIFT: handoff schema headings differ between $PROCESS_DOC and $REPO_CMDS/cdd-next-step.md" >&2
+  echo "DRIFT: handoff schema block differs between $PROCESS_DOC and $REPO_CMDS/cdd-next-step.md" >&2
   diff <(printf '%s\n' "$doc_schema") <(printf '%s\n' "$cmd_schema") >&2 || true
   fail=1
 fi
@@ -143,19 +154,13 @@ fi
 # Plan-file-schema consistency: the same shape, keyed on the "# Plan:" line. The seam
 # checker (check 7) pins the producer against its consumer; this pins the producer
 # against the process doc, which documents the same schema and can drift from it.
-plan_schema_headings() {
-  awk '/^# Plan:/ { in_schema = 1 }
-       in_schema && /^## / { print }
-       in_schema && /^```/ { exit }' "$1"
-}
-
-doc_plan="$(plan_schema_headings "$PROCESS_DOC")"
-cmd_plan="$(plan_schema_headings "$REPO_CMDS/cdd-plan.md")"
+doc_plan="$(schema_block '# Plan:' "$PROCESS_DOC")"
+cmd_plan="$(schema_block '# Plan:' "$REPO_CMDS/cdd-plan.md")"
 if [[ -z "$doc_plan" ]]; then
   echo "ERROR: could not locate the plan-file schema block in $PROCESS_DOC" >&2
   fail=1
 elif [[ "$doc_plan" != "$cmd_plan" ]]; then
-  echo "DRIFT: plan-file schema headings differ between $PROCESS_DOC and $REPO_CMDS/cdd-plan.md" >&2
+  echo "DRIFT: plan-file schema block differs between $PROCESS_DOC and $REPO_CMDS/cdd-plan.md" >&2
   diff <(printf '%s\n' "$doc_plan") <(printf '%s\n' "$cmd_plan") >&2 || true
   fail=1
 fi

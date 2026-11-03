@@ -1,32 +1,32 @@
 Scaffold a new greenfield project on the CDD workflow: `/cdd-bootstrap` (takes no argument).
 
-Run this command from a CDD-repo session (it needs the CDD repo's `template/` and `bootstrap-cdd-project.sh`). This command exists only in the CDD repo; it deliberately has no counterpart in `template/.claude/commands/` (it operates *on* a new target project, so downstream projects have no use for it — see the process doc, Section 2.7). It is the greenfield sibling of `/cdd-retrofit`: `/cdd-retrofit` adapts an *existing* project, `/cdd-bootstrap` creates a *new* one.
+Run this from a CDD-repo session: it needs the CDD repo's `template/` and `bootstrap-cdd-project.sh`. It creates a *new* project; `/cdd-retrofit` adapts an *existing* one.
 
-This is a **guided** command, not a brief-to-files converter. The discovery conversation is part of the job: you walk the user through defining the project, then encode the result into the initial docs and roadmap, then scaffold the project in a single bootstrap invocation. The generated project starts with a real, filled-in overview, `CLAUDE.md`, and roadmap — not the template's pre-filled "survey the codebase" bootstrap phase, which is for files-only installs.
+This is a **guided** command: walk the user through defining the project, encode the result into the initial docs and roadmap, then scaffold the project in a single bootstrap invocation. The generated project starts with a real, filled-in overview, `CLAUDE.md`, and roadmap.
 
-The command takes **no argument**: the project's name, directory, and location all emerge from the discovery conversation, so there is nothing meaningful to pass up front. The target path is proposed and confirmed in step 4, once the identifiers are settled.
+The project's name, directory, and location all come out of the conversation; the target path is proposed and confirmed in step 3.
 
-**Checkpoint discipline:** confirm the project definition (step 1), then the draft roadmap (step 2), then the two identifiers and the target location (steps 3–4) — each before moving on. Nothing is rendered until all are approved. The scaffold commit is created only after the roadmap is approved. Outward-facing actions (creating a GitHub repo, editing `~/.bashrc`) are confirmed separately and never done silently.
+**Checkpoint discipline:** confirm the project definition (step 1), then the draft roadmap (step 2), then the two identifiers and the target location (step 3) — each before moving on. Nothing is rendered or committed until all are approved. Outward-facing actions (creating a GitHub repo, editing `~/.bashrc`) are confirmed separately and never done silently.
 
 ## 1. Guided discovery
 
-Have a conversation to define the project. Do not dump a rigid questionnaire; ask in natural batches, probe vague or one-word answers, and reflect back what you heard. Cover, at minimum:
+Have a conversation to define the project. No rigid questionnaire: ask in natural batches, probe vague or one-word answers, and reflect back what you heard. Cover, at minimum:
 
 - **What it is** — one paragraph, plain terms.
 - **Goals** — why it exists; the problem it solves or outcome it produces; what success looks like.
 - **What it does** — the high-level capabilities, coarse-grained.
-- **What it explicitly does not do** — the non-goals. Push for these; they are load-bearing and easy to skip.
+- **What it explicitly does not do** — the non-goals. Push for these.
 - **Constraints** — language/platform, hard technical limits, regulatory/business constraints, compatibility, deadlines.
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
-- **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch: nothing exists yet to detect, so the answers are commitments, and most of them will honestly be *expected*.
-- **Where issues and code review live** — the tracker (where issues live) and the code host (where pull requests are reviewed). Always ask; never assume. Offer GitHub (Issues + pull requests) as the default answer. The answer becomes the project's capability bindings in `.cdd/` (process doc Section 2.16), written by the bootstrap script in step 6:
+- **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch; the answers are commitments, and most will honestly be *expected*.
+- **Where issues and code review live** — the tracker (where issues live) and the code host (where pull requests are reviewed). Always ask; never assume. Offer GitHub (Issues + pull requests) as the default. The answer becomes the project's capability bindings in `.cdd/` (process doc Section 2.16), written by the bootstrap script in step 5:
   - **GitHub** — bind both to the shipped GitHub adapters.
   - **Jira for issues** — ask for the Jira site (e.g. `acme.atlassian.net`) and the project key (e.g. `ABC`) only. **Never ask for credentials**: tell the user they set `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell. The code host is asked separately.
   - **GitLab** — for either capability or both (gitlab.com or a self-managed instance). Ask for the GitLab URL (default `gitlab.com`) and the project path (e.g. `group/project`) only. **Never ask for credentials**: tell the user they set `GITLAB_TOKEN` (a token with the `api` scope) in their own shell.
   - **Anything CDD ships no adapter for** (Bitbucket, …) — say in one line that no binding is written for it and the issue and PR features skip until one is bound; a project adapter can be written later against `doc/architecture/capability-adapters.md`.
 
-The user may not have firm answers for everything; capture intent and mark genuinely open areas rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
+Where the user has no firm answer, capture intent and mark the area open rather than inventing detail. This material becomes the project overview (`doc/knowledge_base/project-overview.md`) and seeds `CLAUDE.md`.
 
 **Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (`doc/features/template.md`, "Deliverable or project?") and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
 
@@ -36,36 +36,31 @@ The user may not have firm answers for everything; capture intent and mark genui
 
 From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Every practice the engineering floor leaves *expected* becomes one task, phrased so closing it flips that row to *enforced*; the template's suggested infrastructure tasks (README, coding guidelines, release/versioning) cover the rest. One set, not two.
 
-Do **not** include the template's pre-filled "Phase 1: CDD bootstrap" survey phase. That phase exists for files-only starts where the docs haven't been written; here you are writing the docs through this conversation, so the roadmap starts at the project's real first phase.
+Do **not** include the template's pre-filled "Phase 1: CDD bootstrap" survey phase; the roadmap starts at the project's real first phase.
 
 Keep the roadmap's "Annotation conventions" and "Key principles" scaffolding from the template (adapt the principles to the project, or leave a short placeholder).
 
-**Checkpoint:** show the drafted roadmap; the user approves or edits it. It is approved *now*, before the scaffold, because it will be committed as part of the initial scaffold commit (step 6) — there is no separate post-commit edit pass.
+**Checkpoint:** show the drafted roadmap; the user approves or edits it. It is approved *now*: it goes into the initial scaffold commit (step 5), and there is no post-commit edit pass.
 
-## 3. Confirm the two identifiers
+## 3. Confirm the identifiers and the target location
 
-Propose, then confirm with the user before rendering (never pick silently — see the two-identifier model, process doc Section 2.9):
+Propose all three; never pick silently (two-identifier model, process doc Section 2.9):
 
 - `<PROJECT_NAME>` — the display name from discovery; free text, may contain spaces.
-- `<PROJECT_DIR>` — the directory / repo slug, matching `^[A-Za-z][A-Za-z0-9_-]*$`. This is the working tree's directory name and the handoff-directory namespace.
+- `<PROJECT_DIR>` — the directory / repo slug, matching `^[A-Za-z][A-Za-z0-9_-]*$`. It is the working tree's directory name and the handoff-directory namespace.
+- The target path — default `$HOME/Code/<PROJECT_DIR>`; the user may override it, but the basename should match `<PROJECT_DIR>`.
 
-**Checkpoint:** confirm both before proceeding.
-
-## 4. Confirm the target location
-
-The path is derived, not passed in. Propose the CDD convention `$HOME/Code/<PROJECT_DIR>` as the default and let the user override (the basename should match `<PROJECT_DIR>`, since the worktree helper and handoff paths assume it).
-
-The bootstrap script refuses a path that already exists and is non-empty, so check before staging:
+Before presenting them, check the proposed path (the bootstrap script refuses one that exists and is non-empty), and rerun it whenever the path changes at the checkpoint (an override, or a changed `<PROJECT_DIR>`):
 
 ```bash
 [[ -e "<target>" && -n "$(ls -A "<target>" 2>/dev/null)" ]] && echo "exists and non-empty"
 ```
 
-If it exists and is non-empty, stop and ask for a different location — `/cdd-bootstrap` is for greenfield. (Suggest `/cdd-retrofit` if the user actually meant to install CDD into an existing project.) An absent path or an empty directory is fine.
+If it exists and is non-empty, stop and ask for a different location — `/cdd-bootstrap` is for greenfield; suggest `/cdd-retrofit` if the user meant to install CDD into an existing project. An absent path or an empty directory is fine.
 
-**Checkpoint:** confirm the target path before staging the overlay.
+**Checkpoint:** confirm `<PROJECT_NAME>`, `<PROJECT_DIR>` and the target path together before staging the overlay.
 
-## 5. Stage the overlay
+## 4. Stage the overlay
 
 Build a staging directory that mirrors the template layout and holds the filled-in artifacts. The bootstrap script applies it over the template before substitution, so these files override the template stubs:
 
@@ -82,9 +77,9 @@ Write, into `$OVERLAY`:
 - `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (build/test commands as settled in the contract; leave unchosen ones as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
 - *Optionally* `doc/architecture/overview.md` — only if discovery produced enough concrete structural intent to be worth committing; otherwise leave the template's architecture index pointing at a doc the project writes in its first phase.
 
-Author the identifiers as placeholders (`<PROJECT_NAME>`, `<PROJECT_DIR>`) wherever they appear; the bootstrap script substitutes overlaid files too, so this keeps them consistent. Use concrete prose for everything else. Do not leave either reserved token (`<PROJECT_NAME>`, `<PROJECT_DIR>`) standing in for content you meant to write — only as genuine identifier placeholders.
+Write the identifiers as the placeholders `<PROJECT_NAME>` and `<PROJECT_DIR>` wherever they appear (the script substitutes overlaid files too), and concrete prose for everything else. Never leave either token standing in for content you meant to write.
 
-## 6. Scaffold the project (one bootstrap invocation)
+## 5. Scaffold the project (one bootstrap invocation)
 
 Reuse the bootstrap script — do not reimplement copying or substitution:
 
@@ -99,13 +94,13 @@ Reuse the bootstrap script — do not reimplement copying or substitution:
 
 Pass the binding flags from step 1's answer: `--tracker github`, `--tracker jira --jira-site <site> --jira-key <KEY>` or `--tracker gitlab`, and `--code-host github` or `--code-host gitlab`; either `gitlab` adds `--gitlab-project <path>` (and `--gitlab-url <url>` for a self-managed instance), given once. Leave a flag out for a backend CDD ships no adapter for; the script refuses one.
 
-(`--dir` is only needed when `<PROJECT_DIR>` differs from the basename of `--path`; otherwise it is derived, so the example omits it.) This copies the template, applies the overlay (your filled-in files win over the stubs), substitutes the two identifiers, writes the capability bindings into `.cdd/`, writes the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit — so the filled-in overview, roadmap, and `CLAUDE.md` are in that commit.
+The script copies the template, applies the overlay, substitutes the two identifiers, writes the capability bindings into `.cdd/` and the baseline marker `.claude/cdd-baseline`, runs `git init -b main`, and creates the single "Initial CDD scaffold" commit.
 
 Then remove the overlay: `rm -rf "$OVERLAY"`.
 
-## 7. Optional: create and push a GitHub repo
+## 6. Optional: create and push a GitHub repo
 
-Only if the user wants it — this is outward-facing, so confirm explicitly (name, visibility) before running:
+Only if the user wants it. Confirm explicitly (name, visibility) before running:
 
 ```bash
 ( cd "<target>" && gh repo create <PROJECT_DIR> --source . --push --private )   # or --public
@@ -113,21 +108,21 @@ Only if the user wants it — this is outward-facing, so confirm explicitly (nam
 
 Requires an authenticated `gh`. Skip this step entirely if the user wants to stay local.
 
-## 8. Summary and next steps
+## 7. Summary and next steps
 
 Report:
 
 - The identifiers used and the target path.
 - What was written into the scaffold commit: project overview, roadmap (real first phase, no survey phase), `CLAUDE.md`, and whether an architecture overview was included.
 - The baseline marker value and that the "Initial CDD scaffold" commit was created.
-- The GitHub repo, if one was created (step 7).
+- The GitHub repo, if one was created (step 6).
 - The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and those features skip). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
-- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). It is project-independent: once installed, `cdd-worktree` works in every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
+- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). One install serves every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
 
   ```bash
   ./tools/cdd-worktree.sh install
   ```
 
-- The next command: `cd <target>`, run `claude`, and `/cdd-next-step` — it picks up the real first phase of the roadmap. Unlike a files-only install, there is **no** codebase-survey bootstrap phase to clear first; the docs are already populated.
+- The next command: `cd <target>`, run `claude`, and `/cdd-next-step` — it picks up the roadmap's real first phase; there is **no** codebase-survey phase to clear first.
 
-(The bootstrap script prints its own generic "fill in CLAUDE.md / look at the pre-filled roadmap" block; your summary supersedes it for the `/cdd-bootstrap` path, where those are already done.)
+The bootstrap script prints its own generic "fill in CLAUDE.md / look at the pre-filled roadmap" block; your summary supersedes it.

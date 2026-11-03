@@ -8,7 +8,7 @@
 #
 # So this script mutation-tests it: break one thing at a time in a throwaway copy of the
 # tree and require the checker to notice, naming what it noticed. Each of the checker's
-# six checks gets at least one mutation:
+# seven checks gets at least one mutation:
 #   1. Command-set diff        — a repo command copy diverges from its template counterpart;
 #      likewise a repo agent definition (.claude/agents/).
 #   2. Command-set membership  — a command exists on only one side; likewise an agent
@@ -17,8 +17,11 @@
 #      still match each other and only the jq parse can catch it.
 #   4. Settings diff           — .claude/settings.json diverges from the rendered template.
 #   5. Template fence rejection — a cdd-only marker appears in the template itself.
-#   6. Schema-heading contracts — the process doc's handoff and plan-file schema blocks
-#      each lose a heading the command file still writes.
+#   6. Schema-block contracts  — the process doc's handoff and plan-file schema blocks
+#      each lose a heading, or have a placeholder line reworded, that the command file
+#      still carries.
+#   7. Template slug leak      — the template hardcodes this repo's handoff directory
+#      (handoffs/cdd), which the render with dir "cdd" cannot tell from the placeholder.
 #
 # Plus four controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
@@ -121,6 +124,12 @@ drop_schema_heading() {  # drop_schema_heading <block marker> <repo-relative pat
   sandbox_awk "/^$1/ { in_schema = 1 } in_schema && /^## / && !dropped { dropped = 1; next } { print }" "$2"
 }
 
+# Reword the first non-heading, non-blank line after the block's first `## ` heading:
+# a placeholder edit that leaves every heading intact.
+reword_schema_line() {  # reword_schema_line <block marker> <repo-relative path>
+  sandbox_awk "/^$1/ { in_schema = 1 } in_schema && /^## / { seen = 1; print; next } in_schema && seen && !done && NF { print \"<assert-only reworded placeholder>\"; done = 1; next } { print }" "$2"
+}
+
 # --- Control: an unmutated copy passes ----------------------------------------
 fresh_sandbox
 expect_pass "control: an unmutated tree passes"
@@ -170,6 +179,15 @@ sandbox_awk 'NR == 1 { print; print "<!-- cdd-only-begin -->"; print "<!-- cdd-o
 expect_fail "check 5 catches a cdd-only marker in the template" \
   "cdd-only markers found in template/.claude/commands/"
 
+# --- Check 7: this repo's handoff slug hardcoded in the template ---------------
+# Only the template copy changes, and it renders back to what the repo copy says, so the
+# command-set diff stays clean and the slug scan is the only thing that can fail.
+fresh_sandbox
+sandbox_awk '!done && sub(/handoffs\/<PROJECT_DIR>/, "handoffs/cdd") { done = 1 } { print }' \
+  "template/.claude/commands/cdd-next-step.md"
+expect_fail "check 7 catches this repo's handoff directory hardcoded in the template" \
+  "handoff directory (handoffs/cdd) is hardcoded in template/"
+
 # --- Check 4: settings divergence ----------------------------------------------
 fresh_sandbox
 insert_after_allow '      "Bash(true *)",' "$SETTINGS"
@@ -191,17 +209,27 @@ insert_after_allow ',' "$TPL_SETTINGS"
 expect_fail "check 3 catches a syntax error present in both settings copies" \
   "is not valid JSON"
 
-# --- Check 6: schema-heading contracts -----------------------------------------
+# --- Check 6: schema-block contracts -------------------------------------------
 # Mutating the *process doc* rather than the command file, so the command-set diff stays
 # clean and the schema check is the only thing that can fire.
 fresh_sandbox
 drop_schema_heading '# Task:' "$PROCESS_DOC"
 expect_fail "check 6 catches a dropped handoff schema heading" \
-  "handoff schema headings differ"
+  "handoff schema block differs"
 
 fresh_sandbox
 drop_schema_heading '# Plan:' "$PROCESS_DOC"
 expect_fail "check 6 catches a dropped plan-file schema heading" \
-  "plan-file schema headings differ"
+  "plan-file schema block differs"
+
+fresh_sandbox
+reword_schema_line '# Task:' "$PROCESS_DOC"
+expect_fail "check 6 catches a reworded handoff schema placeholder" \
+  "handoff schema block differs"
+
+fresh_sandbox
+reword_schema_line '# Plan:' "$PROCESS_DOC"
+expect_fail "check 6 catches a reworded plan-file schema placeholder" \
+  "plan-file schema block differs"
 
 echo "command-drift contract: clean"
