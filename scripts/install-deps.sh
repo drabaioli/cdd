@@ -38,7 +38,7 @@ esac
 # printed instead and the tool counts as a failure until it is installed.
 CDD_TOOLS=(
   "git|git|git|https://git-scm.com/downloads"
-  "bash|-|bash|Ubuntu's bash is already >= 4"
+  "bash|-|bash|brew install bash (macOS; Ubuntu's bash is already >= 4)"
   "jq|jq|jq|https://jqlang.org/download/"
   "claude|-|-|curl -fsSL https://claude.ai/install.sh | bash"
 )
@@ -130,7 +130,8 @@ for entry in "${MISSING[@]}"; do
 $entry
 EOF
   if [ "$cmd" = claude ]; then
-    WANT_CLAUDE=1
+    # Already installed but off PATH: reinstalling would not help; the re-check says why.
+    [ -x "$HOME/.local/bin/claude" ] || WANT_CLAUDE=1
     continue
   fi
   if [ "$PM" = apt ]; then pkg="$apt"; else pkg="$brew"; fi
@@ -140,6 +141,10 @@ EOF
     PKGS+=("$pkg")
   fi
 done
+# claude's installer is fetched with curl: install curl alongside, when it is missing.
+if [ "$WANT_CLAUDE" -eq 1 ] && ! command -v curl >/dev/null 2>&1; then
+  PKGS+=(curl)
+fi
 
 run_root() {
   if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi
@@ -160,7 +165,8 @@ fi
 if [ "$WANT_CLAUDE" -eq 1 ]; then
   if command -v curl >/dev/null 2>&1; then
     echo "Installing claude with Anthropic's native installer ($CLAUDE_INSTALLER)"
-    curl -fsSL "$CLAUDE_INSTALLER" | bash || status=1
+    # pipefail in a subshell: a failed download must fail this step, not feed bash nothing.
+    ( set -o pipefail; curl -fsSL "$CLAUDE_INSTALLER" | bash ) || status=1
   else
     echo "claude: its installer needs curl, which is not installed; install curl, then re-run." >&2
     status=1
