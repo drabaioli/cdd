@@ -56,6 +56,10 @@
 #     throwaway config, as ref-sync-assert.sh and gc-assert.sh already do), so the
 #     bootstrap gates' scaffold commits need neither a preconfigured identity —
 #     the workflow no longer sets one — nor the caller's signing config.
+#   - `claude` is stubbed on PATH for every gate: install and the bootstrap script
+#     refuse without one, and no gate may run the real CLI. The install-deps script is
+#     not a gate (it installs packages on the host); its own path-filtered workflow
+#     tests it (ADR 0019).
 #   - The gates that bootstrap a real tree also get a throwaway HOME, so the
 #     per-repo marker a bootstrap writes (~/.cdd/handoffs/<repo>/repo.json) lands
 #     in the scratch dir instead of the caller's home.
@@ -88,6 +92,7 @@ GATES=(
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "roadmap-length||roadmap item length: the 200-char cap"
   "staging||gate commands stage by name: no git add -A/--all/. in a command's or agent's shell blocks"
+  "posture||every command -v in tools/ declares its dependency posture; the required-tools blocks and the install-deps scripts agree"
   "install-smoke|jq|worktree/state helper install, against a throwaway HOME"
   "toolchain-sync|jq|keeping the install current: the checkout's sync hook, self-reloading shells, update (stub upstream)"
   "worktree-resume|jq|worktree resume on an existing remote branch"
@@ -103,17 +108,17 @@ GATES=(
   "worktree-done|jq|cdd-worktree-done's removal and branch-deletion paths"
   "adapter-bindings|jq|bootstrap with adapter bindings: .cdd/ shims resolve and pass describe from a fresh clone (offline)"
   "bootstrap|jq|end-to-end bootstrap into a tmpdir"
-  "bootstrap-camelcase||bootstrap with a CamelCase directory slug"
-  "stage-render||render-only staging (--stage), no git tree"
+  "bootstrap-camelcase|jq|bootstrap with a CamelCase directory slug"
+  "stage-render|jq|render-only staging (--stage), no git tree"
   "snapshot-render|tar|render from an extracted template snapshot (--template-dir)"
-  "demo-seed||demo instance via the seed overlay, no GitHub side effects"
+  "demo-seed|jq|demo instance via the seed overlay, no GitHub side effects"
   "runner||the check runner's own contract"
 )
 
 # The lint scope, one path per line. Globs, so it stays self-including: a newly
 # added script is covered without editing this file.
 lint_targets() {
-  printf '%s\n' tools/*.sh tools/adapters/*/*.sh scripts/*.sh demo/*.sh
+  printf '%s\n' tools/*.sh tools/adapters/*/*.sh scripts/*.sh template/scripts/*.sh demo/*.sh
 }
 
 # --- Gates -------------------------------------------------------------------
@@ -168,6 +173,10 @@ gate_roadmap_length() {
 
 gate_staging() {
   ./scripts/staging-check.sh
+}
+
+gate_posture() {
+  ./scripts/posture-check.sh
 }
 
 gate_install_smoke() {
@@ -248,8 +257,10 @@ gate_adapter_bindings() {
 # throwaway $home, pointing at $want. The bootstrap's writer is advisory end-to-end
 # (it sources tools/cdd-state.sh and warns rather than failing), so without this the
 # sourcing seam has no test: a rename fails the gate under `set -e`, but a silent
-# no-op would pass. The bootstrap gates declare `needs jq`, so jq is always present
-# here and a missing marker is a real failure.
+# no-op would pass. The bootstrap script requires jq (it refuses without it), and the
+# gates that run it declare `needs jq` — except snapshot-render, whose single `needs`
+# slot holds tar; there the bootstrap's own refusal names jq. So a missing marker here
+# is a real failure.
 assert_repo_marker() {
   local home="$1" repo="$2" want="$3"
   local marker="$home/.cdd/handoffs/$repo/repo.json" got_ver got_name got_path
@@ -402,6 +413,15 @@ set_up_scratch() {
 [tag]
 	gpgsign = false
 EOF
+
+  # A stub `claude` ahead of everything on PATH, unconditionally: install and the
+  # bootstrap script refuse without a `claude` on PATH (process doc §2.18), but no gate
+  # may ever run the real CLI — the same hermeticity as the git config above. Gates that
+  # assert on a launch put their own logging stub in front of this one.
+  mkdir -p "$TMP/stub-bin"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$TMP/stub-bin/claude"
+  chmod +x "$TMP/stub-bin/claude"
+  export PATH="$TMP/stub-bin:$PATH"
 }
 
 group_begin() {  # group_begin <slug> <description>

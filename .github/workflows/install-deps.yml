@@ -1,0 +1,55 @@
+name: install-deps
+
+# Tests the install-dependencies script on fresh runners, only when it (or this
+# workflow) changes. Not a gate in scripts/ci.sh: it installs packages on the host, so it
+# cannot run in a local check run, and the script rarely changes (ADR 0019).
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/install-deps.sh
+      - template/scripts/install-deps.sh
+      - .github/workflows/install-deps.yml
+  pull_request:
+    paths:
+      - scripts/install-deps.sh
+      - template/scripts/install-deps.sh
+      - .github/workflows/install-deps.yml
+  workflow_dispatch:
+
+jobs:
+  install:
+    name: install (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # claude's native installer puts it in ~/.local/bin, where CDD's own PATH shims
+      # live too; a CDD user has it on PATH. Added before the first run so that run's
+      # own re-check can find what it installed.
+      - name: Put ~/.local/bin on PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # First run: installs what the image lacks. On macOS it starts under the stock
+      # bash 3.2, before Homebrew's bash exists — the case the script is written for.
+      - name: Install (first run)
+        run: ./scripts/install-deps.sh
+
+      # Second run, in a fresh step: must find everything and install nothing.
+      - name: Install again (must be a no-op)
+        run: |
+          out="$(./scripts/install-deps.sh)"
+          echo "$out"
+          [ "$out" = "All dependencies present." ]
+
+      - name: Check only
+        run: ./scripts/install-deps.sh --check
+
+      # The template copy, project block empty: checks CDD's required set alone.
+      - name: Check the template copy
+        run: bash template/scripts/install-deps.sh --check

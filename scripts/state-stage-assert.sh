@@ -11,8 +11,8 @@
 # against the helper's filter.
 #
 # Usage: scripts/state-stage-assert.sh
-# Takes no arguments; it provisions and tears down its own temp tree. Requires jq (every
-# write lives under cdd-state's jq guard); a missing jq is a failure, never a skip.
+# Takes no arguments; it provisions and tears down its own temp tree. Requires jq (cdd-state
+# stops without it); a missing jq is a failure, never a skip.
 
 set -euo pipefail
 

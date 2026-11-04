@@ -140,6 +140,49 @@ cdd-worktree-reload() {
   source "$_CDD_WORKTREE_FILE" || return 1
 }
 
+# --- CDD required tools BEGIN (identical in cdd-state.sh and cdd-worktree.sh; the posture gate diffs them) ---
+# CDD's required tools (process doc §2.18): a missing one stops the command, before any
+# side effect, with exit 4 and one line naming it and how to install it. Both helpers
+# define these same functions with the same bodies, so whichever file a shell sourced
+# last, the definition is the same one.
+
+# cdd-require-hint <tool>: how to install one required tool, on one line.
+cdd-require-hint() {
+  case "$1" in
+    git)    echo "sudo apt-get install git (Ubuntu) or brew install git (macOS)" ;;
+    jq)     echo "sudo apt-get install jq (Ubuntu) or brew install jq (macOS)" ;;
+    bash)   echo "brew install bash (macOS; Ubuntu's bash is already >= 4), then put it ahead of /bin/bash on PATH" ;;
+    claude) echo "curl -fsSL https://claude.ai/install.sh | bash (see https://code.claude.com/docs/en/setup)" ;;
+    *)      echo "see your project's scripts/install-deps.sh" ;;
+  esac
+}
+
+# cdd-require <prog> <tool>...: return 4 after one stderr line per missing tool (all of
+# them, so one run lists everything), 0 when every one is present. The `bash` pseudo-tool
+# means the bash on PATH reports major version >= 4: the shims run `#!/usr/bin/env bash`.
+cdd-require() {
+  local prog="$1" tool v missing=0
+  shift
+  for tool in "$@"; do
+    if [[ "$tool" == bash ]]; then
+      v="$(bash -c 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null)" || v=""
+      [[ "$v" =~ ^[0-9]+$ ]] && (( v >= 4 )) && continue
+      echo "$prog: bash >= 4 is required (found ${v:-none} on PATH); install it: $(cdd-require-hint bash)" >&2
+    elif command -v "$tool" >/dev/null 2>&1; then  # posture: required
+      continue
+    else
+      echo "$prog: $tool is required but not installed; install it: $(cdd-require-hint "$tool")" >&2
+    fi
+    missing=1
+  done
+  if (( missing )); then
+    echo "$prog: a CDD project's scripts/install-deps.sh installs every required tool." >&2
+    return 4
+  fi
+  return 0
+}
+# --- CDD required tools END ---
+
 # Resolve the capability adapter for <capability> down the ladder: the project's
 # .cdd/<capability>, then the machine's ~/.cdd/adapters/<capability>; the first FILE
 # present wins, so a broken project adapter never falls through to a machine one.
@@ -164,8 +207,6 @@ cdd-worktree-adapter() {
 
   if [[ ! -x "$path" ]]; then
     why="it is not executable"
-  elif ! command -v jq >/dev/null 2>&1; then
-    why="reading its describe needs jq, which is not installed"
   else
     # Keep describe's first stderr line: a failing binding says why there (e.g. a
     # shim whose adapter library is missing names the install command), and that
@@ -285,8 +326,7 @@ cdd-worktree-no-adapter() {  # cdd-worktree-no-adapter <capability> [<skipped>]
 # CDD_ISSUE_REFS array (declared `local -a` by the caller, like CDD_ADAPTER): the local
 # record <state_file> when present, else the copy on origin's refs/cdd/<branch> — a
 # read-only fetch, so a dry run may use it. Empty when neither exists or none is
-# recorded. Returns 2 when a record mentions issue_refs but jq is missing to read it,
-# which callers treat as a close that cannot happen yet: the record is kept.
+# recorded.
 cdd-worktree-issue-refs() {
   local branch="$1" state_file="$2" json=""
   CDD_ISSUE_REFS=()
@@ -296,10 +336,6 @@ cdd-worktree-issue-refs() {
     json="$(git show FETCH_HEAD:state.json 2>/dev/null)"
   fi
   [[ -z "$json" ]] && return 0
-  if ! command -v jq >/dev/null 2>&1; then
-    grep -q '"issue_refs"' <<<"$json" && return 2
-    return 0
-  fi
   mapfile -t CDD_ISSUE_REFS < <(jq -r '.issue_refs[]? | strings' <<<"$json" 2>/dev/null)
   return 0
 }
@@ -433,6 +469,9 @@ cdd-worktree() {
     -h|--help) echo "usage: cdd-worktree <branch>" >&2; return 0 ;;
     -*) echo "cdd-worktree: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
   esac
+  # Required tools (process doc §2.18), before any branch or worktree exists: a missing
+  # `claude` would otherwise surface only at the launch, after both were created.
+  cdd-require cdd-worktree git jq claude || return 4
 
   # The sibling worktree name is derived from $PWD; run from a feature worktree
   # this would nest names, so insist on the main worktree. git-dir == git-common-dir
@@ -461,7 +500,7 @@ cdd-worktree() {
   # to the default branch when none was recorded. Prefer a local base branch, else
   # origin/<base> (fetched best-effort); an unresolved base drops to current HEAD.
   local base_branch="" start_point=""
-  if command -v jq >/dev/null 2>&1 && [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
+  if [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
     base_branch="$(jq -r '.base_branch // empty' "${handoff_dir}/${branch}.state.json" 2>/dev/null)"
   fi
   # Only here does the code-host adapter get resolved, and only when no base was
@@ -499,12 +538,12 @@ cdd-worktree() {
       echo "missing or predates it. Update: bash ~/.cdd/tools/cdd-worktree.sh update (or re-run install from your CDD checkout)" >&2
     fi
     # Lane routing (§2.13): a task the human declared small at scoping replaces
-    # plan+implement with the single /cdd-small-change session. Every miss — no jq,
-    # no record, no marker, a project that ships no such command — leaves the
+    # plan+implement with the single /cdd-small-change session. Every miss — no
+    # record, no marker, a project that ships no such command — leaves the
     # /cdd-plan default, so a missing marker can never skip a gate. $handoff_dir is
     # absolute, so it still resolves after the cd into the new worktree.
     local lane=""
-    if command -v jq >/dev/null 2>&1 && [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
+    if [[ -f "${handoff_dir}/${branch}.state.json" ]]; then
       lane="$(jq -r '.lane // empty' "${handoff_dir}/${branch}.state.json" 2>/dev/null)"
     fi
     [[ "$lane" == "small" && -f .claude/commands/cdd-small-change.md ]] \
@@ -519,6 +558,7 @@ cdd-worktree() {
 
 cdd-worktree-done() {
   if cdd-worktree-reload; then cdd-worktree-done "$@"; return; fi
+  cdd-require cdd-worktree-done git jq || return 4
   # Resolve the code-host adapter before anything else: a broken one must stop the
   # command before the cd, the pull, or the worktree removal below.
   local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
@@ -578,8 +618,8 @@ cdd-worktree-done() {
   # here, before the cd, the pull or the worktree removal, as a broken code host does.
   # Resolving before the cd also finds the feature worktree's own .cdd/tracker.
   local -a CDD_ISSUE_REFS=()
-  local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC="" refs_unread=0
-  cdd-worktree-issue-refs "$branch" "$state_file" || refs_unread=1
+  local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC=""
+  cdd-worktree-issue-refs "$branch" "$state_file"
   if (( ${#CDD_ISSUE_REFS[@]} )); then
     cdd-worktree-resolve-tracker
     if (( CDD_TRACKER_RC == 2 )); then return 1; fi
@@ -659,10 +699,7 @@ cdd-worktree-done() {
   # cdd-worktree-gc can retry it.
   local keep_for_gc=0
   if [[ -n "$delete_mode" ]]; then
-    if (( refs_unread )); then
-      echo "warning: the state record lists issue refs, but reading them needs jq; not closing them." >&2
-      keep_for_gc=1
-    elif (( ${#CDD_ISSUE_REFS[@]} )); then
+    if (( ${#CDD_ISSUE_REFS[@]} )); then
       if (( pr_merged )); then
         # "<number> <url>": the url is whatever follows the first space, possibly nothing.
         pr_num="${pr_line%% *}"
@@ -749,6 +786,7 @@ cdd-worktree-handoff-branches() {
 
 cdd-worktree-list() {
   if cdd-worktree-reload; then cdd-worktree-list "$@"; return; fi
+  cdd-require cdd-worktree-list git jq || return 4
   # Derive repo name from the main worktree so this works from any worktree.
   local repo_name
   repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
@@ -857,6 +895,7 @@ cdd-worktree-gc() {
     "") ;;
     *) echo "usage: cdd-worktree-gc [--force]" >&2; return 2 ;;
   esac
+  cdd-require cdd-worktree-gc git jq || return 4
 
   # A broken code-host adapter stops GC outright: it deletes things, and without the
   # adapter's answer it cannot tell a merged task from a scoped one.
@@ -952,11 +991,8 @@ cdd-worktree-gc() {
     plan="${handoff_dir}/${branch}.plan.md"
     state="${handoff_dir}/${branch}.state.json"
     CDD_ISSUE_REFS=() closing=""
-    if [[ -f "$state" || -n "${has_ref[$branch]:-}" ]] \
-       && ! cdd-worktree-issue-refs "$branch" "$state"; then
-      kept=$(( kept + 1 ))
-      echo "keep  $branch (MERGED, issue refs recorded but reading them needs jq; not reaped)"
-      continue
+    if [[ -f "$state" || -n "${has_ref[$branch]:-}" ]]; then
+      cdd-worktree-issue-refs "$branch" "$state"
     fi
     if (( ${#CDD_ISSUE_REFS[@]} )); then
       [[ -z "$CDD_TRACKER_RC" ]] && cdd-worktree-resolve-tracker
@@ -1047,8 +1083,7 @@ cdd-worktree-extract() {
 # (offline, no origin, or none pushed) so the caller keeps the honest no-transfer
 # messaging. Heuristics: the handoff .md is immutable after seed, so it is written only
 # when absent locally; the state .json follows most-advanced-stage-wins (compare .stage
-# indices, keep the further-along side), falling back to write-only-if-absent when jq
-# is unavailable. Never clobbers a more-advanced local record. The plan file is mutable
+# indices, keep the further-along side). Never clobbers a more-advanced local record. The plan file is mutable
 # (the human may edit it before implementing), so it cannot use the handoff's rule; it
 # travels WITH the state record instead — taken when absent locally, or when the ref's
 # record won the stage comparison. See shell-helpers.md.
@@ -1082,7 +1117,7 @@ cdd-worktree-materialize-ref() {
     if [[ ! -f "$state_dest" ]]; then
       cdd-worktree-extract state.json "$state_dest" \
         && echo "Materialized state record: $state_dest"
-    elif command -v jq >/dev/null 2>&1; then
+    else
       local ref_stage local_stage ref_idx local_idx
       ref_stage="$(git show FETCH_HEAD:state.json 2>/dev/null | jq -r '.stage // empty' 2>/dev/null)"
       local_stage="$(jq -r '.stage // empty' "$state_dest" 2>/dev/null)"
@@ -1095,8 +1130,6 @@ cdd-worktree-materialize-ref() {
       else
         echo "Kept local state record (stage ${local_stage:-?} >= synced ${ref_stage:-?})."
       fi
-    else
-      echo "Kept local state record (jq unavailable to compare stages)."
     fi
   fi
 
@@ -1125,6 +1158,7 @@ cdd-worktree-resume() {
     -h|--help) echo "usage: cdd-worktree-resume [<branch>]" >&2; return 0 ;;
     -?*) echo "cdd-worktree-resume: '$branch' looks like an option, not a branch name." >&2; return 2 ;;
   esac
+  cdd-require cdd-worktree-resume git jq || return 4
 
   # A broken code-host adapter stops the resume before anything is fetched or created.
   local CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE="" CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" rc=0
@@ -1255,7 +1289,7 @@ cdd-worktree-resume() {
   local stage="" lane="" repo_name_r state_r
   repo_name_r="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
   state_r="$HOME/.cdd/handoffs/${repo_name_r}/${branch}.state.json"
-  if command -v jq >/dev/null 2>&1 && [[ -f "$state_r" ]]; then
+  if [[ -f "$state_r" ]]; then
     stage="$(jq -r '.stage // empty' "$state_r" 2>/dev/null)"
     lane="$(jq -r '.lane // empty' "$state_r" 2>/dev/null)"
   fi
@@ -1312,8 +1346,9 @@ cdd-worktree-sync() {
   fi
   [[ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" == "$default_branch" ]] || return 0
   cdd-worktree-tools-differ "$top/tools" || return 0
-  if bash "$top/tools/cdd-worktree.sh" install >/dev/null 2>&1 \
-     && bash "$top/tools/cdd-state.sh" install >/dev/null 2>&1; then
+  # stdout only: a refusal's reason (a missing required tool) must reach the user.
+  if bash "$top/tools/cdd-worktree.sh" install >/dev/null \
+     && bash "$top/tools/cdd-state.sh" install >/dev/null; then
     echo "cdd: updated the installed CDD helpers from this pull ($top); open shells pick it up on their next command." >&2
   else
     echo "cdd: this pull changed the CDD helpers, but reinstalling failed; run: bash $top/tools/cdd-worktree.sh install && bash $top/tools/cdd-state.sh install" >&2
@@ -1394,8 +1429,8 @@ cdd-worktree-update() {
   fi
   if ! cdd-worktree-tools-differ "$tmp/cdd/tools"; then
     echo "CDD helpers are up to date with upstream main."
-  elif bash "$tmp/cdd/tools/cdd-worktree.sh" install >/dev/null 2>&1 \
-       && bash "$tmp/cdd/tools/cdd-state.sh" install >/dev/null 2>&1; then
+  elif bash "$tmp/cdd/tools/cdd-worktree.sh" install >/dev/null \
+       && bash "$tmp/cdd/tools/cdd-state.sh" install >/dev/null; then
     # Installing from the clone also hooks the clone itself; harmless, it is deleted below.
     echo "Updated the CDD helpers from upstream main; open shells pick it up on their next command."
   else
@@ -1413,6 +1448,9 @@ cdd-worktree-install() {
     echo "usage: cdd-worktree.sh [install|update|sync]" >&2
     return 2
   fi
+  # The one moment a human is watching: refuse, before writing anything, on a machine
+  # missing a required tool (process doc §2.18).
+  cdd-require cdd-worktree git bash jq claude || return 4
 
   local dest_dir="$HOME/.cdd/tools"
   local dest="$dest_dir/cdd-worktree.sh"

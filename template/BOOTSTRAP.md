@@ -35,6 +35,8 @@ After bootstrap, the new project directory contains:
 │       ├── project-overview.md               # project charter skeleton (what it is, goals, non-goals)
 │       ├── roadmap.md                        # central workflow artifact, Phase 1 pre-filled
 │       └── index.md                          # explains the knowledge base
+└── scripts/
+    └── install-deps.sh                       # installs CDD's required tools + this project's (fill its project block)
 ```
 
 (No `tools/` directory: the worktree helper is a single project-independent script you install once — see below — not a per-project file. Likewise `.cdd/` holds only the backend choice and its coordinates; the adapter code is installed once per machine with the helper.)
@@ -121,11 +123,13 @@ The script will:
 
    **Keeping them current.** Installed from a CDD repo checkout, the helpers update themselves whenever that checkout's default branch is pulled, and open shells pick up the new code on their next command. Without a checkout, update the helpers and the adapter library on demand with `bash ~/.cdd/tools/cdd-worktree.sh update`. Nothing checks for updates in the background.
 
-2. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
+2. **Fill in the project block of `scripts/install-deps.sh`, then run it.** Add one `"command|apt package|brew package|manual hint"` entry per tool the bound adapters need (`gh` for GitHub; `curl` for Jira or GitLab) and per tool of the project's own build and test toolchain. Everything outside the block is CDD's: leave it, so a later `/cdd-retrofit` can carry CDD's changes into it. `scripts/install-deps.sh --check` only reports. (`/cdd-bootstrap` and `/cdd-retrofit` fill the block for you.)
 
-3. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
+3. **Fill in `CLAUDE.md`**: the one-paragraph description, the critical constraints, the build/test commands, the module layout. Anything still wrapped in `<...>` is a stub waiting for you. Likewise fill in the project charter at `doc/knowledge_base/project-overview.md` — what the project is, its goals, what it does and explicitly does not do, its constraints and architecture intentions. (The Phase 1 bootstrap tasks also cover this; doing the thin version now is fine.)
 
-4. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand. `cdd-worktree <branch>` then opens the task's worktree on `/cdd-plan`, which writes the plan file and stops; you open a fresh `claude` in that worktree and run `/cdd-implement` to build from it.
+4. **Look at the roadmap** in `doc/knowledge_base/roadmap.md`. The template ships Phase 1 pre-filled with the CDD bootstrap tasks (codebase survey, initial architecture and feature docs, CLAUDE.md stubs, roadmap fill) plus a suggested-infrastructure task list (CI, linting, tests, …) to slot into the real phases; the phases after Phase 1 are placeholders for the project's actual plan. You can write that plan by hand now, or let the Phase 1 "fill in this roadmap" task drive it through the workflow.
+
+5. **Start the first task**: run `claude` from the project root and invoke `/cdd-next-step`. The per-repo handoff directory `~/.cdd/handoffs/<PROJECT_DIR>/` is created on demand. `cdd-worktree <branch>` then opens the task's worktree on `/cdd-plan`, which writes the plan file and stops; you open a fresh `claude` in that worktree and run `/cdd-implement` to build from it.
 
 ## Per-project customisation
 
@@ -139,6 +143,7 @@ A few things you'll want to add or change as the project takes shape:
 
 ## Required CLI tools
 
-- `git` (with worktree support, any modern version).
-- The tools your bound adapters (`.cdd/`) run on, e.g. `gh`, or `curl` and `jq`. The worktree helpers reach PR state and issues only through those bindings; with none bound, those steps are skipped with one line. Optional but recommended.
-- `claude` (Claude Code CLI).
+- **Required:** `git` (with worktree support), bash >= 4 (macOS ships 3.2: `brew install bash`), `jq`, and `claude` (Claude Code CLI). The bootstrap script and both helpers' install refuse to run without them, and each helper command stops when one is missing, naming it and how to install it.
+- **Per adapter:** the tools your bound adapters (`.cdd/`) run on — `gh` for GitHub, `curl` for Jira or GitLab. Only the adapter that needs one stops without it. The worktree helpers reach PR state and issues only through those bindings; with none bound, those steps are skipped with one line.
+
+`scripts/install-deps.sh` installs all of these, plus whatever its project block lists.

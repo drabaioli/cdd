@@ -35,6 +35,8 @@ Build and checks run on every PR, and every gate below is reachable from **one c
 
 Dependencies are pinned or locked; toolchain versions are documented, including the host tools the check runner's scripts assume and any of their behaviours that differ between machines and so are off-limits.
 
+- Install-dependencies script: `scripts/install-deps.sh` — installs CDD's required tools, the bound adapters' tools and this project's toolchain; it checks first and installs only what is missing.
+
 ## How this list grows
 
 New practices are added here as the project matures. Three things feed it: `/cdd-pre-pr`'s CI-improvement check, its workflow-improvement check (a rule the code review applied from inference rather than from a written standard belongs here), and the roadmap's "Suggested infrastructure tasks". When one of those surfaces a gap and the project closes it, add the corresponding row here or flip it from **Expected** to **Enforced**.

@@ -72,7 +72,7 @@ Several references mean one task, not several. If the items describe unrelated w
 jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/cdd/*.state.json 2>/dev/null   # already-started issues, by state record
 ```
 
-The state records are the only exclusion source. Compare after stripping any leading `#`. The exclusion is advisory — the records are local to this machine, absent without `jq`, and reaped once a PR merges — so when presenting the list say in one line that finding no record is not proof the issue is unstarted.
+The state records are the only exclusion source. Compare after stripping any leading `#`. The exclusion is advisory — the records are local to this machine and reaped once a PR merges — so when presenting the list say in one line that finding no record is not proof the issue is unstarted.
 
 Present the filtered list (number + title) and let the user pick **one or more**; then fetch each one's detail as above.
 

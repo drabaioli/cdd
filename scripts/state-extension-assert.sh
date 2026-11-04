@@ -27,7 +27,7 @@
 #
 # Usage: scripts/state-extension-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. Requires jq
-# (every write lives under cdd-state's jq guard).
+# (cdd-state stops without it).
 
 set -euo pipefail
 

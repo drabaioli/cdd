@@ -11,6 +11,8 @@
 # or wrong-field failure mode). The record is ADVISORY and reconstructible: it is
 # only as reliable as the command steps that write it, and a consumer that finds
 # it missing or stale falls back to inference. See the process doc section 2.13.
+# Its tools are not advisory: a missing jq stops every verb but `stages` with exit 4,
+# and install refuses without git, bash >= 4, jq and claude (process doc §2.18).
 #
 # Install once — copies this script to a stable home that does NOT depend on a
 # live CDD checkout, and wires your shell to source it:
@@ -130,6 +132,49 @@ cdd-state-reload() {
   source "$_CDD_STATE_FILE" || return 1
 }
 
+# --- CDD required tools BEGIN (identical in cdd-state.sh and cdd-worktree.sh; the posture gate diffs them) ---
+# CDD's required tools (process doc §2.18): a missing one stops the command, before any
+# side effect, with exit 4 and one line naming it and how to install it. Both helpers
+# define these same functions with the same bodies, so whichever file a shell sourced
+# last, the definition is the same one.
+
+# cdd-require-hint <tool>: how to install one required tool, on one line.
+cdd-require-hint() {
+  case "$1" in
+    git)    echo "sudo apt-get install git (Ubuntu) or brew install git (macOS)" ;;
+    jq)     echo "sudo apt-get install jq (Ubuntu) or brew install jq (macOS)" ;;
+    bash)   echo "brew install bash (macOS; Ubuntu's bash is already >= 4), then put it ahead of /bin/bash on PATH" ;;
+    claude) echo "curl -fsSL https://claude.ai/install.sh | bash (see https://code.claude.com/docs/en/setup)" ;;
+    *)      echo "see your project's scripts/install-deps.sh" ;;
+  esac
+}
+
+# cdd-require <prog> <tool>...: return 4 after one stderr line per missing tool (all of
+# them, so one run lists everything), 0 when every one is present. The `bash` pseudo-tool
+# means the bash on PATH reports major version >= 4: the shims run `#!/usr/bin/env bash`.
+cdd-require() {
+  local prog="$1" tool v missing=0
+  shift
+  for tool in "$@"; do
+    if [[ "$tool" == bash ]]; then
+      v="$(bash -c 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null)" || v=""
+      [[ "$v" =~ ^[0-9]+$ ]] && (( v >= 4 )) && continue
+      echo "$prog: bash >= 4 is required (found ${v:-none} on PATH); install it: $(cdd-require-hint bash)" >&2
+    elif command -v "$tool" >/dev/null 2>&1; then  # posture: required
+      continue
+    else
+      echo "$prog: $tool is required but not installed; install it: $(cdd-require-hint "$tool")" >&2
+    fi
+    missing=1
+  done
+  if (( missing )); then
+    echo "$prog: a CDD project's scripts/install-deps.sh installs every required tool." >&2
+    return 4
+  fi
+  return 0
+}
+# --- CDD required tools END ---
+
 cdd-state-stages() {
   printf '%s\n' scoped plan_written implementation_done merged checks_passed \
                 pr_open addressed
@@ -188,11 +233,10 @@ cdd-state-write() {
 # when a repo moves or is re-cloned — latest writer wins, like the task ref.
 #
 # Advisory end-to-end, like the rest of this helper: a failing rev-parse, an unwritable
-# directory, or a jq failure warns once and returns 0. It must never fail the state write
-# that called it, nor a `set -e` caller (bootstrap-cdd-project.sh sources this file).
-# `cdd-state` reaches it below its own jq guard; the jq branch here is what covers the
-# direct callers (bootstrap) that have no guard of their own. See
-# doc/architecture/shell-helpers.md.
+# directory, or a failing jq render warns once and returns 0. It must never fail the state
+# write that called it, nor a `set -e` caller (bootstrap-cdd-project.sh sources this file).
+# A missing jq never reaches it: both callers (`cdd-state`, the bootstrap script) check the
+# required tools first. See doc/architecture/shell-helpers.md.
 cdd-state-write-repo-marker() {
   local main_wt repo_name dir content
   main_wt="$(cdd-state-main-worktree)" || {
@@ -206,7 +250,7 @@ cdd-state-write-repo-marker() {
     --arg name "$repo_name" \
     --arg path "$main_wt" \
     '{schema_version: $v, name: $name, path: $path}' 2>/dev/null)" || {
-    echo "cdd-state: could not render repo marker (jq missing/failed); skipping (advisory)." >&2
+    echo "cdd-state: could not render repo marker (jq failed); skipping (advisory)." >&2
     return 0; }
   cdd-state-write "${dir}/repo.json" "$content" \
     || echo "cdd-state: could not write ${dir}/repo.json; skipping (advisory)." >&2
@@ -266,17 +310,22 @@ cdd-state-push-ref() {
 cdd-state() {
   if cdd-state-reload; then cdd-state "$@"; return; fi
   # `stages` is a pure read of the lifecycle enum — no record, no jq. It is answered
-  # BEFORE the jq guard below so that a capability probe (cdd-worktree's skew check,
+  # BEFORE the jq check below so that a capability probe (cdd-worktree's skew check,
   # §2.8) reads the real answer on a host without jq instead of an empty one.
-  if [[ "${1:-}" == "stages" ]]; then
-    cdd-state-stages
-    return 0
-  fi
+  # `install` runs its own full required-tools check, and help needs no tool, so both are
+  # dispatched before the jq check too.
+  case "${1:-}" in
+    stages) cdd-state-stages; return 0 ;;
+    install|"") shift 2>/dev/null; cdd-state-install "$@"; return ;;
+    -h|--help|help)
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
+      return 0 ;;
+  esac
 
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "cdd-state: jq not found; skipping state update (advisory)." >&2
-    return 0
-  fi
+  # jq is a required tool (process doc §2.18): every other verb reads or writes the
+  # record through it, so a missing jq stops here rather than degrading. The record stays
+  # advisory in content: an absent record is still a quiet skip, below.
+  cdd-require cdd-state jq || return 4
 
   local cmd="$1"; shift 2>/dev/null
   case "$cmd" in
@@ -568,8 +617,8 @@ cdd-state() {
       # Read accessor for the cwd-derived record: print .<field>, empty on an
       # absent record or an absent/null field. An array field prints one element
       # per line, so a consumer can loop over it without a second tool; a scalar
-      # prints as before. Advisory and read-only; the jq guard at the top already
-      # handles a machine without jq.
+      # prints as before. Advisory and read-only; a machine without jq already
+      # stopped at the required-tools check at the top.
       local field="$1"
       if [[ -z "$field" ]]; then
         echo "usage: cdd-state get <field>" >&2
@@ -580,12 +629,6 @@ cdd-state() {
       [[ -f "$file" ]] || return 0
       jq -r --arg f "$field" '.[$f] // empty | if type == "array" then .[] else . end' \
         "$file" 2>/dev/null || return 0
-      ;;
-    install|"")
-      cdd-state-install "$@"
-      ;;
-    -h|--help|help)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       ;;
     *)
       echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
@@ -602,6 +645,9 @@ cdd-state-install() {
     echo "usage: cdd-state.sh [install]" >&2
     return 2
   fi
+  # The one moment a human is watching: refuse, before writing anything, on a machine
+  # missing a required tool (process doc §2.18).
+  cdd-require cdd-state git bash jq claude || return 4
 
   local dest_dir="$HOME/.cdd/tools"
   local dest="$dest_dir/cdd-state.sh"

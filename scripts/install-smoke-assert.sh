@@ -18,7 +18,10 @@
 #   - the helper refuses bash < 4 before defining any function: positionally on every
 #     host, and behaviourally (sourced and as install) where a bash 3.2 exists — macOS
 #   - `cdd-state stages` answers with no jq on PATH: it is the capability probe
-#     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq guard
+#     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq check
+#   - a missing required tool stops (process doc §2.18): any other cdd-state verb with
+#     no jq exits 4 naming jq; both installs and the bootstrap script, with no claude or
+#     no jq on PATH, exit 4 naming the tool and write nothing
 #   - handoffs under the legacy ~/.claude-handoffs/ are migrated, originals kept
 #   - a second run is idempotent (no duplicate marker block, no second copy)
 #   - cdd-worktree and cdd-worktree-resume reject an option-shaped branch name (exit 2,
@@ -68,8 +71,8 @@ comment_block() {
 
 [[ -x "$HELPER" ]] || fail "helper not found/executable: $HELPER"
 [[ -x "$STATE_HELPER" ]] || fail "state helper not found/executable: $STATE_HELPER"
-# jq is required: the helper writes state records only with it, and the seed assertions
-# read them. A missing tool is a failure, never a skip (scripts/ci.sh).
+# jq is required: the helpers refuse to install without it, and the seed assertions read
+# the records. A missing tool is a failure, never a skip (scripts/ci.sh).
 command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 # A truncated helper passes the -x test above (truncation preserves the mode bit) and then
@@ -134,13 +137,15 @@ pass "cdd-worktree* PATH shims written to ~/.local/bin and executable"
 # unconditional. Both, so neither is load-bearing alone.
 NOSHELLRC=(bash --norc --noprofile)
 
-# The probe PATH leads with this run's own bash (>= 4: the runner guarantees it), alone in
-# its dir so nothing else beside it leaks in. Without it `bash` — the probe shell and every
-# shim's `#!/usr/bin/env bash` — resolves through /usr/bin:/bin, which on macOS is the
-# stock 3.2 the helper refuses; a user there runs Homebrew bash ahead of it, as this does.
+# The probe PATH leads with this run's own bash (>= 4: the runner guarantees it) and jq (a
+# required tool, wherever the host keeps it), alone in their dir so nothing else beside
+# them leaks in. Without it `bash` — the probe shell and every shim's `#!/usr/bin/env bash`
+# — resolves through /usr/bin:/bin, which on macOS is the stock 3.2 the helper refuses; a
+# user there runs Homebrew bash ahead of it, as this does.
 BASH_BIN="$FAKE_HOME/bash-bin"
 mkdir -p "$BASH_BIN"
 ln -sf "$BASH" "$BASH_BIN/bash"
+ln -sf "$(command -v jq)" "$BASH_BIN/jq"
 PROBE_SYS_PATH="$BASH_BIN:/usr/bin:/bin"
 
 # Pin the no-rc property itself: drop --norc or the stdin redirect and every probe below goes
@@ -354,7 +359,7 @@ else
   echo "note: no bash < 4 on this host; the helper's bash-version guard is exercised on macOS CI"
 fi
 
-# `stages` must answer BEFORE cdd-state's jq guard: behind it, a jq-less host reports an
+# `stages` must answer BEFORE cdd-state's jq check: behind it, a jq-less host reports an
 # empty enum, cdd-worktree's skew check fires on a current helper, and every run there
 # warns wrongly. worktree-launch-assert.sh stubs cdd-state, so only this — the real helper on
 # a jq-less PATH — pins the ordering. The PATH carries the shims plus bash and nothing
@@ -372,8 +377,61 @@ stages_out="$(bounded 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
 grep -qx plan_written <<<"$stages_out" \
   || fail "cdd-state stages must list plan_written even without jq; got: $stages_out"
 grep -qx scoped <<<"$stages_out" \
-  || fail "cdd-state stages printed no enum without jq (answered behind the jq guard?); got: $stages_out"
-pass "cdd-state stages answers the full lifecycle enum with no jq on PATH (before the jq guard)"
+  || fail "cdd-state stages printed no enum without jq (answered behind the jq check?); got: $stages_out"
+pass "cdd-state stages answers the full lifecycle enum with no jq on PATH (before the jq check)"
+
+# Every other verb needs jq, a required tool (process doc §2.18): with none on PATH it
+# stops with exit 4 and names jq, where it used to print an advisory line and return 0.
+nojq_rc=0
+nojq_out="$(bounded 20 env -i HOME="$FAKE_HOME" PATH="$JQLESS_PATH" \
+  "${NOSHELLRC[@]}" -c 'cdd-state set scoped' </dev/null 2>&1)" || nojq_rc=$?
+{ [[ $nojq_rc -eq 4 ]] && grep -qF "cdd-state: jq is required" <<<"$nojq_out"; } \
+  || fail "cdd-state set with no jq must exit 4 naming jq (exit $nojq_rc); got: $nojq_out"
+pass "cdd-state set with no jq on PATH stops: exit 4, naming jq"
+
+# The install-time refusal: with claude or jq missing from PATH, each install and the
+# bootstrap script exit 4 naming the tool, before writing anything. Each PATH holds
+# exactly the tools it lists (symlinks to the host's), so a host whose /usr/bin carries
+# claude or jq cannot make a case pass for the wrong reason — nor the runner's claude stub.
+REQ_BASE_TOOLS=(bash git dirname basename cksum)
+mkbin() {  # mkbin <dir> <tool>...: a PATH dir holding exactly these tools
+  local dir="$1" t p
+  shift
+  mkdir -p "$dir"
+  for t in "$@"; do
+    if [[ "$t" == bash ]]; then p="$BASH"; else p="$(command -v "$t")" || fail "probe setup: $t is not installed"; fi
+    ln -sf "$p" "$dir/$t"
+  done
+}
+NOCLAUDE_BIN="$BROKEN_ROOT/noclaude-bin"
+mkbin "$NOCLAUDE_BIN" "${REQ_BASE_TOOLS[@]}" jq
+NOJQ_BIN="$BROKEN_ROOT/nojq-bin"
+mkbin "$NOJQ_BIN" "${REQ_BASE_TOOLS[@]}"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$NOJQ_BIN/claude"
+chmod +x "$NOJQ_BIN/claude"
+
+for missing in claude jq; do
+  if [[ "$missing" == claude ]]; then bin="$NOCLAUDE_BIN"; else bin="$NOJQ_BIN"; fi
+  for helper in "$HELPER" "$STATE_HELPER"; do
+    req_home="$BROKEN_ROOT/req-home-$missing-$(basename "$helper" .sh)"
+    mkdir -p "$req_home"
+    req_rc=0
+    req_out="$(env -i HOME="$req_home" PATH="$bin" "$BASH" "$helper" install </dev/null 2>&1)" || req_rc=$?
+    { [[ $req_rc -eq 4 ]] && grep -qF "$missing is required" <<<"$req_out"; } \
+      || fail "$(basename "$helper") install with no $missing must exit 4 naming it (exit $req_rc); got: $req_out"
+    [[ -z "$(ls -A "$req_home")" ]] \
+      || fail "$(basename "$helper") install with no $missing wrote to HOME before refusing"
+  done
+  boot_target="$BROKEN_ROOT/boot-$missing"
+  boot_rc=0
+  boot_out="$(env -i HOME="$BROKEN_ROOT/boot-home" PATH="$bin" "$BASH" \
+    "$REPO_ROOT/tools/bootstrap-cdd-project.sh" --name "Refused" --path "$boot_target" \
+    </dev/null 2>&1)" || boot_rc=$?
+  { [[ $boot_rc -eq 4 ]] && grep -qF "$missing is required" <<<"$boot_out"; } \
+    || fail "bootstrap-cdd-project.sh with no $missing must exit 4 naming it (exit $boot_rc); got: $boot_out"
+  [[ ! -e "$boot_target" ]] || fail "bootstrap-cdd-project.sh with no $missing created $boot_target before refusing"
+done
+pass "with no claude or no jq on PATH, both installs and the bootstrap script exit 4 naming the tool and write nothing"
 
 # The cdd-state installer shares the self-repair guard; assert it too.
 ST_BEGIN="# --- CDD state helper (managed by cdd-state.sh install) BEGIN ---"
