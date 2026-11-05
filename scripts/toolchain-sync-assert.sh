@@ -34,7 +34,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
-# jq is required: cdd-state answers an unknown verb or stage only past its jq guard
+# jq is required: cdd-state answers an unknown verb or stage only past its jq check
 # (case 10). A missing tool is a failure, never a skip (scripts/ci.sh).
 command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 

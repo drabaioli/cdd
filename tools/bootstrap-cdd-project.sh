@@ -42,6 +42,10 @@
 # when this script does not live in a git checkout). /cdd-retrofit upgrade mode uses
 # it as the three-way merge base.
 #
+# Before writing anything, in every mode, it refuses (exit 4) on a machine missing one
+# of CDD's required tools -- git, bash >= 4, jq, claude -- naming it and how to install
+# it (process doc section 2.18).
+#
 # See template/BOOTSTRAP.md for the full procedure and the two-identifier model.
 
 set -euo pipefail
@@ -144,6 +148,17 @@ fi
 # lives in tools/, so template/ is one level up at the repo root.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# CDD's required tools (process doc section 2.18), before anything is written. The bash
+# check is inline and parseable by bash 3.2, since sourcing the helper below needs >= 4;
+# the rest goes through the state helper's shared check, which names every missing tool.
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "bootstrap-cdd-project.sh: bash >= 4 is required (found $BASH_VERSION); on macOS: brew install bash" >&2
+  exit 4
+fi
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/cdd-state.sh"
+cdd-require bootstrap-cdd-project.sh git bash jq claude || exit 4
 TEMPLATE_DIR="${TEMPLATE_DIR_OVERRIDE:-$REPO_ROOT/template}"
 [[ -d "$TEMPLATE_DIR" ]] || { echo "error: template dir not found: $TEMPLATE_DIR" >&2; exit 1; }
 
@@ -221,7 +236,7 @@ mkdir -p "$TARGET"
 
 # Copy template tree, excluding BOOTSTRAP.md. Use rsync if available for the exclude;
 # otherwise fall back to cp + rm.
-if command -v rsync >/dev/null 2>&1; then
+if command -v rsync >/dev/null 2>&1; then  # posture: silent-equivalent
   rsync -a --exclude 'BOOTSTRAP.md' "$TEMPLATE_DIR/" "$TARGET/"
 else
   cp -a "$TEMPLATE_DIR/." "$TARGET/"
@@ -231,7 +246,7 @@ fi
 # Overlay any seed directories over the template tree, in order. Overlaid files
 # overwrite template files of the same path; substitution below covers them all.
 for overlay in "${OVERLAYS[@]}"; do
-  if command -v rsync >/dev/null 2>&1; then
+  if command -v rsync >/dev/null 2>&1; then  # posture: silent-equivalent
     rsync -a "$overlay/" "$TARGET/"
   else
     cp -a "$overlay/." "$TARGET/"
@@ -352,22 +367,12 @@ fi
 )
 
 # Record the new repo in ~/.cdd/handoffs/<repo>/repo.json, so it is locatable before
-# it has any task artifacts. Reuse the state helper's writer rather than a second
-# copy of the JSON shape: sourcing it defines functions only (it installs only when
-# executed directly), and the writer is advisory — it warns and returns 0 on a
-# missing jq or an unwritable dir, so it can't fail the bootstrap under `set -e`.
-# Runs from inside $TARGET, since the writer derives the path from git. Skipped if the
-# sibling helper is absent (script copied out on its own) — also advisory.
-if [[ -f "$SCRIPT_DIR/cdd-state.sh" ]]; then
-  (
-    cd "$TARGET"
-    # shellcheck source=/dev/null
-    source "$SCRIPT_DIR/cdd-state.sh"
-    cdd-state-write-repo-marker
-  )
-else
-  echo "note: $SCRIPT_DIR/cdd-state.sh not found; skipped the ~/.cdd/handoffs/<repo>/repo.json marker." >&2
-fi
+# it has any task artifacts. Reuse the state helper's writer (sourced above, for the
+# required-tools check) rather than a second copy of the JSON shape. The writer is
+# advisory — it warns and returns 0 on a failing render or an unwritable dir, so it
+# can't fail the bootstrap under `set -e`. Runs from inside $TARGET, since the writer
+# derives the path from git.
+( cd "$TARGET" && cdd-state-write-repo-marker )
 
 cat <<EOF
 

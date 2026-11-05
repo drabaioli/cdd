@@ -20,6 +20,7 @@ Have a conversation to define the project. No rigid questionnaire: ask in natura
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
 - **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch; the answers are commitments, and most will honestly be *expected*.
+- **Toolchain** — the tools the project's build, test, lint and run need (a compiler, a runtime, a package manager, …), with their apt and Homebrew package names where known. They become entries in the project's `scripts/install-deps.sh` (step 4).
 - **Where issues and code review live** — the tracker (where issues live) and the code host (where pull requests are reviewed). Always ask; never assume. Offer GitHub (Issues + pull requests) as the default. The answer becomes the project's capability bindings in `.cdd/` (process doc Section 2.16), written by the bootstrap script in step 5:
   - **GitHub** — bind both to the shipped GitHub adapters.
   - **Jira for issues** — ask for the Jira site (e.g. `acme.atlassian.net`) and the project key (e.g. `ABC`) only. **Never ask for credentials**: tell the user they set `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell. The code host is asked separately.
@@ -30,7 +31,7 @@ Where the user has no firm answer, capture intent and mark the area open rather 
 
 **Off-ramp:** if discovery reveals this isn't really a project — a single self-contained artifact, finished in essentially one sitting, used as-is by future-you — apply the shared scope-triage heuristic (`doc/features/template.md`, "Deliverable or project?") and **offer to drop to `/cdd-quick-create`** instead of scaffolding the full substrate. Surface the signals; the human decides.
 
-**Checkpoint:** present a structured summary of the captured definition (the headings above, including the chosen tracker and code host). Get explicit confirmation or corrections before writing anything.
+**Checkpoint:** present a structured summary of the captured definition (the headings above, including the toolchain and the chosen tracker and code host). Get explicit confirmation or corrections before writing anything.
 
 ## 2. Draft the initial roadmap
 
@@ -66,7 +67,8 @@ Build a staging directory that mirrors the template layout and holds the filled-
 
 ```bash
 OVERLAY=$(mktemp -d)
-mkdir -p "$OVERLAY/doc/knowledge_base"
+mkdir -p "$OVERLAY/doc/knowledge_base" "$OVERLAY/scripts"
+cp template/scripts/install-deps.sh "$OVERLAY/scripts/install-deps.sh"
 ```
 
 Write, into `$OVERLAY`:
@@ -75,6 +77,7 @@ Write, into `$OVERLAY`:
 - `doc/knowledge_base/roadmap.md` — the roadmap approved in step 2.
 - `doc/knowledge_base/engineering-practices.md` — every row marked **Enforced** or **Expected** from the engineering-floor answers, with no `<…>` status marker left standing. Documentation is enforced from day one; fill a command placeholder only where a command was actually chosen, never to clear the placeholder.
 - `CLAUDE.md` — filled from discovery: the one-paragraph description, the critical constraints you learned (build/test commands as settled in the contract; leave unchosen ones as the template's `<...>` stubs), and the module layout if the architecture intentions imply one. Keep the template's Key references table (including the `project-overview.md` row) and Workflow section.
+- `scripts/install-deps.sh` — the copy made above, with its project block filled: one `"command|apt package|brew package|manual hint"` entry per bound adapter's tool (GitHub → `gh`; Jira or GitLab → `curl`) and per toolchain tool from step 1, `-` in a package column the manager does not offer. Remove the `<project tools …>` placeholder line; keep both markers; leave everything outside the block unchanged. Never invent a package name: leave such a tool out and name it in step 7. Keep it executable (`chmod +x`).
 - *Optionally* `doc/architecture/overview.md` — only if discovery produced enough concrete structural intent to be worth committing; otherwise leave the template's architecture index pointing at a doc the project writes in its first phase.
 
 Write the identifiers as the placeholders `<PROJECT_NAME>` and `<PROJECT_DIR>` wherever they appear (the script substitutes overlaid files too), and concrete prose for everything else. Never leave either token standing in for content you meant to write.
@@ -116,6 +119,7 @@ Report:
 - What was written into the scaffold commit: project overview, roadmap (real first phase, no survey phase), `CLAUDE.md`, and whether an architecture overview was included.
 - The baseline marker value and that the "Initial CDD scaffold" commit was created.
 - The GitHub repo, if one was created (step 6).
+- `scripts/install-deps.sh`, with the tools its project block lists and any left out for want of a package name; suggest running it once in the new project (`scripts/install-deps.sh --check` reports without installing).
 - The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and those features skip). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
 - The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). One install serves every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
 

@@ -17,7 +17,7 @@
 #     refused and creates no worktree
 #   - the closing "Next:" guidance branches on the task's stage: a task parked at
 #     `plan_written` is sent to /cdd-implement, anything else to the review-side
-#     commands (reads the record, so the gate requires jq)
+#     commands (reads the record, so the gate requires jq, as the helper does)
 #   - and on the task's lane before its stage: a small-change task still at `scoped`
 #     is sent to /cdd-small-change rather than told to open a PR on work that does
 #     not exist, while one already built falls through to the review-side commands
@@ -196,7 +196,7 @@ pass "explicit resume of a remote-deleted branch is refused without a worktree"
 # 7. The closing guidance branches on the task's stage. A task parked at
 #    `plan_written` has an approved plan on disk and no code yet, so it resumes into
 #    /cdd-implement rather than into a review-side command. The helper reads the
-#    record itself (no cdd-state dependency), so this needs jq.
+#    record itself (no cdd-state dependency), with jq.
 git clone -q "$WORK/origin.git" "$WORK/repoD"
 state_dir="$WORK/home/.cdd/handoffs/$(basename "$WORK/repoD")"
 mkdir -p "$state_dir"

@@ -74,7 +74,7 @@ normalize_pr() {
 # Exit 4 with an actionable line rather than failing, per the contract. Never reached
 # by `describe`, which is hermetic, nor by a usage error, which has already exited 2.
 require_gh() {
-  if ! command -v gh >/dev/null 2>&1; then
+  if ! command -v gh >/dev/null 2>&1; then  # posture: per-adapter
     err "the GitHub CLI (\`gh\`) is not installed or not on PATH; install it from https://cli.github.com and re-run"
     exit 4
   fi

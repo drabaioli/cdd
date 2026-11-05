@@ -26,7 +26,9 @@ jobs:
 
       # Install-only: the runner needs bash >= 4 (the macOS image ships 3.2), and every
       # tool a gate names — a missing one fails that gate. Ubuntu's image has them all;
-      # macOS lacks shellcheck. jq is preinstalled on both.
+      # macOS lacks shellcheck. jq is preinstalled on both. `claude` is stubbed by the
+      # runner itself; scripts/install-deps.sh is tested by its own workflow
+      # (install-deps.yml), so it is not run here.
       - name: Install bash >= 4 and shellcheck (macOS)
         if: runner.os == 'macOS'
         run: brew install bash shellcheck

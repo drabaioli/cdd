@@ -122,7 +122,7 @@ require_config() {
 require_tools() {
   local t
   for t in curl jq; do
-    if ! command -v "$t" >/dev/null 2>&1; then
+    if ! command -v "$t" >/dev/null 2>&1; then  # posture: per-adapter
       err "\`$t\` is not installed or not on PATH; the GitLab adapter needs curl and jq — install it and re-run"
       exit 4
     fi

@@ -48,6 +48,8 @@ The individual gates the runner should call:
 <lint command>
 ```
 
+`scripts/install-deps.sh` installs what the project needs, CDD's required tools included (`--check` only reports); add a tool to its project block when the project starts needing one.
+
 Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and `/cdd-pre-pr` invokes it, so a gate is never listed twice. A missing tool fails its gate, never skips it.
 
 ## Module layout

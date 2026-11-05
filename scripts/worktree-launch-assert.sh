@@ -29,10 +29,12 @@
 #     when the marker AND the command file are both present, and every miss — no
 #     marker, no command file, an older cdd-state that rejects `lane` outright —
 #     degrades to /cdd-plan with the seeded record (base branch included) intact
+#   - a missing `claude` stops `cdd-worktree` with exit 4, naming it, before any branch
+#     or worktree is created (process doc §2.18)
 #
 # Usage: scripts/worktree-launch-assert.sh
-# Takes no arguments; provisions and tears down its own temp tree. Requires jq
-# (base_branch lives under cdd-state's jq guard).
+# Takes no arguments; provisions and tears down its own temp tree. Requires jq (a
+# required tool: cdd-state stops without it).
 
 set -euo pipefail
 
@@ -46,8 +48,8 @@ pass() { echo "ok: $*"; }
 [[ -f "$HELPER_WT" ]] || fail "helper not found: $HELPER_WT"
 [[ -f "$HELPER_STATE" ]] || fail "helper not found: $HELPER_STATE"
 
-# jq is required: without it the helper skips base_branch, leaving nothing to test. A
-# missing tool is a failure, never a skip (scripts/ci.sh).
+# jq is required: without it the helpers stop, leaving nothing to test. A missing tool is
+# a failure, never a skip (scripts/ci.sh).
 command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 
 WORK="$(mktemp -d)"
@@ -333,5 +335,31 @@ run_state seed feat_oldstate --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed
 [[ "$(jq -r '.lane // "absent"' "$DIR/feat_oldstate.state.json")" == "absent" ]] \
   || fail "a rejected lane call must not have written a marker"
 pass "lane routing: an older cdd-state rejects only the lane call, keeping the record"
+
+# 10. A missing `claude` is caught before the worktree exists: cdd-worktree checks its
+#     required tools first, so the human is not left with a branch and a worktree that
+#     nothing launched into. The PATH holds exactly the tools the helper needs up to that
+#     check (symlinks to the host's) and no claude — neither this script's stub nor the
+#     runner's, nor a real one on the host.
+NOCLAUDE_BIN="$WORK/noclaude-bin"
+mkdir -p "$NOCLAUDE_BIN"
+ln -sf "$BASH" "$NOCLAUDE_BIN/bash"
+for t in git jq dirname basename cksum; do
+  ln -sf "$(command -v "$t")" "$NOCLAUDE_BIN/$t"
+done
+run_state seed feat_noclaude --base "$BASE_BRANCH" >/dev/null 2>&1 || fail "seed feat_noclaude failed"
+printf '# Task: feat_noclaude\n\nbody\n' > "$DIR/feat_noclaude.md"
+nc_rc=0
+# shellcheck disable=SC2016  # $1 is a `bash -c` positional parameter
+nc_out="$(cd "$WORK/machine" && env -i HOME="$HOME_DIR" PATH="$NOCLAUDE_BIN" \
+  GIT_CONFIG_SYSTEM=/dev/null GIT_CONFIG_GLOBAL="$GIT_CONFIG_GLOBAL" \
+  "$BASH" --norc --noprofile -c 'source "$1"; cdd-worktree feat_noclaude' _ "$HELPER_WT" \
+  </dev/null 2>&1)" || nc_rc=$?
+{ [[ $nc_rc -eq 4 ]] && grep -qF "cdd-worktree: claude is required" <<<"$nc_out"; } \
+  || fail "cdd-worktree with no claude must exit 4 naming claude (exit $nc_rc); got: $nc_out"
+[[ ! -e "$WORK/${REPO_NAME}-feat_noclaude" ]] || fail "cdd-worktree with no claude created the worktree"
+git -C "$WORK/machine" rev-parse --verify -q refs/heads/feat_noclaude >/dev/null \
+  && fail "cdd-worktree with no claude cut the branch"
+pass "a missing claude stops cdd-worktree (exit 4, naming it) before any branch or worktree"
 
 echo "all worktree-launch smoke checks passed"

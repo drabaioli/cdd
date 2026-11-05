@@ -37,7 +37,7 @@ pass() { echo "ok: $*"; }
 [[ -f "$HELPER_WT" ]] || fail "helper not found: $HELPER_WT"
 [[ -f "$HELPER_STATE" ]] || fail "helper not found: $HELPER_STATE"
 
-# jq is required: the ref push under test lives behind cdd-state's jq guard. A missing
+# jq is required: cdd-state stops without it, so the ref push under test needs it. A missing
 # tool is a failure, never a skip (scripts/ci.sh).
 command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
 

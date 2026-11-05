@@ -72,7 +72,7 @@ Several references mean one task, not several. If the items describe unrelated w
 jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/cdd/*.state.json 2>/dev/null   # already-started issues, by state record
 ```
 
-The state records are the only exclusion source. Compare after stripping any leading `#`. The exclusion is advisory — the records are local to this machine, absent without `jq`, and reaped once a PR merges — so when presenting the list say in one line that finding no record is not proof the issue is unstarted.
+The state records are the only exclusion source. Compare after stripping any leading `#`. The exclusion is advisory — the records are local to this machine and reaped once a PR merges — so when presenting the list say in one line that finding no record is not proof the issue is unstarted.
 
 Present the filtered list (number + title) and let the user pick **one or more**; then fetch each one's detail as above.
 
@@ -119,7 +119,7 @@ If several items could reasonably be "next" (including ones that could run in pa
 The task is already chosen — do **not** propose candidates. In issue-driven mode the intent text comes from §0b; everything below applies unchanged.
 
 - **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate.
-- **Roadmap-belonging decision**: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
+- **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task; add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
 
 Then continue with §4.
 

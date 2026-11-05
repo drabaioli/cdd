@@ -59,7 +59,7 @@ If the project has no single runner yet, run each gate command in sequence inste
 ```
 <!-- cdd-only-begin -->
 
-**In this repo the runner is `./scripts/ci.sh`** — 29 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. Not fail-fast. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. The `drift` and `seams` gates need interpretation rather than a rerun; see their triage section after step 8.
+**In this repo the runner is `./scripts/ci.sh`** — 30 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. Not fail-fast. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. The `drift` and `seams` gates need interpretation rather than a rerun; see their triage section after step 8.
 <!-- cdd-only-end -->
 
 ## 3. Code review
@@ -251,4 +251,4 @@ cdd-state get issue_refs    # one reference per line; empty when none were recor
   **Announce the rung in one line, once**, before the first call — not once per reference. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved, emit **no close lines** and say in one line `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` — the PR still opens, and the issues stay open to close by hand. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line rather than guessing a syntax.
 
   **Then say what those lines will actually do**, once, before asking to open the PR. When the tracker's and the code host's `describe.backend` are the same (`github`, `gitlab`), the code host closes the issue on merge — say that plainly, adding GitLab's caveat when it is `gitlab`: it closes only on a merge into the default branch, and only while the project's "Auto-close referenced issues on default branch" setting is on (the default). Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close.
-- **Empty** (no record, an unsynced or reaped one, or no `jq`): **no close lines.** Do not derive references from the branch name. Say so in one line at the confirmation step; the PR still opens, and the issues stay open to close by hand.
+- **Empty** (no record, or an unsynced or reaped one): **no close lines.** Do not derive references from the branch name. Say so in one line at the confirmation step; the PR still opens, and the issues stay open to close by hand.
