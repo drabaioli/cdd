@@ -50,7 +50,7 @@ Project specifics live in two project-owned places, and no project edits a shipp
 6. **Retrofit migrates the old edits — transitionally.** `/cdd-retrofit` upgrade mode gains a
    fourth verdict: a local hunk left in a shipped command is proposed, per file, to move onto a
    declaration or an extension. It exists only to migrate edits made before this mechanism; it
-   is deleted once every project has migrated, and the removal issue is filed then.
+   is deleted once every project has migrated (removal tracked by issue #148).
 7. **The CDD repo dogfoods it.** The repo's own additions to `/cdd-pre-pr` and `/cdd-process-pr`
    moved out of `cdd-only` fences into `.cdd/extensions/`, so its command copies equal the
    rendered template. The fence is retired with them: the drift and seam checks no longer
