@@ -2,6 +2,8 @@ Run a pre-PR checklist for the current branch. Compare against the base branch t
 
 This session is fresh and separate from the implementation session. Any "propose to the user" step in this command is a proposal to the user running this session.
 
+**Project extension.** First, check for `.cdd/extensions/cdd-pre-pr.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 0. Resolve the base branch
 
 ```bash
@@ -40,31 +42,19 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run the project's **check runner** — the single command that runs every gate, the same gate list CI runs. **Capture only the last 40 lines + exit code, do not read the full output.**
+Run the **check runner `CLAUDE.md` declares** under Build & test — the single command that runs every gate, the same gate list CI runs. **Capture only the last 40 lines + exit code, do not read the full output.**
 
 ```bash
-<check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
+<the check runner CLAUDE.md declares>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 ```
 
 Report each gate as pass ✓ / fail ✗ from the runner's summary. On failure, include the captured tail. **A missing tool is a failure, never a skip** — say which tool to install; an older runner's *skipped* counts as failed too.
 
-If the project has no single runner yet, run each gate command in sequence instead, and note the gap for step 6:
-
-```bash
-<build command>          2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-<format check command>   2>&1 | tail -20; echo "EXIT:${PIPESTATUS[0]}"
-<lint command>           2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-<unit test command>      2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-<integration test cmd>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-```
-<!-- cdd-only-begin -->
-
-**In this repo the runner is `./scripts/ci.sh`** — 30 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. Not fail-fast. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there. The `drift` and `seams` gates need interpretation rather than a rerun; see their triage section after step 8.
-<!-- cdd-only-end -->
+If `CLAUDE.md` declares no runner — a placeholder still in angle brackets declares nothing — run each gate command it lists under Build & test in turn, with the same capture, and note the missing runner for step 6. If it lists none, say so and mark the checklist's check-runner line ✗.
 
 ## 3. Code review
 
-Read all changed source files from the step 1 diff.
+Read the changed source files from the step 1 diff that fall inside the code review scope `CLAUDE.md` declares — all of them when it declares none (a placeholder still in angle brackets declares nothing, as in step 2).
 
 Review for:
 
@@ -141,10 +131,6 @@ Route each one by scope; never leave it as a remark that dies with the session:
 
 - **Project-specific** → the user chooses where it lands, and you recommend: applied now as an edit (a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer), riding along in step 10's commit, or proposed as a roadmap item for later. A line or two argues for the edit, anything larger for the roadmap — say which you'd pick and why, ask once, apply the answer. Never pick silently. Step 9's summary names whichever landed.
 - **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken.
-<!-- cdd-only-begin -->
-
-  This repo *is* CDD, so the third route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
-<!-- cdd-only-end -->
 
 Do **not** manufacture an improvement every run; "nothing surfaced" is the common, correct outcome. Raise it only if it would change how a future session behaves and is a pattern, not a one-off — a friction hit twice, or one that would cost the next session the same rework. At most one item per run; if two qualify, take the stronger. This step records; it never blocks the PR, and it is not a checkpoint.
 
@@ -160,21 +146,6 @@ git log --oneline "HEAD..origin/$BASE_BRANCH"
 
 Report the count. If it is non-zero, say by how many commits `origin/$BASE_BRANCH` has advanced, summarize what landed, and recommend running `/cdd-merge-base` in a fresh session before opening the PR. Advisory only — it never blocks the checklist, and this session neither merges nor invokes `/cdd-merge-base` itself.
 
-<!-- cdd-only-begin -->
-## Triaging the `drift` and `seams` gates (CDD repo only)
-
-A failure of either gate is a **judgement call, not a bug to fix blindly**. Step 2 already ran both; these notes are for reading a failure.
-
-**`drift` — `scripts/command-drift-check.sh`.** Diffs this repo's `.claude/commands/` and `.claude/agents/` against the `template/.claude/` copies, rendered with this repo's identifiers so substitution drift cancels out. Intentionally one-sided files are listed in `scripts/command-drift-whitelist.txt`; CDD-only sections of shared files (such as this one) are fenced with `cdd-only` markers and stripped before comparison. It also asserts that the handoff and plan-file schema blocks are identical between the process doc (Sections 2.6 and 2.15) and `cdd-next-step.md` / `cdd-plan.md`, that no `cdd-only` markers leak into the template, and that no template file hardcodes this repo's handoff directory (`handoffs/cdd`).
-
-On divergence, present each diff to the user; for each, the user decides: reconcile the repo copy, reconcile the template copy, or record a justified exception (a whitelist entry or a `cdd-only` fence).
-
-**`seams` — `scripts/prompt-seam-check.sh`.** Verifies 12 seams between the repo's prompts with grep only; `./scripts/prompt-seam-check.sh list` names them and each failure line names its seam. Known non-commands are whitelisted in `scripts/prompt-seam-whitelist.txt`. The issue-ref and code-host-caller checks strip this file's `cdd-only` regions first: a needle of theirs satisfied only inside this section does not count.
-
-On a broken seam, present each one to the user; for each, the user decides: fix the reference/heading/path, or record a justified exception (a whitelist entry).
-
-For both: apply fixes only on user approval, and do not auto-edit either tree from this step.
-<!-- cdd-only-end -->
 ## 9. Summary
 
 Present a checklist summary:

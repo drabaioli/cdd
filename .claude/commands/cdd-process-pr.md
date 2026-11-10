@@ -4,6 +4,8 @@ Run on the feature branch (not on the default branch), after a PR has been opene
 
 **Automation:** one checkpoint, up front — the triage plan in step 4. Once it is approved, edits, commit, push and in-thread replies run without further confirmation; add no per-action gates. The one exception: routing a workflow gap (step 5), which the triage plan does not settle and which is asked once, with a recommendation. Never resolve review threads; the user does.
 
+**Project extension.** First, check for `.cdd/extensions/cdd-process-pr.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 1. Discover the open PR
 
 Confirm the current branch is not the default branch (`origin`'s HEAD, else `main`):
@@ -90,10 +92,6 @@ For questions, prepare the answer text. For discussion comments, prepare a brief
 
 - **Project-specific** → the user chooses where it lands, and you recommend: folded into this PR as an edit in this run's commit (a `CLAUDE.md` constraint, a coding-standard rule, a doc pointer), or a roadmap item for later. A line or two argues for folding it in, anything larger for the roadmap — say which you'd pick and why, ask once, apply the answer. Never pick silently.
 - **General enough that any CDD project would want it** → offer to file an issue on the CDD repo: `gh issue create --repo drabaioli/cdd`. **Human-gated** — show the title and body, ask once, and never file without explicit approval. If `gh` is unauthenticated or the user declines, fall back to the roadmap item above and say which fallback was taken.
-<!-- cdd-only-begin -->
-
-  This repo *is* CDD, so the third route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
-<!-- cdd-only-end -->
 
 Say in the reply (step 7) where the gap was routed. The default is still silence: most review comments are about the diff and nothing else.
 

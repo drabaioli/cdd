@@ -23,8 +23,8 @@ New behaviour ships with a test, or an explicit, recorded reason it does not. `/
 Build and checks run on every PR, and every gate below is reachable from **one check runner** that is the single source of the gate sequence: CI delegates to it and `/cdd-pre-pr` invokes it, so no gate list is written twice. Host tools differ between machines, so a green local run can still fail CI: keep scripts to behaviour every tool named under dependency hygiene below shares. A missing tool fails its gate, never skips it, locally and in CI.
 
 - CI entry point: `<ci workflow / command>`
-- Check runner: `<check runner command>`
-- Slow gates: CI may fan out instead of calling the runner whole — one job lists the gates with `<check runner command> list`, and one job per gate runs `<check runner command> <gate>` — so the list still exists only once, in the runner.
+- Check runner: the one `CLAUDE.md` declares under Build & test — its only declaration.
+- Slow gates: CI may fan out instead of calling the runner whole — one job lists the gates with the runner's `list` mode, and one job per gate runs the runner with that gate's name — so the list still exists only once, in the runner.
 
 ## Lint & format — <Expected until a lint/format command exists>
 

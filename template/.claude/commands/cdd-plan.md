@@ -2,6 +2,8 @@ Plan a task from its handoff and write the plan file a later `/cdd-implement` se
 
 Runs in the task's feature worktree. Its **only** artifact is the plan file — it writes no file inside the repo. A separate, fresh `/cdd-implement` session builds from that file, so anything you learn and do not write into it is lost; follow its schema.
 
+**Project extension.** First, check for `.cdd/extensions/cdd-plan.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 1. Read the handoff and rebuild context
 
 Derive the task's paths from git — no argument is passed:

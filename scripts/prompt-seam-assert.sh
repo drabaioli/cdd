@@ -10,13 +10,14 @@
 #
 # So this script mutation-tests it: break one seam at a time in a throwaway copy of
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
-# checker's 12 checks gets at least one mutation:
+# checker's 13 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
 #   2. Issue-ref contract      — three cases, one per half of the seam: cdd-next-step.md
 #      stops recording the refs with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving
 #      close lines through `issue-close-token`; and cdd-pre-pr.md loses its §11 close-line
-#      block while keeping the cdd-only prose that quotes the same tokens, which catches
-#      a checker pinned to its own documentation rather than to the seam.
+#      block, which pins the consumer half to that block — the triage prose that quotes
+#      the same tokens now lives in .cdd/extensions/cdd-pre-pr.md, and a checker that
+#      read it would be pinned to its own documentation rather than to the seam.
 #   3. Path-existence linter   — CLAUDE.md gains a backticked path to a missing file; and,
 #      separately, the process doc does, since it is in scope for the same check.
 #   4. Required-section presence — cdd-pre-pr.md loses a load-bearing heading; and,
@@ -34,7 +35,11 @@
 #      that dropped the adapter path would.
 #  11. Retrofit task record  — cdd-retrofit.md goes back to recommending
 #      `git worktree remove`, as an edit reverting the cleanup advice would.
-#  12. Seam-check count       — a check is added to the checker's own registry without
+#  12. Extension points      — four cases: a template command stops naming its extension
+#      file; `<check runner command>` reappears in a template command; cdd-implement.md
+#      stops naming the runner `CLAUDE.md` declares; this repo's pre-PR extension renames
+#      a heading to a title the command lacks.
+#  13. Seam-check count       — a check is added to the checker's own registry without
 #      updating the prose that restates how many checks there are. Self-referential, so
 #      the mutation has to add a registry entry AND a check function, not just a number.
 #
@@ -161,8 +166,9 @@ expect_pass "control: a whitelisted dangling reference is silenced"
 # --- Check 2: issue-ref contract -----------------------------------------------
 # Each half gets its own case, so a checker that kept only one of the needles is caught.
 # The rewrites are global (/g) because cdd-pre-pr.md names each token more than once;
-# the checker strips `cdd-only` regions before grepping, so the triage prose that
-# describes this check is out of scope either way — which the last case below pins.
+# the triage prose that describes this check lives in .cdd/extensions/cdd-pre-pr.md, out
+# of the checker's scope (and a `cdd-only` fence would be stripped) — the last case below
+# pins the consumer half to the block that does the work.
 fresh_sandbox
 sandbox_sed 's/cdd-state issue-refs/cdd-state note-refs/g' "$CMDS/cdd-next-step.md"
 expect_fail "check 2 catches a producer that stops recording the issue refs" \
@@ -174,14 +180,15 @@ expect_fail "check 2 catches a consumer that stops deriving close lines" \
   "no longer derives close lines via issue-close-token"
 
 # The consumer half must be pinned to the §11 block that does the work, not to the
-# cdd-only triage prose that merely quotes the same three tokens while describing this
-# check. Deleting §11 outright, leaving that prose untouched, is the mutation that
-# tells the two apart: a checker grepping the raw file would report clean.
+# triage prose that merely quotes the same three tokens while describing this check
+# (now in .cdd/extensions/cdd-pre-pr.md). Deleting §11 outright, leaving that prose
+# untouched, is the mutation that tells the two apart: a checker that read the prose
+# would report clean.
 fresh_sandbox
 # shellcheck disable=SC2016  # `$d` is sed's last-line address, not a shell expansion
 sandbox_sed '/^\*\*Close lines\.\*\* The body carries one close line per reference/,$d' \
   "$CMDS/cdd-pre-pr.md"
-expect_fail "check 2 is not satisfied by its own cdd-only documentation" \
+expect_fail "check 2 is not satisfied by its own documentation" \
   "no longer reads the refs back with cdd-state get issue_refs"
 
 # --- Check 3: path-existence linter -------------------------------------------
@@ -299,7 +306,42 @@ grep -qF 'worktree remove' "$SANDBOX/$CMDS/cdd-retrofit.md" \
 expect_fail "check 11 catches retrofit recommending git worktree remove again" \
   "recommends \`git worktree remove\` again"
 
-# --- Check 12: seam-check count ------------------------------------------------
+# --- Check 12: extension points ------------------------------------------------
+# Each half of the seam gets its own case. A template command that stops naming its own
+# extension file: the rest of the command still reads sensibly, and a project's extension
+# would simply stop being read.
+fresh_sandbox
+sandbox_sed 's#\.cdd/extensions/cdd-plan\.md#.cdd/extensions/plan.md#g' template/.claude/commands/cdd-plan.md
+grep -qF '.cdd/extensions/cdd-plan.md' "$SANDBOX/template/.claude/commands/cdd-plan.md" \
+  && fail "check 12 setup: cdd-plan.md still names its extension file after mutation"
+expect_fail "check 12 catches a command that stopped reading its extension" \
+  "extension point missing: template/.claude/commands/cdd-plan.md"
+
+# The old fill-in placeholder coming back: the runner would be declared twice.
+fresh_sandbox
+sandbox_sed 's#<the check runner CLAUDE\.md declares>#<check runner command>#' template/.claude/commands/cdd-pre-pr.md
+grep -qF '<check runner command>' "$SANDBOX/template/.claude/commands/cdd-pre-pr.md" \
+  || fail "check 12 setup: cdd-pre-pr.md does not carry the old placeholder after mutation"
+expect_fail "check 12 catches the runner placeholder reappearing in a command" \
+  "carries <check runner command> again"
+
+# A gate-running command that stops reading the runner from CLAUDE.md.
+fresh_sandbox
+sandbox_sed 's/check runner .CLAUDE\.md. declares/project check runner/g' template/.claude/commands/cdd-implement.md
+grep -qF 'CLAUDE.md` declares' "$SANDBOX/template/.claude/commands/cdd-implement.md" \
+  && fail "check 12 setup: cdd-implement.md still names the declared runner after mutation"
+expect_fail "check 12 catches a command that stopped reading the declared runner" \
+  "runner seam broken: template/.claude/commands/cdd-implement.md"
+
+# This repo's own extension attaching to a step title its command does not have.
+fresh_sandbox
+sandbox_sed 's/^## Build & QA$/## Build and QA/' .cdd/extensions/cdd-pre-pr.md
+grep -qxF '## Build and QA' "$SANDBOX/.cdd/extensions/cdd-pre-pr.md" \
+  || fail "check 12 setup: the pre-PR extension heading was not renamed in the sandbox"
+expect_fail "check 12 catches an extension heading that names no step" \
+  "extension heading names no step: .cdd/extensions/cdd-pre-pr.md: Build and QA"
+
+# --- Check 13: seam-check count ------------------------------------------------
 # Self-referential, so the mutation is a real check rather than an edited number: give
 # the sandbox checker one more registry entry and a matching no-op body, and the four
 # prose sites (this file among them) are now one short. Two insertion points, hence awk
@@ -322,8 +364,8 @@ sandbox_add_probe_check
 # before the rest is written, and under pipefail the writer's EPIPE fails the pipeline.
 probe_list="$("$SANDBOX/scripts/prompt-seam-check.sh" list)"
 grep -qxF seam-probe <<<"$probe_list" \
-  || fail "check 12 setup: the probe check is not in the sandbox registry"
-expect_fail "check 12 catches a check added without updating the prose" \
+  || fail "check 13 setup: the probe check is not in the sandbox registry"
+expect_fail "check 13 catches a check added without updating the prose" \
   "seam-count drift in"
 
 echo "prompt-seam contract: clean"

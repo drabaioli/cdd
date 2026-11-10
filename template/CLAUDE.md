@@ -32,6 +32,8 @@ Keep architecture and feature docs — and their indexes — current as part of 
 
 Once a coding standard exists, link it from the Key references table and reference it here.
 
+**Code review scope:** <the changed files /cdd-pre-pr reviews, when not every changed source file — e.g. only *.cpp and *.hpp; delete this line to review them all>
+
 ## Build & test
 
 ```bash
@@ -50,7 +52,7 @@ The individual gates the runner should call:
 
 `scripts/install-deps.sh` installs what the project needs, CDD's required tools included (`--check` only reports); add a tool to its project block when the project starts needing one.
 
-Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and `/cdd-pre-pr` invokes it, so a gate is never listed twice. A missing tool fails its gate, never skips it.
+Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and CDD's commands (`/cdd-pre-pr`, `/cdd-merge-base`, `/cdd-implement`, `/cdd-small-change`) run the runner named in this block, its one declaration, so a gate is never listed twice. A missing tool fails its gate, never skips it.
 
 ## Module layout
 
@@ -86,4 +88,5 @@ This project uses the Claude-Driven Development workflow. Every CDD session is a
 - **When main has advanced under a feature branch** (merge session): run `/cdd-merge-base` in a fresh context on the feature branch.
 - **Before opening a PR** (pre-PR session): run `/cdd-pre-pr` in a fresh context to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (one close line per ref recorded on the state record, derived through the tracker's `issue-close-token`; with no usable record there are no close lines, said out loud rather than guessed).
 - **When a PR review leaves comments** (PR-review session): run `/cdd-process-pr` in a fresh context on the feature branch.
+- **To add a project step to a CDD command**: write `.cdd/extensions/<command>.md` (e.g. `.cdd/extensions/cdd-pre-pr.md`), one `##` heading per step it attaches to, named by that step's title. Never edit `.claude/commands/cdd-*.md`. An extension only adds; a deterministic pass/fail check belongs in the check runner instead.
 - Keep `doc/architecture/`, `doc/features/`, and this file current as part of every change.

@@ -2,6 +2,8 @@ Make a small, pre-stated change end to end in one session: `/cdd-small-change` (
 
 This is the build half of the **small-change lane**: it replaces `/cdd-plan` *and* `/cdd-implement` for a task the human declared small at scoping. It runs in the task's feature worktree. There is no plan file on this lane, so this session takes its own approval (step 3).
 
+**Project extension.** First, check for `.cdd/extensions/cdd-small-change.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 1. Read the handoff
 
 Derive the task's paths from git — no argument is passed:
@@ -46,11 +48,7 @@ Rationale lives once: where the change touches a rule whose argument already has
 
 ## 6. Verify
 
-Run the project's check runner, whole — the same gate list CI runs, not a subset chosen for a small diff.
-<!-- cdd-only-begin -->
-
-In this repo the runner is `./scripts/ci.sh` (not fail-fast); `./scripts/ci.sh <gate>` reruns one gate while iterating on a failure.
-<!-- cdd-only-end -->
+Run the check runner `CLAUDE.md` declares, whole — the same gate list CI runs, not a subset chosen for a small diff. If it declares none, run every gate command it lists under Build & test.
 
 Report failures with their output, not a summary of them. A gate whose tool is missing has failed, not skipped — say which tool to install.
 

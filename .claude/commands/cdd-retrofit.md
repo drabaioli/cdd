@@ -98,6 +98,7 @@ Group the `auto-merged` entries apart from the rest. A `no-op` entry writes noth
 - files the project deleted (section 4.4);
 - new files still carrying residual `<...>` placeholders after the best-effort fill (section 4.4);
 - local hunks that swap in another backend — migrate into `.cdd/` (section 4.4);
+- local edits to a shipped command — should move to an extension point (section 4.4; transitional);
 - template changes to a project-owned file the project has also changed — `CLAUDE.md`, the roadmap, the filled-in knowledge-base docs (section 4.4);
 - template renames (section 4.4) — asked before the batch, above, not again;
 - legacy-sweep patches and the legacy helper (section 4.5);
@@ -328,6 +329,8 @@ Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not 
 
 **Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" or "both changed" rows) that swaps `gh issue …` / `gh pr …` for another backend (`jira`, `acli`, `glab`, `curl …atlassian.net/…`) is a backend to bind, not a customization to keep. Check for it before a both-changed file can join the batch. Propose, per file: restore the template's hunk and bind the capability instead — a shipped adapter if CDD has one (section 2.6), otherwise a project adapter written against `doc/architecture/capability-adapters.md`. If declined, preserve it like any customization.
 
+**Move to an extension point — the fourth verdict. TRANSITIONAL: this migrates edits made before CDD had extension points (#127). Delete this paragraph and its section 2.7 queue line once every project has migrated past it; the removal issue is filed then, not before.** Any local hunk left in a `.claude/commands/cdd-*.md` file — the "local customization" row, or the local side of a "both changed" one — after the backend-swap check above, goes per file: never batched, never auto-merged. Propose restoring the template's text and moving the hunk: a runner or gate list → `CLAUDE.md`'s Build & test (a gate the runner lacks → propose it as a gate); a narrowing of what is reviewed → `CLAUDE.md`'s Code review scope line; an added step → `.cdd/extensions/<command>.md` under the title of the step it attaches to. A hunk that removes or weakens a step — a checkpoint above all — has no extension form: say so, and offer to keep it as a customization or drop it. If declined, preserve it like any customization and list it.
+
 **Added files — reconcile fill-in skeletons, don't ship them raw.** For every file you propose adding:
 
 - **Scan the staged render for residual `<...>` tokens.** The render already substituted `<PROJECT_NAME>`/`<PROJECT_DIR>`, so any remaining `<...>` is genuine fill-in content — a placeholder field or a provisional status marker.
@@ -374,7 +377,7 @@ Either way, section 5 reports it.
 
 ### 4.6 Upstream candidates
 
-For each preserved local customization in a CDD-managed file — including the local hunks an `auto-merged` file kept — judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Collect the general ones into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as an extension**: a new shipped adapter, not a prompt change. Do not auto-apply anything to the CDD repo in this session.
+For each preserved local customization in a CDD-managed file — including the local hunks an `auto-merged` file kept — judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Collect the general ones into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as a new shipped adapter**, not a prompt change. A declined fourth-verdict hunk (section 4.4) is assessed like any preserved customization. Do not auto-apply anything to the CDD repo in this session.
 
 ### 4.7 Update the marker and commit
 
@@ -412,8 +415,9 @@ Report, in both modes:
 - **Legacy migration** (upgrade mode): the sweep's outcome as its own category, apart from the file lists — *swept* (what was found, including the historical hits deliberately left alone), *patched* (files brought back into agreement, listed), and *recommended for removal* (a project-local worktree/state helper, with the exact shell rc line the user still has to delete by hand). An empty sweep says so in one line.
 - **Install-deps script**: whether `scripts/install-deps.sh` was added (or folded into the project's own installer), the tools its project block lists, and any left out for want of a package name.
 - **Capability bindings**: each `.cdd/<capability>` written (with its evidence), declined, or already present; each "no adapter for this backend" line; any upgrade-mode "migrate into `.cdd/`" hunk and its outcome; for Jira, the env vars the user sets; and, if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing on this machine, that the bound capability stops until `./tools/cdd-worktree.sh install` runs.
+- **Command edits to move** (upgrade mode): each fourth-verdict hunk (section 4.4) — where it moved, or kept or dropped and why; flagged transitional.
 - The marker value written.
-- Upstream candidates surfaced (upgrade mode), each with its destination (port into `template/`, or propose as an extension), with a pointer to file them as a roadmap item in the CDD repo.
+- Upstream candidates surfaced (upgrade mode), each with its destination (port into `template/`, or propose as a new shipped adapter), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.
 - The next steps for the user:
   - Review the retrofit branch (`git -C "$WT" show`).
