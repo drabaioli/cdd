@@ -53,7 +53,9 @@ Project specifics live in two project-owned places, and no project edits a shipp
    is deleted once every project has migrated, and the removal issue is filed then.
 7. **The CDD repo dogfoods it.** The repo's own additions to `/cdd-pre-pr` and `/cdd-process-pr`
    moved out of `cdd-only` fences into `.cdd/extensions/`, so its command copies equal the
-   rendered template. The fence stays supported.
+   rendered template. The fence is retired with them: the drift and seam checks no longer
+   strip one, and a whole-file whitelist entry is the only exception left. A finer-grained
+   one would be the in-file exception rejected below for projects.
 
 ## Rejected alternatives
 

@@ -55,17 +55,6 @@ whitelisted() {
   grep -vE '^[[:space:]]*(#|$)' "$WHITELIST" | grep -qxF -- "$1"
 }
 
-# A command file with its `cdd-only` regions removed — the same stripper, and the same
-# marker pair, as command-drift-check.sh. A check whose needles could also be named in a
-# CDD-meta section must grep the stripped text, or it would be satisfied by the
-# documentation of a seam rather than by the seam itself. The triage prose that quotes
-# these tokens now lives in .cdd/extensions/cdd-pre-pr.md, outside every checked command,
-# and no repo command carries a fence today; stripping still guards against one that
-# quotes a needle.
-strip_cdd_only() {
-  sed '/<!-- cdd-only-begin -->/,/<!-- cdd-only-end -->/d' "$1"
-}
-
 # --- Check: command-name resolution -------------------------------------------
 # Every `/cdd-*` reference across the repo's markdown resolves to an existing
 # .claude/commands/cdd-*.md, or is a whitelisted non-command (shell helper, marker
@@ -92,19 +81,16 @@ check_command_refs() {
 # issue_refs) and turned into close lines through the adapter's issue-close-token in
 # cdd-pre-pr.md. The state record is the only carrier — there is no branch-name token
 # and no commit trailer — so a one-sided edit here loses the close lines outright.
-# Both files are read with their `cdd-only` regions stripped: a fenced CDD-meta section
-# naming the tokens below while explaining this very check would let the §11 block that
-# *does* the work be deleted outright and still report clean — the check would be pinned
-# to its own documentation. (That triage prose now lives in .cdd/extensions/cdd-pre-pr.md.)
+# Only the command files are read: prose naming these tokens while explaining this very
+# check lives in .cdd/extensions/cdd-pre-pr.md, so it cannot satisfy the needles and let
+# the §11 block that *does* the work be deleted outright — the check stays pinned to the
+# seam rather than to its own documentation.
 check_issue_refs() {
-  local next pre
-  next="$(strip_cdd_only "$NEXT")"
-  pre="$(strip_cdd_only "$PRE")"
-  grep -qF 'cdd-state issue-refs' <<<"$next" \
+  grep -qF 'cdd-state issue-refs' "$NEXT" \
     || note "issue-ref producer broken: $NEXT no longer records the refs with cdd-state issue-refs"
-  grep -qF 'cdd-state get issue_refs' <<<"$pre" \
+  grep -qF 'cdd-state get issue_refs' "$PRE" \
     || note "issue-ref consumer broken: $PRE no longer reads the refs back with cdd-state get issue_refs"
-  grep -qF 'issue-close-token' <<<"$pre" \
+  grep -qF 'issue-close-token' "$PRE" \
     || note "issue-ref consumer broken: $PRE no longer derives close lines via issue-close-token"
   return 0
 }
@@ -330,18 +316,14 @@ check_heuristic() {
 # resolved code-host adapter, and with none installed stop or skip with the
 # /cdd-retrofit line (ADR 0012). A one-sided edit that dropped the adapter calls would
 # leave every project unable to open or process a PR — the same class as the
-# issue-refs seam. Both files are read stripped, as there: a fenced CDD-meta section
-# could name these verbs while describing this check. Captured into variables, as
-# there, rather than piped: under pipefail, `grep -q` exiting early SIGPIPEs the sed.
+# issue-refs seam.
 check_code_host_callers() {
-  local pre process verb
-  pre="$(strip_cdd_only "$PRE")"
-  process="$(strip_cdd_only "$REPO_CMDS/cdd-process-pr.md")"
-  grep -qF -- 'pr-create' <<<"$pre" \
+  local process="$REPO_CMDS/cdd-process-pr.md" verb
+  grep -qF -- 'pr-create' "$PRE" \
     || note "code-host caller broken: $PRE no longer opens the PR through \`pr-create\`"
   for verb in pr-for-branch pr-comments pr-reply; do
-    grep -qF -- "$verb" <<<"$process" \
-      || note "code-host caller broken: $REPO_CMDS/cdd-process-pr.md no longer calls \`$verb\`"
+    grep -qF -- "$verb" "$process" \
+      || note "code-host caller broken: $process no longer calls \`$verb\`"
   done
   return 0
 }

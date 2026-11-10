@@ -167,8 +167,8 @@ expect_pass "control: a whitelisted dangling reference is silenced"
 # Each half gets its own case, so a checker that kept only one of the needles is caught.
 # The rewrites are global (/g) because cdd-pre-pr.md names each token more than once;
 # the triage prose that describes this check lives in .cdd/extensions/cdd-pre-pr.md, out
-# of the checker's scope (and a `cdd-only` fence would be stripped) — the last case below
-# pins the consumer half to the block that does the work.
+# of the checker's scope — the last case below pins the consumer half to the block that
+# does the work.
 fresh_sandbox
 sandbox_sed 's/cdd-state issue-refs/cdd-state note-refs/g' "$CMDS/cdd-next-step.md"
 expect_fail "check 2 catches a producer that stops recording the issue refs" \
