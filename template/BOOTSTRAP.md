@@ -137,8 +137,8 @@ A few things you'll want to add or change as the project takes shape:
 
 - **A coding standard** under `doc/knowledge_base/`, referenced from `CLAUDE.md`. The template does not ship one and does not reserve a row for one in `CLAUDE.md`'s Key references table; add the row when you add the standard.
 - **Decision records** as ADRs under `doc/architecture/adr/` as you make significant structural, design or tooling choices. Append-only.
-- **Build commands** in `CLAUDE.md` and in `cdd-pre-pr.md` step 2. Replace the `<build command>`-style placeholders with the actual commands.
-- **Test categories** in `cdd-pre-pr.md` step 2. Add or remove jobs as appropriate.
+- **Build and test commands** in `CLAUDE.md`'s Build & test only. Replace the `<build command>`-style placeholders with the actual commands; its check-runner line is the runner's one declaration, which CDD's commands read.
+- **A project step for a CDD command** in `.cdd/extensions/<command>.md`, never in the shipped command file (`CLAUDE.md`'s Workflow section says how).
 - **Remote name**: the worktree helper assumes the remote is named `origin`. It takes the default branch from the code-host binding (`.cdd/code-host`) when one is bound and answers, else from `origin`'s HEAD (falling back to `main`), so repos whose default branch is `master` work unchanged; a differently-named remote requires editing the shared helper at `~/.cdd/tools/cdd-worktree.sh`.
 
 ## Required CLI tools

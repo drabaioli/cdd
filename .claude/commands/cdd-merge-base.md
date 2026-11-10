@@ -2,6 +2,8 @@ Integrate the current state of the base branch into the feature branch. Two phas
 
 Run this command on the feature branch (not on the base branch), when the base branch has advanced under it or has something this branch should pick up (a new utility, a refactor, an updated convention).
 
+**Project extension.** First, check for `.cdd/extensions/cdd-merge-base.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 0. Resolve the base branch
 
 ```bash
@@ -175,7 +177,7 @@ adopt: <one-line description of what was adopted from the base branch>
 
 ## 7. Verify
 
-Runs on both paths. Run the project's check runner to confirm the merged state is healthy — the same commands as `/cdd-pre-pr` step 2, with the same "tail 40 lines + exit code" capture pattern.
+Runs on both paths. Run the check runner `CLAUDE.md` declares, exactly as `/cdd-pre-pr` step 2 does — same capture, same fallback when none is declared — to confirm the merged state is healthy.
 
 If anything fails, report the failure — naming the failing gate and including the captured tail — and stop. Do not push.
 

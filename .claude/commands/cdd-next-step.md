@@ -2,6 +2,8 @@ Scope the next roadmap task and produce a handoff file for a fresh plan session.
 
 The exploratory session. Run on the main worktree. It modifies **no** file in the repo; its only artifact is the handoff file under `~/.cdd/handoffs/cdd/`, consumed later by an isolated plan session (`/cdd-plan`).
 
+**Project extension.** First, check for `.cdd/extensions/cdd-next-step.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 0. Mode: roadmap-driven, intent-driven, or issue-driven
 
 One optional argument. Dispatch on its shape, trying the rows in order:

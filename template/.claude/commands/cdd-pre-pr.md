@@ -2,6 +2,8 @@ Run a pre-PR checklist for the current branch. Compare against the base branch t
 
 This session is fresh and separate from the implementation session. Any "propose to the user" step in this command is a proposal to the user running this session.
 
+**Project extension.** First, check for `.cdd/extensions/cdd-pre-pr.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 0. Resolve the base branch
 
 ```bash
@@ -40,27 +42,19 @@ Also record the `git status --porcelain` output as the **entry snapshot**. The t
 
 ## 2. Build & QA
 
-Run the project's **check runner** — the single command that runs every gate, the same gate list CI runs. **Capture only the last 40 lines + exit code, do not read the full output.**
+Run the **check runner `CLAUDE.md` declares** under Build & test — the single command that runs every gate, the same gate list CI runs. **Capture only the last 40 lines + exit code, do not read the full output.**
 
 ```bash
-<check runner command>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
+<the check runner CLAUDE.md declares>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
 ```
 
 Report each gate as pass ✓ / fail ✗ from the runner's summary. On failure, include the captured tail. **A missing tool is a failure, never a skip** — say which tool to install; an older runner's *skipped* counts as failed too.
 
-If the project has no single runner yet, run each gate command in sequence instead, and note the gap for step 6:
-
-```bash
-<build command>          2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-<format check command>   2>&1 | tail -20; echo "EXIT:${PIPESTATUS[0]}"
-<lint command>           2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-<unit test command>      2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-<integration test cmd>   2>&1 | tail -40; echo "EXIT:${PIPESTATUS[0]}"
-```
+If `CLAUDE.md` declares no runner — a placeholder still in angle brackets declares nothing — run each gate command it lists under Build & test in turn, with the same capture, and note the missing runner for step 6. If it lists none, say so and mark the checklist's check-runner line ✗.
 
 ## 3. Code review
 
-Read all changed source files from the step 1 diff.
+Read the changed source files from the step 1 diff that fall inside the code review scope `CLAUDE.md` declares — all of them when it declares none (a placeholder still in angle brackets declares nothing, as in step 2).
 
 Review for:
 

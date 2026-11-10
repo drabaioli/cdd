@@ -4,12 +4,10 @@
 #
 # The template is rendered via tools/bootstrap-cdd-project.sh --stage with this repo's own
 # identifier (dir "cdd"), so expected substitution drift cancels out mechanically
-# and only real divergence survives. Remaining divergence is a defect unless:
-#   - the file is listed in scripts/command-drift-whitelist.txt (one-sided by design;
-#     command and agent entries match by basename), or
-#   - the diverging region in the repo copy sits between `<!-- cdd-only-begin -->` and
-#     `<!-- cdd-only-end -->` lines (CDD-meta content), which are stripped before the
-#     comparison.
+# and only real divergence survives. Remaining divergence is a defect unless the file is
+# listed in scripts/command-drift-whitelist.txt (one-sided by design; command and agent
+# entries match by basename). There is no finer-grained exception: this repo's additions
+# to a shipped command live in .cdd/extensions/, like a downstream project's (ADR 0020).
 #
 # Also asserts:
 #   - the handoff schema block is identical, line for line, between the process doc
@@ -18,14 +16,11 @@
 #   - the plan-file schema block is identical between the process doc (section 2.15) and
 #     .claude/commands/cdd-plan.md, the same way. Both carry the schema, so either can
 #     drift from the other; the seam checker only pins cdd-plan.md against cdd-implement.md.
-#   - no cdd-only markers appear in template/.claude/commands/ or template/.claude/agents/
-#     — they belong in the repo copies only; a marker in the template would be
-#     stripped from both sides of the comparison above and hide real drift.
 #   - no file under template/ hardcodes this repo's handoff directory (handoffs/cdd):
 #     rendered with dir "cdd", it is indistinguishable from handoffs/<PROJECT_DIR>.
 #   - .claude/settings.json matches the rendered template/.claude/settings.json.
-#     JSON has no cdd-only fence, so a deliberately CDD-only settings entry needs a
-#     scripts/command-drift-whitelist.txt line (.claude/settings.json) instead.
+#     A deliberately CDD-only settings entry needs a scripts/command-drift-whitelist.txt
+#     line (.claude/settings.json) for the whole file.
 #   - both settings.json files parse as JSON (requires jq) — the template's copy
 #     is generated into every bootstrapped project, so a syntax error ships silently.
 set -euo pipefail
@@ -45,10 +40,6 @@ trap 'rm -rf "$TMP"' EXIT
 
 whitelisted() {
   grep -v '^[[:space:]]*#' "$WHITELIST" | grep -v '^[[:space:]]*$' | grep -qxF "$1"
-}
-
-strip_cdd_only() {
-  sed '/<!-- cdd-only-begin -->/,/<!-- cdd-only-end -->/d' "$1"
 }
 
 fail=0
@@ -79,9 +70,9 @@ for sub in commands agents; do
       continue
     fi
     if ! diff -u \
-        --label "$repo_dir/$name (cdd-only sections stripped)" \
+        --label "$repo_dir/$name" \
         --label "template/.claude/$sub/$name (rendered)" \
-        <(strip_cdd_only "$repo_f") <(strip_cdd_only "$rendered_f"); then
+        "$repo_f" "$rendered_f"; then
       fail=1
     fi
   done
@@ -102,8 +93,8 @@ else
   done
 fi
 
-# The shipped settings file: same render-then-diff, minus the cdd-only fence, which JSON
-# cannot carry. A CDD-only entry would therefore need a whitelist line for the whole file.
+# The shipped settings file: same render-then-diff. A CDD-only entry needs a whitelist
+# line for the whole file.
 if ! whitelisted ".claude/settings.json"; then
   if ! diff -u \
       --label ".claude/settings.json" \
@@ -112,16 +103,6 @@ if ! whitelisted ".claude/settings.json"; then
     fail=1
   fi
 fi
-
-# cdd-only fences belong in the repo copies only; strip_cdd_only runs on both sides,
-# so a marker in the template would silently hide the fenced content from the diff.
-for sub in commands agents; do
-  [[ -d "template/.claude/$sub" ]] || continue
-  if grep -rnE 'cdd-only-(begin|end)' "template/.claude/$sub/" >&2; then
-    echo "ERROR: cdd-only markers found in template/.claude/$sub/ (see above); they belong in the repo copies only" >&2
-    fail=1
-  fi
-done
 
 # The render above uses this repo's own dir, `cdd`, so a template line that hardcodes
 # `handoffs/cdd` where it should say `handoffs/<PROJECT_DIR>` renders identically and

@@ -4,6 +4,8 @@ Run on the feature branch (not on the default branch), after a PR has been opene
 
 **Automation:** one checkpoint, up front — the triage plan in step 4. Once it is approved, edits, commit, push and in-thread replies run without further confirmation; add no per-action gates. The one exception: routing a workflow gap (step 5), which the triage plan does not settle and which is asked once, with a recommendation. Never resolve review threads; the user does.
 
+**Project extension.** First, check for `.cdd/extensions/cdd-process-pr.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
+
 ## 1. Discover the open PR
 
 Confirm the current branch is not the default branch (`origin`'s HEAD, else `main`):

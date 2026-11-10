@@ -8,8 +8,6 @@
 <body>
 <branch>
 <branch_name>
-<build command>
-<check runner command>
 <count>
 <count or "none">
 <BASE_BRANCH>
@@ -20,9 +18,6 @@
 <facts from outside the repo, quoted verbatim, each with its source, its date or version, and its disposition — adopted (step), rejected (reason), to verify, or context only — or "None">
 <file>
 <files reconciled in steps 3–8>
-<format check command>
-<integration test cmd>
-<lint command>
 <M>
 <mechanical | logical | structural>
 <message>
@@ -44,11 +39,11 @@
 <sha>
 <short title>
 <slug>
+<the check runner CLAUDE.md declares>
 <the handoff's deferred questions and the answers agreed here, plus any `## Requirements` criterion amended or dropped with the human's agreement — or "None">
 <the bounded digest the session printed at the checkpoint>
 <self-contained prompt for the plan session>
 <title>
-<unit test command>
 <url>
 <what was tried and why it failed, so it is not re-explored — or "None">
 <which check-runner gates to run, which assertions or tests to add or extend>

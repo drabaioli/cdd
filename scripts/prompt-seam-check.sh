@@ -26,6 +26,7 @@ PROCESS_DOC_KB="doc/knowledge_base/claude-driven-development.md"
 WT_HELPER="tools/cdd-worktree.sh"
 NEXT="$REPO_CMDS/cdd-next-step.md"
 PRE="$REPO_CMDS/cdd-pre-pr.md"
+EXT_PRE=".cdd/extensions/cdd-pre-pr.md"   # this repo's own additions to /cdd-pre-pr
 
 # --- Check registry -----------------------------------------------------------
 # "slug|description", in run order. Each slug has one check_<slug-with-underscores>()
@@ -43,6 +44,7 @@ CHECKS=(
   "heuristic|the lane eligibility heuristic is stated verbatim everywhere"
   "code-host-callers|the commands routed through the code host still name the verbs they call"
   "retrofit-record|cdd-retrofit leaves its branch a task record and recommends cdd-worktree-done"
+  "extension-points|every shipped command reads its project extension, the four that run gates read the check runner from CLAUDE.md, and this repo's extension headings name real steps"
   "check-count|the seam-check count stated in prose matches this registry"
 )
 
@@ -51,15 +53,6 @@ note() { echo "  $*" >&2; fail=1; }
 
 whitelisted() {
   grep -vE '^[[:space:]]*(#|$)' "$WHITELIST" | grep -qxF -- "$1"
-}
-
-# A command file with its `cdd-only` regions removed — the same stripper, and the same
-# marker pair, as command-drift-check.sh. A check whose needles are also named in a
-# CDD-meta section must grep the stripped text: cdd-pre-pr.md's triage prose *describes*
-# the seam checks and quotes their tokens verbatim, so an unstripped grep would be
-# satisfied by the documentation of a seam rather than by the seam itself.
-strip_cdd_only() {
-  sed '/<!-- cdd-only-begin -->/,/<!-- cdd-only-end -->/d' "$1"
 }
 
 # --- Check: command-name resolution -------------------------------------------
@@ -88,19 +81,16 @@ check_command_refs() {
 # issue_refs) and turned into close lines through the adapter's issue-close-token in
 # cdd-pre-pr.md. The state record is the only carrier — there is no branch-name token
 # and no commit trailer — so a one-sided edit here loses the close lines outright.
-# Both files are read with their `cdd-only` regions stripped. cdd-pre-pr.md's own triage
-# section names all three tokens below while explaining this very check, so grepping the
-# raw file would let the §11 block that *does* the work be deleted outright and still
-# report clean — the check would be pinned to its own documentation.
+# Only the command files are read: prose naming these tokens while explaining this very
+# check lives in .cdd/extensions/cdd-pre-pr.md, so it cannot satisfy the needles and let
+# the §11 block that *does* the work be deleted outright — the check stays pinned to the
+# seam rather than to its own documentation.
 check_issue_refs() {
-  local next pre
-  next="$(strip_cdd_only "$NEXT")"
-  pre="$(strip_cdd_only "$PRE")"
-  grep -qF 'cdd-state issue-refs' <<<"$next" \
+  grep -qF 'cdd-state issue-refs' "$NEXT" \
     || note "issue-ref producer broken: $NEXT no longer records the refs with cdd-state issue-refs"
-  grep -qF 'cdd-state get issue_refs' <<<"$pre" \
+  grep -qF 'cdd-state get issue_refs' "$PRE" \
     || note "issue-ref consumer broken: $PRE no longer reads the refs back with cdd-state get issue_refs"
-  grep -qF 'issue-close-token' <<<"$pre" \
+  grep -qF 'issue-close-token' "$PRE" \
     || note "issue-ref consumer broken: $PRE no longer derives close lines via issue-close-token"
   return 0
 }
@@ -110,9 +100,14 @@ check_issue_refs() {
 # extension, no placeholders/globs/home/vars/brace-expansion) must resolve to a real file.
 # The process doc is in scope alongside the prompts and the two root indexes: it cites ADRs
 # and architecture docs by path, and a rename on either side would otherwise strand them.
+# So are this repo's command extensions (.cdd/extensions/*.md), which cite scripts by path.
+# A token under .cdd/extensions/ itself is not a path to resolve: an extension file is
+# optional by design, so a command naming one that does not exist is not broken — the
+# extension-points check pins those names instead.
 check_paths() {
   local f p
-  for f in "$REPO_CMDS"/cdd-*.md CLAUDE.md README.md "$PROCESS_DOC_KB"; do
+  for f in "$REPO_CMDS"/cdd-*.md .cdd/extensions/*.md CLAUDE.md README.md "$PROCESS_DOC_KB"; do
+    [[ -e "$f" ]] || continue   # the extensions glob matches nothing in a tree without any
     # SC2016: the single quotes below are deliberate — the grep/sed patterns match
     # literal backtick characters in the markdown; no shell expansion is wanted.
     # shellcheck disable=SC2016
@@ -124,7 +119,8 @@ check_paths() {
                | sed -E 's/^`//; s/`$//' \
                | grep -E '/' \
                | grep -E '\.(md|sh|ya?ml|txt|json|png)$' \
-               | grep -vE '[<>*~$ {}]')
+               | grep -vE '[<>*~$ {}]' \
+               | grep -vE '^\.cdd/extensions/')
   done
   return 0
 }
@@ -198,18 +194,16 @@ check_headings() {
 }
 
 # --- Check: gate-count contract -----------------------------------------------
-# The runner's registry is the source of truth for how many gates there are; both
-# CLAUDE.md and cdd-pre-pr.md also state the count in prose, and a pre-PR session
-# reads the prose to describe what it ran. `ci.sh list` is the same interface
+# The runner's registry is the source of truth for how many gates there are; CLAUDE.md,
+# which declares the runner, also states the count in prose, and a pre-PR session reads
+# the prose to describe what it ran. `ci.sh list` is the same interface
 # ci-runner-assert.sh consumes; `list` returns before the runner does any work.
 check_gate_count() {
-  local gate_count f
+  local gate_count f=CLAUDE.md
   gate_count="$(./scripts/ci.sh list | grep -c .)"
-  for f in CLAUDE.md "$PRE"; do
-    grep -qE "(^|[^0-9])$gate_count gates?([^a-z]|$)" "$f" && continue
-    note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
-    grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
-  done
+  grep -qE "(^|[^0-9])$gate_count gates?([^a-z]|$)" "$f" && return 0
+  note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
+  grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
   return 0
 }
 
@@ -322,18 +316,14 @@ check_heuristic() {
 # resolved code-host adapter, and with none installed stop or skip with the
 # /cdd-retrofit line (ADR 0012). A one-sided edit that dropped the adapter calls would
 # leave every project unable to open or process a PR — the same class as the
-# issue-refs seam. Both files are read stripped, as there: cdd-pre-pr.md's triage
-# prose names these verbs while describing this check. Captured into variables, as
-# there, rather than piped: under pipefail, `grep -q` exiting early SIGPIPEs the sed.
+# issue-refs seam.
 check_code_host_callers() {
-  local pre process verb
-  pre="$(strip_cdd_only "$PRE")"
-  process="$(strip_cdd_only "$REPO_CMDS/cdd-process-pr.md")"
-  grep -qF -- 'pr-create' <<<"$pre" \
+  local process="$REPO_CMDS/cdd-process-pr.md" verb
+  grep -qF -- 'pr-create' "$PRE" \
     || note "code-host caller broken: $PRE no longer opens the PR through \`pr-create\`"
   for verb in pr-for-branch pr-comments pr-reply; do
-    grep -qF -- "$verb" <<<"$process" \
-      || note "code-host caller broken: $REPO_CMDS/cdd-process-pr.md no longer calls \`$verb\`"
+    grep -qF -- "$verb" "$process" \
+      || note "code-host caller broken: $process no longer calls \`$verb\`"
   done
   return 0
 }
@@ -359,6 +349,52 @@ check_retrofit_record() {
   return 0
 }
 
+# --- Check: command extension points -------------------------------------------
+# A project never edits a shipped command (ADR 0020): each one first reads its own
+# .cdd/extensions/<command>.md, and the four that run gates take the check runner from
+# CLAUDE.md rather than a placeholder of their own. A one-sided edit that dropped either
+# would send downstream projects back to hand-editing commands — and nothing else would
+# notice, since a command with no extension file behaves exactly as before. So:
+#   (a) every shipped command names its own extension file, and none carries the old
+#       `<check runner command>` placeholder (that would declare the runner twice);
+#   (b) the four gate-running commands name the runner CLAUDE.md declares;
+#   (c) every `##` heading in this repo's own extensions names a real step of its
+#       command — an extension attaches by step title, so a renamed step strands it.
+# Captured into variables rather than piped, as in the code-host-callers check.
+check_extension_points() {
+  local f name ext ext_titles cmd_titles title
+  for f in template/.claude/commands/cdd-*.md; do
+    grep -qF -- ".cdd/extensions/$(basename "$f")" "$f" \
+      || note "extension point missing: $f no longer reads .cdd/extensions/$(basename "$f")"
+    if grep -qF -- '<check runner command>' "$f"; then
+      note "runner declared twice: $f carries <check runner command> again instead of reading the runner CLAUDE.md declares"
+    fi
+  done
+  for name in cdd-pre-pr cdd-merge-base cdd-implement cdd-small-change; do
+    f="template/.claude/commands/$name.md"
+    # SC2016: the backticks are literal markdown, not command substitution.
+    # shellcheck disable=SC2016
+    grep -qF -- 'check runner `CLAUDE.md` declares' "$f" \
+      || note "runner seam broken: $f no longer runs the check runner CLAUDE.md declares"
+  done
+  for ext in .cdd/extensions/*.md; do
+    [[ -e "$ext" ]] || continue   # the glob matches nothing in a tree without extensions
+    f="$REPO_CMDS/$(basename "$ext")"
+    if [[ ! -f "$f" ]]; then
+      note "extension for no command: $ext has no matching $f"
+      continue
+    fi
+    ext_titles="$(heading_titles "$ext")"
+    cmd_titles="$(heading_titles "$f")"
+    while IFS= read -r title; do
+      [[ -n "$title" ]] || continue
+      grep -qxF -- "$title" <<<"$cmd_titles" \
+        || note "extension heading names no step: $ext: $title"
+    done <<<"$ext_titles"
+  done
+  return 0
+}
+
 # --- Check: seam-check-count contract -----------------------------------------
 # Same shape as the gate-count check, turned on this script: CHECKS above is the source
 # of truth for how many seam checks there are, and four files restate that count in prose
@@ -373,7 +409,7 @@ check_retrofit_record() {
 check_check_count() {
   local n="${#CHECKS[@]}"
   local f
-  for f in scripts/prompt-seam-assert.sh "$PRE" \
+  for f in scripts/prompt-seam-assert.sh "$EXT_PRE" \
            doc/knowledge_base/engineering-practices.md doc/architecture/overview.md; do
     grep -qE "(^|[^0-9])$n (check|seam|case)s?([^a-z]|$)" "$f" && continue
     note "seam-count drift in $f: this checker registers $n checks; the file states:"

@@ -2,8 +2,7 @@
 # scripts/command-drift-check.sh): a command or agent definition allowed to exist on
 # only one side, written as its basename (so an entry matches in .claude/commands/ and
 # .claude/agents/ alike), or the whole settings file, written as the repo-relative path
-# .claude/settings.json (JSON carries no cdd-only fence, so an exception there
-# covers the file, not a section).
+# .claude/settings.json. An exception always covers a whole file, never a section.
 # One entry per line; lines starting with # and blank lines are ignored.
 
 # CDD-repo-only: operates *on* target projects from a CDD session (process doc §2.7).

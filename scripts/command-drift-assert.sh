@@ -8,7 +8,7 @@
 #
 # So this script mutation-tests it: break one thing at a time in a throwaway copy of the
 # tree and require the checker to notice, naming what it noticed. Each of the checker's
-# seven checks gets at least one mutation:
+# six checks gets at least one mutation:
 #   1. Command-set diff        — a repo command copy diverges from its template counterpart;
 #      likewise a repo agent definition (.claude/agents/).
 #   2. Command-set membership  — a command exists on only one side; likewise an agent
@@ -16,21 +16,18 @@
 #   3. Settings JSON validity  — both settings files gain the same syntax error, so they
 #      still match each other and only the jq parse can catch it.
 #   4. Settings diff           — .claude/settings.json diverges from the rendered template.
-#   5. Template fence rejection — a cdd-only marker appears in the template itself.
-#   6. Schema-block contracts  — the process doc's handoff and plan-file schema blocks
+#   5. Schema-block contracts  — the process doc's handoff and plan-file schema blocks
 #      each lose a heading, or have a placeholder line reworded, that the command file
 #      still carries.
-#   7. Template slug leak      — the template hardcodes this repo's handoff directory
+#   6. Template slug leak      — the template hardcodes this repo's handoff directory
 #      (handoffs/cdd), which the render with dir "cdd" cannot tell from the placeholder.
 #
-# Plus four controls, which are what make the mutations mean anything:
+# Plus three controls, which are what make the mutations mean anything:
 #   - An unmutated copy must PASS. Without this, every mutation could be "detected" by a
 #     checker that is simply broken and fails on everything.
 #   - A whitelisted one-sided command must PASS, pinning the documented escape hatch.
-#   - A whitelisted settings.json divergence must PASS, pinning the same hatch for the
-#     file that has no cdd-only fence available to it (JSON carries no comments).
-#   - A cdd-only fence in the *repo* copy must PASS, pinning the stripping that makes
-#     CDD-meta sections possible at all.
+#   - A whitelisted settings.json divergence must PASS, pinning the same hatch, by whole
+#     file, for settings.json.
 #
 # Check 3 needs jq, and a missing tool is a failure, never a skip (scripts/ci.sh): the
 # gate requires jq up front rather than dropping that one mutation.
@@ -164,28 +161,13 @@ printf '# assert-only probe command\n' > "$SANDBOX/.claude/commands/cdd-probe.md
 printf 'cdd-probe.md\n' >> "$SANDBOX/$WHITELIST"
 expect_pass "control: a whitelisted one-sided command passes"
 
-# --- Control: a cdd-only fence in the repo copy is stripped --------------------
-fresh_sandbox
-sandbox_awk 'NR == 1 { print; print "<!-- cdd-only-begin -->"; print "assert-only CDD-meta paragraph."; print "<!-- cdd-only-end -->"; next } { print }' \
-  ".claude/commands/$SHARED_CMD"
-expect_pass "control: a cdd-only fence in the repo copy passes"
-
-# --- Check 5: a cdd-only marker in the template is rejected --------------------
-# An empty marker pair, so stripping leaves the two sides byte-identical and the marker
-# check is the only thing that can fail. A fence with content would also trip check 1.
-fresh_sandbox
-sandbox_awk 'NR == 1 { print; print "<!-- cdd-only-begin -->"; print "<!-- cdd-only-end -->"; next } { print }' \
-  "template/.claude/commands/$SHARED_CMD"
-expect_fail "check 5 catches a cdd-only marker in the template" \
-  "cdd-only markers found in template/.claude/commands/"
-
-# --- Check 7: this repo's handoff slug hardcoded in the template ---------------
+# --- Check 6: this repo's handoff slug hardcoded in the template ---------------
 # Only the template copy changes, and it renders back to what the repo copy says, so the
 # command-set diff stays clean and the slug scan is the only thing that can fail.
 fresh_sandbox
 sandbox_awk '!done && sub(/handoffs\/<PROJECT_DIR>/, "handoffs/cdd") { done = 1 } { print }' \
   "template/.claude/commands/cdd-next-step.md"
-expect_fail "check 7 catches this repo's handoff directory hardcoded in the template" \
+expect_fail "check 6 catches this repo's handoff directory hardcoded in the template" \
   "handoff directory (handoffs/cdd) is hardcoded in template/"
 
 # --- Check 4: settings divergence ----------------------------------------------
@@ -209,27 +191,27 @@ insert_after_allow ',' "$TPL_SETTINGS"
 expect_fail "check 3 catches a syntax error present in both settings copies" \
   "is not valid JSON"
 
-# --- Check 6: schema-block contracts -------------------------------------------
+# --- Check 5: schema-block contracts -------------------------------------------
 # Mutating the *process doc* rather than the command file, so the command-set diff stays
 # clean and the schema check is the only thing that can fire.
 fresh_sandbox
 drop_schema_heading '# Task:' "$PROCESS_DOC"
-expect_fail "check 6 catches a dropped handoff schema heading" \
+expect_fail "check 5 catches a dropped handoff schema heading" \
   "handoff schema block differs"
 
 fresh_sandbox
 drop_schema_heading '# Plan:' "$PROCESS_DOC"
-expect_fail "check 6 catches a dropped plan-file schema heading" \
+expect_fail "check 5 catches a dropped plan-file schema heading" \
   "plan-file schema block differs"
 
 fresh_sandbox
 reword_schema_line '# Task:' "$PROCESS_DOC"
-expect_fail "check 6 catches a reworded handoff schema placeholder" \
+expect_fail "check 5 catches a reworded handoff schema placeholder" \
   "handoff schema block differs"
 
 fresh_sandbox
 reword_schema_line '# Plan:' "$PROCESS_DOC"
-expect_fail "check 6 catches a reworded plan-file schema placeholder" \
+expect_fail "check 5 catches a reworded plan-file schema placeholder" \
   "plan-file schema block differs"
 
 echo "command-drift contract: clean"

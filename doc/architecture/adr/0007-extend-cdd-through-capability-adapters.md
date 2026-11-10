@@ -1,6 +1,6 @@
 # 0007: Extend CDD through `.cdd/` capability adapters
 
-**Status:** Accepted; partially superseded by [0009](0009-drop-the-docs-capability.md), [0010](0010-code-host-rename-and-broken-adapter-rule.md) and [0012](0012-drop-the-builtin-gh-rung.md) (the built-in third rung)
+**Status:** Accepted; partially superseded by [0009](0009-drop-the-docs-capability.md), [0010](0010-code-host-rename-and-broken-adapter-rule.md) and [0012](0012-drop-the-builtin-gh-rung.md) (the built-in third rung); its deferred session hooks taken up, as command extensions, by [0020](0020-extend-commands-through-project-owned-extensions.md)
 
 ## Context
 
@@ -119,6 +119,7 @@ introducing one.
 - **Session hooks (`.cdd/hooks/<gate>.md`) now.** Zero observed demand across the whole fleet; the
   one load-bearing customization anyone had was a gate, and the check runner already took it.
   Deferred, not refused — if the demand appears, the namespace has room.
+  *Taken up by 0020: the demand appeared (#127).*
 - **A config file (YAML/TOML/JSON) instead of a `describe` verb.** Needs a format, a parser and a
   registry, and still cannot express a bespoke project setup whose binding has to run logic inline.
 - **MCP-first.** See CLI-first above: it amputates every shell-time verb, `pr-merged` and
