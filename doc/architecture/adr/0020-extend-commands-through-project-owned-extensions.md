@@ -88,7 +88,8 @@ Project specifics live in two project-owned places, and no project edits a shipp
   carry, and the same safeguard: the file is committed and reviewed. Every extension line rides
   into the command's context, so extensions should stay short.
 - That Claude Code does not discover Markdown under `.cdd/` as commands is inferred from its
-  documented discovery locations, not stated by them.
+  documented discovery locations, not stated by them; checked on Claude Code 2.1.322, which
+  registers none (a file under `.claude/commands/local/` registered as `/local:<name>`).
 - `/cdd-retrofit` carries a transitional fourth verdict until the fleet has migrated.
 - One more seam check (`extension-points`) pins that every shipped command still reads its
   extension file, that the four gate-running commands read the runner `CLAUDE.md` declares, and
