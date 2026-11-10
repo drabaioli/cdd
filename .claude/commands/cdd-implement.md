@@ -47,7 +47,7 @@ Rationale lives once: where the change touches a rule whose argument already has
 
 ## 5. Verify
 
-Run what the plan's `## Verification` names — the check runner `CLAUDE.md` declares (with none declared, each gate it lists under Build & test), plus any assertions or tests the plan says to add or extend. Report failures with their output, not a summary of them.
+Run what the plan's `## Verification` names — the check runner `CLAUDE.md` declares (with none declared, each gate it lists under Build & test; with none listed either, say so — nothing verified the change), plus any assertions or tests the plan says to add or extend. Report failures with their output, not a summary of them.
 
 ## 6. Commit
 

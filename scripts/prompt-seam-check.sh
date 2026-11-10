@@ -44,7 +44,7 @@ CHECKS=(
   "heuristic|the lane eligibility heuristic is stated verbatim everywhere"
   "code-host-callers|the commands routed through the code host still name the verbs they call"
   "retrofit-record|cdd-retrofit leaves its branch a task record and recommends cdd-worktree-done"
-  "extension-points|every shipped command reads its project extension, and the four that run gates read the check runner from CLAUDE.md"
+  "extension-points|every shipped command reads its project extension, the four that run gates read the check runner from CLAUDE.md, and this repo's extension headings name real steps"
   "check-count|the seam-check count stated in prose matches this registry"
 )
 

@@ -48,7 +48,7 @@ Rationale lives once: where the change touches a rule whose argument already has
 
 ## 6. Verify
 
-Run the check runner `CLAUDE.md` declares, whole — the same gate list CI runs, not a subset chosen for a small diff. If it declares none, run every gate command it lists under Build & test.
+Run the check runner `CLAUDE.md` declares, whole — the same gate list CI runs, not a subset chosen for a small diff. If it declares none, run every gate command it lists under Build & test; if it lists none either, say so — nothing verified the change.
 
 Report failures with their output, not a summary of them. A gate whose tool is missing has failed, not skipped — say which tool to install.
 
