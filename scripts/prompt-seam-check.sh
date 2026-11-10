@@ -208,18 +208,16 @@ check_headings() {
 }
 
 # --- Check: gate-count contract -----------------------------------------------
-# The runner's registry is the source of truth for how many gates there are; both
-# CLAUDE.md and this repo's pre-PR extension also state the count in prose, and a pre-PR
-# session reads the prose to describe what it ran. `ci.sh list` is the same interface
+# The runner's registry is the source of truth for how many gates there are; CLAUDE.md,
+# which declares the runner, also states the count in prose, and a pre-PR session reads
+# the prose to describe what it ran. `ci.sh list` is the same interface
 # ci-runner-assert.sh consumes; `list` returns before the runner does any work.
 check_gate_count() {
-  local gate_count f
+  local gate_count f=CLAUDE.md
   gate_count="$(./scripts/ci.sh list | grep -c .)"
-  for f in CLAUDE.md "$EXT_PRE"; do
-    grep -qE "(^|[^0-9])$gate_count gates?([^a-z]|$)" "$f" && continue
-    note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
-    grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
-  done
+  grep -qE "(^|[^0-9])$gate_count gates?([^a-z]|$)" "$f" && return 0
+  note "gate-count drift in $f: scripts/ci.sh registers $gate_count gates; the file states:"
+  grep -noE '[0-9]+ gates?' "$f" | sed 's/^/    /' >&2 || true
   return 0
 }
 

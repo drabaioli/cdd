@@ -49,7 +49,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 
 `scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 30 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` (the runner stubs `claude` itself) — **a missing tool fails its gate, never skips it**. `scripts/install-deps.sh` installs this repo's tools: CDD's required set plus `gh`, `shellcheck` and `tar` (`--check` only reports). The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
 
-What `/cdd-pre-pr` adds in this repo — the runner notes and how to triage the `drift` and `seams` gates — lives in `.cdd/extensions/cdd-pre-pr.md`.
+What `/cdd-pre-pr` adds in this repo — the macOS caveat and how to triage the `drift` and `seams` gates — lives in `.cdd/extensions/cdd-pre-pr.md`.
 
 ## Module layout
 

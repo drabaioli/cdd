@@ -1,4 +1,4 @@
-This repo's additions to `/cdd-process-pr` — CDD dogfooding its own command extensions.
+What `/cdd-process-pr` adds in this repo: where a general workflow gap goes when the project is CDD itself.
 
 ## Address the feedback
 

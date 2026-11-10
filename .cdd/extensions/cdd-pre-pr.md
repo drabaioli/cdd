@@ -1,8 +1,8 @@
-This repo's additions to `/cdd-pre-pr` — CDD dogfooding its own command extensions.
+What `/cdd-pre-pr` adds in this repo: how to read a failure of the two gates that need judgement, and where a general workflow improvement goes when the project is CDD itself.
 
 ## Build & QA
 
-**In this repo the runner is `./scripts/ci.sh`** — 30 gates, listed with what each checks in the registry at the top of the script; `./scripts/ci.sh list` names them and `./scripts/ci.sh <gate>` reruns one. Not fail-fast. CI runs it on Ubuntu and macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there.
+CI also runs the runner on macOS, so a gate leaning on one host's sed/grep/awk can pass here and fail there.
 
 A failure of the `drift` or `seams` gate is a **judgement call, not a bug to fix blindly** — read it with the notes below rather than rerunning it.
 
