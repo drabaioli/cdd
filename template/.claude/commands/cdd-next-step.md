@@ -19,7 +19,7 @@ The `issue` / `issues` keyword is checked before the pattern. The direct row mat
 
 Every mode first runs §0a, §1 and §2; "Branches at" is where its own path starts. Issue-driven is intent-driven with the intent text taken from tracker items (§0b). All modes share §4 onward; do not fork the flow beyond §0b, §1 and §3.
 
-**The tracker defines what a reference looks like.** Resolve it down the ladder — project, then machine — and take the first file present:
+**The tracker defines what a reference looks like.** With an empty argument there is nothing to classify: skip to §0a (roadmap-driven mode resolves the tracker in §3, only to read a cited issue). Otherwise resolve it down the ladder — project, then machine — and take the first file present:
 
 ```bash
 for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
@@ -116,12 +116,19 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 
 If several items could reasonably be "next" (including ones that could run in parallel in separate worktrees), present them and let the user pick. Say explicitly which items overlap in the modules they would touch.
 
+Once the user has picked one task, read any issue its line cites, as context for scoping it — read-only, open or closed. Resolve the tracker down §0's ladder with §0's checks, and announce the rung in one line. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count). Read each with `<adapter> issue-read <ref>`. The issue is context, never the point of the run: a broken adapter, no `issue-read` verb, or a failed call gets one line saying the issue was not read and why (the stderr line, for exit 4), and the session carries on without it. With nothing resolved, print §0b's install line only if the line visibly cites an issue, and carry on. The task stays roadmap-driven: no issue ref is recorded (§7).
+
 ## 3-intent. Scope the given task (intent-driven and issue-driven modes)
 
 The task is already chosen — do **not** propose candidates. In issue-driven mode the intent text comes from §0b; everything below applies unchanged.
 
-- **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate.
-- **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task; add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
+- **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate. In issue-driven mode, a closed issue that roadmap lines cite was promoted to a phase: propose the phase's first unchecked line citing it (none left: say the phase is done) and, if the user agrees, proceed as that item, roadmap-driven, recording no issue ref (§7).
+- **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task, unless it is multi-PR (below); add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
+- **Multi-PR judgement** (issue-driven): the issue is multi-PR when it shows, up front, several separately shippable steps whose order is worth planning, or asks for a phase — not merely when it looks likely to take two or three PRs. Recommend in one line naming the signal; the user decides. For a multi-PR issue the verdict is a new **roadmap phase**, recorded in Notes (§5):
+  - an intro, one task line per PR — each ending with the issue's ref, in the form `ref_pattern` matches (e.g. `#NN`), and within the 200-character cap — and a milestone; the issue keeps the detail;
+  - this task adds the phase; ask whether it also does the phase's first line (adding the phase alone usually qualifies for the small-change lane, §4b);
+  - if the issue asks for a convergence step first (decisions to confirm, research to finish), that step is the first line, worded so its task adds or confirms the implementation lines once the user approves the final shape; until then propose those lines only as the issue sketches them, or not at all;
+  - the issue's ref is still recorded (§7), so this task's PR closes it; the phase's later tasks are picked roadmap-driven and record none.
 
 Then continue with §4.
 
@@ -194,7 +201,9 @@ The prompt is a plain task spec: no standing instructions about planning, commit
 
 **Notes**: deferred questions (§4), the roadmap-belonging verdict (§3-intent), and any roadmap changes the discussion surfaced (tasks to add, split, remove, or reword), as instructions to the implementation session. **Do not edit the roadmap file in this session.** The implementing session makes the edits: `/cdd-implement`, or `/cdd-small-change` on the small-change lane.
 
-Then, immediately before asking for approval, print a short digest of the handoff in chat, following the `CLAUDE.md` rule — short, plain, only what changes the answer — so the human can approve or push back without opening the handoff. What usually earns a line: what the task is and which lane it takes, how much research the plan session should do (or that it is left to the planner), why it is worth doing now, what "done" means, anything deliberately out of scope, and any question deferred to `/cdd-plan`. Say what applies and drop the rest.
+**Multi-PR issue** (§3-intent): Notes carry the whole phase, exact lines included. `## Roadmap reference` holds the phase's first line marked `(added by this task)` when this task also does it, else `None — adds the phase in Notes`.
+
+Then, immediately before asking for approval, print a short digest of the handoff in chat, following the `CLAUDE.md` rule — short, plain, only what changes the answer — so the human can approve or push back without opening the handoff. What usually earns a line: what the task is and which lane it takes, how much research the plan session should do (or that it is left to the planner), why it is worth doing now, what "done" means, the proposed phase for a multi-PR issue and whether this task also does its first line, anything deliberately out of scope, and any question deferred to `/cdd-plan`. Say what applies and drop the rest.
 
 Show the draft for approval. Iterate if needed.
 
@@ -232,7 +241,7 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>
 ```
 
-Then seed the task **state record** beside the handoff, with the **base branch** agreed in §4 (substitute it for the `$(…)` default when the task stacks on a branch not checked out here). The second call runs **on the small-change lane only** (it is what `cdd-worktree` routes on; on the standard lane do not call it — an absent marker *is* the standard lane). The third runs **in issue-driven mode only**, with the references in the order given, each exactly as the tracker reports it (the adapter's `.ref`):
+Then seed the task **state record** beside the handoff, with the **base branch** agreed in §4 (substitute it for the `$(…)` default when the task stacks on a branch not checked out here). The second call runs **on the small-change lane only** (it is what `cdd-worktree` routes on; on the standard lane do not call it — an absent marker *is* the standard lane). The third runs **in issue-driven mode only** — not for a promoted issue routed to its phase (§3-intent) — with the references in the order given, each exactly as the tracker reports it (the adapter's `.ref`):
 
 ```bash
 cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"

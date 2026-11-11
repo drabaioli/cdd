@@ -69,7 +69,7 @@ Seven verbs, of which one (`describe`) is mandatory and the other six are declar
 | Verb                                | Replaces today                              | Notes                          |
 | ----------------------------------- | ------------------------------------------- | ------------------------------ |
 | `describe`                          | —                                           | mandatory                      |
-| `issue-read <ref>`                  | `gh issue view` (`/cdd-next-step` §0b)      | comments inline                |
+| `issue-read <ref>`                  | `gh issue view` (`/cdd-next-step` §0b)      | comments inline; also a roadmap line's cited issue (`/cdd-next-step` §3) |
 | `issue-list`                        | `gh issue list` (`/cdd-next-step` §0b)      | open items only                |
 | `issue-create --title T --body B`   | `/cdd-pre-pr`'s improvement channel         |                                |
 | `issue-transition <ref> <state>`    | `cdd-worktree-done` / `-gc`, post-merge     | once per recorded ref          |
@@ -382,7 +382,8 @@ How far "no lower rung" reaches is set per call site, by what the caller would d
 
 | Call site                                          | Broken adapter                                               |
 | -------------------------------------------------- | ------------------------------------------------------------ |
-| `/cdd-next-step` (tracker)                         | stops the command                                            |
+| `/cdd-next-step` with an argument (tracker)        | stops the command                                            |
+| `/cdd-next-step` with no argument (tracker)        | prints the line and scopes the task without the cited issue  |
 | `/cdd-pre-pr` §0, `/cdd-merge-base` §0 (code host) | stops the command — only reached when no base was recorded   |
 | `cdd-worktree` (code host)                         | stops before cutting the branch — only when no base was recorded |
 | `cdd-worktree-done`, `-gc`, `-resume` (code host)  | stops before doing anything                                  |
