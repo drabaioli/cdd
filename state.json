@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "branch": "multi_pr_issue_roadmap_phase",
+  "stage": "pr_open",
+  "pr": 152,
+  "base_branch": "main",
+  "sessions": [
+    {
+      "id": "26d4c7db-7aab-4f0d-a217-c4f187f8d1c2",
+      "stage": "scoped",
+      "dir": "/home/diego/Code/cdd"
+    },
+    {
+      "id": "fdbc235c-f3b8-46a2-b82b-fc4345f89ffb",
+      "stage": "plan_written",
+      "dir": "/home/diego/Code/cdd-multi_pr_issue_roadmap_phase"
+    },
+    {
+      "id": "d65c8f55-efbd-44b0-bc43-e0f7ad15f4e4",
+      "stage": "implementation_done",
+      "dir": "/home/diego/Code/cdd-multi_pr_issue_roadmap_phase"
+    },
+    {
+      "id": "27a282d5-fa07-49fb-a278-2d5670b2f875",
+      "stage": "checks_passed",
+      "dir": "/home/diego/Code/cdd-multi_pr_issue_roadmap_phase"
+    }
+  ],
+  "issue_refs": [
+    "146"
+  ]
+}
