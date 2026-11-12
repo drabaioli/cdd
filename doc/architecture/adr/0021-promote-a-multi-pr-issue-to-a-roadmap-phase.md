@@ -57,6 +57,6 @@ for it in the command.
 - Out of scope: an issue that grows mid-implementation — a single task whose PR does only part of
   it. It is not an epic and gets no phase: the human leaves it open with a progress comment, and a
   later `/cdd-next-step <ref>` resumes it from the comments. Supporting it in the tooling is a
-  follow-up: today the state record makes `/cdd-pre-pr` emit a close line, and `cdd-worktree-done`
+  follow-up (#151): today the state record makes `/cdd-pre-pr` emit a close line, and `cdd-worktree-done`
   / `-gc` close the issue after the merge, regardless.
 - #145 is the first issue to use this.
