@@ -19,7 +19,7 @@ The `issue` / `issues` keyword is checked before the pattern. The direct row mat
 
 Every mode first runs §0a, §1 and §2; "Branches at" is where its own path starts. Issue-driven is intent-driven with the intent text taken from tracker items (§0b). All modes share §4 onward; do not fork the flow beyond §0b, §1 and §3.
 
-**The tracker defines what a reference looks like.** With an empty argument there is nothing to classify: skip to §0a (roadmap-driven mode resolves the tracker in §3, only to read a cited issue). Otherwise resolve it down the ladder — project, then machine — and take the first file present:
+**The tracker defines what a reference looks like.** Resolve it down the ladder — project, then machine — and take the first file present:
 
 ```bash
 for c in .cdd/tracker ~/.cdd/adapters/tracker; do [ -e "$c" ] && { echo "$c"; break; }; done
@@ -33,7 +33,7 @@ If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the sh
 
 Use it only if the file is executable and `describe` exits 0, parses as JSON, reports `capability` `tracker`, and reports a `contract` this CDD supports (currently `1`). Otherwise the adapter is **installed but broken**: say so in **one line** naming its path, and **stop the command**. Do not try a lower rung. With nothing resolved there is no `ref_pattern`: the direct row never matches, and `issue` / `issues` still dispatches to §0b, which stops with the install line.
 
-Resolution done only to classify the argument is **silent**; the rung is announced in §0b.
+Resolution done only to classify the argument is **silent**; the rung is announced in §0b, or in §3 roadmap-driven.
 
 ## 0a. Verify the checkout is current
 
@@ -63,7 +63,7 @@ Then continue with §0b (issue-driven mode) or §1.
 
 **Announce the rung in one line** before the first call — `.cdd/tracker` or `~/.cdd/adapters/tracker`.
 
-**Direct** (every token matched): read each item, in the order given, read-only (never assign, comment, or relabel): one `<adapter> issue-read <ref>` per token, passing each through unchanged.
+**Direct** (every token matched): read each item, in the order given, read-only (never assign, comment, or relabel): one `<adapter> issue-read <ref>` per token, passing each through unchanged. If any item's `state` is `closed`, say which is already closed and stop.
 
 Several references mean one task, not several. If the items describe unrelated work, say so and ask which to scope — do not silently fold unrelated work into one handoff.
 
@@ -116,13 +116,13 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 
 If several items could reasonably be "next" (including ones that could run in parallel in separate worktrees), present them and let the user pick. Say explicitly which items overlap in the modules they would touch.
 
-Once the user has picked one task, read any issue its line cites, as context for scoping it — read-only, open or closed. Resolve the tracker down §0's ladder with §0's checks, silently, and announce the rung in one line before the first `issue-read`. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count). Read each with `<adapter> issue-read <ref>`. The issue is context, never the point of the run: a broken adapter, no `issue-read` verb, or a failed call gets one line saying the issue was not read and why (the stderr line, for exit 4), and the session carries on without it. With nothing resolved, print §0b's install line only if the line visibly cites an issue, and carry on. The task stays roadmap-driven: no issue ref is recorded (§7).
+Once the user has picked one task, read every issue its line cites, open or closed, read-only, as part of the task's context. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count); with no tracker resolved (§0), nothing is cited. Announce the rung in one line before the first `<adapter> issue-read <ref>`; §0b's preconditions apply, and a failed call stops the command. The task stays roadmap-driven: no issue ref is recorded (§7).
 
 ## 3-intent. Scope the given task (intent-driven and issue-driven modes)
 
 The task is already chosen — do **not** propose candidates. In issue-driven mode the intent text comes from §0b; everything below applies unchanged.
 
-- **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate. In issue-driven mode, a closed issue that roadmap lines cite was promoted to a phase: propose the phase's first unchecked line citing it (none left: say the phase is done) and, if the user agrees, proceed as that item, roadmap-driven, recording no issue ref (§7).
+- **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate.
 - **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task, unless it is multi-PR (below); add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
 - **Multi-PR judgement** (issue-driven): the issue is multi-PR when it shows, up front, several separately shippable steps whose order is worth planning, or asks for a phase — not merely when it looks likely to take two or three PRs. Recommend in one line naming the signal; the user decides. For a multi-PR issue the verdict is a new **roadmap phase**, recorded in Notes (§5):
   - an intro, one task line per PR — each ending with the issue's ref, in the form `ref_pattern` matches (e.g. `#NN`), and within the 200-character cap — and a milestone; the issue keeps the detail;
@@ -241,7 +241,7 @@ Create the per-repo handoff directory if it doesn't exist:
 mkdir -p ~/.cdd/handoffs/<PROJECT_DIR>
 ```
 
-Then seed the task **state record** beside the handoff, with the **base branch** agreed in §4 (substitute it for the `$(…)` default when the task stacks on a branch not checked out here). The second call runs **on the small-change lane only** (it is what `cdd-worktree` routes on; on the standard lane do not call it — an absent marker *is* the standard lane). The third runs **in issue-driven mode only** — not for a promoted issue routed to its phase (§3-intent) — with the references in the order given, each exactly as the tracker reports it (the adapter's `.ref`):
+Then seed the task **state record** beside the handoff, with the **base branch** agreed in §4 (substitute it for the `$(…)` default when the task stacks on a branch not checked out here). The second call runs **on the small-change lane only** (it is what `cdd-worktree` routes on; on the standard lane do not call it — an absent marker *is* the standard lane). The third runs **in issue-driven mode only**, with the references in the order given, each exactly as the tracker reports it (the adapter's `.ref`):
 
 ```bash
 cdd-state seed <branch> --base "$(git rev-parse --abbrev-ref HEAD)"

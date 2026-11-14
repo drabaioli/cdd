@@ -32,14 +32,12 @@ for it in the command.
    the issue is already closed, and a close line on a PR that closes nothing is noise. Closing it
    again would be harmless — `issue-transition` returns `changed: false` — so this is about noise,
    not safety.
-5. **Roadmap-driven mode reads the chosen line's cited issue**, open or closed, as context. The
-   read is a read-only consumer, the case ADR 0010 already lets print a line instead of stopping,
-   so a missing or broken tracker or a failed read costs one line and the session carries on. A
-   run with no argument therefore no longer resolves the tracker up front, and no longer stops on
-   a broken adapter.
-6. **A promoted issue routes to its phase.** `/cdd-next-step <ref>` on a closed issue that roadmap
-   lines cite leads, through the overlap check, to the phase's next unchecked line, picked as a
-   roadmap task.
+5. **Roadmap-driven mode reads the chosen line's cited issue**, open or closed, as part of the
+   task's context: the issue holds the detail the line leaves out. Failing to read it stops the
+   command, as in issue-driven mode.
+6. **Issue-driven mode refuses a closed issue.** `/cdd-next-step <ref>` on a closed issue says so
+   and stops: the issue is either done or promoted, and a promoted phase's next line comes from
+   plain `/cdd-next-step`.
 
 ## Rejected alternatives
 
