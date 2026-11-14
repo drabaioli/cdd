@@ -116,7 +116,7 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 
 If several items could reasonably be "next" (including ones that could run in parallel in separate worktrees), present them and let the user pick. Say explicitly which items overlap in the modules they would touch.
 
-Once the user has picked one task, read every issue its line cites, open or closed, read-only, as part of the task's context. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count); with no tracker resolved (§0), nothing is cited. Announce the rung in one line before the first `<adapter> issue-read <ref>`; §0b's preconditions apply, and a failed call stops the command. The task stays roadmap-driven: no issue ref is recorded (§7).
+Once the user has picked one task, read every issue its line cites, open or closed, read-only, as part of the task's context. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count). With no tracker resolved (§0) there is no `ref_pattern`: a line that still visibly cites an issue (e.g. `#145`, `PROJ-12`) cites one. Announce the rung in one line before the first `<adapter> issue-read <ref>`; §0b's preconditions apply, and a failed call stops the command. The task stays roadmap-driven: no issue ref is recorded (§7).
 
 ## 3-intent. Scope the given task (intent-driven and issue-driven modes)
 
