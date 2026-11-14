@@ -33,7 +33,7 @@ If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the sh
 
 Use it only if the file is executable and `describe` exits 0, parses as JSON, reports `capability` `tracker`, and reports a `contract` this CDD supports (currently `1`). Otherwise the adapter is **installed but broken**: say so in **one line** naming its path, and **stop the command**. Do not try a lower rung. With nothing resolved there is no `ref_pattern`: the direct row never matches, and `issue` / `issues` still dispatches to §0b, which stops with the install line.
 
-Resolution done only to classify the argument is **silent**; the rung is announced in §0b.
+Resolution done only to classify the argument is **silent**; the rung is announced in §0b, or in §3 roadmap-driven.
 
 ## 0a. Verify the checkout is current
 
@@ -63,7 +63,7 @@ Then continue with §0b (issue-driven mode) or §1.
 
 **Announce the rung in one line** before the first call — `.cdd/tracker` or `~/.cdd/adapters/tracker`.
 
-**Direct** (every token matched): read each item, in the order given, read-only (never assign, comment, or relabel): one `<adapter> issue-read <ref>` per token, passing each through unchanged.
+**Direct** (every token matched): read each item, in the order given, read-only (never assign, comment, or relabel): one `<adapter> issue-read <ref>` per token, passing each through unchanged. If any item's `state` is `closed`, say which is already closed and stop.
 
 Several references mean one task, not several. If the items describe unrelated work, say so and ask which to scope — do not silently fold unrelated work into one handoff.
 
@@ -116,12 +116,19 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 
 If several items could reasonably be "next" (including ones that could run in parallel in separate worktrees), present them and let the user pick. Say explicitly which items overlap in the modules they would touch.
 
+Once the user has picked one task, read every issue its line cites, open or closed, read-only, as part of the task's context. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count). With no tracker resolved (§0) there is no `ref_pattern`: a line that still visibly cites an issue (e.g. `#145`, `PROJ-12`) cites one. Announce the rung in one line before the first `<adapter> issue-read <ref>`; §0b's preconditions apply, and a failed call stops the command. The task stays roadmap-driven: no issue ref is recorded (§7).
+
 ## 3-intent. Scope the given task (intent-driven and issue-driven modes)
 
 The task is already chosen — do **not** propose candidates. In issue-driven mode the intent text comes from §0b; everything below applies unchanged.
 
 - **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate.
-- **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task; add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
+- **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task, unless it is multi-PR (below); add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
+- **Multi-PR judgement** (issue-driven): the issue is multi-PR when it shows, up front, several separately shippable steps whose order is worth planning, or asks for a phase — not merely when it looks likely to take two or three PRs. Recommend in one line naming the signal; the user decides. For a multi-PR issue the verdict is a new **roadmap phase**, recorded in Notes (§5):
+  - an intro, one task line per PR — each ending with the issue's ref, in the form `ref_pattern` matches (e.g. `#NN`), and within the 200-character cap — and a milestone; the issue keeps the detail;
+  - this task adds the phase; ask whether it also does the phase's first line (adding the phase alone usually qualifies for the small-change lane, §4b);
+  - if the issue asks for a convergence step first (decisions to confirm, research to finish), that step is the first line, worded so its task adds or confirms the implementation lines once the user approves the final shape; until then propose those lines only as the issue sketches them, or not at all;
+  - the issue's ref is still recorded (§7), so this task's PR closes it; the phase's later tasks are picked roadmap-driven and record none.
 
 Then continue with §4.
 
@@ -194,7 +201,9 @@ The prompt is a plain task spec: no standing instructions about planning, commit
 
 **Notes**: deferred questions (§4), the roadmap-belonging verdict (§3-intent), and any roadmap changes the discussion surfaced (tasks to add, split, remove, or reword), as instructions to the implementation session. **Do not edit the roadmap file in this session.** The implementing session makes the edits: `/cdd-implement`, or `/cdd-small-change` on the small-change lane.
 
-Then, immediately before asking for approval, print a short digest of the handoff in chat, following the `CLAUDE.md` rule — short, plain, only what changes the answer — so the human can approve or push back without opening the handoff. What usually earns a line: what the task is and which lane it takes, how much research the plan session should do (or that it is left to the planner), why it is worth doing now, what "done" means, anything deliberately out of scope, and any question deferred to `/cdd-plan`. Say what applies and drop the rest.
+**Multi-PR issue** (§3-intent): Notes carry the whole phase, exact lines included. `## Roadmap reference` holds the phase's first line marked `(added by this task)` when this task also does it, else `None — adds the phase in Notes`.
+
+Then, immediately before asking for approval, print a short digest of the handoff in chat, following the `CLAUDE.md` rule — short, plain, only what changes the answer — so the human can approve or push back without opening the handoff. What usually earns a line: what the task is and which lane it takes, how much research the plan session should do (or that it is left to the planner), why it is worth doing now, what "done" means, the proposed phase for a multi-PR issue and whether this task also does its first line, anything deliberately out of scope, and any question deferred to `/cdd-plan`. Say what applies and drop the rest.
 
 Show the draft for approval. Iterate if needed.
 
