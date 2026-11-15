@@ -81,7 +81,8 @@ CLOSED="$WORK/closed"
 FAILING="$WORK/failing"
 COMMENT_FAILING="$WORK/comment-failing"
 MERGED="$WORK/merged"
-export GH_LOG CLOSED FAILING COMMENT_FAILING MERGED
+COMMENTS="$WORK/comments"
+export GH_LOG CLOSED FAILING COMMENT_FAILING MERGED COMMENTS
 
 # Stub gh: logs every call. `issue view` reads $CLOSED; `issue close` fails for a ref in
 # $FAILING and otherwise records the ref in $CLOSED; `issue comment` fails for a ref in
@@ -109,7 +110,8 @@ EOF
 chmod +x "$WORK/bin/gh"
 
 # make_tracker <dest> <mode>: a stub tracker adapter logging to $TRACKER_LOG, sharing
-# the gh stub's $CLOSED / $FAILING / $COMMENT_FAILING. Modes: working; no-transition
+# the gh stub's $CLOSED / $FAILING / $COMMENT_FAILING; each comment it posts lands in
+# $COMMENTS, which issue-read returns as the issue's comments. Modes: working; no-transition
 # (does not declare issue-transition); no-comment (does not declare issue-comment);
 # broken (describe exits 1).
 make_tracker() {
@@ -135,7 +137,10 @@ case "$1" in
     fi ;;
   issue-comment)
     if has "$2" "$COMMENT_FAILING"; then echo "stub: comment refused" >&2; exit 1; fi
+    jq -nc --arg r "$2" --arg b "$4" '{ref: $r, body: $b}' >> "$COMMENTS"
     echo "{\"ref\":\"$2\",\"url\":\"u\"}" ;;
+  issue-read)
+    jq -sc --arg r "$2" '{ref: $r, comments: [.[] | select(.ref == $r) | {body}]}' "$COMMENTS" ;;
   *) exit 3 ;;
 esac
 EOF
@@ -188,7 +193,7 @@ reset() {
   for r in $(git -C "$WORK/origin.git" for-each-ref --format='%(refname)' refs/cdd/); do
     git -C "$WORK/origin.git" update-ref -d "$r"
   done
-  : > "$GH_LOG"; : > "$TRACKER_LOG"; : > "$CLOSED"; : > "$FAILING"; : > "$COMMENT_FAILING"; : > "$MERGED"
+  : > "$GH_LOG"; : > "$TRACKER_LOG"; : > "$CLOSED"; : > "$FAILING"; : > "$COMMENT_FAILING"; : > "$MERGED"; : > "$COMMENTS"
   make_code_host
 }
 
@@ -551,6 +556,19 @@ run "$MACHINE" cdd-worktree-gc --force
 ! grep -q "^issue-transition ABC-5" "$TRACKER_LOG" || fail "partial retry: the partial ref was transitioned$(show)"
 record_gone d_pretry || fail "partial retry: the task should be reaped$(show)"
 pass "a partial ref is linked only on the run that reaps, so a gc retry never comments twice"
+
+# 12h2. The issue already carries this PR's partly-done link (done linked it, then failed
+# to remove the worktree or delete refs/cdd): a rerun reads it and does not post again.
+reset
+make_tracker "$MACHINE_TRACKER" working
+jq -nc --arg b "$PARTLY" '{ref: "ABC-6", body: $b}' > "$COMMENTS"
+task d_plinked '["ABC-6"]' '["ABC-6"]'; merged d_plinked; worktree d_plinked
+run "$WORK/wt-d_plinked" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "partial, already linked: exited $RC$(show)"
+grep -qx "issue ABC-6: PR #7 already linked" "$WORK/out" || fail "partial, already linked: expected the already-linked line$(show)"
+! grep -q "^issue-comment ABC-6" "$TRACKER_LOG" || fail "partial, already linked: commented a second time$(show)"
+record_gone d_plinked || fail "partial, already linked: the record should be removed$(show)"
+pass "a partial ref whose issue already carries the PR's link is not commented on again"
 
 # 12i. End to end through the real verb: the record carries only issue_refs, the feature
 # worktree marks one ref with `cdd-state partial-refs` (as /cdd-pre-pr does), and done

@@ -29,7 +29,8 @@ issue whose PR turns out to do only part of it: the human leaves it open and a l
    on the keys of its own line; and a squash merge can copy the body into the commit message.
 4. **After the merge, `done` / `gc` skip `issue-transition` for a partial ref** and reuse
    `issue-comment` to link the merged PR — only on a run where no other close failed, the run
-   that lets the record be reaped, so a gc retry never comments twice.
+   that lets the record be reaped, and only when `issue-read` does not already show that link,
+   since an open issue has no `changed: false` to stop a rerun from commenting twice.
 
 Rejected:
 

@@ -375,7 +375,8 @@ cdd-worktree-resolve-tracker() {
 #
 # A ref in the caller's CDD_PARTIAL_REFS is never transitioned: it stays open, and gets
 # the merged PR linked only on a run where no close failed — the run that lets the
-# record be reaped — so a gc retry never comments twice on it either.
+# record be reaped — and only when the issue does not carry that link already, so no
+# rerun or gc retry comments twice on it either.
 cdd-worktree-close-issues() {  # cdd-worktree-close-issues <pr-ref> <pr-url> <ref>...
   local CDD_ADAPTER="$CDD_TRACKER" CDD_ADAPTER_DESCRIBE="$CDD_TRACKER_DESCRIBE"
   local CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" ref p rc failed=0 i
@@ -440,6 +441,16 @@ cdd-worktree-link-pr() {  # cdd-worktree-link-pr <ref> <pr-ref> <pr-url> [partia
   fi
   if [[ -n "$CDD_ADAPTER" ]]; then
     (( CDD_LINK_UNSUPPORTED )) && return 0
+    # A partial ref stays open, so unlike a close there is no `changed: false` to stop a
+    # second comment when the record outlives this run (done failing after step 2, or a
+    # refs/cdd delete failing). Skip it when the issue already carries this PR's link; a
+    # failed or unsupported read posts anyway.
+    if [[ "${4:-}" == partial ]] && cdd-worktree-adapter-call issue-read "$ref" \
+      && jq -e --arg n "${body%. Left open*}" 'any(.comments[]?.body | strings; contains($n))' \
+        <<<"$CDD_ADAPTER_OUT" >/dev/null 2>&1; then
+      echo "issue $ref: $label already linked"
+      return 0
+    fi
     cdd-worktree-adapter-call issue-comment "$ref" --body "$body" || rc=$?
     if (( rc == 0 )); then
       echo "issue $ref: linked $label"
