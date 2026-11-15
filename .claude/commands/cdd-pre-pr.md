@@ -62,7 +62,7 @@ Review for:
 - Design issues (coupling, responsibility boundaries, API shape).
 - Compliance with the project coding standard linked from CLAUDE.md.
 
-Flag any issues found. If the change establishes a convention that should become the project norm, update the coding standard accordingly.
+Fix a clear defect yourself — one with a single obvious fix inside the branch's scope — and rerun the gates it touches; it rides in step 10's commit. Flag only what needs a judgement call: a design change, wider scope, or more than one reasonable fix. If the change establishes a convention that should become the project norm, update the coding standard accordingly.
 
 **Then check the diff against the handoff's acceptance criteria** — its `## Requirements` section.
 
@@ -153,7 +153,7 @@ Present a checklist summary:
 ```
 ## Pre-PR Checklist
 - [ ] Check runner passed (<N> gates: <N> passed, <N> failed)
-- [ ] Code review: no issues / issues flagged (list them)
+- [ ] Code review: no issues / fixed (list them) / flagged (list them)
 - [ ] Handoff requirements met (or unmet/deviating criteria listed)
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
@@ -171,7 +171,7 @@ Mark each item as pass ✓ or needs attention ✗ with details.
 
 ## 10. Commit reconciliation edits
 
-Commit the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). Local commit only — **no push**; pushing happens, if at all, in step 11.
+Commit step 3's fixes and the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). Local commit only — **no push**; pushing happens, if at all, in step 11.
 
 First check the entry snapshot from step 1:
 
