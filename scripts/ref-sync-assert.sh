@@ -5,7 +5,11 @@
 # `git init --bare` for `origin` and two clones with separate $HOME dirs as
 # "machine A" and "machine B". It sources both helpers (tools/cdd-state.sh and
 # tools/cdd-worktree.sh) and asserts:
-#   - `cdd-state seed`/`set` on machine A push refs/cdd/<branch> to origin
+#   - the sync is opt-in (ADR 0022): with `cdd.syncTaskRef` unset, `seed` writes the
+#     local record and pushes no refs/cdd/* ref; a non-boolean value warns (naming
+#     the key) and still pushes nothing
+#   - with `git config cdd.syncTaskRef true` on the clone (the per-clone form),
+#     `cdd-state seed`/`set` on machine A push refs/cdd/<branch> to origin
 #   - `cdd-worktree-resume <branch>` on a fresh machine B materializes the handoff
 #     (byte-for-byte), the plan file (process doc 2.15) and the state record (at the
 #     advanced stage), no `claude`
@@ -14,7 +18,8 @@
 #     clobbered (it is immutable after seed)
 #   - the plan file travels WITH the state record, since unlike the handoff it is
 #     mutable: taken when the ref's record wins, kept when the local record wins
-#   - the no-ref path still resumes cleanly (materializes nothing, exits 0)
+#   - the no-ref path still resumes cleanly (materializes nothing, exits 0) and its
+#     message names the `cdd.syncTaskRef` setting
 #
 # Usage: scripts/ref-sync-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. Requires jq
@@ -55,6 +60,7 @@ EOF
 DEFAULT_BRANCH="main"
 FEATURE="feat_sync"
 FEATURE_NO="feat_noref"  # pushed to origin, but never gets a refs/cdd/* ref
+FEATURE_OFF="feat_off"   # seeded with the sync off: must never get a refs/cdd/* ref
 BASE_TASK="develop"      # a non-default base recorded at seed; must ride the ref
 
 # Stub `claude` on PATH as a negative guard: resume must never invoke it.
@@ -120,6 +126,30 @@ HOME_A="$WORK/homeA"
 git clone -q "$WORK/origin.git" "$WORK/machineA"
 DIR_A="$(handoff_dir "$HOME_A" "$WORK/machineA")"
 mkdir -p "$DIR_A"
+
+# 2a. Off by default (ADR 0022): with cdd.syncTaskRef unset, a seed writes the local
+# record and pushes nothing.
+printf '# Task: %s\n\nSync-off handoff.\n' "$FEATURE_OFF" > "$DIR_A/$FEATURE_OFF.md"
+run_state "$WORK/machineA" "$HOME_A" seed "$FEATURE_OFF" >/dev/null 2>&1 \
+  || fail "cdd-state seed failed on machine A with the sync off"
+[[ -f "$DIR_A/$FEATURE_OFF.state.json" ]] \
+  || fail "seed with the sync off did not write the local record"
+[[ -z "$(git -C "$WORK/machineA" ls-remote origin 'refs/cdd/*')" ]] \
+  || fail "seed with cdd.syncTaskRef unset pushed a refs/cdd/* ref"
+pass "sync off by default: seed wrote the local record and pushed no ref"
+
+# 2b. A value git cannot read as a boolean warns, naming the key, and pushes nothing.
+git -C "$WORK/machineA" config cdd.syncTaskRef maybe
+err="$(run_state "$WORK/machineA" "$HOME_A" lane "$FEATURE_OFF" small 2>&1 >/dev/null)" \
+  || fail "cdd-state lane failed on machine A with a non-boolean cdd.syncTaskRef"
+grep -q "cdd.syncTaskRef" <<<"$err" \
+  || fail "a non-boolean cdd.syncTaskRef should warn naming the key (got: $err)"
+[[ -z "$(git -C "$WORK/machineA" ls-remote origin 'refs/cdd/*')" ]] \
+  || fail "a non-boolean cdd.syncTaskRef pushed a refs/cdd/* ref"
+pass "non-boolean cdd.syncTaskRef warned and pushed nothing"
+
+# 2c. Turn the sync on per clone; the assertions below prove that form pushes.
+git -C "$WORK/machineA" config cdd.syncTaskRef true
 HANDOFF_A="$DIR_A/$FEATURE.md"
 printf '# Task: %s\n\nScoped handoff body.\nNo trailing weirdness.\n' "$FEATURE" > "$HANDOFF_A"
 
@@ -231,6 +261,8 @@ set -e
   || fail "no-ref resume must not materialize a handoff"
 grep -q "No synced task ref" <<<"$out" \
   || fail "no-ref resume should print the honest no-transfer message"
+grep -q "cdd.syncTaskRef" <<<"$out" \
+  || fail "no-ref resume should name the cdd.syncTaskRef setting"
 [[ ! -s "$CLAUDE_STUB_LOG" ]] || fail "no-ref resume must not launch claude"
 pass "no-ref path resumes cleanly without materializing anything"
 

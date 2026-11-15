@@ -33,6 +33,8 @@ trap 'rm -rf "$WORK"' EXIT
 
 # Isolate from the caller's git identity / signing config; keep runs deterministic.
 export GIT_CONFIG_SYSTEM=/dev/null
+# The sync to refs/cdd/<branch> is opt-in (ADR 0022); this gate asserts the push,
+# so its throwaway global config turns it on (the --global form).
 export GIT_CONFIG_GLOBAL="$WORK/gitconfig"
 cat > "$GIT_CONFIG_GLOBAL" <<'GITCONFIG'
 [user]
@@ -42,6 +44,8 @@ cat > "$GIT_CONFIG_GLOBAL" <<'GITCONFIG'
 	defaultBranch = main
 [commit]
 	gpgsign = false
+[cdd]
+	syncTaskRef = true
 GITCONFIG
 
 DEFAULT_BRANCH="main"
@@ -180,6 +184,11 @@ synced="$(git -C "$CLONE" show "$ref_commit:state.json")"
   || fail "h: the held write's session did not ride the task ref"
 [[ "$(jq -r '.stage' <<<"$synced")" == "addressed" ]] \
   || fail "h: the ref's record does not carry the held stage"
-pass "a held write still syncs refs/cdd/$FEATURE with the appended session"
+# The ref leaves the machine, so it drops the session's local dir; the local record keeps it.
+[[ "$(jq '.sessions[-1] | has("dir")' <<<"$synced")" == "false" ]] \
+  || fail "h: the ref's record still carries sessions[].dir"
+[[ "$(jq '.sessions[-1] | has("dir")' "$FILE")" == "true" ]] \
+  || fail "h: the local record lost sessions[].dir"
+pass "a held write still syncs refs/cdd/$FEATURE with the appended session, minus its local dir"
 
 echo "all state-stage checks passed"
