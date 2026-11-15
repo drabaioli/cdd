@@ -237,7 +237,7 @@ cdd-worktree-adapter() {
     return 2
   fi
   CDD_ADAPTER="$path" CDD_ADAPTER_DESCRIBE="$desc"
-  # Only the machine rung is announced; the project's own binding serves silently (ADR 0022).
+  # Only the machine rung is announced; the project's own binding serves silently (ADR 0023).
   if [[ "$path" == "$HOME/.cdd/adapters/$cap" ]]; then
     echo "$cap: using adapter $shown ($(jq -r '.backend // "?"' <<<"$desc"))" >&2
   fi

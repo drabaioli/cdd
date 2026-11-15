@@ -395,7 +395,7 @@ The helpers' side is detailed in [Shell helpers](shell-helpers.md#code-host-reso
 Announcing which rung served is scoped **to the point of use, not to the session**:
 
 - Resolution performed merely to **classify** something — deciding whether `$ARGUMENTS` looks like an issue reference, say — is **silent**. Taken literally, "say when no adapter is installed" would print a line in every session in every repo, since no project has an adapter; that is noise, and noise is how a load-bearing line stops being read.
-- When a call is **actually made**, a machine-rung adapter is announced in one line, in prompts and helpers alike, and the project's own `.cdd/<capability>` serves silently ([ADR 0022](adr/0022-say-nothing-when-all-is-normal.md)) — or, with nothing installed, the one missing-adapter line above.
+- When a call is **actually made**, a machine-rung adapter is announced in one line, in prompts and helpers alike, and the project's own `.cdd/<capability>` serves silently ([ADR 0023](adr/0023-say-nothing-when-all-is-normal.md)) — or, with nothing installed, the one missing-adapter line above.
 - **The shell helpers say what they skip.** `cdd-worktree-done`, `-gc`, `-list` and `-resume` print the missing-adapter line once when a code-host (or, for the issue close, tracker) adapter is needed and absent, because with the built-in rung gone a silent skip would be indistinguishable from "nothing to do". `done` then falls to its keep/delete/abort prompt and keeps the task record for `gc`; `gc` reaps nothing; `list` and `resume` show no PR column.
 - **The broken-adapter line is unconditional**, even during silent classification. The user installed something that is not working, and silence there is indistinguishable from it working.
 

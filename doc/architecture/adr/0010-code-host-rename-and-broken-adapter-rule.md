@@ -1,6 +1,6 @@
 # 0010: Rename "forge" to "code host", and stop on a broken adapter
 
-**Status:** Accepted; partially superseded by [0012](0012-drop-the-builtin-gh-rung.md) (a missing adapter no longer falls through to a built-in `gh` rung, and the helpers no longer have a silent built-in rung to be silent on), and by [0022](0022-say-nothing-when-all-is-normal.md) (only the machine rung is announced)
+**Status:** Accepted; partially superseded by [0012](0012-drop-the-builtin-gh-rung.md) (a missing adapter no longer falls through to a built-in `gh` rung, and the helpers no longer have a silent built-in rung to be silent on), and by [0023](0023-say-nothing-when-all-is-normal.md) (only the machine rung is announced)
 
 ## Context
 

@@ -10,7 +10,7 @@
 #     keep/delete/abort prompt, list and resume show no PR status; `gh` is never called
 #   - installed and working        -> it serves and `gh` is never called; the project
 #     rung wins over the machine rung and serves silently; the machine rung is
-#     announced in exactly one stderr line (ADR 0022)
+#     announced in exactly one stderr line (ADR 0023)
 #   - installed but broken (not executable; describe exits non-zero, prints non-JSON,
 #     reports an unsupported contract or another capability) -> one line naming it,
 #     and NO lower rung: neither a working machine adapter nor `gh` is consulted.

@@ -1,4 +1,4 @@
-# 0022: Say nothing when all is normal
+# 0023: Say nothing when all is normal
 
 **Status:** Accepted
 
