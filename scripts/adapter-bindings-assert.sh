@@ -113,6 +113,7 @@ resolve "$HOME_C" "$CLONE" code-host
 grep -qF "code-host adapter .cdd/code-host is unusable: describe exited 4: adapter library missing" "$WORK/err" \
   || fail "no library: the line should name the adapter and relay describe's reason: $(cat "$WORK/err")"
 grep -qF "cdd-worktree.sh install" "$WORK/err" || fail "no library: the line should carry the install command"
+grep -qF "cdd-worktree.sh update" "$WORK/err" || fail "no library: the line should carry the no-checkout install (update)"
 pass "without the library the resolver stops in one line carrying the install hint"
 
 # --- 5. a Jira binding carries its coordinates, never a credential -------------

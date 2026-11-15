@@ -10,25 +10,29 @@
 #
 #   tools/cdd-worktree.sh install
 #
+# It also installs the task-state helper (cdd-state.sh) from beside it (issue #150),
+# so this one command installs both helpers.
+#
 # On a machine without a CDD checkout (a fresh machine with only a downstream CDD
-# project), fetch the canonical script to its home and run it in one step:
+# project), fetch the canonical script to its home and let `update` do the install:
 #
 #   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
 #     --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
-#     && bash ~/.cdd/tools/cdd-worktree.sh install
+#     && bash ~/.cdd/tools/cdd-worktree.sh update
 #
-# (It must land on disk first; `curl ... | bash` won't work because install copies
-# itself from its own file path, which a piped stdin does not provide.)
+# `update`, not `install`: a lone curled file has nothing beside it to install, and
+# `update` fetches upstream tools/ and installs from it. (It must land on disk first;
+# `curl ... | bash` won't work because install copies itself from its own file path,
+# which a piped stdin does not provide.)
 #
-# Either form copies the helper to ~/.cdd/tools/cdd-worktree.sh, appends a
-# marker-guarded source line to ~/.bashrc and ~/.zshrc (idempotent), and migrates
-# any handoffs from the old ~/.claude-handoffs/ location. After installing, open a
-# new shell; the CDD clone can then disappear and the commands still work.
+# Either form copies the helpers to ~/.cdd/tools/, appends marker-guarded source
+# lines to ~/.bashrc and ~/.zshrc (idempotent), and migrates any handoffs from the
+# old ~/.claude-handoffs/ location. After installing, open a new shell; the CDD
+# clone can then disappear and the commands still work.
 #
-# Run from a CDD checkout, install also copies the shipped capability adapters
-# (tools/adapters/<cap>/<backend>.sh) to ~/.cdd/tools/adapters/ -- a library the
-# committed .cdd/<cap> bindings exec, never a resolution-ladder rung (ADR 0011). The
-# curl form above fetches only this file, so it prints the per-adapter curl form.
+# Install also copies the shipped capability adapters (tools/adapters/<cap>/<backend>.sh)
+# from beside it to ~/.cdd/tools/adapters/ -- a library the committed .cdd/<cap>
+# bindings exec, never a resolution-ladder rung (ADR 0011).
 #
 # Staying current (ADR 0014): run from a CDD git checkout, install also writes a
 # post-merge + post-rewrite hook into it, so a pull that lands on its default branch
@@ -1330,7 +1334,7 @@ cdd-worktree-tools-differ() {
 # `cdd-worktree.sh sync`: what the checkout's post-merge / post-rewrite hook runs (see
 # cdd-worktree-install-hooks), with cwd = the worktree's top level. When the pull landed
 # on the default branch and left this checkout's tools/ differing from the install, it
-# re-runs both installs from here and prints one line; otherwise it prints nothing and
+# re-runs the install from here (which installs both helpers) and prints one line; otherwise it prints nothing and
 # changes nothing. Pulls on other branches (a feature worktree's /cdd-merge-base shares
 # the hook) never install. Always returns 0: a hook must never fail the git command.
 #
@@ -1349,11 +1353,10 @@ cdd-worktree-sync() {
   [[ "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" == "$default_branch" ]] || return 0
   cdd-worktree-tools-differ "$top/tools" || return 0
   # stdout only: a refusal's reason (a missing required tool) must reach the user.
-  if bash "$top/tools/cdd-worktree.sh" install >/dev/null \
-     && bash "$top/tools/cdd-state.sh" install >/dev/null; then
+  if bash "$top/tools/cdd-worktree.sh" install >/dev/null; then
     echo "cdd: updated the installed CDD helpers from this pull ($top); open shells pick it up on their next command." >&2
   else
-    echo "cdd: this pull changed the CDD helpers, but reinstalling failed; run: bash $top/tools/cdd-worktree.sh install && bash $top/tools/cdd-state.sh install" >&2
+    echo "cdd: this pull changed the CDD helpers, but reinstalling failed; run: bash $top/tools/cdd-worktree.sh install" >&2
   fi
   return 0
 }
@@ -1414,14 +1417,17 @@ HOOK
 }
 
 # `cdd-worktree.sh update`: bring the install up to date with upstream main, for a
-# machine with no CDD checkout (or one that wants it now). On demand only — no command
+# machine with no CDD checkout (or one that wants it now) -- and the first install on
+# such a machine, after a curl of this one file: a missing installed counterpart counts
+# as different, so everything gets installed. On demand only — no command
 # ever reaches the network on its own. Fetches just tools/ (a shallow, blobless, sparse
-# clone into a temp dir), compares it with the install, and runs the normal installs
+# clone into a temp dir), compares it with the install, and runs the normal install
 # from that clone when anything differs. One result line; an unreachable upstream is
 # one line, exit 1, and changes nothing. CDD_UPSTREAM_URL overrides the upstream (a test
 # knob: the toolchain-sync gate points it at a local stub).
 cdd-worktree-update() {
-  local url="${CDD_UPSTREAM_URL:-https://github.com/drabaioli/cdd.git}" tmp rc=0
+  local url="${CDD_UPSTREAM_URL:-https://github.com/drabaioli/cdd.git}" tmp rc=0 first=0
+  [[ -f "$HOME/.cdd/tools/cdd-state.sh" ]] || first=1
   tmp="$(mktemp -d)" || return 1
   if ! GIT_TERMINAL_PROMPT=0 git clone -q --depth 1 --filter=blob:none --sparse "$url" "$tmp/cdd" >/dev/null 2>&1 \
      || ! git -C "$tmp/cdd" sparse-checkout set tools >/dev/null 2>&1; then
@@ -1431,10 +1437,13 @@ cdd-worktree-update() {
   fi
   if ! cdd-worktree-tools-differ "$tmp/cdd/tools"; then
     echo "CDD helpers are up to date with upstream main."
-  elif bash "$tmp/cdd/tools/cdd-worktree.sh" install >/dev/null \
-       && bash "$tmp/cdd/tools/cdd-state.sh" install >/dev/null; then
+  elif bash "$tmp/cdd/tools/cdd-worktree.sh" install >/dev/null; then
     # Installing from the clone also hooks the clone itself; harmless, it is deleted below.
-    echo "Updated the CDD helpers from upstream main; open shells pick it up on their next command."
+    if (( first )); then
+      echo "Installed the CDD helpers from upstream main; open a new shell so the commands are available."
+    else
+      echo "Updated the CDD helpers from upstream main; open shells pick it up on their next command."
+    fi
   else
     echo "cdd: fetched upstream main, but installing it failed, so the install may be partly updated; re-run: bash ~/.cdd/tools/cdd-worktree.sh update" >&2
     rc=1
@@ -1459,8 +1468,9 @@ cdd-worktree-install() {
   mkdir -p "$dest_dir" "$HOME/.cdd/handoffs"
 
   # Copy this running script to the stable home, unless we're already it.
-  local src
+  local src src_dir
   src="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  src_dir="$(dirname "$src")"
   if [[ "$src" != "$dest" ]]; then
     cp "$src" "$dest"
     chmod +x "$dest"
@@ -1469,15 +1479,20 @@ cdd-worktree-install() {
     echo "Helper already at $dest (running from the installed copy)."
   fi
 
+  # One installer: the state helper ships beside this one (issue #150). Its stdout is
+  # folded into one line; its stderr (notes, a refusal's reason) still shows.
+  if [[ -f "$src_dir/cdd-state.sh" ]]; then
+    bash "$src_dir/cdd-state.sh" install >/dev/null || return $?
+    echo "Installed helper: $dest_dir/cdd-state.sh"
+  fi
+
   # Copy the shipped capability adapters beside it, as a machine-global LIBRARY at
   # ~/.cdd/tools/adapters/<cap>/<backend>.sh -- deliberately not a resolution-ladder
   # rung (that is ~/.cdd/adapters/<cap>), so installing binds no project. A project
   # binds by committing a .cdd/<cap> shim that execs a library file (ADR 0011).
   # Newest wins: shipped files are overwritten, nothing is deleted. Nothing to copy
-  # when running from the installed copy (the library is already its sibling); a
-  # note when no library results (a curl-only install fetches this one file).
-  local src_dir lib_dir="$dest_dir/adapters" a rel lib_count=0
-  src_dir="$(dirname "$src")"
+  # when running from the installed copy (the library is already its sibling).
+  local lib_dir="$dest_dir/adapters" a rel lib_count=0
   if [[ "$src_dir" != "$dest_dir" && -d "$src_dir/adapters" ]]; then
     shopt -s nullglob
     for a in "$src_dir"/adapters/*/*.sh; do
@@ -1489,9 +1504,15 @@ cdd-worktree-install() {
     done
     shopt -u nullglob
     echo "Installed adapter library: $lib_dir ($lib_count adapter(s))"
-  elif [[ ! -d "$lib_dir" ]]; then
-    echo "Note: no adapters/ beside $src, so no adapter library is installed. A project binding (.cdd/<cap>) needs it; fetch each adapter it names with:" >&2
-    echo "  curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/adapters/<cap>/<backend>.sh --create-dirs -o ~/.cdd/tools/adapters/<cap>/<backend>.sh && chmod +x ~/.cdd/tools/adapters/<cap>/<backend>.sh" >&2
+  fi
+
+  # A lone copy (a curl of this one file) installs only itself: name what is missing
+  # and the one command that fetches the rest.
+  local missing=""
+  [[ -f "$dest_dir/cdd-state.sh" ]] || missing="cdd-state.sh"
+  [[ -d "$lib_dir" ]] || missing="${missing:+$missing and }the adapter library (adapters/)"
+  if [[ -n "$missing" ]]; then
+    echo "Note: not installed: $missing (nothing beside $src to install it from); fetch the rest with: bash ~/.cdd/tools/cdd-worktree.sh update" >&2
   fi
 
   # Run from a CDD git checkout, hook it so a pull of its default branch keeps this

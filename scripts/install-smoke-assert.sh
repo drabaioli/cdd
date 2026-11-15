@@ -28,8 +28,9 @@
 #     nothing created) and treat --help as usage (exit 0) — the guard whose absence had
 #     `cdd-worktree --help` cutting a branch and a worktree literally called "--help"
 #
-# It also runs `tools/cdd-state.sh install` and asserts the same shim contract
-# for the `cdd-state` command, since that helper self-installs identically, plus three
+# `cdd-worktree.sh install` also installs the task-state helper from beside it (issue
+# #150): the gate asserts, from that first install alone, the `cdd-state` helper, its rc
+# block and the same shim contract for the `cdd-state` command, plus three
 # properties of `cdd-state seed`: the recorded handoff session, the synced task ref
 # refs/cdd/<branch>, and the per-repo marker repo.json — whose `path` must be the MAIN
 # worktree, not the worktree the writer ran in.
@@ -97,6 +98,16 @@ HOME="$FAKE_HOME" "$HELPER" install >/dev/null
 DEST="$FAKE_HOME/.cdd/tools/cdd-worktree.sh"
 [[ -f "$DEST" && -x "$DEST" ]] || fail "helper not copied (or not executable) to $DEST"
 pass "helper copied to ~/.cdd/tools/ and executable"
+
+# Issue #150: checked here, before any other install runs, so nothing but the worktree
+# install can have put cdd-state in place.
+ST_DEST="$FAKE_HOME/.cdd/tools/cdd-state.sh"
+[[ -f "$ST_DEST" && -x "$ST_DEST" ]] || fail "cdd-worktree.sh install did not install cdd-state.sh to $ST_DEST"
+[[ -f "$FAKE_HOME/.local/bin/cdd-state" && -x "$FAKE_HOME/.local/bin/cdd-state" ]] \
+  || fail "cdd-worktree.sh install did not write the cdd-state PATH shim"
+markers=$(grep -cF "CDD state helper (managed by cdd-state.sh install) BEGIN" "$FAKE_HOME/.bashrc")
+[[ "$markers" -eq 1 ]] || fail "cdd-worktree.sh install: expected one cdd-state marker block in .bashrc, found $markers"
+pass "cdd-worktree.sh install alone installs cdd-state (helper, shim, rc block) (issue #150)"
 
 [[ -d "$FAKE_HOME/.cdd/handoffs" ]] || fail "handoff root ~/.cdd/handoffs not created"
 pass "handoff root created"
@@ -260,8 +271,7 @@ markers=$(grep -cF "CDD worktree helper (managed by cdd-worktree.sh install) BEG
 [[ "$markers" -eq 1 ]] || fail "self-repair left more than one worktree marker block (found $markers)"
 pass "install self-repairs a disabled worktree block (active again, still single)"
 
-# The task-state helper self-installs identically; assert its shim contract too.
-HOME="$FAKE_HOME" "$STATE_HELPER" install >/dev/null
+# The worktree install wrote the cdd-state shim too; assert its shim contract.
 STATE_SHIM="$FAKE_HOME/.local/bin/cdd-state"
 [[ -f "$STATE_SHIM" && -x "$STATE_SHIM" ]] || fail "cdd-state shim missing/not executable: $STATE_SHIM"
 # Resolution under a non-interactive, PATH-only shell is the property that keeps
@@ -441,7 +451,7 @@ ST_ACTIVE='^[[:space:]]*\[\[ -f "\$HOME/\.cdd/tools/cdd-state\.sh" \]\] && sourc
 comment_block "$FAKE_HOME/.bashrc" "$ST_BEGIN" "$ST_END"
 grep -qE "$ST_ACTIVE" "$FAKE_HOME/.bashrc" \
   && fail "precondition: state block still active after comment_block"
-HOME="$FAKE_HOME" "$STATE_HELPER" install >/dev/null
+HOME="$FAKE_HOME" "$HELPER" install >/dev/null
 grep -qE "$ST_ACTIVE" "$FAKE_HOME/.bashrc" \
   || fail "install did not self-repair a disabled state block to an active source line"
 markers=$(grep -cF "CDD state helper (managed by cdd-state.sh install) BEGIN" "$FAKE_HOME/.bashrc")
