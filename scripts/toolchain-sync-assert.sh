@@ -22,6 +22,8 @@
 #   9. behind -> "Updated", installed files now upstream's; again -> "up to date";
 #      unreachable -> one line, exit 1, nothing changed. Run from the installed copy it
 #      overwrites, so it also pins that bash never reads past the dispatch afterwards.
+#  9b. a fresh HOME holding only a curled cdd-worktree.sh: update is the first install —
+#      "Installed", both helpers, the adapter library, both rc blocks, all six shims
 # cdd-state's loud failures:
 #  10. an unknown verb and an invalid stage still exit 2, and name the update command
 #
@@ -102,7 +104,6 @@ snapshot() {
 # --- 1. install writes the hooks only into a checkout ---------------------------
 bash "$CHECKOUT/tools/cdd-worktree.sh" install >"$WORK/install.out" 2>&1 \
   || fail "install from the checkout failed: $(cat "$WORK/install.out")"
-bash "$CHECKOUT/tools/cdd-state.sh" install >/dev/null 2>&1 || fail "cdd-state install failed"
 HOOKS="$CHECKOUT/.git/hooks"
 for h in post-merge post-rewrite; do
   [[ -f "$HOOKS/$h" && -x "$HOOKS/$h" ]] || fail "install did not write an executable $h hook"
@@ -292,6 +293,27 @@ if [[ "$(wc -l <<<"$out")" -ne 1 ]] || ! grep -qF "could not fetch" <<<"$out"; t
 fi
 [[ "$(snapshot)" == "$before" ]] || fail "update from an unreachable upstream changed the install"
 pass "update: behind -> updated, current -> up to date, unreachable -> one line and nothing changed"
+
+# --- 9b. update as the first install after a curl of the one script (issue #150) ----
+FRESH="$WORK/home-fresh"
+mkdir -p "$FRESH/.cdd/tools"
+cp "$SEED/tools/cdd-worktree.sh" "$FRESH/.cdd/tools/cdd-worktree.sh"   # the curl
+RC=0
+out="$(HOME="$FRESH" CDD_UPSTREAM_URL="file://$UPSTREAM" bash "$FRESH/.cdd/tools/cdd-worktree.sh" update 2>&1)" || RC=$?
+(( RC == 0 )) || fail "update on a fresh HOME exited $RC: $out"
+grep -qF "Installed the CDD helpers from upstream main" <<<"$out" || fail "update on a fresh HOME did not say it installed: $out"
+shopt -s nullglob
+for f in "$SEED/tools/cdd-state.sh" "$SEED"/tools/adapters/*/*.sh; do
+  cmp -s "$f" "$FRESH/.cdd/tools/${f#"$SEED"/tools/}" || fail "update on a fresh HOME did not install ${f#"$SEED"/tools/}"
+done
+shopt -u nullglob
+for m in "CDD worktree helper (managed by cdd-worktree.sh install) BEGIN" "CDD state helper (managed by cdd-state.sh install) BEGIN"; do
+  [[ "$(grep -cF "$m" "$FRESH/.bashrc")" -eq 1 ]] || fail "update on a fresh HOME: expected one '$m' block in .bashrc"
+done
+for c in cdd-worktree cdd-worktree-resume cdd-worktree-done cdd-worktree-list cdd-worktree-gc cdd-state; do
+  [[ -x "$FRESH/.local/bin/$c" ]] || fail "update on a fresh HOME did not write the $c shim"
+done
+pass "update on a fresh HOME with only the curled script installs both helpers, the library, both rc blocks and all six shims"
 
 # --- 10. cdd-state's loud failures name the update command -------------------------
 state_fails() {  # state_fails <cdd-state arg>...

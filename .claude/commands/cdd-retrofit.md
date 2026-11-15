@@ -119,7 +119,7 @@ Both modes run this after their commit (sections 3.4 / 4.7): the retrofit branch
   command -v cdd-state >/dev/null && cdd-state stages 2>/dev/null | grep -qx implementation_done
   ```
 
-  On failure print one line — "no task record: `cdd-state` is missing or too old on this machine; run `./tools/cdd-worktree.sh install` and `./tools/cdd-state.sh install` in this CDD repo" — and finish normally.
+  On failure print one line — "no task record: `cdd-state` is missing or too old on this machine; run `./tools/cdd-worktree.sh install` in this CDD repo" — and finish normally.
 - **Write the handoff first**, so the record's sync carries it: `mkdir -p ~/.cdd/handoffs/$REPO_NAME`, then `~/.cdd/handoffs/$REPO_NAME/$BRANCH.md`:
 
   ```markdown
@@ -370,7 +370,7 @@ Do not widen either pattern. If `$WT` is **not a git repo** (section 2.5's fallb
 
 **The legacy worktree helper — the loudest hit.** If the `ls` probe finds one, the project predates the machine-global helper. State the recommendation; don't offer a neutral menu:
 
-- **Recommended — retire it.** Propose deleting it from `$WT`, and tell the user to run `./tools/cdd-worktree.sh install` and `./tools/cdd-state.sh install` once from the CDD repo — the installer also moves handoffs out of the old location. The shell rc sourcing line is outside this command's write scope: print the exact line to delete and let the user do it. **Never edit a user's shell rc.**
+- **Recommended — retire it.** Propose deleting it from `$WT`, and tell the user to run `./tools/cdd-worktree.sh install` once from the CDD repo — the installer also moves handoffs out of the old location. The shell rc sourcing line is outside this command's write scope: print the exact line to delete and let the user do it. **Never edit a user's shell rc.**
 - **Decline path — patch it in place.** Under the usual per-file approval, reconcile the kept helper with the migrated scaffolding: the handoff directory, the command names it prints, and the `<branch>.state.json` sidecar beside the handoff (absent from any pre-#38 helper). Say plainly that it is now a maintained-by-hand path.
 
 Either way, section 5 reports it.
@@ -423,4 +423,4 @@ Report, in both modes:
   - Review the retrofit branch (`git -C "$WT" show`).
   - Before opening the PR, `cd "$WT"` and run `/cdd-pre-pr` from a fresh Claude session there: its reconciliation and review pass catches doc inconsistencies the retrofit introduced, and doc skeletons left with unfilled placeholders. Then open a PR from `$BRANCH`.
   - Once merged, run `cdd-worktree-done` from `$WT`: it pulls the default branch in the checkout that has it, removes the worktree, deletes the merged branch and reaps the task record. It stops if no checkout of the target is on the default branch, so switch one there first.
-  - Install mode only: if the worktree helper was never installed on this machine, run `./tools/cdd-worktree.sh install` once in the CDD repo (project-independent; nothing is added per project), and re-run it if it predates the adapter library a `.cdd/` binding runs. Then run `/cdd-next-step` in the target: its first task is the roadmap's pre-filled bootstrap phase (codebase survey, initial architecture and feature docs, `CLAUDE.md` stubs, roadmap fill). On a project without prior doc discipline that first task is a doc reconciliation that makes the docs match the code for the first time, so it may be slow and span several early PRs — expected, not a fault. Existing docs are reconciled and adopted, not overwritten; the roadmap's Phase 1 intro lists common fold-in patterns (split architecture docs → `doc/architecture/`, a `future-work.md`/TODO/backlog doc → the roadmap, an oversized `CLAUDE.md` → slim to pointers).
+  - Install mode only: if the CDD helpers were never installed on this machine, or `cdd-state` is missing, run `./tools/cdd-worktree.sh install` once in the CDD repo (project-independent; nothing is added per project), and re-run it if it predates the adapter library a `.cdd/` binding runs. Then run `/cdd-next-step` in the target: its first task is the roadmap's pre-filled bootstrap phase (codebase survey, initial architecture and feature docs, `CLAUDE.md` stubs, roadmap fill). On a project without prior doc discipline that first task is a doc reconciliation that makes the docs match the code for the first time, so it may be slow and span several early PRs — expected, not a fault. Existing docs are reconciled and adopted, not overwritten; the roadmap's Phase 1 intro lists common fold-in patterns (split architecture docs → `doc/architecture/`, a `future-work.md`/TODO/backlog doc → the roadmap, an oversized `CLAUDE.md` → slim to pointers).

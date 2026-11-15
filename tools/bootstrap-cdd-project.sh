@@ -323,7 +323,7 @@ SHIM
     cat <<SHIM
 lib="\$HOME/.cdd/tools/adapters/$cap/$backend.sh"
 if [ ! -x "\$lib" ]; then
-  echo "adapter library missing: \$lib; install once per machine: <cdd>/tools/cdd-worktree.sh install, or: curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/adapters/$cap/$backend.sh --create-dirs -o \"\$lib\" && chmod +x \"\$lib\"" >&2
+  echo "adapter library missing: \$lib; install once per machine: <cdd>/tools/cdd-worktree.sh install, or without a CDD checkout: curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh --create-dirs -o ~/.cdd/tools/cdd-worktree.sh && bash ~/.cdd/tools/cdd-worktree.sh update" >&2
   exit 4
 fi
 exec "\$lib" "\$@"
@@ -381,8 +381,8 @@ Location: $TARGET_ABS
 
 Next steps:
 
-  1. One-time, if you haven't already: install the shared CDD worktree helper, then
-     open a new shell. After that, \`cdd-worktree <branch>\` works in every CDD project.
+  1. One-time, if you haven't already: install the shared CDD helpers (cdd-worktree,
+     cdd-state and the adapter library), then open a new shell. After that, \`cdd-worktree <branch>\` works in every CDD project.
 
        ${SCRIPT_DIR}/cdd-worktree.sh install
 

@@ -14,16 +14,11 @@
 # Its tools are not advisory: a missing jq stops every verb but `stages` with exit 4,
 # and install refuses without git, bash >= 4, jq and claude (process doc §2.18).
 #
-# Install once — copies this script to a stable home that does NOT depend on a
-# live CDD checkout, and wires your shell to source it:
-#
-#   tools/cdd-state.sh install
-#
-# On a machine without a CDD checkout, fetch it to its home and install in one step:
-#
-#   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-state.sh \
-#     --create-dirs -o ~/.cdd/tools/cdd-state.sh \
-#     && bash ~/.cdd/tools/cdd-state.sh install
+# Installed by `tools/cdd-worktree.sh install`, which runs this file's `install` from
+# beside it (issue #150): it copies this script to a stable home that does NOT depend
+# on a live CDD checkout, and wires your shell to source it. Without a checkout, use
+# the curl-then-`update` form in cdd-worktree.sh's header. Running `install` here
+# directly still works.
 #
 # Kept current alongside cdd-worktree.sh (ADR 0014): a pull of a CDD checkout that
 # install hooked reinstalls both, and `bash ~/.cdd/tools/cdd-worktree.sh update`
@@ -658,7 +653,8 @@ cdd-state() {
 }
 
 # Install this helper to its stable home and wire it into the user's shells.
-# Run directly (`tools/cdd-state.sh install`), never sourced. Idempotent.
+# Run directly (`tools/cdd-state.sh install`), never sourced -- normally run by
+# `cdd-worktree.sh install`. Idempotent.
 cdd-state-install() {
   if [[ $# -gt 0 && "$1" != "install" ]]; then
     echo "usage: cdd-state.sh [install]" >&2
@@ -743,7 +739,7 @@ RCBLOCK
 # result is unbounded recursion rather than an error.
 helper="$HOME/.cdd/tools/cdd-state.sh"
 if [[ ! -f "$helper" ]]; then
-  echo "cdd-state: helper not found at $helper; reinstall with: bash <cdd>/tools/cdd-state.sh install" >&2
+  echo "cdd-state: helper not found at $helper; reinstall with: bash <cdd>/tools/cdd-worktree.sh install" >&2
   exit 127
 fi
 # shellcheck source=/dev/null
