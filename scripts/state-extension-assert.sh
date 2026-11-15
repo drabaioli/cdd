@@ -3,8 +3,8 @@
 #
 # The point is NOT that `cdd-state set-field` works — it is that a foreign top-level
 # key survives every verb that rewrites the record. That property is free today,
-# because `set`, `lane`, `issue-refs` and `set-field` all build a jq filter of field
-# *assignments*
+# because `set`, `lane`, `issue-refs`, `partial-refs` and `set-field` all build a jq
+# filter of field *assignments*
 # over the existing file; it would be silently lost the day one of them is refactored
 # into a rebuild-from-scratch form. So the assertions below are written against
 # behaviour ("both foreign keys are still byte-identical after this write"), never
@@ -24,6 +24,9 @@
 # alone: `cdd-state get` flattens the array to one ref per line (what /cdd-pre-pr loops
 # over), and a second call REPLACES the list rather than appending to it (the field is
 # amendable, unlike base_branch and lane) — a property a refactor could silently invert.
+# `partial-refs` gets one too: the same replace semantics plus a zero-ref clear to [],
+# a cwd-derived record, and the refusal of a ref outside issue_refs (a typo there would
+# leave the real issue unmarked, and it would close after the merge).
 #
 # Usage: scripts/state-extension-assert.sh
 # Takes no arguments; it provisions and tears down its own temp tree. Requires jq
@@ -162,15 +165,17 @@ run_state set-field x-second '"another"' >/dev/null 2>&1 || fail "second set-fie
 assert_survives "a second set-field"
 run_state issue-refs "$FEATURE" '#97' '12' >/dev/null 2>&1 || fail "cdd-state issue-refs failed"
 assert_survives "issue-refs"
-pass "both foreign keys survived lane, set, set --pr, a second set-field and issue-refs"
+run_state partial-refs '12' >/dev/null 2>&1 || fail "cdd-state partial-refs failed"
+assert_survives "partial-refs"
+pass "both foreign keys survived lane, set, set --pr, a second set-field, issue-refs and partial-refs"
 
 # 4. CDD's own fields are untouched by set-field.
-own_fields() { jq -S -c '{schema_version, branch, stage, pr, base_branch, lane, issue_refs, sessions}' "$FILE"; }
+own_fields() { jq -S -c '{schema_version, branch, stage, pr, base_branch, lane, issue_refs, partial_refs, sessions}' "$FILE"; }
 before="$(own_fields)"
 run_state set-field x-third '[1,2,3]' >/dev/null 2>&1 || fail "set-field x-third failed"
 [[ "$(own_fields)" == "$before" ]] \
   || fail "set-field changed CDD's own fields: $before -> $(own_fields)"
-pass "set-field left schema_version/branch/stage/pr/base_branch/lane/issue_refs/sessions untouched"
+pass "set-field left schema_version/branch/stage/pr/base_branch/lane/issue_refs/partial_refs/sessions untouched"
 
 # 5. Value round-trip by JSON type. `null` lands as a PRESENT null-valued field —
 #    absent and null carry distinct meaning in this record (`pr`, `lane`), so removal
@@ -210,6 +215,31 @@ rc="$(status_of issue-refs "$ABSENT" '#1')"
   || fail "issue-refs fabricated a record at $DIR/$ABSENT.state.json"
 pass "issue-refs never fabricates an absent record"
 
+# 5c. The partial-refs list: stored as written on the cwd-derived record, flattened by
+#     `get`, replaced whole by a second call, and cleared to [] by a call with no refs.
+[[ "$(field_of "$FILE" partial_refs)" == '["12"]' ]] \
+  || fail "partial-refs did not store the refs as a JSON array of strings: $(field_of "$FILE" partial_refs)"
+run_state partial-refs '#97' '12' >/dev/null 2>&1 || fail "partial-refs with two refs failed"
+got="$(run_state get partial_refs 2>/dev/null)"
+[[ "$got" == $'#97\n12' ]] \
+  || fail "cdd-state get partial_refs must print one ref per line, in order; got: $(printf %q "$got")"
+run_state partial-refs '#97' >/dev/null 2>&1 || fail "second partial-refs failed"
+[[ "$(field_of "$FILE" partial_refs)" == '["#97"]' ]] \
+  || fail "a second partial-refs must REPLACE the list, not append: $(field_of "$FILE" partial_refs)"
+run_state partial-refs >/dev/null 2>&1 || fail "partial-refs with no refs failed"
+[[ "$(field_of "$FILE" partial_refs)" == '[]' ]] \
+  || fail "partial-refs with no refs must write [], clearing the mark: $(field_of "$FILE" partial_refs)"
+assert_survives "a clearing partial-refs"
+pass "partial-refs round-trips, replaces the whole list and clears to []"
+
+git -C "$CLONE" switch -q -c "$ABSENT"
+rc="$(status_of partial-refs '#1')"
+git -C "$CLONE" switch -q "$FEATURE"
+[[ "$rc" == "0" ]] || fail "partial-refs on an absent record should exit 0 (advisory), got $rc"
+[[ ! -f "$DIR/$ABSENT.state.json" ]] \
+  || fail "partial-refs fabricated a record at $DIR/$ABSENT.state.json"
+pass "partial-refs never fabricates an absent record"
+
 # 6. Rejections, each leaving the record byte-identical.
 BEFORE="$WORK/before.json"
 assert_rejected() {
@@ -233,6 +263,9 @@ assert_rejected 2 "issue-refs with no arguments at all" issue-refs
 assert_rejected 2 "issue-refs with an option-shaped branch" issue-refs --branch "$FEATURE"
 assert_rejected 2 "issue-refs with an option-shaped ref" issue-refs "$FEATURE" --help
 assert_rejected 0 "issue-refs --help" issue-refs --help
+assert_rejected 2 "partial-refs with a ref outside issue_refs" partial-refs '12' '#151'
+assert_rejected 2 "partial-refs with an option-shaped ref" partial-refs --nope
+assert_rejected 0 "partial-refs --help" partial-refs --help
 pass "every rejection exits as documented and leaves the record byte-identical"
 [[ "$(jq 'has("stage") and .stage == "pr_open"' "$FILE")" == "true" ]] \
   || fail 'a rejected "set-field stage merged" must not have touched .stage'

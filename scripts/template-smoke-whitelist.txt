@@ -47,3 +47,5 @@
 <url>
 <what was tried and why it failed, so it is not re-explored — or "None">
 <which check-runner gates to run, which assertions or tests to add or extend>
+<its .url, else the ref>
+<what is left>

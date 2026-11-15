@@ -24,6 +24,12 @@
 # one warning and changes nothing else; an adapter without issue-comment is told once
 # per run; and the GitHub tracker adapter's issue-comment itself.
 #
+# And a ref marked partial on the record (`partial_refs`, ADR 0024): never transitioned,
+# one "left open (partial)" line and one "Partly done by" comment linking the merged PR —
+# in done (mixed, and all-partial through the GitHub adapter) and gc --force; gc's dry
+# run says it would leave it open; and a run where another close fails posts no comment,
+# so the gc retry that follows comments exactly once.
+#
 # Like code-host-ladder-assert.sh it stands in a local bare repo for origin, gives the
 # helpers their own $HOME, and puts a logging `gh` stub on PATH. A stub code-host
 # adapter (the machine rung) answers pr-merged for the branches in $MERGED. Where the
@@ -182,13 +188,16 @@ reset() {
   make_code_host
 }
 
-# task <branch> <refs as a JSON array, or ""> — seeds the handoff, plan and state
-# record, and pushes refs/cdd/<branch> carrying the handoff and state, as cdd-state does.
+# task <branch> <refs as a JSON array, or ""> [<partial refs as a JSON array>] — seeds
+# the handoff, plan and state record, and pushes refs/cdd/<branch> carrying the handoff
+# and state, as cdd-state does.
 task() {
-  local b="$1" refs="$2" hb sb tree commit
+  local b="$1" refs="$2" partial="${3:-}" hb sb tree commit
   printf '# Task: %s\n' "$b" > "$DIR/$b.md"
   printf '# Plan: %s\n' "$b" > "$DIR/$b.plan.md"
-  if [[ -n "$refs" ]]; then
+  if [[ -n "$partial" ]]; then
+    printf '{"stage":"pr_open","issue_refs":%s,"partial_refs":%s}\n' "$refs" "$partial" > "$DIR/$b.state.json"
+  elif [[ -n "$refs" ]]; then
     printf '{"stage":"pr_open","issue_refs":%s}\n' "$refs" > "$DIR/$b.state.json"
   else
     printf '{"stage":"pr_open"}\n' > "$DIR/$b.state.json"
@@ -465,6 +474,77 @@ done
 grep -qxF "issue-comment ABC-13 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$TRACKER_LOG" || fail "gc retry, comments: gc should pass the PR's url$(show)"
 record_gone g_retry || fail "gc retry, comments: the task should be reaped$(show)"
 pass "a gc retry never comments twice, and links the PR from its own merge check"
+
+# --- partial refs: left open, merged PR linked once ------------------------------
+
+PARTLY="Partly done by PR #7, merged: https://github.com/o/r/pull/7. Left open for the rest."
+
+# 12d. done, mixed: the complete ref closes and is linked; the partial one is left open
+# and gets the "Partly done" comment, once.
+reset
+make_tracker "$MACHINE_TRACKER" working
+task d_partial '["ABC-1","ABC-2"]' '["ABC-2"]'; merged d_partial; worktree d_partial
+run "$WORK/wt-d_partial" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "done, partial: exited $RC$(show)"
+grep -qx "issue ABC-1: closed" "$WORK/out" || fail "done, partial: ABC-1 should close$(show)"
+grep -qxF "issue-comment ABC-1 --body Closed after PR #7 merged: https://github.com/o/r/pull/7" "$TRACKER_LOG" || fail "done, partial: ABC-1 should get the closed link$(show)"
+! grep -q "^issue-transition ABC-2" "$TRACKER_LOG" || fail "done, partial: the partial ABC-2 was transitioned$(show)"
+grep -qx "issue ABC-2: left open (partial)" "$WORK/out" || fail "done, partial: expected the left-open line$(show)"
+[[ "$(grep -c "^issue-comment ABC-2 " "$TRACKER_LOG")" == 1 ]] || fail "done, partial: ABC-2 should be commented on exactly once$(show)"
+grep -qxF "issue-comment ABC-2 --body $PARTLY" "$TRACKER_LOG" || fail "done, partial: ABC-2 should get the partly-done comment$(show)"
+grep -qx "issue ABC-2: linked PR #7" "$WORK/out" || fail "done, partial: expected a linked line for ABC-2$(show)"
+record_gone d_partial || fail "done, partial: the record should be removed$(show)"
+pass "done closes the complete ref and leaves the partial one open, linking the merged PR once"
+
+# 12e. done, all refs partial, GitHub adapter: nothing closes, the comment is posted.
+reset
+use_github_tracker
+task d_allpartial '["#51"]' '["#51"]'; merged d_allpartial; worktree d_allpartial
+run "$WORK/wt-d_allpartial" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "done, all partial: exited $RC$(show)"
+! grep -q "issue close" "$GH_LOG" || fail "done, all partial: gh issue close was called$(show)"
+grep -qxF "issue comment 51 --body $PARTLY" "$GH_LOG" || fail "done, all partial: #51 should get the partly-done comment$(show)"
+record_gone d_allpartial || fail "done, all partial: the record should be removed$(show)"
+pass "done with every ref partial closes nothing and links the merged PR"
+
+# 12f. gc dry run: says which refs it would close and which it would leave open.
+reset
+make_tracker "$MACHINE_TRACKER" working
+task g_pdry '["ABC-1","ABC-2"]' '["ABC-2"]'; merged g_pdry
+run "$MACHINE" cdd-worktree-gc
+[[ $RC -eq 0 ]] || fail "gc dry run, partial: exited $RC$(show)"
+grep -q "reap  g_pdry (MERGED): would remove .*; would close ABC-1; would leave ABC-2 open" "$WORK/out" || fail "gc dry run, partial: expected the close and leave-open lists$(show)"
+no_issue_calls || fail "gc dry run, partial: a tracker call was made$(show)"
+record_kept g_pdry || fail "gc dry run, partial: something was deleted$(show)"
+pass "gc's dry run lists the partial ref as left open, with no tracker call"
+
+# 12g. gc --force: a partial ref is not transitioned, is commented once, and the task reaped.
+reset
+make_tracker "$MACHINE_TRACKER" working
+task g_pforce '["ABC-3"]' '["ABC-3"]'; merged g_pforce
+run "$MACHINE" cdd-worktree-gc --force
+[[ $RC -eq 0 ]] || fail "gc --force, partial: exited $RC$(show)"
+! grep -q "^issue-transition" "$TRACKER_LOG" || fail "gc --force, partial: the partial ref was transitioned$(show)"
+[[ "$(grep -c "^issue-comment ABC-3 " "$TRACKER_LOG")" == 1 ]] || fail "gc --force, partial: ABC-3 should be commented on exactly once$(show)"
+grep -qxF "issue-comment ABC-3 --body $PARTLY" "$TRACKER_LOG" || fail "gc --force, partial: expected the partly-done comment$(show)"
+record_gone g_pforce || fail "gc --force, partial: the task should be reaped$(show)"
+pass "gc --force leaves a partial ref open, links the merged PR once, and reaps"
+
+# 12h. A failed close posts no partial comment; the gc retry that succeeds posts it once.
+reset
+make_tracker "$MACHINE_TRACKER" working
+echo ABC-4 >> "$FAILING"
+task d_pretry '["ABC-4","ABC-5"]' '["ABC-5"]'; merged d_pretry; worktree d_pretry
+run "$WORK/wt-d_pretry" cdd-worktree-done
+record_kept d_pretry || fail "partial retry: done should keep the record$(show)"
+! grep -q "^issue-comment ABC-5" "$TRACKER_LOG" || fail "partial retry: done commented on the partial ref despite a failed close$(show)"
+: > "$FAILING"
+run "$MACHINE" cdd-worktree-gc --force
+[[ $RC -eq 0 ]] || fail "partial retry: gc exited $RC$(show)"
+[[ "$(grep -c "^issue-comment ABC-5 " "$TRACKER_LOG")" == 1 ]] || fail "partial retry: ABC-5 should be commented on exactly once across done and gc$(show)"
+! grep -q "^issue-transition ABC-5" "$TRACKER_LOG" || fail "partial retry: the partial ref was transitioned$(show)"
+record_gone d_pretry || fail "partial retry: the task should be reaped$(show)"
+pass "a partial ref is linked only on the run that reaps, so a gc retry never comments twice"
 
 # 13. A broken tracker adapter keeps only the tasks with refs.
 reset

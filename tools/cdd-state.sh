@@ -51,6 +51,14 @@
 #                                      AMENDABLE, unlike base_branch and lane: each call
 #                                      replaces the whole list, so a task that grows a
 #                                      second issue re-runs the verb with the full set.
+#   cdd-state partial-refs [<ref>...]
+#                                  Mark which recorded refs the PR does only part of,
+#                                      as `partial_refs` (a subset of issue_refs; a ref
+#                                      outside it exits 2 without writing). Used by
+#                                      /cdd-pre-pr in the feature worktree, so the
+#                                      record is cwd-derived; read by cdd-worktree-done
+#                                      and -gc, which leave such a ref open. Each call
+#                                      replaces the list; no refs writes [] (clears it).
 #   cdd-state set <stage> [--pr N] Advance an existing record to <stage> (and set
 #                                      the PR number with --pr). Derives repo/branch
 #                                      from the current worktree. Skips silently if
@@ -85,10 +93,10 @@
 #
 # When the human has turned task-ref sync on (`git config cdd.syncTaskRef true`, per clone
 # or --global; off by default, ADR 0022), every verb that writes the record (`seed`, `lane`,
-# `issue-refs`, `set`, `set-field`) also syncs the handoff + plan file + record to a per-task
-# ref `refs/cdd/<branch>` on origin (best-effort, advisory), so a resume on another machine
-# can materialize them; the pushed record carries no `sessions[].dir`. See
-# cdd-worktree-resume and shell-helpers.md.
+# `issue-refs`, `partial-refs`, `set`, `set-field`) also syncs the handoff + plan file +
+# record to a per-task ref `refs/cdd/<branch>` on origin (best-effort, advisory), so a
+# resume on another machine can materialize them; the pushed record carries no
+# `sessions[].dir`. See cdd-worktree-resume and shell-helpers.md.
 #
 # `seed` and `set` also refresh the per-repo marker `~/.cdd/handoffs/<repo>/repo.json`, which
 # records this repo's main worktree and is the one artifact in that directory that
@@ -332,7 +340,7 @@ cdd-state() {
     stages) cdd-state-stages; return 0 ;;
     install|"") shift 2>/dev/null; cdd-state-install "$@"; return ;;
     -h|--help|help)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | partial-refs [<ref>...] | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       return 0 ;;
   esac
 
@@ -481,6 +489,47 @@ cdd-state() {
         || { echo "cdd-state: failed to update $file" >&2; return 1; }
       if cdd-state-write "$file" "$content"; then
         echo "Issue refs: $(basename "$file") -> $*"
+        cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
+      fi
+      ;;
+    partial-refs)
+      local r
+      for r in "$@"; do
+        case "$r" in
+          -h|--help) echo "usage: cdd-state partial-refs [<ref>...]" >&2; return 0 ;;
+          -*) echo "cdd-state partial-refs: '$r' looks like an option, not a ref." >&2; return 2 ;;
+          "") echo "cdd-state partial-refs: empty ref." >&2; return 2 ;;
+        esac
+      done
+      # The cwd-derived record, as `set` and `set-field` without --branch: /cdd-pre-pr,
+      # the only writer, runs in the feature worktree.
+      local file branch
+      file="$(cdd-state-file)" || return 1
+      branch="$(basename "${file%.state.json}")"
+      # Writers never fabricate a record; only `seed` (i.e. /cdd-next-step) creates one.
+      if [[ ! -f "$file" ]]; then
+        echo "cdd-state: no record at $file; skipping (advisory)." >&2
+        return 0
+      fi
+      # Each ref must already be in issue_refs: a typo would otherwise leave the real
+      # issue unmarked, and it would close after the merge. Checked before any write.
+      local stray
+      # shellcheck disable=SC2016  # $ARGS.positional is jq's own, not a shell expansion
+      stray="$(jq -r --args '($ARGS.positional - (.issue_refs // [])) | join(" ")' -- "$@" <"$file")" \
+        || { echo "cdd-state: failed to read $file" >&2; return 1; }
+      if [[ -n "$stray" ]]; then
+        echo "cdd-state partial-refs: not in the record's issue_refs: $stray" >&2
+        return 2
+      fi
+      # Like issue_refs, AMENDABLE: each call replaces the whole list, and a call with
+      # no refs writes [] (clearing an earlier mark). One field assignment, so every
+      # other key rides through; no session entry and no per-repo marker — an annotation.
+      local content
+      # shellcheck disable=SC2016  # $ARGS.positional is jq's own, not a shell expansion
+      content="$(jq --args '.partial_refs = $ARGS.positional' -- "$@" <"$file")" \
+        || { echo "cdd-state: failed to update $file" >&2; return 1; }
+      if cdd-state-write "$file" "$content"; then
+        echo "Partial refs: $(basename "$file") -> ${*:-none}"
         cdd-state-push-ref "${file%.state.json}.md" "$file" "$branch"
       fi
       ;;
@@ -645,7 +694,7 @@ cdd-state() {
         "$file" 2>/dev/null || return 0
       ;;
     *)
-      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
+      echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | partial-refs [<ref>...] | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
       cdd-state-update-hint
       return 2
       ;;

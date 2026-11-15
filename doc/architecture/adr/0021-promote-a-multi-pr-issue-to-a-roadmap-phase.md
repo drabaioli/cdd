@@ -54,7 +54,7 @@ for it in the command.
 - A reader seeing a closed issue cited by pending roadmap lines must read "closed" as planned.
 - Out of scope: an issue that grows mid-implementation — a single task whose PR does only part of
   it. It is not an epic and gets no phase: the human leaves it open with a progress comment, and a
-  later `/cdd-next-step <ref>` resumes it from the comments. Supporting it in the tooling is a
-  follow-up (#151): today the state record makes `/cdd-pre-pr` emit a close line, and `cdd-worktree-done`
-  / `-gc` close the issue after the merge, regardless.
+  later `/cdd-next-step <ref>` resumes it from the comments. The tooling now supports it:
+  `/cdd-pre-pr` marks such a ref partial and it stays open
+  ([ADR 0024](0024-leave-a-partially-done-issue-open.md)).
 - #145 is the first issue to use this.

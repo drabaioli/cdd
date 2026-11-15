@@ -80,7 +80,9 @@ check_command_refs() {
 # records on the state record (cdd-state issue-refs) are read back (cdd-state get
 # issue_refs) and turned into close lines through the adapter's issue-close-token in
 # cdd-pre-pr.md. The state record is the only carrier — there is no branch-name token
-# and no commit trailer — so a one-sided edit here loses the close lines outright.
+# and no commit trailer — so a one-sided edit here loses the close lines outright. The
+# same holds for the partial mark: cdd-pre-pr.md writes it (cdd-state partial-refs) and
+# the worktree helper reads it back (partial_refs) to leave such an issue open.
 # Only the command files are read: prose naming these tokens while explaining this very
 # check lives in .cdd/extensions/cdd-pre-pr.md, so it cannot satisfy the needles and let
 # the §11 block that *does* the work be deleted outright — the check stays pinned to the
@@ -92,6 +94,10 @@ check_issue_refs() {
     || note "issue-ref consumer broken: $PRE no longer reads the refs back with cdd-state get issue_refs"
   grep -qF 'issue-close-token' "$PRE" \
     || note "issue-ref consumer broken: $PRE no longer derives close lines via issue-close-token"
+  grep -qF 'cdd-state partial-refs' "$PRE" \
+    || note "partial-ref producer broken: $PRE no longer marks partial refs with cdd-state partial-refs"
+  grep -qF 'partial_refs' "$WT_HELPER" \
+    || note "partial-ref consumer broken: $WT_HELPER no longer reads partial_refs to leave those issues open"
   return 0
 }
 
