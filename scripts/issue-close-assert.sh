@@ -28,7 +28,10 @@
 # one "left open (partial)" line and one "Partly done by" comment linking the merged PR —
 # in done (mixed, and all-partial through the GitHub adapter) and gc --force; gc's dry
 # run says it would leave it open; and a run where another close fails posts no comment,
-# so the gc retry that follows comments exactly once.
+# so the gc retry that follows comments exactly once. Two cases join the halves for real:
+# the mark written by `cdd-state partial-refs` in the feature worktree (what /cdd-pre-pr
+# runs) is the one done reads, and gc reads it from refs/cdd/<branch> when the record is
+# not local (a task finished on another machine).
 #
 # Like code-host-ladder-assert.sh it stands in a local bare repo for origin, gives the
 # helpers their own $HOME, and puts a logging `gh` stub on PATH. A stub code-host
@@ -44,6 +47,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HELPER="$REPO_ROOT/tools/cdd-worktree.sh"
+STATE_HELPER="$REPO_ROOT/tools/cdd-state.sh"
 GH_ADAPTER="$REPO_ROOT/tools/adapters/tracker/github.sh"
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
@@ -518,17 +522,19 @@ no_issue_calls || fail "gc dry run, partial: a tracker call was made$(show)"
 record_kept g_pdry || fail "gc dry run, partial: something was deleted$(show)"
 pass "gc's dry run lists the partial ref as left open, with no tracker call"
 
-# 12g. gc --force: a partial ref is not transitioned, is commented once, and the task reaped.
+# 12g. gc --force: a partial ref is not transitioned, is commented once, and the task
+# reaped — with the record only on refs/cdd/<branch>, so the mark is read from there.
 reset
 make_tracker "$MACHINE_TRACKER" working
 task g_pforce '["ABC-3"]' '["ABC-3"]'; merged g_pforce
+rm "$DIR/g_pforce.state.json"   # the mark now lives only on refs/cdd/g_pforce
 run "$MACHINE" cdd-worktree-gc --force
 [[ $RC -eq 0 ]] || fail "gc --force, partial: exited $RC$(show)"
 ! grep -q "^issue-transition" "$TRACKER_LOG" || fail "gc --force, partial: the partial ref was transitioned$(show)"
 [[ "$(grep -c "^issue-comment ABC-3 " "$TRACKER_LOG")" == 1 ]] || fail "gc --force, partial: ABC-3 should be commented on exactly once$(show)"
 grep -qxF "issue-comment ABC-3 --body $PARTLY" "$TRACKER_LOG" || fail "gc --force, partial: expected the partly-done comment$(show)"
 record_gone g_pforce || fail "gc --force, partial: the task should be reaped$(show)"
-pass "gc --force leaves a partial ref open, links the merged PR once, and reaps"
+pass "gc --force reads the mark from refs/cdd, leaves the ref open, links the merged PR once, and reaps"
 
 # 12h. A failed close posts no partial comment; the gc retry that succeeds posts it once.
 reset
@@ -545,6 +551,29 @@ run "$MACHINE" cdd-worktree-gc --force
 ! grep -q "^issue-transition ABC-5" "$TRACKER_LOG" || fail "partial retry: the partial ref was transitioned$(show)"
 record_gone d_pretry || fail "partial retry: the task should be reaped$(show)"
 pass "a partial ref is linked only on the run that reaps, so a gc retry never comments twice"
+
+# 12i. End to end through the real verb: the record carries only issue_refs, the feature
+# worktree marks one ref with `cdd-state partial-refs` (as /cdd-pre-pr does), and done
+# leaves exactly that ref open while closing the other.
+mark_partial() {
+  # shellcheck source=/dev/null
+  source "$STATE_HELPER"
+  cdd-state partial-refs "$@"
+}
+reset
+make_tracker "$MACHINE_TRACKER" working
+task d_verb '["ABC-20","ABC-21"]'; merged d_verb; worktree d_verb
+run "$WORK/wt-d_verb" mark_partial ABC-21
+[[ $RC -eq 0 ]] || fail "end to end: cdd-state partial-refs exited $RC$(show)"
+[[ "$(jq -c .partial_refs "$DIR/d_verb.state.json")" == '["ABC-21"]' ]] \
+  || fail "end to end: the verb did not write the mark on the task's record$(show)"
+run "$WORK/wt-d_verb" cdd-worktree-done
+[[ $RC -eq 0 ]] || fail "end to end: done exited $RC$(show)"
+grep -qx "issue ABC-20: closed" "$WORK/out" || fail "end to end: ABC-20 should close$(show)"
+! grep -q "^issue-transition ABC-21" "$TRACKER_LOG" || fail "end to end: the marked ABC-21 was transitioned$(show)"
+grep -qxF "issue-comment ABC-21 --body $PARTLY" "$TRACKER_LOG" || fail "end to end: ABC-21 should get the partly-done comment$(show)"
+record_gone d_verb || fail "end to end: the record should be removed$(show)"
+pass "the mark cdd-state partial-refs writes is the one done reads"
 
 # 13. A broken tracker adapter keeps only the tasks with refs.
 reset
