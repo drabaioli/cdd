@@ -78,7 +78,7 @@ What `/cdd-pre-pr` adds in this repo — the macOS caveat and how to triage the 
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `.claude/agents/`                  | This repo's own subagent definitions (`cdd-researcher`, spawned by `/cdd-plan`) |
 | `.cdd/`                            | This repo's own capability-adapter bindings: `code-host` and `tracker`, relative symlinks to the GitHub adapters under `tools/adapters/`; and `extensions/`, its command extensions (`cdd-pre-pr.md`, `cdd-process-pr.md`) |
-| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`, both self-installing and self-updating) + the capability adapters under `adapters/<capability>/<backend>.sh` (mirroring `~/.cdd/adapters/<capability>`; none installs as a rung — `cdd-worktree.sh install` copies them to the `~/.cdd/tools/adapters/` library that downstream `.cdd/` shims exec) |
+| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`; one install, `cdd-worktree.sh install`, installs both; both self-updating) + the capability adapters under `adapters/<capability>/<backend>.sh` (mirroring `~/.cdd/adapters/<capability>`; none installs as a rung — `cdd-worktree.sh install` copies them to the `~/.cdd/tools/adapters/` library that downstream `.cdd/` shims exec) |
 
 ## Architecture
 

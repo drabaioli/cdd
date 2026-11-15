@@ -51,6 +51,7 @@ CDD's front door is its guided commands. Here's the shortest path from zero to y
 
 ```bash
 git clone https://github.com/drabaioli/cdd.git && cd cdd
+./tools/cdd-worktree.sh install   # once per machine; then open a new shell
 claude
 ```
 
@@ -102,17 +103,17 @@ CDD ships ten slash commands, all prefixed `cdd-` so they autocomplete as a grou
 | `/cdd‑retrofit` | Install or upgrade CDD in an existing project. |
 | `/cdd‑quick‑create` | Produce a one-off self-contained deliverable (script + README), no project substrate. |
 
-`cdd-worktree` (and its companions `cdd-worktree-done`, `cdd-worktree-list`, `cdd-worktree-resume`, and `cdd-worktree-gc`) is a **shell helper**, not a slash command. It's a single project-independent script — a machine-global toolchain dependency, like `git` or `gh` — that you install once and that then works in every CDD project. From a CDD repo checkout: `tools/cdd-worktree.sh install`. On a fresh machine with only a downstream project (no CDD repo), one command fetches and installs it:
+`cdd-worktree` (and its companions `cdd-worktree-done`, `cdd-worktree-list`, `cdd-worktree-resume`, and `cdd-worktree-gc`) is a **shell helper**, not a slash command. It ships with the task-state helper `cdd-state` as the CDD helpers — project-independent scripts, a machine-global toolchain dependency like `git` or `gh` — that you install once, with one command, and that then work in every CDD project. From a CDD repo checkout: `tools/cdd-worktree.sh install`. On a fresh machine with only a downstream project (no CDD repo), fetch the one script and let `update` install everything:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
   --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
-  && bash ~/.cdd/tools/cdd-worktree.sh install
+  && bash ~/.cdd/tools/cdd-worktree.sh update
 ```
 
 The fetch form needs `curl`. Install first what [Prerequisites](#prerequisites) lists as required: install refuses, naming the tool, when one is missing.
 
-Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. A project whose `.cdd/` binds a tracker or code host also needs the adapter library at `~/.cdd/tools/adapters/`: the checkout form installs it, while the curl form fetches only the helper and prints the one-line fetch for each adapter (see `template/BOOTSTRAP.md`). The checkout form keeps itself current: a pull of the checkout's default branch reinstalls the helpers when they changed, and open shells pick up the new code on their next command. Without a checkout, `bash ~/.cdd/tools/cdd-worktree.sh update` brings the helpers and the adapter library up to date with upstream `main`. It spins up and tears down the per-task git worktree that a task's plan and implementation sessions run in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch — so a task started elsewhere can be picked up to run `/cdd-implement`, `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`. The task's handoff, plan file and state record ride along too, synced through a per-task git ref (advisory — resume still works without them). `cdd-worktree-gc` periodically reaps the handoff, plan file, state record, and synced ref of tasks whose PR has merged (dry-run unless `--force`), so those artifacts don't accumulate across machines. Once a task's PR has merged, `cdd-worktree-done` (or, as backstop, `cdd-worktree-gc`) also closes the issues the task was sourced from, through the tracker, and links the merged PR on each it closes.
+Either form wires `~/.bashrc` and `~/.zshrc` (idempotent); open a new shell afterwards. Both forms install both helpers and the adapter library at `~/.cdd/tools/adapters/` that a project whose `.cdd/` binds a tracker or code host needs. The checkout form keeps itself current: a pull of the checkout's default branch reinstalls the helpers when they changed, and open shells pick up the new code on their next command. Without a checkout, `bash ~/.cdd/tools/cdd-worktree.sh update` brings the helpers and the adapter library up to date with upstream `main`. It spins up and tears down the per-task git worktree that a task's plan and implementation sessions run in, and `cdd-worktree-resume [<branch>]` recreates that worktree on a second machine — tracking the existing remote branch — so a task started elsewhere can be picked up to run `/cdd-implement`, `/cdd-process-pr`, `/cdd-merge-base`, or `/cdd-pre-pr`. The task's handoff, plan file and state record ride along too, synced through a per-task git ref (advisory — resume still works without them). `cdd-worktree-gc` periodically reaps the handoff, plan file, state record, and synced ref of tasks whose PR has merged (dry-run unless `--force`), so those artifacts don't accumulate across machines. Once a task's PR has merged, `cdd-worktree-done` (or, as backstop, `cdd-worktree-gc`) also closes the issues the task was sourced from, through the tracker, and links the merged PR on each it closes.
 
 ## Questions?
 

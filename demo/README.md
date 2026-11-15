@@ -46,7 +46,7 @@ demo/setup.sh mdr_demo_07     # a specific instance
 
 `setup.sh` wraps `tools/bootstrap-cdd-project.sh` (it does **not** reimplement substitution): bootstrap copies `template/`, overlays `demo/seed/` via `--overlay`, substitutes the identifiers, binds the GitHub tracker and code-host adapters in `.cdd/` (`--tracker github --code-host github`), runs `git init`, and makes the scaffold commit. Then `setup.sh` creates and pushes a GitHub repo with `gh repo create --source . --push` (private by default; pass `--public` to share).
 
-After setup, `setup.sh` runs the shared worktree helper's one-time `install` (`tools/cdd-worktree.sh install`, idempotent) so `cdd-worktree` is available in new shells. Because the helper is a single project-independent script, there is no per-instance rc block: the install wires `~/.bashrc` and `~/.zshrc` once and every instance uses the same `cdd-worktree` command. Under `--local-only` the install is skipped (no environment side effects).
+After setup, `setup.sh` runs the shared CDD helpers' one-time `install` (`tools/cdd-worktree.sh install`, idempotent: `cdd-worktree`, `cdd-state` and the adapter library) so the commands are available in new shells. Because the helpers are project-independent, there is no per-instance rc block: the install wires `~/.bashrc` and `~/.zshrc` once and every instance uses the same `cdd-worktree` command. Under `--local-only` the install is skipped (no environment side effects).
 
 Auto-numbering checks **both** local directories under the base **and** existing GitHub repos, so a parked demo (local or remote) never gets a colliding number.
 

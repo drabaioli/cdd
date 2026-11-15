@@ -96,30 +96,27 @@ The script will:
 3. Substitute `<PROJECT_NAME>` and `<PROJECT_DIR>`.
 4. Write the `.cdd/` bindings, if any flags were passed, then the baseline marker `.claude/cdd-baseline` (the CDD repo commit hash the template was rendered from; used later by `/cdd-retrofit`'s upgrade mode).
 5. Run `git init -b main` and create an initial scaffold commit.
-6. Print a "next steps" block pointing at the one-time worktree-helper install.
+6. Print a "next steps" block pointing at the one-time helper install.
 
 ## After bootstrap
 
-1. **Install the shared helpers (one-time, project-independent).** Two self-installing scripts — the worktree helper and the task-state helper. If you haven't installed them for an earlier CDD project, install them once. If you have the CDD repo checked out:
+1. **Install the shared helpers (one-time, project-independent).** Two scripts — the worktree helper and the task-state helper — installed by one command. If you haven't installed them for an earlier CDD project, install them once. If you have the CDD repo checked out:
 
    ```bash
-   ./tools/cdd-worktree.sh install && ./tools/cdd-state.sh install
+   ./tools/cdd-worktree.sh install
    ```
 
-   On a fresh machine that only has *this* project (no CDD repo checkout), fetch each canonical helper and install it in one step:
+   On a fresh machine that only has *this* project (no CDD repo checkout), fetch the worktree helper and let its `update` install everything from upstream:
 
    ```bash
    curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-worktree.sh \
      --create-dirs -o ~/.cdd/tools/cdd-worktree.sh \
-     && bash ~/.cdd/tools/cdd-worktree.sh install
-   curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/cdd-state.sh \
-     --create-dirs -o ~/.cdd/tools/cdd-state.sh \
-     && bash ~/.cdd/tools/cdd-state.sh install
+     && bash ~/.cdd/tools/cdd-worktree.sh update
    ```
 
-   (Each must land on disk first — `curl … | bash` won't work, because each installer copies itself from its own file path.) Either form copies the helper to `~/.cdd/tools/`, wires `~/.bashrc` and `~/.zshrc` to source it (idempotent), and drops PATH shims into `~/.local/bin` so the commands also resolve in non-interactive shells (e.g. Claude Code's Bash tool, where `cdd-state set …` runs). Open a new shell. After this, `cdd-worktree` and `cdd-state` work in every CDD project — there is nothing per-project to add. They are machine-global toolchain dependencies, like `git` or `gh`: one install per machine, newest wins.
+   (`update`, not `install`: the one fetched file has nothing beside it to install. It must land on disk first — `curl … | bash` won't work, because the installer copies itself from its own file path.) Either form copies both helpers to `~/.cdd/tools/`, wires `~/.bashrc` and `~/.zshrc` to source them (idempotent), and drops PATH shims into `~/.local/bin` so the commands also resolve in non-interactive shells (e.g. Claude Code's Bash tool, where `cdd-state set …` runs). Open a new shell. After this, `cdd-worktree` and `cdd-state` work in every CDD project — there is nothing per-project to add. They are machine-global toolchain dependencies, like `git` or `gh`: one install per machine, newest wins.
 
-   Run from the CDD repo checkout, the install also copies the adapter library, `~/.cdd/tools/adapters/`, that the project's `.cdd/` bindings run (re-run it if you installed the helper before this CDD version). The curl form fetches only the helper; it prints the per-adapter curl line to fetch the rest. Until the library is there, a bound capability stops with that command rather than falling back to `gh`.
+   Both forms also install the adapter library, `~/.cdd/tools/adapters/`, that the project's `.cdd/` bindings run (re-run the install if you installed the helpers before this CDD version). Until the library is there, a bound capability stops with that command rather than falling back to `gh`.
 
    **Keeping them current.** Installed from a CDD repo checkout, the helpers update themselves whenever that checkout's default branch is pulled, and open shells pick up the new code on their next command. Without a checkout, update the helpers and the adapter library on demand with `bash ~/.cdd/tools/cdd-worktree.sh update`. Nothing checks for updates in the background.
 

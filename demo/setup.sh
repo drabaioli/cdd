@@ -11,7 +11,7 @@
 #   --name "Display Name"   Override the display name (<PROJECT_NAME>).
 #   --base DIR              Base directory for the instance (default: $CDD_DEMO_BASE or ~/Code).
 #   --public               Create the GitHub repo public (default: private).
-#   --local-only           Skip all GitHub steps and the worktree-helper install. For tests/CI.
+#   --local-only           Skip all GitHub steps and the CDD helper install. For tests/CI.
 #
 # The instance name becomes the directory, so each instance gets its own handoff dir
 # (~/.cdd/handoffs/<instance>/). The worktree helper is the shared, project-independent
@@ -104,10 +104,10 @@ fi
 
 CDD_WORKTREE="$REPO_ROOT/tools/cdd-worktree.sh"
 
-# Install the shared, project-independent worktree helper once (idempotent). This
-# wires ~/.bashrc and ~/.zshrc to source ~/.cdd/tools/cdd-worktree.sh, so the
-# `cdd-worktree` command is available for every CDD project — including this
-# instance — and installs the adapter library this instance's .cdd/ bindings run.
+# Install the shared, project-independent CDD helpers once (idempotent): cdd-worktree,
+# cdd-state and the adapter library this instance's .cdd/ bindings run. This wires
+# ~/.bashrc and ~/.zshrc to source them, so the `cdd-worktree` and `cdd-state`
+# commands are available for every CDD project — including this instance.
 # Skipped under --local-only (CI path: no environment side effects).
 if (( ! LOCAL_ONLY )); then
   "$CDD_WORKTREE" install
@@ -119,8 +119,8 @@ if (( LOCAL_ONLY )); then
 Done. Instance '$INSTANCE' is ready at $TARGET
 
 Next steps:
-  1. Install the shared worktree helper once (if you haven't already; it also
-     installs the adapter library the instance's .cdd/ bindings run):
+  1. Install the shared CDD helpers once (if you haven't already: cdd-worktree,
+     cdd-state and the adapter library the instance's .cdd/ bindings run):
        $CDD_WORKTREE install
   2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 
@@ -132,7 +132,7 @@ else
 Done. Instance '$INSTANCE' is ready at $TARGET
 
 Next steps:
-  1. Open a new shell so the \`cdd-worktree\` command is active (the install above
+  1. Open a new shell so the shared CDD helpers are active (the install above
      wired your ~/.bashrc and ~/.zshrc).
   2. cd "$TARGET" and run \`claude\`, then /cdd-next-step to start Phase 1.
 

@@ -121,7 +121,7 @@ Report:
 - The GitHub repo, if one was created (step 6).
 - `scripts/install-deps.sh`, with the tools its project block lists and any left out for want of a package name; suggest running it once in the new project (`scripts/install-deps.sh --check` reports without installing).
 - The capability bindings written into `.cdd/` (or, per capability, the one line saying none was written and those features skip). For Jira, name `JIRA_EMAIL` and `JIRA_API_TOKEN` as the environment variables the user sets in their own shell.
-- The one-time worktree-helper install, if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). One install serves every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
+- The one-time helper install (both helpers and the adapter library), if the user hasn't already run it for an earlier CDD project (offer to run it for them — confirm first, since it edits their shell config). One install serves every CDD project. It also installs the adapter library the `.cdd/` bindings run: if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing for a bound capability, offer the same install — until it runs, that capability stops with the install command rather than falling back.
 
   ```bash
   ./tools/cdd-worktree.sh install
