@@ -138,7 +138,7 @@ Its consumer is the post-merge close: on each ref that `issue-transition` report
 
 The string a commit message or PR description carries so the backend auto-closes the item on merge. GitHub yields `Closes #42`; Jira yields a smart commit. A backend with no such mechanism does not declare the verb, and the caller simply writes no token.
 
-Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the references recorded on the task's state record (`cdd-state get issue_refs`, process doc §2.13), calls this verb once per reference, and appends each `.token` to the PR body. The rung is announced **once**, before the first of those calls, rather than once per call — N identical lines is noise, and the announcement rule exists to be read. An adapter that does not declare the verb yields no close lines at all, said in one line and never guessed at; and when no reference was recorded, the command never reaches the ladder and emits no close lines either. The state record is the only carrier — there is no branch-name fallback behind it ([ADR 0008](adr/0008-drop-the-issue-ref-branch-token.md)).
+Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the references recorded on the task's state record (`cdd-state get issue_refs`, process doc §2.13), calls this verb once per reference, and appends each `.token` to the PR body. A machine-rung tracker is announced **once**, before the first of those calls, rather than once per call — N identical lines is noise, and the announcement rule exists to be read. An adapter that does not declare the verb yields no close lines at all, said in one line and never guessed at; and when no reference was recorded, the command never reaches the ladder and emits no close lines either. The state record is the only carrier — there is no branch-name fallback behind it ([ADR 0008](adr/0008-drop-the-issue-ref-branch-token.md)).
 
 **What the token can and cannot promise.** Emitting a close line is not the same as closing the
 item, and the contract deliberately does not claim otherwise. Three cases:
@@ -353,8 +353,6 @@ The shim checks that its library file is executable and `exec`s it; the script's
 
 **A missing library is a broken adapter, not an absent one.** The shim exists, so the ladder has resolved to it; its `describe` exits 4 with the install command, and the resolver relays that first stderr line in its one "is unusable" line. Every call site then stops (or shows no data, for a listing) — never a silent fall-through to `gh`. A machine whose helper install predates the library needs one re-run of `cdd-worktree.sh install`.
 
-**The announcement line appears.** A bound project is served by an adapter, so the helpers print their one "using adapter" line (below).
-
 The conformance checker is not run against a downstream shim: it probes with an empty `HOME`, where no library exists. The `adapter-bindings` gate covers the shims instead, from a fresh clone on a second scratch `HOME`, through both a direct `describe` and the helpers' resolver.
 
 ## Docs: not a capability
@@ -397,7 +395,7 @@ The helpers' side is detailed in [Shell helpers](shell-helpers.md#code-host-reso
 Announcing which rung served is scoped **to the point of use, not to the session**:
 
 - Resolution performed merely to **classify** something — deciding whether `$ARGUMENTS` looks like an issue reference, say — is **silent**. Taken literally, "say when no adapter is installed" would print a line in every session in every repo, since no project has an adapter; that is noise, and noise is how a load-bearing line stops being read.
-- When a prompt **actually makes a call**, it announces in one line which rung served it — or, with nothing installed, the one missing-adapter line above.
+- When a call is **actually made**, a machine-rung adapter is announced in one line, in prompts and helpers alike, and the project's own `.cdd/<capability>` serves silently ([ADR 0022](adr/0022-say-nothing-when-all-is-normal.md)) — or, with nothing installed, the one missing-adapter line above.
 - **The shell helpers say what they skip.** `cdd-worktree-done`, `-gc`, `-list` and `-resume` print the missing-adapter line once when a code-host (or, for the issue close, tracker) adapter is needed and absent, because with the built-in rung gone a silent skip would be indistinguishable from "nothing to do". `done` then falls to its keep/delete/abort prompt and keeps the task record for `gc`; `gc` reaps nothing; `list` and `resume` show no PR column.
 - **The broken-adapter line is unconditional**, even during silent classification. The user installed something that is not working, and silence there is indistinguishable from it working.
 

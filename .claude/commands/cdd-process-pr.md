@@ -21,7 +21,7 @@ Resolve the code host down the ladder — project, then machine; the first file 
 for c in .cdd/code-host ~/.cdd/adapters/code-host; do [ -e "$c" ] && { CODE_HOST="$c"; break; }; done
 ```
 
-If `$CODE_HOST` is set, check it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, say in **one line** that the adapter at its path is installed but broken, and **stop** — do not route around it. If usable, say in one line which adapter serves and its `backend`. With nothing resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **stop**.
+If `$CODE_HOST` is set, check it: the file is executable, and `"$CODE_HOST" describe` exits 0, parses as JSON, and reports `capability` `code-host` and `contract` `1`. If any of that fails, say in **one line** that the adapter at its path is installed but broken, and **stop** — do not route around it. If usable and it is the machine rung (`~/.cdd/adapters/code-host`), say so in one line with its `backend`. With nothing resolved, print `No code-host adapter is installed; run /cdd-retrofit in this project to install one.` and **stop**.
 
 Resolve the open PR for the current branch:
 

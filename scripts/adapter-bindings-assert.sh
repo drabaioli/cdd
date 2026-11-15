@@ -101,8 +101,8 @@ for cap in tracker code-host; do
     || fail "clone, prompt path: .cdd/$cap describe did not validate"
   resolve "$HOME_B" "$CLONE" "$cap"
   [[ $RC -eq 0 ]] || fail "clone, helper path: resolving $cap returned $RC: $(cat "$WORK/err")"
-  grep -qxF "$cap: using adapter .cdd/$cap (github)" "$WORK/err" \
-    || fail "clone, helper path: expected the one announcement line for $cap, got: $(cat "$WORK/err")"
+  [[ ! -s "$WORK/err" ]] \
+    || fail "clone, helper path: the project's own $cap binding should resolve silently, got: $(cat "$WORK/err")"
 done
 pass "from a fresh clone, both shims pass describe via a prompt and via cdd-worktree"
 

@@ -192,9 +192,9 @@ cdd-require() {
 # scoping hands them to every function they call): CDD_ADAPTER (the path, empty when
 # none) and CDD_ADAPTER_DESCRIBE (its describe JSON). Globals rather than stdout
 # because a command substitution's subshell could not publish the describe as well.
-# Returns 0 when a valid adapter serves (announcing it in one stderr line), 1 when none
-# is installed (silent; callers say what they skip), 2 when one is installed but broken (after
-# printing exactly one stderr line naming it and why).
+# Returns 0 when a valid adapter serves (announcing it in one stderr line when the machine
+# rung's), 1 when none is installed (silent; callers say what they skip), 2 when one is
+# installed but broken (after printing exactly one stderr line naming it and why).
 cdd-worktree-adapter() {
   local cap="$1" top c path="" why="" desc="" rc=0 got
   CDD_ADAPTER="" CDD_ADAPTER_DESCRIBE=""
@@ -237,7 +237,10 @@ cdd-worktree-adapter() {
     return 2
   fi
   CDD_ADAPTER="$path" CDD_ADAPTER_DESCRIBE="$desc"
-  echo "$cap: using adapter $shown ($(jq -r '.backend // "?"' <<<"$desc"))" >&2
+  # Only the machine rung is announced; the project's own binding serves silently (ADR 0022).
+  if [[ "$path" == "$HOME/.cdd/adapters/$cap" ]]; then
+    echo "$cap: using adapter $shown ($(jq -r '.backend // "?"' <<<"$desc"))" >&2
+  fi
   return 0
 }
 

@@ -8,8 +8,9 @@
 #   - missing (no file at a rung)  -> the next rung; with none at all, the PR-dependent
 #     steps skip with one line naming /cdd-retrofit: gc reaps nothing, done falls to its
 #     keep/delete/abort prompt, list and resume show no PR status; `gh` is never called
-#   - installed and working        -> it serves, announced in exactly one stderr line,
-#     and `gh` is never called; the project rung wins over the machine rung
+#   - installed and working        -> it serves and `gh` is never called; the project
+#     rung wins over the machine rung and serves silently; the machine rung is
+#     announced in exactly one stderr line (ADR 0022)
 #   - installed but broken (not executable; describe exits non-zero, prints non-JSON,
 #     reports an unsupported contract or another capability) -> one line naming it,
 #     and NO lower rung: neither a working machine adapter nor `gh` is consulted.
@@ -217,39 +218,39 @@ pass "no adapter: one missing-adapter line; gc reaps nothing, list/resume show n
 # --- 2. A working project adapter serves, and gh is never called ---------------
 reset
 make_adapter "$PROJECT_RUNG" working trunk "$PROJECT_LOG"
-announce="code-host: using adapter .cdd/code-host (stub)"
 
 run "$MACHINE" cdd-worktree-default-branch
 [[ $RC -eq 0 && "$(cat "$WORK/out")" == "trunk" ]] || fail "working adapter: default branch should be the adapter's 'trunk'$(show)"
-one_line_matching -xF "$announce" || fail "working adapter: expected exactly one announcement line$(show)"
+[[ "$(stderr_lines)" == 0 ]] || fail "working adapter: the project adapter should serve silently$(show)"
 
 run "$MACHINE" cdd-worktree-gc
 [[ $RC -eq 0 ]] || fail "working adapter: gc exited $RC$(show)"
 grep -q "reap  $MERGED (MERGED): would remove" "$WORK/out" || fail "working adapter: gc did not reap what the adapter says merged$(show)"
 grep -q "keep  $OPEN (not merged" "$WORK/out" || fail "working adapter: gc did not keep $OPEN$(show)"
-one_line_matching -xF "$announce" || fail "working adapter: gc should announce exactly once$(show)"
+[[ "$(stderr_lines)" == 0 ]] || fail "working adapter: gc should be silent on stderr$(show)"
 
 run "$MACHINE" cdd-worktree-list
 [[ $RC -eq 0 ]] || fail "working adapter: list exited $RC$(show)"
 [[ "$(pr_column "$MERGED")" == "#42 MERGED" ]] || fail "working adapter: list should show '#42 MERGED' for $MERGED$(show)"
 [[ "$(pr_column "$OPEN")" == "-" ]] || fail "working adapter: list should show '-' for $OPEN$(show)"
-[[ "$(stderr_lines)" == 1 ]] || fail "working adapter: list should announce exactly once$(show)"
+[[ "$(stderr_lines)" == 0 ]] || fail "working adapter: list should be silent on stderr$(show)"
 [[ ! -s "$GH_LOG" ]] || fail "working adapter: gh was called: $(cat "$GH_LOG")"
-pass "a working project adapter serves default-branch, gc and list; announced once; gh never called"
+pass "a working project adapter serves default-branch, gc and list silently; gh never called"
 
 # --- 3. The machine rung, and the project rung winning over it -----------------
 reset
 make_adapter "$MACHINE_RUNG" working machine-trunk "$MACHINE_LOG"
 run "$MACHINE" cdd-worktree-default-branch
 [[ $RC -eq 0 && "$(cat "$WORK/out")" == "machine-trunk" ]] || fail "machine rung: expected 'machine-trunk'$(show)"
-grep -qF "code-host: using adapter $MACHINE_RUNG (stub)" "$WORK/err" || fail "machine rung: announcement should name it$(show)"
+one_line_matching -xF "code-host: using adapter $MACHINE_RUNG (stub)" || fail "machine rung: expected exactly one announcement naming it$(show)"
 make_adapter "$PROJECT_RUNG" working trunk "$PROJECT_LOG"
 : > "$MACHINE_LOG"
 run "$MACHINE" cdd-worktree-default-branch
 [[ "$(cat "$WORK/out")" == "trunk" ]] || fail "both rungs: the project adapter should win$(show)"
+[[ "$(stderr_lines)" == 0 ]] || fail "both rungs: the project adapter should win silently$(show)"
 [[ ! -s "$MACHINE_LOG" ]] || fail "both rungs: the machine adapter should not have been called"
 [[ ! -s "$GH_LOG" ]] || fail "machine rung: gh was called: $(cat "$GH_LOG")"
-pass "the machine rung serves when alone; the project rung wins when both exist"
+pass "the machine rung serves when alone, announced once; the project rung wins silently when both exist"
 
 # --- 4. A broken project adapter stops; nothing lower is consulted -------------
 for mode in nonexec desc-exit1 desc-nonjson contract99 cap-tracker; do
