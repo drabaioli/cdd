@@ -33,7 +33,7 @@ If one resolved, run `describe` and take `.ref_pattern` — an ERE — as the sh
 
 Use it only if the file is executable and `describe` exits 0, parses as JSON, reports `capability` `tracker`, and reports a `contract` this CDD supports (currently `1`). Otherwise the adapter is **installed but broken**: say so in **one line** naming its path, and **stop the command**. Do not try a lower rung. With nothing resolved there is no `ref_pattern`: the direct row never matches, and `issue` / `issues` still dispatches to §0b, which stops with the install line.
 
-Resolution done only to classify the argument is **silent**; the rung is announced in §0b, or in §3 roadmap-driven.
+Resolution done only to classify the argument is **silent**.
 
 ## 0a. Verify the checkout is current
 
@@ -61,7 +61,7 @@ Then continue with §0b (issue-driven mode) or §1.
 
 *With nothing resolved*, print exactly `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` and stop.
 
-**Announce the rung in one line** before the first call — `.cdd/tracker` or `~/.cdd/adapters/tracker`.
+If the machine rung (`~/.cdd/adapters/tracker`) resolved, say so in one line before the first call.
 
 **Direct** (every token matched): read each item, in the order given, read-only (never assign, comment, or relabel): one `<adapter> issue-read <ref>` per token, passing each through unchanged. If any item's `state` is `closed`, say which is already closed and stop.
 
@@ -102,9 +102,7 @@ For each handoff `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, ask the user inline whether to delete it with its siblings (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.plan.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation.
-
-For a richer view that also reports worktree / PR status, suggest `cdd-worktree-list`.
+If the branch is gone, the handoff is stale. For each stale handoff, ask the user inline whether to delete it with its siblings (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.plan.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation. `cdd-worktree-list` adds each one's worktree and PR status.
 
 ## 3. Propose the next task (roadmap-driven mode)
 
@@ -116,7 +114,7 @@ Identify the next unchecked item(s) in the roadmap. Summarize:
 
 If several items could reasonably be "next" (including ones that could run in parallel in separate worktrees), present them and let the user pick. Say explicitly which items overlap in the modules they would touch.
 
-Once the user has picked one task, read every issue its line cites, open or closed, read-only, as part of the task's context. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count). With no tracker resolved (§0) there is no `ref_pattern`: a line that still visibly cites an issue (e.g. `#145`, `PROJ-12`) cites one. Announce the rung in one line before the first `<adapter> issue-read <ref>`; §0b's preconditions apply, and a failed call stops the command. The task stays roadmap-driven: no issue ref is recorded (§7).
+Once the user has picked one task, read every issue its line cites, open or closed, read-only, as part of the task's context. A cited issue is a token on the line that matches `ref_pattern` once surrounding punctuation is stripped and reads as a reference — not a number in the prose (an ADR, a phase, a count). With no tracker resolved (§0) there is no `ref_pattern`: a line that still visibly cites an issue (e.g. `#145`, `PROJ-12`) cites one. Before the first `<adapter> issue-read <ref>`, §0b's preconditions and its machine-rung line apply, and a failed call stops the command. The task stays roadmap-driven: no issue ref is recorded (§7).
 
 ## 3-intent. Scope the given task (intent-driven and issue-driven modes)
 
@@ -124,7 +122,7 @@ The task is already chosen — do **not** propose candidates. In issue-driven mo
 
 - **Overlap check**: if the prompt substantially matches an existing roadmap item (especially an unchecked one), surface it and ask whether to proceed as that item (roadmap-driven) rather than create a duplicate.
 - **Roadmap-belonging decision**: issue-driven → no roadmap item by default, since the issue already tracks the task, unless it is multi-PR (below); add one only if the user asks. Intent-driven: substantive, evolving, or likely to be referenced later → belongs on the roadmap; a trivial throwaway → maybe not. If unclear, ask the user. Record the verdict in the handoff's Notes (§5).
-- **Multi-PR judgement** (issue-driven): the issue is multi-PR when it shows, up front, several separately shippable steps whose order is worth planning, or asks for a phase — not merely when it looks likely to take two or three PRs. Recommend in one line naming the signal; the user decides. For a multi-PR issue the verdict is a new **roadmap phase**, recorded in Notes (§5):
+- **Multi-PR judgement** (issue-driven): the issue is multi-PR when it shows, up front, several separately shippable steps whose order is worth planning, or asks for a phase — not merely when it looks likely to take two or three PRs. When it is, recommend that in one line naming the signal; the user decides, and the verdict is a new **roadmap phase**, recorded in Notes (§5):
   - an intro, one task line per PR — each ending with the issue's ref, in the form `ref_pattern` matches (e.g. `#NN`), and within the 200-character cap — and a milestone; the issue keeps the detail;
   - this task adds the phase; ask whether it also does the phase's first line (adding the phase alone usually qualifies for the small-change lane, §4b);
   - if the issue asks for a convergence step first (decisions to confirm, research to finish), that step is the first line, worded so its task adds or confirms the implementation lines once the user approves the final shape; until then propose those lines only as the issue sketches them, or not at all;

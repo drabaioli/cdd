@@ -69,11 +69,12 @@ See `doc/architecture/index.md` for the full picture.
 
 ## Talking to the human
 
-Anything printed for a human to decide on — a checkpoint digest, a session's closing report, a question — is **short, plainly worded, and only what changes their answer**.
+Anything printed for the human — a checkpoint digest, a session's closing report, a question — is **short, plainly worded, and only what changes their answer**.
 
 - **Short.** A few lines. Long enough to decide against, short enough to be read rather than skimmed; a wall of text turns a checkpoint into a rubber stamp.
 - **Plain.** Ordinary words, not the project's own vocabulary — "the tests that cover the parser all pass", not "the parser suite's coverage gate is green". Name a mechanism only when the human needs it to act.
 - **Only what decides.** What the thing is, why, and anything that would change the answer. Leave out what they will see anyway at review time: the file list, the internal mechanics, the log of how you got there.
+- **Silent when normal.** A check that passed or a default that held prints nothing; only what needs the human or changes their answer gets a line.
 
 Correctness outranks brevity — if a point cannot be made both plainly and correctly in the space, say it correctly.
 

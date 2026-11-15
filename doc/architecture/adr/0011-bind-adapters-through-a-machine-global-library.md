@@ -1,6 +1,6 @@
 # 0011: Bind adapters through a machine-global library
 
-**Status:** Accepted
+**Status:** Accepted; partially superseded by [0023](0023-say-nothing-when-all-is-normal.md) (a project's own binding serves silently)
 
 ## Context
 
