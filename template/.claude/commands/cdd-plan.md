@@ -135,7 +135,7 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 <which check-runner gates to run, which assertions or tests to add or extend>
 ```
 
-Then advance the task **state record** — this write also pushes the plan onto the task's sync ref. It is advisory and skips silently if the record is absent; never create one:
+Then advance the task **state record** — when task-ref sync is on, this write also pushes the plan onto the task's sync ref. It is advisory and skips silently if the record is absent; never create one:
 
 ```bash
 cdd-state set plan_written

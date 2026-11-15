@@ -31,7 +31,7 @@ If reality contradicts the plan, **stop and report to the human**. Do not silent
 Two expected cases:
 
 - **The plan's anchors no longer match the tree** (e.g. a `/cdd-merge-base` ran since planning). If the cited `file:line` lines no longer say what the plan says, stop, report which anchors drifted, and offer to re-run `/cdd-plan` against the merged tree.
-- **The plan file is not there** (an older worktree helper does not sync it). Say plainly the plan was not materialized on this machine, and offer to re-run `/cdd-plan`. **Never improvise the work from the handoff alone.**
+- **The plan file is not there** (task-ref sync is off — its default — or an older worktree helper did not carry it). Say plainly the plan was not materialized on this machine, and offer to copy it over from the machine that wrote it, or to re-run `/cdd-plan`. **Never improvise the work from the handoff alone.**
 
 Anything smaller — a stale line number, a renamed file, a step that turns out to be a no-op — is your judgement call; mention it in the final summary.
 

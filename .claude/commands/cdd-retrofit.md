@@ -151,7 +151,7 @@ Both modes run this after their commit (sections 3.4 / 4.7): the retrofit branch
              && CLAUDE_CODE_SESSION_ID= cdd-state set implementation_done )
   ```
 
-  Write no lane marker. Both calls also push the handoff and the record to the target's `origin` as `refs/cdd/$BRANCH`; with no `origin`, or offline, the helper says so in its own line, and nothing else changes.
+  Write no lane marker. If the target's clone has task-ref sync on (`cdd.syncTaskRef`), both calls also push the handoff and the record to its `origin` as `refs/cdd/$BRANCH`; with no `origin`, or offline, the helper says so in its own line. With the sync off they push nothing. Either way nothing else changes.
 - **Check it landed:** `~/.cdd/handoffs/$REPO_NAME/$BRANCH.state.json` exists. If not (`cdd-state` exits 4 naming a missing required tool, for one), say so in one line and finish normally.
 
 ## 3. Install mode

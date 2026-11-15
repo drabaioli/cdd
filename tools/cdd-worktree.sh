@@ -1149,7 +1149,8 @@ cdd-worktree-materialize-ref() {
 # Recreate a worktree on an EXISTING remote branch so a task started on another
 # machine can be picked up here. Unlike cdd-worktree, this requires no handoff and
 # tracks the remote branch rather than creating a new one. If the originating machine
-# synced a per-task ref (refs/cdd/<branch>, see cdd-state), the handoff, plan file and
+# synced a per-task ref (refs/cdd/<branch>, see cdd-state) — it does so only when the
+# human turned the sync on there (`cdd.syncTaskRef`, off by default) — the handoff, plan file and
 # state record are fetched and materialized here before launch (most-advanced-stage
 # wins, advisory — a missing ref just means nothing to transfer); the resume-side commands
 # (/cdd-process-pr, /cdd-merge-base, /cdd-pre-pr) read PR/branch state from git and
@@ -1282,8 +1283,9 @@ cdd-worktree-resume() {
   echo "Resumed worktree for '$branch' on origin/$branch (now in $worktree_path)."
   # Fetch + materialize the handoff/plan/state from refs/cdd/<branch> if it was synced.
   if ! cdd-worktree-materialize-ref "$branch"; then
-    echo "No synced task ref (refs/cdd/$branch); handoff/plan/state not transferred."
-    echo "Resume-side commands read PR/branch state from git and the code host, so this is fine."
+    echo "No synced task ref (refs/cdd/$branch); handoff, plan and state not transferred."
+    echo "Task-ref sync is off unless the machine that ran the task set: git config cdd.syncTaskRef true (private repos only)."
+    echo "Review-side commands don't need them; to run /cdd-implement here, copy the plan file over first."
   fi
   # A task parked at plan_written has an approved plan on disk and no code yet, so it
   # resumes into the implementation half of the split rather than into a review-side

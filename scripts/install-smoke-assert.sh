@@ -475,12 +475,17 @@ EXPECT_DIR="$(cd "$REPO_ROOT" && git rev-parse --show-toplevel)"
 # Overriding `remote.origin.pushurl` (not the fetch URL) is the narrowest lever — the
 # helper's own `git push --force origin ...` is untouched, so the real path still runs.
 # GIT_CONFIG_* outranks the runner's GIT_CONFIG_GLOBAL and ci.sh sets no GIT_CONFIG_COUNT.
+# The sync itself is opt-in (ADR 0022), so the same env also turns it on
+# (`cdd.syncTaskRef`): without it there would be no push to assert, and the
+# option-shaped-branch check below would pass vacuously.
 FAKE_ORIGIN="$FAKE_HOME/origin.git"
 git init -q --bare "$FAKE_ORIGIN"
 PUSH_TO_FAKE=(
-  GIT_CONFIG_COUNT=1
+  GIT_CONFIG_COUNT=2
   GIT_CONFIG_KEY_0=remote.origin.pushurl
   GIT_CONFIG_VALUE_0="$FAKE_ORIGIN"
+  GIT_CONFIG_KEY_1=cdd.syncTaskRef
+  GIT_CONFIG_VALUE_1=true
 )
 # The helper is dual-mode: executed directly it only installs, so source it and
 # call the function (the same path the PATH shim takes) to reach `seed`.
