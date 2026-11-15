@@ -48,6 +48,8 @@ trap 'rm -rf "$WORK"' EXIT
 
 # Isolate from the caller's git identity / signing config; keep runs deterministic.
 export GIT_CONFIG_SYSTEM=/dev/null
+# The sync to refs/cdd/<branch> is opt-in (ADR 0022); this gate asserts the push,
+# so its throwaway global config turns it on (the --global form).
 export GIT_CONFIG_GLOBAL="$WORK/gitconfig"
 cat > "$GIT_CONFIG_GLOBAL" <<'GITCONFIG'
 [user]
@@ -57,6 +59,8 @@ cat > "$GIT_CONFIG_GLOBAL" <<'GITCONFIG'
 	defaultBranch = main
 [commit]
 	gpgsign = false
+[cdd]
+	syncTaskRef = true
 GITCONFIG
 
 DEFAULT_BRANCH="main"

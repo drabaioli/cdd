@@ -88,9 +88,11 @@
 # `dir` on a session entry is the worktree root the session ran in (from
 # `git rev-parse --show-toplevel`): the natural `cd` target for `claude --resume`.
 #
-# Every verb that writes the record (`seed`, `lane`, `issue-refs`, `set`, `set-field`) also syncs
-# the handoff + plan file + record to a per-task ref `refs/cdd/<branch>` on origin
-# (best-effort, advisory), so a resume on another machine can materialize them; see
+# When the human has turned task-ref sync on (`git config cdd.syncTaskRef true`, per clone
+# or --global; off by default, ADR 0022), every verb that writes the record (`seed`, `lane`,
+# `issue-refs`, `set`, `set-field`) also syncs the handoff + plan file + record to a per-task
+# ref `refs/cdd/<branch>` on origin (best-effort, advisory), so a resume on another machine
+# can materialize them; the pushed record carries no `sessions[].dir`. See
 # cdd-worktree-resume and shell-helpers.md.
 #
 # `seed` and `set` also refresh the per-repo marker `~/.cdd/handoffs/<repo>/repo.json`, which
@@ -258,7 +260,9 @@ cdd-state-write-repo-marker() {
 }
 
 # Sync the handoff + plan + state record to a per-task ref refs/cdd/<branch> on origin,
-# so a resume on another machine can materialize them (see cdd-worktree-resume). Bundles
+# so a resume on another machine can materialize them (see cdd-worktree-resume). Runs
+# only when `cdd.syncTaskRef` is true (off by default, ADR 0022); the pushed state.json
+# drops each session's local `dir`, while the local record keeps it. Bundles
 # whichever of the three files exist into a git tree (stable in-tree names handoff.md /
 # plan.md / state.json, decoupled from the branch-named on-disk files), wraps it in a
 # parentless commit, and force-pushes (advisory, latest-wins). Best-effort end-to-end:
@@ -269,6 +273,16 @@ cdd-state-write-repo-marker() {
 # identity; the SHA is irrelevant under force-push. See doc/architecture/shell-helpers.md.
 cdd-state-push-ref() {
   local handoff_md="$1" state_json="$2" branch="$3"
+  # Opt-in (ADR 0022): push only when the human turned the sync on with
+  # `git config cdd.syncTaskRef true` (per clone or --global). Unset or false is the
+  # silent default; any other failure to read it as a boolean warns and does not push.
+  local sync rc=0
+  sync="$(git config --bool cdd.syncTaskRef 2>/dev/null)" || rc=$?
+  if (( rc > 1 )); then
+    echo "cdd-state: could not read cdd.syncTaskRef as a boolean; not syncing the task ref (advisory)." >&2
+    return 0
+  fi
+  [[ "$sync" == true ]] || return 0
   # The plan file (§2.15) is derived, not passed: it is the <branch>.plan.md sibling
   # of the handoff, so both callers stay two-argument. It is written after seed — by
   # /cdd-plan on approval — so the `set plan_written` push is what first carries it.
@@ -287,7 +301,12 @@ cdd-state-push-ref() {
     entries+="100644 blob ${blob}"$'\t'"plan.md"$'\n'
   fi
   if [[ -f "$state_json" ]]; then
-    blob="$(git hash-object -w "$state_json" 2>/dev/null)" \
+    # The ref leaves the machine, so it carries no local paths: sessions[].dir is
+    # dropped from the pushed copy only (ADR 0022); the local record keeps it.
+    local filtered
+    filtered="$(jq 'del(.sessions[]?.dir)' "$state_json" 2>/dev/null)" \
+      || { echo "cdd-state: could not filter state; skipping ref sync (advisory)." >&2; return 0; }
+    blob="$(printf '%s\n' "$filtered" | git hash-object -w --stdin 2>/dev/null)" \
       || { echo "cdd-state: could not hash state; skipping ref sync (advisory)." >&2; return 0; }
     entries+="100644 blob ${blob}"$'\t'"state.json"$'\n'
   fi
