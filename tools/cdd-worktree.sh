@@ -67,8 +67,9 @@
 #                               if merged, force-delete if squash-merged on
 #                               the code host, otherwise prompt), close the
 #                               issues recorded on the task's state record once a
-#                               merged PR is confirmed (via the tracker adapter),
-#                               and delete the handoff file iff the branch was
+#                               merged PR is confirmed (via the tracker adapter;
+#                               a partial one stays open and only gets the merged
+#                               PR linked), and delete the handoff file iff the branch was
 #                               deleted and every close succeeded.
 #
 #   cdd-worktree-list       List all active handoffs in ~/.cdd/handoffs/<repo-name>/
@@ -92,7 +93,8 @@
 #                               handoff + state record and the remote sync ref
 #                               (refs/cdd/<branch>) for any task whose PR has
 #                               merged, first closing the issues its state
-#                               record lists (the backstop for done's close).
+#                               record lists (the backstop for done's close; a
+#                               partial one stays open, merged PR linked).
 #                               Conservative — reaps only merged tasks (never a
 #                               scoped-but-unstarted or open-PR one) and is
 #                               dry-run unless --force. Needs a code-host
@@ -330,13 +332,14 @@ cdd-worktree-no-adapter() {  # cdd-worktree-no-adapter <capability> [<skipped>]
 }
 
 # Read the issue refs recorded on <branch>'s state record into the caller's
-# CDD_ISSUE_REFS array (declared `local -a` by the caller, like CDD_ADAPTER): the local
-# record <state_file> when present, else the copy on origin's refs/cdd/<branch> — a
-# read-only fetch, so a dry run may use it. Empty when neither exists or none is
-# recorded.
+# CDD_ISSUE_REFS array, and the ones marked partial (`partial_refs`, left open after the
+# merge) into CDD_PARTIAL_REFS — both declared `local -a` by the caller, like
+# CDD_ADAPTER: the local record <state_file> when present, else the copy on origin's
+# refs/cdd/<branch> — a read-only fetch, so a dry run may use it. Empty when neither
+# exists or none is recorded.
 cdd-worktree-issue-refs() {
   local branch="$1" state_file="$2" json=""
-  CDD_ISSUE_REFS=()
+  CDD_ISSUE_REFS=() CDD_PARTIAL_REFS=()
   if [[ -f "$state_file" ]]; then
     json="$(cat "$state_file")"
   elif git fetch --quiet origin "refs/cdd/$branch" 2>/dev/null; then
@@ -344,6 +347,7 @@ cdd-worktree-issue-refs() {
   fi
   [[ -z "$json" ]] && return 0
   mapfile -t CDD_ISSUE_REFS < <(jq -r '.issue_refs[]? | strings' <<<"$json" 2>/dev/null)
+  mapfile -t CDD_PARTIAL_REFS < <(jq -r '.partial_refs[]? | strings' <<<"$json" 2>/dev/null)
   return 0
 }
 
@@ -368,14 +372,26 @@ cdd-worktree-resolve-tracker() {
 # <pr-ref> and <pr-url> name the merged PR (either may be ""); each ref closed now — not
 # one already closed, so a gc retry never comments twice — gets a comment linking it,
 # via cdd-worktree-link-pr. Best-effort: a comment never affects the return code.
+#
+# A ref in the caller's CDD_PARTIAL_REFS is never transitioned: it stays open, and gets
+# the merged PR linked only on a run where no close failed — the run that lets the
+# record be reaped — and only when the issue does not carry that link already, so no
+# rerun or gc retry comments twice on it either.
 cdd-worktree-close-issues() {  # cdd-worktree-close-issues <pr-ref> <pr-url> <ref>...
   local CDD_ADAPTER="$CDD_TRACKER" CDD_ADAPTER_DESCRIBE="$CDD_TRACKER_DESCRIBE"
-  local CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" ref rc failed=0
+  local CDD_ADAPTER_OUT="" CDD_ADAPTER_ERR="" ref p rc failed=0 i
   local pr="$1" pr_url="$2" CDD_LINK_UNSUPPORTED=0
+  local -a close=() partial=()
   shift 2
   if [[ -n "$CDD_ADAPTER" ]]; then
-    while (( $# )); do
-      ref="$1" rc=0
+    for ref in "$@"; do
+      for p in ${CDD_PARTIAL_REFS[@]+"${CDD_PARTIAL_REFS[@]}"}; do
+        [[ "$p" == "$ref" ]] && { partial+=("$ref"); continue 2; }
+      done
+      close+=("$ref")
+    done
+    for (( i = 0; i < ${#close[@]}; i++ )); do
+      ref="${close[i]}" rc=0
       cdd-worktree-adapter-call issue-transition "$ref" closed || rc=$?
       if (( rc == 0 )); then
         if [[ "$(jq -r '.changed' <<<"$CDD_ADAPTER_OUT" 2>/dev/null)" == "false" ]]; then
@@ -385,14 +401,19 @@ cdd-worktree-close-issues() {  # cdd-worktree-close-issues <pr-ref> <pr-url> <re
           cdd-worktree-link-pr "$ref" "$pr" "$pr_url"
         fi
       elif (( rc == 3 )); then
-        echo "tracker $CDD_ADAPTER does not support issue-transition; not closing $*." >&2
-        return "$failed"
+        echo "tracker $CDD_ADAPTER does not support issue-transition; not closing ${close[*]:i}." >&2
+        break
       else
         echo "warning: could not close issue $ref (exit $rc) via ${CDD_ADAPTER}${CDD_ADAPTER_ERR:+: $CDD_ADAPTER_ERR}" >&2
         failed=1
       fi
-      shift
     done
+    if (( failed == 0 )); then
+      for ref in ${partial[@]+"${partial[@]}"}; do
+        echo "issue $ref: left open (partial)"
+        cdd-worktree-link-pr "$ref" "$pr" "$pr_url" partial
+      done
+    fi
     return "$failed"
   fi
 
@@ -400,29 +421,42 @@ cdd-worktree-close-issues() {  # cdd-worktree-close-issues <pr-ref> <pr-url> <re
   return 1
 }
 
-# Comment on <ref>, just closed, that the merged PR closed it: the tracker adapter's
+# Comment on <ref>, just closed, that the merged PR closed it — or, with `partial`, on
+# <ref> left open, that the merged PR did part of it: the tracker adapter's
 # `issue-comment` (CDD_ADAPTER, as scoped by cdd-worktree-close-issues; callers only
 # reach it with one). One line. Without issue-comment the adapter is told once per
 # close-issues call (CDD_LINK_UNSUPPORTED, its local) and the rest are skipped. Never
 # fails: a missing link is not worth keeping a task's record for.
-cdd-worktree-link-pr() {  # cdd-worktree-link-pr <ref> <pr-ref> <pr-url>
+cdd-worktree-link-pr() {  # cdd-worktree-link-pr <ref> <pr-ref> <pr-url> [partial]
   local ref="$1" pr="$2" url="$3" label body rc=0
   [[ "$pr" == "?" ]] && pr=""
   [[ -z "$pr" && -z "$url" ]] && return 0
   label="PR${pr:+ #$pr}"
-  if [[ -n "$url" ]]; then
+  if [[ "${4:-}" == partial ]]; then
+    body="Partly done by $label, merged${url:+: $url}. Left open for the rest."
+  elif [[ -n "$url" ]]; then
     body="Closed after $label merged: $url"
   else
     body="Closed after $label merged."
   fi
   if [[ -n "$CDD_ADAPTER" ]]; then
     (( CDD_LINK_UNSUPPORTED )) && return 0
+    # A partial ref stays open, so unlike a close there is no `changed: false` to stop a
+    # second comment when the record outlives this run (done failing after step 2, or a
+    # refs/cdd delete failing). Skip it when the issue already carries this PR's link; a
+    # failed or unsupported read posts anyway.
+    if [[ "${4:-}" == partial ]] && cdd-worktree-adapter-call issue-read "$ref" \
+      && jq -e --arg n "${body%. Left open*}" 'any(.comments[]?.body | strings; contains($n))' \
+        <<<"$CDD_ADAPTER_OUT" >/dev/null 2>&1; then
+      echo "issue $ref: $label already linked"
+      return 0
+    fi
     cdd-worktree-adapter-call issue-comment "$ref" --body "$body" || rc=$?
     if (( rc == 0 )); then
       echo "issue $ref: linked $label"
     elif (( rc == 3 )); then
       CDD_LINK_UNSUPPORTED=1
-      echo "tracker $CDD_ADAPTER does not support issue-comment; not linking $label on the issues it closes." >&2
+      echo "tracker $CDD_ADAPTER does not support issue-comment; not linking $label on the issues." >&2
     else
       echo "warning: could not link $label on issue $ref (exit $rc) via ${CDD_ADAPTER}${CDD_ADAPTER_ERR:+: $CDD_ADAPTER_ERR}" >&2
     fi
@@ -624,7 +658,7 @@ cdd-worktree-done() {
   # broken tracker adapter never blocks one that did not; when it is broken it stops
   # here, before the cd, the pull or the worktree removal, as a broken code host does.
   # Resolving before the cd also finds the feature worktree's own .cdd/tracker.
-  local -a CDD_ISSUE_REFS=()
+  local -a CDD_ISSUE_REFS=() CDD_PARTIAL_REFS=()
   local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC=""
   cdd-worktree-issue-refs "$branch" "$state_file"
   if (( ${#CDD_ISSUE_REFS[@]} )); then
@@ -885,7 +919,8 @@ cdd-worktree-list() {
 # or one with an open PR: those are indistinguishable from a finished task by ref or
 # branch presence alone, and only the PR state tells them apart. Before reaping a
 # merged task it closes the issues its state record lists — the backstop for the same
-# close in cdd-worktree-done — and a failed close keeps the task for the next run.
+# close in cdd-worktree-done — and a failed close keeps the task for the next run. A
+# partial ref stays open and only gets the merged PR linked.
 # When the branch still exists locally and the merged PR's reported head_sha does not
 # contain its tip (cdd-worktree-tip-in-head), the name was reused and the task is
 # kept; with no local branch or no head_sha there is nothing to compare, and gc trusts
@@ -950,8 +985,8 @@ cdd-worktree-gc() {
   # The tracker is resolved lazily, at the first merged task that recorded issue refs,
   # and once per run: a broken tracker adapter then keeps only the tasks with refs,
   # and a run with none never touches the tracker at all.
-  local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC="" closing
-  local -a CDD_ISSUE_REFS=()
+  local CDD_TRACKER="" CDD_TRACKER_DESCRIBE="" CDD_TRACKER_RC="" closing r p would_close would_leave
+  local -a CDD_ISSUE_REFS=() CDD_PARTIAL_REFS=()
   local reaped=0 kept=0 pr_state pr_ref pr_url pr_head pr_tip handoff plan state items joined
   for branch in "${!seen[@]}"; do
     pr_ref="" pr_url=""
@@ -997,7 +1032,7 @@ cdd-worktree-gc() {
     handoff="${handoff_dir}/${branch}.md"
     plan="${handoff_dir}/${branch}.plan.md"
     state="${handoff_dir}/${branch}.state.json"
-    CDD_ISSUE_REFS=() closing=""
+    CDD_ISSUE_REFS=() CDD_PARTIAL_REFS=() closing=""
     if [[ -f "$state" || -n "${has_ref[$branch]:-}" ]]; then
       cdd-worktree-issue-refs "$branch" "$state"
     fi
@@ -1023,7 +1058,14 @@ cdd-worktree-gc() {
         continue
       fi
       if (( ! force )); then
-        closing="; would close ${CDD_ISSUE_REFS[*]}"
+        would_close="" would_leave=""
+        for r in "${CDD_ISSUE_REFS[@]}"; do
+          for p in ${CDD_PARTIAL_REFS[@]+"${CDD_PARTIAL_REFS[@]}"}; do
+            [[ "$p" == "$r" ]] && { would_leave+=" $r"; continue 2; }
+          done
+          would_close+=" $r"
+        done
+        closing="${would_close:+; would close${would_close}}${would_leave:+; would leave${would_leave} open}"
       elif ! cdd-worktree-close-issues "$pr_ref" "$pr_url" "${CDD_ISSUE_REFS[@]}"; then
         kept=$(( kept + 1 ))
         echo "keep  $branch (MERGED, issue close failed; kept so the next gc retries)"

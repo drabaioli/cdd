@@ -128,7 +128,7 @@ Its consumer is the post-merge close in `cdd-worktree-done` and `cdd-worktree-gc
 
 Posts a comment on the item. `B` is plain text; an adapter may render a bare `http(s)` URL in it as a link (the Jira adapter does). `url` is the new comment's, omitted when the backend does not report one; `id` follows `issue-create`'s omit rule. Additive, so the contract stays at 1.
 
-Its consumer is the post-merge close: on each ref that `issue-transition` reports it closed **now** (`changed: true`), `cdd-worktree-done` and `cdd-worktree-gc` post one comment naming the merged PR and its link — `Closed after PR #42 merged: https://…`. A ref already closed (`changed: false`) gets none, so a gc retry never comments twice, and an item closed by the PR's own close line already shows the PR (GitHub's timeline, Jira's development panel). The comment is best-effort: a failure is one warning and never keeps the task's record, and an adapter that does not declare the verb is said once per run and the rest skipped.
+Its consumer is the post-merge close: on each ref that `issue-transition` reports it closed **now** (`changed: true`), `cdd-worktree-done` and `cdd-worktree-gc` post one comment naming the merged PR and its link — `Closed after PR #42 merged: https://…`. A ref already closed (`changed: false`) gets none, so a gc retry never comments twice, and an item closed by the PR's own close line already shows the PR (GitHub's timeline, Jira's development panel). The comment is best-effort: a failure is one warning and never keeps the task's record, and an adapter that does not declare the verb is said once per run and the rest skipped. The same commands also comment on each partial ref, which is never transitioned, naming the merged PR that did part of it, unless `issue-read` shows that comment already ([ADR 0024](adr/0024-leave-a-partially-done-issue-open.md)).
 
 ### `issue-close-token <ref>` → object
 
@@ -138,7 +138,7 @@ Its consumer is the post-merge close: on each ref that `issue-transition` report
 
 The string a commit message or PR description carries so the backend auto-closes the item on merge. GitHub yields `Closes #42`; Jira yields a smart commit. A backend with no such mechanism does not declare the verb, and the caller simply writes no token.
 
-Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the references recorded on the task's state record (`cdd-state get issue_refs`, process doc §2.13), calls this verb once per reference, and appends each `.token` to the PR body. A machine-rung tracker is announced **once**, before the first of those calls, rather than once per call — N identical lines is noise, and the announcement rule exists to be read. An adapter that does not declare the verb yields no close lines at all, said in one line and never guessed at; and when no reference was recorded, the command never reaches the ladder and emits no close lines either. The state record is the only carrier — there is no branch-name fallback behind it ([ADR 0008](adr/0008-drop-the-issue-ref-branch-token.md)).
+Its consumer is `/cdd-pre-pr` §11, when it opens the PR: it reads the references recorded on the task's state record (`cdd-state get issue_refs`, process doc §2.13), calls this verb once per reference it judges complete, and appends each `.token` to the PR body; a partial one gets a plain, non-closing reference instead ([ADR 0024](adr/0024-leave-a-partially-done-issue-open.md)). A machine-rung tracker is announced **once**, before the first of those calls, rather than once per call — N identical lines is noise, and the announcement rule exists to be read. An adapter that does not declare the verb yields no close lines at all, said in one line and never guessed at; and when no reference was recorded, the command never reaches the ladder and emits no close lines either. The state record is the only carrier — there is no branch-name fallback behind it ([ADR 0008](adr/0008-drop-the-issue-ref-branch-token.md)).
 
 **What the token can and cannot promise.** Emitting a close line is not the same as closing the
 item, and the contract deliberately does not claim otherwise. Three cases:
@@ -161,7 +161,7 @@ does nothing look like one that does.
 
 **The close CDD guarantees is made after the merge, by `issue-transition`.** `cdd-worktree-done`
 (the primary path) and `cdd-worktree-gc` (the backstop) close every ref recorded on the task's state
-record once the code host confirms the PR merged — automatically, on every backend, GitHub-on-GitHub
+record, except a partial one, once the code host confirms the PR merged — automatically, on every backend, GitHub-on-GitHub
 included. There it is usually a no-op (`changed: false`), but it also covers a dropped close line
 and a PR merged into a non-default branch, where GitHub does not auto-close. So the token is now
 the fast path where a backend or integration acts on it, not the only mechanism. When CDD itself

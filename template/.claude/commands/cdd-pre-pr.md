@@ -62,7 +62,7 @@ Review for:
 - Design issues (coupling, responsibility boundaries, API shape).
 - Compliance with the project coding standard linked from CLAUDE.md.
 
-Flag any issues found. If the change establishes a convention that should become the project norm, update the coding standard accordingly.
+Fix a clear defect yourself — one with a single obvious fix inside the branch's scope — and rerun the gates it touches; it rides in step 10's commit. Flag only what needs a judgement call: a design change, wider scope, or more than one reasonable fix. If the change establishes a convention that should become the project norm, update the coding standard accordingly.
 
 **Then check the diff against the handoff's acceptance criteria** — its `## Requirements` section.
 
@@ -153,7 +153,7 @@ Present a checklist summary:
 ```
 ## Pre-PR Checklist
 - [ ] Check runner passed (<N> gates: <N> passed, <N> failed)
-- [ ] Code review: no issues / issues flagged (list them)
+- [ ] Code review: no issues / fixed (list them) / flagged (list them)
 - [ ] Handoff requirements met (or unmet/deviating criteria listed)
 - [ ] Architecture docs up to date
 - [ ] Feature docs up to date
@@ -171,7 +171,7 @@ Mark each item as pass ✓ or needs attention ✗ with details.
 
 ## 10. Commit reconciliation edits
 
-Commit the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). Local commit only — **no push**; pushing happens, if at all, in step 11.
+Commit step 3's fixes and the documentation reconciliation edits this session made in steps 3–8 (architecture/feature docs, CLAUDE.md, README, the coding standard, and the roadmap). Local commit only — **no push**; pushing happens, if at all, in step 11.
 
 First check the entry snapshot from step 1:
 
@@ -205,7 +205,7 @@ Ask: **"Open a PR now?"** Do not pre-show a title or body, and do not print manu
   Once a PR is open, advance the task **state record**: run `cdd-state set pr_open --pr NN` with the new PR's number.
 - **On no**: stop. The checklist already stands on its own.
 
-**Close lines.** The body carries one close line per reference the task was sourced from. Read the recorded references first:
+**Close lines.** The body carries one close line per reference the task was sourced from, except one this PR does only part of. Read the recorded references first:
 
 ```bash
 cdd-state get issue_refs    # one reference per line; empty when none were recorded
@@ -219,7 +219,9 @@ cdd-state get issue_refs    # one reference per line; empty when none were recor
 
   If one resolved but is broken — not executable, or its `describe` exits non-zero, does not parse, or reports another `capability` or an unsupported `contract` — say so in one line naming it and emit **no close lines**; do not guess a `Closes #` syntax. The PR itself can still be opened.
 
-  If the machine rung (`~/.cdd/adapters/tracker`) resolved, say so in one line, once, before the first call — not once per reference. Then, per reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved, emit **no close lines** and say in one line `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` — the PR still opens, and the issues stay open to close by hand. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line rather than guessing a syntax.
+  If the machine rung (`~/.cdd/adapters/tracker`) resolved, say so in one line, once, before the first call — not once per reference. Then **judge each reference**, whatever verbs the adapter declares: run `<adapter> issue-read <ref>` and compare what the issue asks (its body and the decisions in its comments) with what the branch delivers — the step 1 diff, and the handoff requirements as step 3 checked them. Complete → its close line, and nothing said. Incomplete, or you cannot tell (the read failed) → **partial**: no close line; the body gets `Part of <its .url, else the ref> — left for later: <what is left>`. Never put a closing word (any form of close, fix, resolve or implement) right before a partial reference anywhere in the body, nor a `#` word on its line. Record the partial set without asking — `cdd-state partial-refs <ref>...`, with no refs when none is partial — and if that call fails, say in one line that `cdd-worktree-done` will still close the partial issues after the merge. At the confirmation, add one line per partial reference: it stays open, and what is left, or that you could not tell. If the human reverses either call there, re-run `cdd-state partial-refs` with the amended set and swap that reference's line.
+
+  Then, per complete reference, run `<adapter> issue-close-token <ref>` and append its `.token` to the body — one line each, in recorded order. With nothing resolved, emit **no close lines** and say in one line `No tracker adapter is installed; run /cdd-retrofit in this project to install one.` — the PR still opens, and the issues stay open to close by hand. An adapter that does not declare `issue-close-token` in its `describe.verbs` yields **no close lines at all** — say so in one line rather than guessing a syntax.
 
   **Then say what those lines will actually do**, once, before asking to open the PR. When the tracker's and the code host's `describe.backend` are the same (`github`, `gitlab`), the code host closes the issue on merge — say that plainly, adding GitLab's caveat when it is `gitlab`: it closes only on a merge into the default branch, and only while the project's "Auto-close referenced issues on default branch" setting is on (the default). Otherwise the line fires only if the tracker's own code-host integration is installed and watching this repo (Jira's DVCS connector, say); name that condition rather than implying the issue will close.
 - **Empty**: **no close lines.** Do not derive references from the branch name. If `cdd-state get stage` is empty too, there is no record here (unsynced or reaped): say so in one line at the confirmation step; the PR still opens, and the issues stay open to close by hand.

@@ -12,9 +12,10 @@
 # the tree and require the checker to notice, naming the seam it noticed. Each of the
 # checker's 13 checks gets at least one mutation:
 #   1. Command-name resolution — a markdown file referencing a command that does not exist.
-#   2. Issue-ref contract      — three cases, one per half of the seam: cdd-next-step.md
-#      stops recording the refs with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving
-#      close lines through `issue-close-token`; and cdd-pre-pr.md loses its §11 close-line
+#   2. Issue-ref contract      — four cases: cdd-next-step.md stops recording the refs
+#      with `cdd-state issue-refs`; cdd-pre-pr.md stops deriving close lines through
+#      `issue-close-token`; cdd-pre-pr.md stops marking partial refs with
+#      `cdd-state partial-refs`; and cdd-pre-pr.md loses its §11 close-line
 #      block, which pins the consumer half to that block — the triage prose that quotes
 #      the same tokens now lives in .cdd/extensions/cdd-pre-pr.md, and a checker that
 #      read it would be pinned to its own documentation rather than to the seam.
@@ -178,6 +179,11 @@ fresh_sandbox
 sandbox_sed 's/issue-close-token/issue-closing-phrase/g' "$CMDS/cdd-pre-pr.md"
 expect_fail "check 2 catches a consumer that stops deriving close lines" \
   "no longer derives close lines via issue-close-token"
+
+fresh_sandbox
+sandbox_sed 's/cdd-state partial-refs/cdd-state mark-refs/g' "$CMDS/cdd-pre-pr.md"
+expect_fail "check 2 catches a pre-PR that stops marking partial refs" \
+  "no longer marks partial refs with cdd-state partial-refs"
 
 # The consumer half must be pinned to the §11 block that does the work, not to the
 # triage prose that merely quotes the same three tokens while describing this check
