@@ -1,4 +1,4 @@
-What `/cdd-pre-pr` adds in this repo: how to read a failure of the two gates that need judgement, and where a general workflow improvement goes when the project is CDD itself.
+What `/cdd-pre-pr` adds in this repo: how to read a failure of the two gates that need judgement, which parts of `CLAUDE.md` the template's must match, and where a general workflow improvement goes when the project is CDD itself.
 
 ## Build & QA
 
@@ -15,6 +15,10 @@ On divergence, present each diff to the user; for each, the user decides: reconc
 On a broken seam, present each one to the user; for each, the user decides: fix the reference/heading/path, or record a justified exception (a whitelist entry).
 
 For both: apply fixes only on user approval, and do not auto-edit either tree from this step.
+
+## Documentation reconciliation
+
+Every part of `CLAUDE.md` that is not specific to CDD — "Talking to the human", "Writing changes", the Workflow bullets other than the CDD-specific ones — is the same in `template/CLAUDE.md`. Where the diff changes such a part in one file, make the same change in the other (ADR 0026).
 
 ## Workflow improvement check (conditional)
 

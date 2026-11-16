@@ -30,7 +30,7 @@ CDD relies on a small set of artifacts. Each has a clear owner, a clear update r
 
 ### 2.1 `CLAUDE.md` (project root)
 
-The entry point Claude Code reads at session start. Kept thin: an index, not a knowledge dump — a one-paragraph project description, a key-references table pointing at the canonical docs, the critical constraints that bite within minutes, the build/test commands, and a workflow pointer (run `/cdd-pre-pr` before opening a PR; keep docs current). Updated by the agent during `/cdd-pre-pr` when module layout, build commands, or top-level constraints change. Architecture details do not live here; they live in `doc/architecture/`.
+The entry point Claude Code reads at session start. Kept thin: an index, not a knowledge dump — a one-paragraph project description, a key-references table pointing at the canonical docs, the critical constraints that bite within minutes, the build/test commands, and a workflow pointer (run `/cdd-pre-pr` before opening a PR; keep docs current). It also states how every change is written: in the least code, prose and structure that still delivers the best solution (ADR 0026). Updated by the agent during `/cdd-pre-pr` when module layout, build commands, or top-level constraints change. Architecture details do not live here; they live in `doc/architecture/`.
 
 ### 2.2 The roadmap (`doc/knowledge_base/roadmap.md` or similar)
 

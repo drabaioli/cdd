@@ -79,7 +79,7 @@ Do not save the researchers' digests: what matters goes into the plan's `## Exte
 
 ## 4. Confirm scope, then check against the requirements
 
-Surface any remaining open questions and confirm scope with the user before drafting the plan.
+Surface any remaining open questions and confirm scope with the user before drafting the plan. Among equally good designs, draft the one that needs the least code.
 
 Then check the plan you are about to present against the handoff's `## Requirements`, criterion by criterion. If your plan does not satisfy one, or you believe a criterion is wrong, say so explicitly — do not quietly redefine done. Any deviation is a bullet in the digest below.
 

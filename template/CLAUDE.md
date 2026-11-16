@@ -78,6 +78,10 @@ Anything printed for the human — a checkpoint digest, a session's closing repo
 
 Correctness outranks brevity — if a point cannot be made both plainly and correctly in the space, say it correctly.
 
+## Writing changes
+
+Write every change in the least code, prose and structure that still delivers the best solution. Bloat is repeated code, abstractions nothing needs yet, handling for errors that can't happen, comments or docs that only restate the code, and wordy prose. This is about how each change is written, not how much a task touches: fixing an unrelated bug or improving quality along the way stays welcome.
+
 ## Workflow
 
 This project uses the Claude-Driven Development workflow. Every CDD session is a fresh context doing exactly one job.
@@ -89,5 +93,6 @@ This project uses the Claude-Driven Development workflow. Every CDD session is a
 - **When main has advanced under a feature branch** (merge session): run `/cdd-merge-base` in a fresh context on the feature branch.
 - **Before opening a PR** (pre-PR session): run `/cdd-pre-pr` in a fresh context to verify CI gates pass and that architecture/feature docs and the roadmap reflect the change; it auto-commits its own reconciliation edits (local, no push) and ends with an opt-in step to open the PR (one close line per ref recorded on the state record, derived through the tracker's `issue-close-token` — none for an issue it judges the PR only partly does, which stays open; with no usable record there are no close lines, said out loud rather than guessed).
 - **When a PR review leaves comments** (PR-review session): run `/cdd-process-pr` in a fresh context on the feature branch.
+- **To clean up finished tasks' artifacts** (maintenance, not a session): run `cdd-worktree-gc` from the main worktree. It reaps the handoff, plan file, state record, and synced `refs/cdd/<branch>` of any task whose PR has merged, first closing the issues recorded on its state record (a partial one stays open) and linking the merged PR on each — the backstop for `cdd-worktree-done` (which closes them itself once the PR is confirmed merged) never running or its ref cleanup failing across machines. Dry-run by default; `--force` to delete.
 - **To add a project step to a CDD command**: write `.cdd/extensions/<command>.md` (e.g. `.cdd/extensions/cdd-pre-pr.md`), one `##` heading per step it attaches to, named by that step's title. Never edit `.claude/commands/cdd-*.md`. An extension only adds; a deterministic pass/fail check belongs in the check runner instead.
 - Keep `doc/architecture/`, `doc/features/`, and this file current as part of every change.

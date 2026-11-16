@@ -97,6 +97,10 @@ Anything printed for the human — a checkpoint digest, a session's closing repo
 
 Correctness outranks brevity — if a point cannot be made both plainly and correctly in the space, say it correctly.
 
+## Writing changes
+
+Write every change in the least code, prose and structure that still delivers the best solution. Bloat is repeated code, abstractions nothing needs yet, handling for errors that can't happen, comments or docs that only restate the code, and wordy prose. This is about how each change is written, not how much a task touches: fixing an unrelated bug or improving quality along the way stays welcome.
+
 ## Workflow
 
 This project uses CDD on itself. Every CDD session is a fresh context doing exactly one job (see process doc section 3 for the session taxonomy).
