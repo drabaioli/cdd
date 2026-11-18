@@ -1,6 +1,6 @@
 # 0016: Apply clean retrofit changes as one approved batch
 
-**Status:** Accepted
+**Status:** Accepted; partially superseded by [0027](0027-ask-retrofit-only-what-decides.md) (CDD's own sections of a project's `CLAUDE.md` are compared like a CDD-managed file)
 
 ## Context
 
