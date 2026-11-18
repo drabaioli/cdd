@@ -86,20 +86,25 @@ Both modes write in this shape; sections 3 and 4 say which of their writes are b
 **Show the batch once, before any write.** One line per entry — the path and its kind:
 
 - install mode: `new`, `settings union`;
-- upgrade mode: `upgrade`, `new`, `new (filled: <fields>)`, `auto-merged`, `no-op: <why>`.
+- upgrade mode: `upgrade`, `new`, `new (filled: <fields>)`, `auto-merged`, `no-op: <why>`; for `CLAUDE.md`'s CDD sections (section 4.4), one line `sections: <heading> (<kind>), …`, each kind `upgrade`, `new` or `auto-merged`.
 
 Group the `auto-merged` entries apart from the rest. A `no-op` entry writes nothing (section 4.4) but is still listed. Put any caveat on the line under its entry (the section 3.3 `WebFetch` line, for one). End with how many per-file questions follow.
 
 **One approval writes the whole batch into `$WT`.** Before answering, the user may ask for any entry's diff, or pull entries out — each pulled entry joins the per-file queue. Declining the batch sends every entry to the per-file queue, never drops it. An empty batch is one line saying so, then straight to the queue.
 
-**Then the per-file queue, one file at a time:** show the diff (or both versions), propose, write into `$WT` on approval. The queue holds exactly:
+**Then the per-file queue, one item at a time:** show the diff (or both versions), propose, write into `$WT` on approval.
 
-- merge conflicts (section 4.4);
-- files the project deleted (section 4.4);
+- **One question, one prompt.** Items one answer would settle — the same template change landing in several files — are asked together: the question once, then each file's diff. The user may still answer them apart.
+- **A move carries its repoints.** An item that moves text lists under itself the edits elsewhere that only repoint references to the moved text (find them with `git -C "$WT" grep` on its old location, e.g. "`/cdd-pre-pr` step 2"); its approval covers them, and declined, they are not made. Ask it before any item for those files, which then ask only about the rest.
+
+The queue holds exactly:
+
+- merge conflicts, a CDD section of `CLAUDE.md` included (section 4.4);
+- files the project deleted, and CDD sections of `CLAUDE.md` it deleted or renamed (section 4.4);
 - new files still carrying residual `<...>` placeholders after the best-effort fill (section 4.4);
 - local hunks that swap in another backend — migrate into `.cdd/` (section 4.4);
 - local edits to a shipped command — should move to an extension point (section 4.4; transitional);
-- template changes to a project-owned file the project has also changed — `CLAUDE.md`, the roadmap, the filled-in knowledge-base docs (section 4.4);
+- template changes to a project-owned file the project has also changed — the project's own sections of `CLAUDE.md`, the roadmap, the filled-in knowledge-base docs (section 4.4);
 - template renames (section 4.4) — asked before the batch, above, not again;
 - legacy-sweep patches and the legacy helper (section 4.5);
 - capability bindings (section 2.6) — asked before the batch, above, not again;
@@ -266,7 +271,7 @@ Every file the template ships is compared, in one of two sets:
 
 (The worktree helper is in neither set: it is installed once per machine, not shipped per project.)
 
-**DEPRECATION SEAM — the plan/implement split reaches a project only through the project-owned `CLAUDE.md` rule below the table; make sure that proposal carries it, and never list it as `no-op`. Delete this paragraph once every project has been retrofitted past the split — issue #90, which also covers the matching fallback in `cdd-worktree.sh`.** When the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — the `CLAUDE.md` proposal must include the Workflow edit: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Adapt the current template's `CLAUDE.md` Workflow bullets for the wording.
+**DEPRECATION SEAM — the plan/implement split reaches a project only through `CLAUDE.md`'s Workflow section (CDD sections, below the table); make sure that section's entry carries it, and never list it as `no-op`. Delete this paragraph once every project has been retrofitted past the split — issue #90, which also covers the matching fallback in `cdd-worktree.sh`.** When the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — the Workflow section's entry must include the edit: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Adapt the current template's `CLAUDE.md` Workflow bullets for the wording.
 
 **Template path renames.** The comparison table has no rename row, so resolve each row below against the target *first*, then compare on the new path only.
 
@@ -322,10 +327,12 @@ jq -n --slurpfile o "$STAGE/old/.claude/settings.json" \
 
 Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not parse — goes per file.
 
-**Project-owned files** go through the same table, with two differences:
+**Project-owned files** go through the same table, with two differences (`CLAUDE.md`'s CDD sections excepted — below):
 
 - **A both-changed one never auto-merges.** It goes per file: show the template's change (old → current render), propose how to carry it into the project's version, and apply on approval. A clean `git merge-file` result makes a fair first draft. Exception: a template change that touches only skeleton text the project has since replaced (a placeholder it filled, or the pre-filled bootstrap phase its roadmap no longer has) carries nothing — list it in the batch as `no-op: <why>` instead of asking. When in doubt, ask.
 - **Section 4.6 does not assess them.**
+
+**CDD sections of `CLAUDE.md`.** They are `## Talking to the human`, `## Writing changes` and `## Workflow`; when the template's `CLAUDE.md` gains a CDD section, add its heading here. Only for a both-changed `CLAUDE.md`: split the old render, current render and target at `## ` heading lines outside code fences, each section running to the next heading, matched by exact heading text. Each CDD section goes through the table above as a CDD-managed file would (merge, backend-swap check, section 4.6). One in the old render whose heading the target lacks takes the "file absent in target" row; one absent from the old render is `new`, inserted after the section preceding it in the current render, or at the end if the project lacks that one. The rest of the file — title, preamble, every other section — is compared with the CDD sections removed from all three, under the project-owned rule above (ADR 0027).
 
 **Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" or "both changed" rows) that swaps `gh issue …` / `gh pr …` for another backend (`jira`, `acli`, `glab`, `curl …atlassian.net/…`) is a backend to bind, not a customization to keep. Check for it before a both-changed file can join the batch. Propose, per file: restore the template's hunk and bind the capability instead — a shipped adapter if CDD has one (section 2.6), otherwise a project adapter written against `doc/architecture/capability-adapters.md`. If declined, preserve it like any customization.
 
