@@ -101,7 +101,7 @@ Rationale lives once: where the change touches a rule whose argument already has
 
 For each behavioural change in the diff (a new function, a new branch, changed output, a fixed bug), check whether a test covers it (the "tested behaviour" row of `doc/knowledge_base/engineering-practices.md`).
 
-- **If the project has a test command** ("tested behaviour" marked *enforced*): confirm a test exercises the new behaviour. Flag a behavioural change that landed with no test.
+- **If the project has a test command** ("tested behaviour" marked *enforced* or *upheld*): confirm a test exercises the new behaviour. Flag a behavioural change that landed with no test.
 - **If a change is deliberately untested** (a throwaway script, generated code, a spike): allowed, but state the reason in the PR summary.
 - **If the project has no test command yet** ("tested behaviour" still *expected*): do not invent a framework. Note that the change shipped untested for lack of a harness, and confirm that standing one up is tracked as a roadmap task. If this change is exactly the kind of behaviour that motivates a first test, say so and let the user decide whether to pull that task forward.
 

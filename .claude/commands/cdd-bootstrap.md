@@ -35,7 +35,7 @@ Where the user has no firm answer, capture intent and mark the area open rather 
 
 ## 2. Draft the initial roadmap
 
-From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Every practice the engineering floor leaves *expected* becomes one task, phrased so closing it flips that row to *enforced*; the template's suggested infrastructure tasks (README, coding guidelines, release/versioning) cover the rest. One set, not two.
+From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Every practice the engineering floor leaves *expected* becomes one task, phrased so closing it flips that row to *enforced* or *upheld*; the template's suggested infrastructure tasks (README, coding guidelines, release/versioning) cover the rest. One set, not two.
 
 Do **not** include the template's pre-filled "Phase 1: CDD bootstrap" survey phase; the roadmap starts at the project's real first phase.
 
