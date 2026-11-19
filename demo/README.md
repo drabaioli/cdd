@@ -18,8 +18,7 @@ demo/seed/
     ├── knowledge_base/roadmap.md          # the 6-phase roadmap
     ├── architecture/
     │   ├── index.md                       # pointer list
-    │   ├── overview.md                    # the actions-pipeline architecture
-    │   └── adr/0000-template.md           # ADR template
+    │   └── overview.md                    # the actions-pipeline architecture
     └── features/
         ├── index.md                       # pointer list
         └── overview.md                    # planned features by phase

@@ -4,6 +4,8 @@ Feature documentation: what the system does, from a capability / user perspectiv
 
 > **This file is a pointer list.** Do not put feature descriptions here — put them in per-feature documents and link them below.
 
+Start each feature doc from [the skeleton](feature-template.md).
+
 ## Documents
 
 - <add features as they land — one link per doc, with a one-line summary>

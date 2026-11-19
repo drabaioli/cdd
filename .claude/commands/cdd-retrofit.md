@@ -267,7 +267,7 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 Every file the template ships is compared, in one of two sets:
 
 - **Project-owned** — the template files a project fills with its own content: `CLAUDE.md`, `doc/knowledge_base/roadmap.md`, `doc/knowledge_base/engineering-practices.md`, `doc/knowledge_base/project-overview.md`.
-- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json`, the four `index.md` files under `doc/`, and `doc/architecture/adr/0000-template.md`. A file the template adds later joins this set by default.
+- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json`, the four `index.md` files under `doc/`, `doc/architecture/adr/0000-template.md` and `doc/features/feature-template.md`. A file the template adds later joins this set by default.
 
 (The worktree helper is in neither set: it is installed once per machine, not shipped per project.)
 
@@ -294,7 +294,7 @@ For each file, with `old` = staged old render, `current` = staged current render
 | target != old, current == old | local customization, template unchanged | preserve; assess for upstreaming (4.6) |
 | target != old, current != old | both changed | three-way merge (below — as text, or as JSON for `.claude/settings.json`): clean → batch entry `auto-merged` with the merged result; conflict → per file: show both diffs, propose a merge that keeps the local intent while adopting the template improvement, apply on approval |
 | all equal | nothing to do | skip silently |
-| file absent in old render | newer than the project's baseline | add it as a new file — batch entry `new`, or per file, per "Added files" below |
+| file absent in old render | newer than the project's baseline | add it as a new file — batch entry `new`, or per file, per "Added files" below; if the target already has a file at that path, per file: show both, the user decides — never write over it |
 | file absent in target | project deleted it | per file — ask: deliberate removal (respect it) or accident (restore)? |
 
 For a both-changed file, merge the template's change into the project's file without touching `$WT`:
@@ -340,6 +340,7 @@ Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not 
 
 **Added files — reconcile fill-in skeletons, don't ship them raw.** For every file you propose adding:
 
+- **A copy-me skeleton keeps its placeholders** — they are its content: `doc/architecture/adr/0000-template.md` and `doc/features/feature-template.md` join the batch as plain `new`, never flagged for reconciliation.
 - **Scan the staged render for residual `<...>` tokens.** The render already substituted `<PROJECT_NAME>`/`<PROJECT_DIR>`, so any remaining `<...>` is genuine fill-in content — a placeholder field or a provisional status marker.
 - **If it carries residual placeholders, reconcile before writing:** fill the fields you can confidently detect from the target's actual state. A file left with no residual placeholder joins the batch as `new (filled: <fields>)` (plain `new` if nothing needed filling); one still carrying any is proposed per file. Keep it lightweight — no general reconciliation engine (`/cdd-pre-pr` is the systematic backstop). Never fabricate a value to clear a placeholder; leave it and let the summary flag it.
 - **Worked example — `engineering-practices.md`.** Fill `<test command>` / `<integration test command>` / `<lint command>` / `<format check command>` / `<ci workflow / command>` from the commands you can detect (a `Makefile`/`pyproject.toml`/`package.json` test or lint target, a test-runner or linter config), and flip each provisional status marker to **Enforced** or **Expected** according to whether that gate actually exists — CI judged by a `.github/workflows/*.yml`, tests/lint by the presence of the corresponding runner or linter config. Apply the same shape to any other added fill-in doc.
