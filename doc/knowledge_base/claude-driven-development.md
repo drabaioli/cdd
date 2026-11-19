@@ -52,7 +52,7 @@ Architecture decision records (ADRs, Nygard style: Title, Status, Context, Decis
 
 ### 2.4 Feature docs (`doc/features/`)
 
-"What the system does," from a capability/user perspective — one doc per significant feature, created or updated by the implementation session whenever a feature changes in a user-visible way, and reconciled by `/cdd-pre-pr`. They serve human readers (what does this system do today?) and the agent (what contract must a refactor preserve?). The same index convention as architecture docs applies.
+"What the system does," from a capability/user perspective — one doc per significant feature, created or updated by the implementation session whenever a feature changes in a user-visible way, and reconciled by `/cdd-pre-pr`. They serve human readers (what does this system do today?) and the agent (what contract must a refactor preserve?). The same index convention as architecture docs applies. New feature docs start from the copy-me skeleton `doc/features/feature-template.md` — summary, surface, behavioural contract, inputs and outputs, observable failure modes — and drop a section that has nothing to say rather than padding it.
 
 ### 2.5 Knowledge base (`doc/knowledge_base/`)
 

@@ -1,6 +1,6 @@
 # CDD Repository Features
 
-What this repo provides. This index is a pointer list — the content lives in the per-feature documents.
+What this repo provides. This index is a pointer list — the content lives in the per-feature documents. Start each feature doc from [the skeleton](feature-template.md).
 
 ## Documents
 
