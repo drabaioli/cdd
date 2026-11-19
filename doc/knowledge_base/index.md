@@ -6,7 +6,7 @@ Project metadata, history, and foundational documents for the CDD project.
 
 - **`claude-driven-development.md`**: the process document. Philosophy, lifecycle, artifacts, edit rules, known gaps. The source of truth for what CDD is.
 - **`roadmap.md`**: the central workflow artifact. Phases, tasks, milestones. Edited by implementation sessions (ticking checkboxes; applying pre-approved add/modify/remove edits) and by `/cdd-pre-pr` (ticking + proposing edits to the user). Never edited by `/cdd-next-step`.
-- **`engineering-practices.md`**: this repo's engineering floor — which practices are enforced by a gate and which are expected of a session.
+- **`engineering-practices.md`**: this repo's engineering floor — which practices are enforced by a named gate, which are upheld by another named mechanism (such as `/cdd-pre-pr`), and which are expected.
 
 ## Conventions
 

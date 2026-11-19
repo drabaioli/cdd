@@ -14,9 +14,9 @@
 #   4. The workflow delegates: exactly one `run:` line in template-smoke.yml
 #      invokes scripts/ci.sh, and every other is an install-only setup step (a
 #      package install naming no repo script), so a gate cannot be re-added to YAML
-#      behind the runner's back. Its matrix names an Ubuntu and a macOS runner —
-#      the two tool families (issue #107) — and the runner's bash >= 4 guard
-#      precedes its first bash-4 construct.
+#      behind the runner's back. It triggers on pull requests, and its matrix names
+#      an Ubuntu and a macOS runner — the two tool families (issue #107) — and the
+#      runner's bash >= 4 guard precedes its first bash-4 construct.
 #   5. The syntax gate checks *every* script in scope, not just the first. This is
 #      not hypothetical: `bash -n a.sh b.sh` parses only a.sh and turns the rest
 #      into positional parameters, so the pre-runner CI's `bash -n scripts/*.sh`
@@ -140,6 +140,11 @@ os_line="$(grep -E '^[[:space:]]*os:' "$WORKFLOW")"
 [[ "$os_line" == *ubuntu-* && "$os_line" == *macos-* ]] \
   || fail "$WORKFLOW matrix must name an ubuntu- and a macos- runner; got: ${os_line:-<no os: line>}"
 pass "workflow matrix runs on Ubuntu and macOS"
+
+# The engineering-practices contract claims CI runs on every PR (ADR 0028).
+grep -qE '^[[:space:]]*pull_request:' "$WORKFLOW" \
+  || fail "$WORKFLOW must trigger on pull_request"
+pass "workflow triggers on every pull request"
 
 # The bash >= 4 guard sits before the runner's first bash-4 construct, or on bash 3.2
 # (stock macOS) it would never get the chance to explain itself.

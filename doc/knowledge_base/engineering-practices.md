@@ -1,17 +1,22 @@
 # CDD Engineering Practices
 
-The engineering floor this repo — the CDD meta-project — commits to. CDD distinguishes two kinds of practice:
+The engineering floor this repo — the CDD meta-project — commits to. CDD distinguishes three kinds of practice (process doc §2.12; why: ADR 0028):
 
-- **Enforced** — a CDD gate guarantees it on every change. If an enforced practice is failing, `/cdd-pre-pr` or CI reports it and the change is not ready to merge.
+- **Enforced** — gate(s) of `./scripts/ci.sh` hold it on every change. If an enforced practice is failing, `/cdd-pre-pr` or CI reports it and the change is not ready to merge.
+- **Upheld** — held on every change by a named mechanism other than a runner gate, such as `/cdd-pre-pr`'s reconciliation.
 - **Expected** — committed to but not yet mechanized here; tracked as a roadmap task until it becomes enforced.
+
+An Enforced section carries a ``- Gates: `<gate>`, …`` line naming its gates as `./scripts/ci.sh list` registers them; only an Enforced section carries one. A section whose practices differ splits its marker into parts, its `Gates:` line backing the Enforced part(s). The `practices` gate checks this file.
 
 This repo is documentation and shell scripts: there is no compiled build, so "build" and "tests" take the shape of shell-syntax checks, the bootstrap smoke, and the command-drift check rather than a compiler and a unit-test runner. Every gate below runs from one command, `./scripts/ci.sh` — see `CLAUDE.md` → "Build & test".
 
-## Documentation — Enforced
+## Documentation — Upheld (reconciliation); Enforced (roadmap length)
 
 The process doc, template, architecture/feature docs, and roadmap are reconciled against the diff by `/cdd-pre-pr` (documentation reconciliation), and the two-layer consistency rule — process-doc-first, then template — is part of every change. A change isn't done until the docs match it. Roadmap items additionally obey a hard length cap, enforced as a gate rather than reconciled by judgement (see below, and ADR 0005).
 
-## Tested behaviour — Enforced
+- Gates: `roadmap-length`
+
+## Tested behaviour — Enforced (the suites); Upheld (new behaviour ships with a test)
 
 There is no unit-test suite; behaviour is exercised by integration-style smoke and consistency checks, all reachable from `./scripts/ci.sh`:
 
@@ -21,6 +26,7 @@ There is no unit-test suite; behaviour is exercised by integration-style smoke a
 - `./scripts/prompt-seam-check.sh` — deterministic seam contracts between the repo's own prompts: `/cdd-*` references resolve to a command file, the issue refs `/cdd-next-step` records are read back and turned into close lines by `/cdd-pre-pr`, backticked file paths resolve, each command keeps its load-bearing headings (matched by title, so renumbering a step is a no-op), the gate count stated in prose matches `./scripts/ci.sh list`, every open row of the template's engineering-practices contract is named in `/cdd-bootstrap`'s engineering-floor question, every plan-file section `/cdd-plan` writes is still named by `/cdd-implement`, the small-change lane's routing marker is still written and still read on both routing paths, the lane's eligibility heuristic is stated verbatim everywhere it is applied, every shipped command reads its `.cdd/extensions/<command>.md` and the four gate-running ones the check runner `CLAUDE.md` declares (with this repo's extension headings naming real steps), and the seam-check count restated in prose in four files matches `./scripts/prompt-seam-check.sh list`.
 - `./scripts/posture-check.sh` — the dependency posture (process doc §2.18): every non-comment `command -v` under `tools/` carries a `# posture: required|per-adapter|silent-equivalent` tag; the required-tools blocks of `tools/cdd-state.sh` and `tools/cdd-worktree.sh` are identical; `scripts/install-deps.sh` equals `template/scripts/install-deps.sh` outside its project block. Carries an inline self-check fixture per rule, run through the real check functions.
 - `./scripts/staging-check.sh` — no command or agent prompt, here or in `template/`, stages with `git add -A`, `--all` or `.` inside a fenced code block (process doc §2.11 rule 1: commit only what the session produced). Prose that warns against it passes; a line staging a tree the command just created carries `# stage-all-ok: <reason>`. Carries an inline self-check fixture run through the real scan path.
+- `./scripts/practices-check.sh` — every Enforced section of this file names, on its `Gates:` line, a gate `./scripts/ci.sh list` registers, and no other section carries one (ADR 0028). Carries an inline self-check (a fixture contract against a fixture registry).
 - `./scripts/roadmap-length-check.sh` — every item in all three roadmaps the repo ships (its own, the template's, the demo seed's), pending and completed alike, fits in 200 characters (why: ADR 0005). Carries an inline self-check (three fixtures either side of the cap, one multibyte).
 - `./scripts/install-smoke-assert.sh` — the worktree/state helpers' `install` contract against a throwaway HOME: the copied helper, the marker-guarded rc block and its self-repair, the PATH shims (including the loud refusal the cwd-changing ones must give), the legacy handoff migration, the option-shaped-branch rejection in all three commands that take a branch positionally, the required-tools refusals (no `jq`: a state verb exits 4; no `claude` or no `jq`: both installs and the bootstrap script exit 4 and write nothing), and three properties of `cdd-state seed` — the recorded session, the synced `refs/cdd/<branch>` (with the sync turned on), and `repo.json` naming the MAIN worktree. Offline and side-effect-free: the ref push goes to a throwaway bare origin. Its shim probes run `bash --norc --noprofile </dev/null` and assert that a `cdd-*` name resolves to a file (why: `doc/architecture/overview.md`, "Isolating a shell").
 - `./scripts/toolchain-sync-assert.sh` — keeping the install current (ADR 0014), offline: against a bare "upstream" and a clone of it, the sync hook `install` writes into a checkout reinstalls on a default-branch pull (merge, rebase, adapter-only) and stays silent on a feature branch, a non-helper change, or `commit --amend`; a foreign hook and `core.hooksPath` are left alone; a changed helper is re-sourced on the next call and an unchanged one is not; `update` against a `file://` stub; `cdd-state`'s loud errors name `update`. Mutation-checked by hand when written: dropping the dispatch's `exit`, the reload guard, the branch check, the `amend` skip or the `-ef` test each fails it.
@@ -28,21 +34,28 @@ There is no unit-test suite; behaviour is exercised by integration-style smoke a
 - `./scripts/adapter-conformance-assert.sh` — the conformance checker's own contract, by mutation: twenty-six broken copies of the five shipped adapters, one defect each, every one of which the checker must *fail* on and name — including a Jira one that exports fake credentials to prove the environment scrub is what keeps them out. Six controls (an unmutated copy of each of the five adapters passes; an adapter omitting the optional `create_target` passes) pin the other direction, and every mutation is verified to have actually changed the file. Why: `doc/architecture/overview.md`.
 - End-to-end bootstrap smoke: `tools/bootstrap-cdd-project.sh` into a tmpdir + `scripts/template-smoke-assert.sh` (clean, link-valid tree) — in four shapes: plain, CamelCase dir, `--stage` render-only, and `--template-dir` snapshot.
 - Demo seed-overlay smoke: `demo/setup.sh … --local-only`.
-- `./scripts/ci-runner-assert.sh` — the check runner's own contract: registry and gate functions agree, an unknown gate is rejected, a missing tool fails its gate (naming it) while the other gates still run, no gate script carries a self-skip, the workflow delegates instead of holding its own gate list (one runner step; any other step install-only), its matrix keeps both an Ubuntu and a macOS runner, the runner's bash >= 4 guard precedes its first bash-4 construct, and gates are isolated — a gate cannot leak a shell variable or a cd into a later one.
+- `./scripts/ci-runner-assert.sh` — the check runner's own contract: registry and gate functions agree, an unknown gate is rejected, a missing tool fails its gate (naming it) while the other gates still run, no gate script carries a self-skip, the workflow delegates instead of holding its own gate list (one runner step; any other step install-only), it triggers on every PR, its matrix keeps both an Ubuntu and a macOS runner, the runner's bash >= 4 guard precedes its first bash-4 construct, and gates are isolated — a gate cannot leak a shell variable or a cd into a later one.
 - `./scripts/prompt-seam-assert.sh` — the seam checker's own contract, by mutation: each of its 13 checks is required to *fail* on a tree where that one seam is broken, in a throwaway copy. Three controls (an unmutated copy passes; a whitelisted dangling reference is silenced; a renumbered heading still passes) keep the 13 checks honest, and a structural assertion pairs the registry with the check functions both ways. Why a guard needs mutation-testing: `doc/architecture/overview.md`.
 
-New behaviour in a script or the bootstrap path ships with the relevant smoke or assertion extended to cover it.
+- Gates: `syntax`, `drift`, `drift-contract`, `seams`, `seams-contract`, `roadmap-length`, `staging`, `practices`, `install-smoke`, `toolchain-sync`, `worktree-resume`, `ref-sync`, `gc`, `worktree-launch`, `state-extension`, `state-stage`, `adapter-conformance`, `adapter-conformance-contract`, `code-host-ladder`, `issue-close`, `worktree-done`, `adapter-bindings`, `bootstrap`, `bootstrap-camelcase`, `stage-render`, `snapshot-render`, `demo-seed`, `runner`
+
+New behaviour in a script or the bootstrap path ships with the relevant smoke or assertion extended to cover it — upheld by `/cdd-pre-pr`'s test-coverage reconciliation.
 
 ## Continuous integration — Enforced
 
-`.github/workflows/template-smoke.yml` runs `./scripts/ci.sh` on every PR, holding no gate list of its own, as two blocking jobs on two tool families: `ubuntu-24.04` (GNU sed/grep, gawk) and `macos-15` (BSD sed/grep, BWK awk). Not fanned out: the whole run takes about half a minute. Mechanics in `doc/architecture/overview.md`.
+`.github/workflows/template-smoke.yml` runs `./scripts/ci.sh` on every PR, holding no gate list of its own, as two jobs on two tool families: `ubuntu-24.04` (GNU sed/grep, gawk) and `macos-15` (BSD sed/grep, BWK awk). Not fanned out: the whole run takes about half a minute. Mechanics in `doc/architecture/overview.md`.
+
+- Gates: `runner`
 
 ## Lint & format — Enforced (lint); Expected (format)
 
 - Lint: `shellcheck` over all repo shell scripts, as the runner's `shellcheck` gate.
 - Format: no automated formatter for Markdown or shell is enforced yet. *Expected.*
+- Gates: `shellcheck`
 
 ## Dependency & toolchain hygiene — Enforced (dependency posture, host-tool portability); Expected (version pinning)
+
+- Gates: `posture`, `portability`
 
 Every external tool has exactly one posture (rule: process doc §2.18; reasoning: ADR 0019). This table is the per-tool assignment for this repo; tools are assumed present at whatever version the host has, not pinned. `scripts/install-deps.sh` installs all of them (`--check` only reports).
 
