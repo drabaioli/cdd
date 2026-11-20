@@ -94,6 +94,7 @@ GATES=(
   "staging||gate commands stage by name: no git add -A/--all/. in a command's or agent's shell blocks"
   "posture||every command -v in tools/ declares its dependency posture; the required-tools blocks and the install-deps scripts agree"
   "practices||every Enforced row of the engineering-practices contract names a gate this runner registers"
+  "practices-contract|jq|the shipped practices checker's own contract: invocation, failure modes, a bootstrapped tree"
   "install-smoke|jq|worktree/state helper install, against a throwaway HOME"
   "toolchain-sync|jq|keeping the install current: the checkout's sync hook, self-reloading shells, update (stub upstream)"
   "worktree-resume|jq|worktree resume on an existing remote branch"
@@ -181,7 +182,11 @@ gate_posture() {
 }
 
 gate_practices() {
-  ./scripts/practices-check.sh
+  ./scripts/practices-check.sh ./scripts/ci.sh
+}
+
+gate_practices_contract() {
+  ./scripts/practices-check-assert.sh
 }
 
 gate_install_smoke() {

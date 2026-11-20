@@ -47,7 +47,7 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 ./scripts/ci.sh <gate> [<gate>]  # rerun one gate while iterating on a failure
 ```
 
-`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 31 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` (the runner stubs `claude` itself) — **a missing tool fails its gate, never skips it**. `scripts/install-deps.sh` installs this repo's tools: CDD's required set plus `gh`, `shellcheck` and `tar` (`--check` only reports). The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
+`scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 32 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` (the runner stubs `claude` itself) — **a missing tool fails its gate, never skips it**. `scripts/install-deps.sh` installs this repo's tools: CDD's required set plus `gh`, `shellcheck` and `tar` (`--check` only reports). The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
 
 What `/cdd-pre-pr` adds in this repo — the macOS caveat and how to triage the `drift` and `seams` gates — lives in `.cdd/extensions/cdd-pre-pr.md`.
 
@@ -61,7 +61,7 @@ What `/cdd-pre-pr` adds in this repo — the macOS caveat and how to triage the 
 | `template/`                        | Copy-paste material for new projects                      |
 | `template/.claude/commands/`       | Slash commands shipped to new projects                    |
 | `template/.claude/agents/`         | Subagent definitions shipped to new projects (`cdd-researcher`, web-only) |
-| `template/scripts/`                | `install-deps.sh` skeleton shipped to new projects (CDD-owned part + a project block bootstrap/retrofit fill) |
+| `template/scripts/`                | `install-deps.sh` skeleton shipped to new projects (CDD-owned part + a project block bootstrap/retrofit fill); `practices-check.sh`, the CDD-owned contract checker the project's runner registers as a gate |
 | `template/doc/`                    | Doc skeletons shipped to new projects                     |
 | `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
 | `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
@@ -73,7 +73,7 @@ What `/cdd-pre-pr` adds in this repo — the macOS caveat and how to triage the 
 | `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
 | `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
 | `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, toolchain-sync assertion, host-tool portability check, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), staging check, posture check, engineering-practices contract check, adapter-conformance check, code-host ladder assertion, adapter-bindings assertion; plus `install-deps.sh` (installs this repo's tools; tested by its own workflow, not a gate) |
+| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, toolchain-sync assertion, host-tool portability check, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), staging check, posture check, engineering-practices contract check (a symlink to the template's copy) and its own assertion, adapter-conformance check, code-host ladder assertion, adapter-bindings assertion; plus `install-deps.sh` (installs this repo's tools; tested by its own workflow, not a gate) |
 | `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`; `install-deps.yml` tests the install-deps script when it changes |
 | `.claude/commands/`                | This repo's own slash commands                            |
 | `.claude/agents/`                  | This repo's own subagent definitions (`cdd-researcher`, spawned by `/cdd-plan`) |

@@ -37,7 +37,8 @@ Once a coding standard exists, link it from the Key references table and referen
 ## Build & test
 
 ```bash
-<check runner command>   # every gate, the same list CI runs (see below)
+<check runner command>        # every gate, the same list CI runs (see below)
+<check runner command> list   # the gate names, one per line
 ```
 
 The individual gates the runner should call:
@@ -48,11 +49,12 @@ The individual gates the runner should call:
 <integration test command>
 <format check command>
 <lint command>
+scripts/practices-check.sh <check runner command>
 ```
 
 `scripts/install-deps.sh` installs what the project needs, CDD's required tools included (`--check` only reports); add a tool to its project block when the project starts needing one.
 
-Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over `<check runner command> list` when gates are slow — and CDD's commands (`/cdd-pre-pr`, `/cdd-merge-base`, `/cdd-implement`, `/cdd-small-change`) run the runner named in this block, its one declaration, so a gate is never listed twice. A missing tool fails its gate, never skips it.
+Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over its `list` mode when gates are slow — and CDD's commands (`/cdd-pre-pr`, `/cdd-merge-base`, `/cdd-implement`, `/cdd-small-change`) run the runner named in this block, its one declaration, so a gate is never listed twice. A missing tool fails its gate, never skips it. Every runner has the `list` mode and runs one gate by name; `scripts/practices-check.sh` (CDD's, do not edit) reads that list to check `doc/knowledge_base/engineering-practices.md`.
 
 ## Module layout
 
