@@ -17,7 +17,7 @@ On a greenfield project, write architecture guidelines and intentions rather tha
 - [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted.
 - [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability.
 - [ ] Fill in the project charter (`doc/knowledge_base/project-overview.md`) and the `CLAUDE.md` stubs: what the project is, goals, non-goals, constraints, build/test commands, module layout.
-- [ ] Fill in the engineering-practices contract (`doc/knowledge_base/engineering-practices.md`): mark each practice *enforced* or *expected*, and fill the command placeholders that apply.
+- [ ] Fill in the engineering-practices contract (`doc/knowledge_base/engineering-practices.md`): mark each practice *enforced*, *upheld* or *expected*, and fill the command placeholders that apply.
 - [ ] Fill in this roadmap: replace the placeholder phases below with the project's real plan, slotting in items from "Suggested infrastructure tasks" where they fit.
 
 **Milestone: the docs describe the project as it actually is, and the roadmap below is a real plan.**

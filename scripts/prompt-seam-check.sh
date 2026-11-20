@@ -218,8 +218,8 @@ check_gate_count() {
 # question, so the practices it asks about must be the ones the template contract
 # actually carries as open. A row added to (or renamed in) the contract that the prompt
 # never asks about ships resolved by guess — the one thing resolving-at-bootstrap exists
-# to prevent. Negotiable means "status not plainly Enforced": a row marked `— Enforced`
-# outright (documentation) is not up for discussion, and a heading with no `— <status>`
+# to prevent. Negotiable means "status not plainly Enforced or Upheld": a row marked
+# `— Enforced` or `— Upheld` outright (documentation) is not up for discussion, and a heading with no `— <status>`
 # suffix at all ("How this list grows") is not a practice row. Both sides must name the
 # row identically, exactly as with the issue-ref tokens — no mapping table here, which
 # would be a third copy free to drift from both.
@@ -235,7 +235,7 @@ check_engineering_floor() {
   while IFS= read -r practice; do
     grep -qiF -- "$practice" <<<"$floor_bullet" && continue
     note "engineering-floor seam broken: $contract carries the open practice '$practice', which $bootstrap's engineering-floor bullet does not name"
-  done < <(awk -F' — ' '/^## / && NF > 1 { sub(/^## /, ""); if ($NF != "Enforced") print $1 }' "$contract")
+  done < <(awk -F' — ' '/^## / && NF > 1 { sub(/^## /, ""); if ($NF != "Enforced" && $NF != "Upheld") print $1 }' "$contract")
   return 0
 }
 
