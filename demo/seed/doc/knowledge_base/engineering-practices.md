@@ -32,6 +32,19 @@ The checks below run locally through `/cdd-pre-pr`, but nothing runs them automa
 - Lint command: `python -m pyflakes app`
 - Format check command: `black --check app tests`
 
+## Static analysis & security scanning — Upheld (static analysis); Expected (security scan)
+
+`pyflakes`, the lint command above, is the static analyser, run by `/cdd-pre-pr` build & QA. A security scanner for the Python code (`bandit`, say) is *expected*.
+
+- Static analysis command: `python -m pyflakes app`
+- Security scan command: *none yet — expected*
+
+## Duplicate-block check — Expected
+
+A clone detector that checks each change for new duplicated blocks is *expected*.
+
+- Duplicate check command: *none yet — expected*
+
 ## Dependency & toolchain hygiene — Expected
 
 `requirements.txt` lists dependencies; pinning them to exact versions and documenting the Python toolchain version is *expected*.
