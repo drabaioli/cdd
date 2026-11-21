@@ -10,7 +10,7 @@
 # tree and require the checker to notice, naming what it noticed. Each of the checker's
 # six checks gets at least one mutation:
 #   1. Command-set diff        — a repo command copy diverges from its template counterpart;
-#      likewise a repo agent definition (.claude/agents/).
+#      likewise a repo agent definition (.claude/agents/) and a repo hook (.claude/hooks/).
 #   2. Command-set membership  — a command exists on only one side; likewise an agent
 #      definition.
 #   3. Settings JSON validity  — both settings files gain the same syntax error, so they
@@ -61,6 +61,8 @@ TPL_SETTINGS="template/.claude/settings.json"
 SHARED_CMD="cdd-plan.md"
 # Likewise an agent definition the template ships.
 SHARED_AGENT="cdd-researcher.md"
+# Likewise a hook the template ships.
+SHARED_HOOK="cdd-test-guard.sh"
 
 # --- The throwaway tree -------------------------------------------------------
 # Everything but .git, which in a worktree is a *file* pointing elsewhere — copying it
@@ -154,6 +156,12 @@ rm "$SANDBOX/template/.claude/agents/$SHARED_AGENT" \
   || fail "could not remove the template agent definition in the sandbox"
 expect_fail "check 2 catches an agent definition present on only one side" \
   "DRIFT: $SHARED_AGENT exists only in .claude/agents/"
+
+# --- Check 1 covers hooks too ----------------------------------------------------
+fresh_sandbox
+printf '\n# assert-only drift probe.\n' >> "$SANDBOX/.claude/hooks/$SHARED_HOOK"
+expect_fail "check 1 catches a repo hook diverging from the template" \
+  "template/.claude/hooks/$SHARED_HOOK (rendered)"
 
 # --- Control: the command whitelist silences it --------------------------------
 fresh_sandbox

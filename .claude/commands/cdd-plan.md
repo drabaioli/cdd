@@ -89,7 +89,7 @@ The handoff is immutable: a criterion the human agrees to amend or drop is **rec
 
 Immediately before asking for approval, print a short summary of the plan in chat, following the rule in `CLAUDE.md` — short, plain, only what changes the answer. It is the whole of what the human approves against: the plan at high altitude, not the plan itself.
 
-What usually earns a line: the approach, roughly what it touches, the riskiest step, what research changed (which findings moved the plan, that research found nothing that changed it, or that it was skipped and why), any outside assumption the plan rests on that could not be checked, anything you investigated and rejected that the human might otherwise suggest, how it will be verified, and any deviation from the handoff's `## Requirements`. Say what applies and drop the rest. No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file.
+What usually earns a line: the approach, roughly what it touches, the riskiest step, what research changed (which findings moved the plan, that research found nothing that changed it, or that it was skipped and why), any outside assumption the plan rests on that could not be checked, anything you investigated and rejected that the human might otherwise suggest, any existing test it changes, how it will be verified, and any deviation from the handoff's `## Requirements`. Say what applies and drop the rest. No granular detail and no exploration log — the human should be able to approve or push back without opening the plan file.
 
 ## 6. Checkpoint: plan approval
 
@@ -134,6 +134,8 @@ Structure (the section names are a contract `/cdd-implement` reads — do not re
 ## Verification
 <which check-runner gates to run, which assertions or tests to add or extend>
 ```
+
+Name every existing test file the plan changes in `## File map`, by its repo-relative path in backticks: the test guard lets an edit to an existing test through without a prompt only when the file map names it.
 
 Then advance the task **state record** — when task-ref sync is on, this write also pushes the plan onto the task's sync ref. It is advisory and skips silently if the record is absent; never create one:
 

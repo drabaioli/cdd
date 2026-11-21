@@ -51,6 +51,12 @@ A change that adds a block duplicating code already in the project is caught on 
 - Duplicate check command: `<duplicate check command>`
 - Gates: <the runner gate that runs it>
 
+## Test protection — <Upheld once test paths are declared below; Expected until then>
+
+An edit to an existing test file asks the human first, unless the approved plan's `## File map` names it, so a test cannot be quietly rewritten to make the code pass; a new test file is not held. Upheld by the test-guard hook CDD ships (`.claude/hooks/cdd-test-guard.sh`, wired in `.claude/settings.json`), which reads the patterns below: shell patterns matched against the repo-relative path, `*` also matching `/` (`tests/*`, `*_test.go`). With none declared the hook holds nothing. Edits made through the shell are not held; `/cdd-pre-pr`'s code review of the diff is the backstop.
+
+- Test paths: `<test path pattern>`
+
 ## Dependency & toolchain hygiene — Expected
 
 Dependencies are pinned or locked; toolchain versions are documented, including the host tools the check runner's scripts assume and any of their behaviours that differ between machines and so are off-limits.

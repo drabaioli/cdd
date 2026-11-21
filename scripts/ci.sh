@@ -95,6 +95,7 @@ GATES=(
   "posture||every command -v in tools/ declares its dependency posture; the required-tools blocks and the install-deps scripts agree"
   "practices||every Enforced row of the engineering-practices contract names a gate this runner registers"
   "practices-contract|jq|the shipped practices checker's own contract: invocation, failure modes, a bootstrapped tree"
+  "test-guard|jq|the shipped test-guard hook: an edit to an existing test the plan does not name prompts; new tests, named tests and other files pass"
   "install-smoke|jq|worktree/state helper install, against a throwaway HOME"
   "toolchain-sync|jq|keeping the install current: the checkout's sync hook, self-reloading shells, update (stub upstream)"
   "worktree-resume|jq|worktree resume on an existing remote branch"
@@ -120,7 +121,7 @@ GATES=(
 # The lint scope, one path per line. Globs, so it stays self-including: a newly
 # added script is covered without editing this file.
 lint_targets() {
-  printf '%s\n' tools/*.sh tools/adapters/*/*.sh scripts/*.sh template/scripts/*.sh demo/*.sh
+  printf '%s\n' tools/*.sh tools/adapters/*/*.sh scripts/*.sh template/scripts/*.sh demo/*.sh .claude/hooks/*.sh template/.claude/hooks/*.sh
 }
 
 # --- Gates -------------------------------------------------------------------
@@ -187,6 +188,10 @@ gate_practices() {
 
 gate_practices_contract() {
   ./scripts/practices-check-assert.sh
+}
+
+gate_test_guard() {
+  ./scripts/test-guard-assert.sh
 }
 
 gate_install_smoke() {

@@ -10,6 +10,8 @@
 #     names its tools and none that can write, run a shell or spawn subagents
 #   - cdd-researcher has no file tools, and .claude/settings.json pre-approves WebFetch
 #     only through the hook that names it, never with a bare allow rule
+#   - the test-guard hook .claude/hooks/cdd-test-guard.sh is present and wired in
+#     .claude/settings.json on the Edit and Write tools
 #   - the baseline marker .claude/cdd-baseline is present and well-formed
 #
 # Usage: scripts/template-smoke-assert.sh /path/to/bootstrapped/tree
@@ -135,6 +137,11 @@ jq -e '[.hooks.PreToolUse[]? | select(.matcher == "WebFetch") | .hooks[]?.comman
         | select(contains("cdd-researcher"))] | length == 1' .claude/settings.json >/dev/null \
   || fail ".claude/settings.json lacks the WebFetch hook that pre-approves the cdd-researcher's fetches"
 pass "WebFetch is pre-approved for the file-less cdd-researcher only"
+[[ -f .claude/hooks/cdd-test-guard.sh ]] || fail ".claude/hooks/cdd-test-guard.sh missing"
+jq -e '[.hooks.PreToolUse[]? | select((.matcher | split("|")) as $m | ($m | index("Edit")) and ($m | index("Write")))
+        | .hooks[]?.command | select(contains("cdd-test-guard.sh"))] | length == 1' .claude/settings.json >/dev/null \
+  || fail ".claude/settings.json does not wire the test-guard hook on the Edit and Write tools"
+pass "the test-guard hook is shipped and wired on the edit tools"
 
 # 5. Baseline marker: present, single line, a commit hash or "unknown".
 [[ -f .claude/cdd-baseline ]] || fail ".claude/cdd-baseline marker missing"
