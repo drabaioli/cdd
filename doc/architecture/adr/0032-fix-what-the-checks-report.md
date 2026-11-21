@@ -31,11 +31,10 @@ static analysis fed back and a duplicate-block check. The contract had no row fo
    form the tool offers (changed files matched against the project, or the whole project failing
    only on new clones).
 3. **The implementing session fixes what a failing gate reports** (`/cdd-implement`,
-   `/cdd-small-change`), re-runs that gate, then the runner whole. It fixes only a failure with
-   one clear fix inside the change, and leaves and reports, with output, one that predates the
-   change, lies outside it, or needs a judgement call: silencing the check (a suppression, a
-   skipped or weakened test), departing from the plan or a requirement, or more than one
-   reasonable fix. On the small-change lane a fix that would widen the approved change goes back
+   `/cdd-small-change`), re-runs that gate, then the runner whole. It fixes a failure with one
+   clear fix, and leaves and reports, with output, one that needs a judgement call: silencing
+   the check (a suppression, a skipped or weakened test), departing from the plan or a
+   requirement, or more than one reasonable fix. On the small-change lane a fix that would widen the approved change goes back
    to its approval. The split is ADR 0025's, applied to tool output.
 4. **Three rounds per gate**, then report.
 

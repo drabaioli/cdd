@@ -50,7 +50,7 @@ Rationale lives once: where the change touches a rule whose argument already has
 
 Run the check runner `CLAUDE.md` declares, whole — the same gate list CI runs, not a subset chosen for a small diff. If it declares none, run every gate command it lists under Build & test; if it lists none either, say so — nothing verified the change.
 
-When a gate fails, fix what it reports and re-run that gate, then the runner whole. Fix a failure only when it has one clear fix inside the approved change; a fix that would widen it goes back to step 3 with the correction. Leave it failing and report it when it predates this change, lies outside it, or needs a judgement call — silencing the check (a suppression, a skipped or weakened test) or more than one reasonable fix. Stop after three rounds on a gate that still fails.
+When a gate fails, fix what it reports and re-run that gate, then the runner whole. Fix a failure when it has one clear fix; a fix that would widen the approved change goes back to step 3 with the correction. Leave it failing and report it when it needs a judgement call — silencing the check (a suppression, a skipped or weakened test) or more than one reasonable fix. Stop after three rounds on a gate that still fails.
 
 Report failures with their output, not a summary of them. A gate whose tool is missing has failed, not skipped — say which tool to install.
 
