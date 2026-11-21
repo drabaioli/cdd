@@ -1,25 +1,37 @@
 #!/usr/bin/env bash
-# Every Enforced row of this repo's engineering-practices contract names a gate the check
-# runner registers (process doc §2.12; issue #89). Why: ADR 0028.
+# Every Enforced row of the engineering-practices contract names a gate the project's
+# check runner registers (CDD process doc, section 2.12). The check runner registers this
+# script as a gate of its own.
 #
-# Scope: `doc/knowledge_base/engineering-practices.md` only — not the template's skeleton
-# (its rows are placeholders) nor the demo seed (no runner).
+# This file belongs to CDD and changes with it (/cdd-retrofit carries those changes over);
+# do not edit it locally.
 #
 # A section runs from a `## ` heading to the next. Its status is the heading text after the
 # first ` — `; a heading with none ("How this list grows") is not a practice row. The rules:
 #   (a) a status containing the word Enforced needs a `Gates:` line naming at least one
 #       backticked gate;
-#   (b) every backticked name on a `Gates:` line is a gate `./scripts/ci.sh list` registers;
-#   (c) only a section whose status contains Enforced carries a `Gates:` line.
+#   (b) every backticked name on a `Gates:` line is a gate the runner's `list` mode prints
+#       (the first field of each line);
+#   (c) only a section whose status contains Enforced carries a `Gates:` line;
+#   (d) a status still a `<…>` placeholder is a finding of its own; its section is
+#       otherwise not checked.
 # A `Gates:` line is `Gates:` or `- Gates:` at the start of a line. A gate may back several
 # rows; nothing requires every gate to back one.
 #
-# The scan proves itself before every run, the staging-check precedent: a fixture contract
-# and a fixture registry go through the real scan path and must be reported on exactly the
-# expected lines, so a rotted pattern cannot report "clean".
+# The scan proves itself before every run: a fixture contract and a fixture registry go
+# through the real scan path and must be reported on exactly the expected lines, so a
+# rotted pattern cannot report "clean".
 #
-# Usage: scripts/practices-check.sh   (no arguments; no side effects)
+# Usage: scripts/practices-check.sh <check runner command> [<arg>...]
+#   Runs `<check runner command> list` from the repository root to learn the gate names.
+#   Register it in the runner as a gate, passing the runner's own invocation.
 set -euo pipefail
+
+usage() {
+  echo "usage: scripts/practices-check.sh <check runner command> [<arg>...]" >&2
+  exit 2
+}
+[[ $# -gt 0 ]] || usage
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
@@ -37,13 +49,15 @@ scan() {
     }
     /^## / {
       close_section()
-      head = FNR; gated = 0; enforced = 0; status = ""
+      head = FNR; gated = 0; enforced = 0; unresolved = 0; status = ""
       at = index($0, " — ")
       if (at) status = substr($0, at + length(" — "))
+      if (status ~ /^</) { print file ":" FNR ": status marker not resolved"; unresolved = 1; next }
       if (status ~ /(^|[^A-Za-z])Enforced([^A-Za-z]|$)/) { enforced = 1; n_enforced++ }
       next
     }
     /^(- )?Gates:/ {
+      if (unresolved) next
       if (!enforced) { print file ":" FNR ": Gates: line under a section not marked Enforced"; next }
       rest = $0
       while (match(rest, /`[^`]*`/)) {
@@ -64,9 +78,9 @@ self_check_fail() {
 
 # Expected findings: 3 (Enforced, no Gates: line), 5 (Enforced, `Gates: none`),
 # 8 (mixed Enforced; Expected, no Gates: line), 15 (unregistered `gamma`),
-# 21 (Gates: under Expected), 26 (Gates: under Upheld).
+# 21 (Gates: under Expected), 26 (Gates: under Upheld), 28 (unresolved status marker).
 # Not findings: 10 (valid `- Gates:` bullet), 17 (mixed, bare `Gates:` form), 23 (Upheld,
-# no gates), 28 (no ` — ` status).
+# no gates), 29 (Gates: under the unresolved marker), 31 (no ` — ` status).
 self_check() {
   local dir out
   dir="$(mktemp -d)"
@@ -101,29 +115,39 @@ Gates: `beta`
 ## Upheld gated — Upheld
 - Gates: `alpha`
 
+## Pending — <Upheld once x; Expected until then>
+- Gates: <the runner gate(s)>
+
 ## How this list grows
 EOF
   out="$(scan "$dir/contract" "$dir/registry" | grep -v '^enforced ' | cut -d: -f2 | tr '\n' ' ' || true)"
-  [[ "$out" == "3 5 8 15 21 26 " ]] \
-    || self_check_fail "expected findings on fixture lines 3 5 8 15 21 26, got: '${out:-none}'"
+  [[ "$out" == "3 5 8 15 21 26 28 " ]] \
+    || self_check_fail "expected findings on fixture lines 3 5 8 15 21 26 28, got: '${out:-none}'"
   rm -rf "$dir"
   trap - EXIT
 }
 
 self_check
 
-registry="$(mktemp)"
-# shellcheck disable=SC2064  # expand now: $registry is local
-trap "rm -f '$registry'" EXIT
-./scripts/ci.sh list | awk '{ print $1 }' > "$registry"
-[[ -s "$registry" ]] || { echo "practices check: ./scripts/ci.sh list returned no gates" >&2; exit 1; }
+[[ -f "$CONTRACT" ]] || { echo "practices check: $CONTRACT not found" >&2; exit 1; }
 
-out="$(scan "$CONTRACT" "$registry")"
+tmp="$(mktemp -d)"
+# shellcheck disable=SC2064  # expand now: $tmp is local
+trap "rm -rf '$tmp'" EXIT
+"$@" list > "$tmp/list" || {
+  echo "practices check: \`$* list\` failed — every check runner needs a list mode (CDD process doc §2.14)" >&2
+  exit 1
+}
+awk 'NF { print $1 }' "$tmp/list" > "$tmp/registry"
+[[ -s "$tmp/registry" ]] || { echo "practices check: \`$* list\` returned no gates" >&2; exit 1; }
+
+out="$(scan "$CONTRACT" "$tmp/registry")"
 findings="$(grep -v '^enforced ' <<<"$out" || true)"
 if [[ -n "$findings" ]]; then
   echo "$findings" >&2
-  echo "practices check: name a gate ./scripts/ci.sh list registers on the section's Gates: line," \
-    "or re-mark the row Upheld (naming its mechanism) or Expected (ADR 0028)" >&2
+  echo "practices check: resolve each status marker; name a gate \`$* list\` prints on the" \
+    "section's Gates: line, or re-mark the row Upheld (naming its mechanism) or Expected" \
+    "(CDD process doc §2.12)" >&2
   exit 1
 fi
 echo "practices check: ${out##*enforced } Enforced section(s), all backed"

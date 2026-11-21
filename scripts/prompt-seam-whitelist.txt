@@ -24,6 +24,8 @@
 # Produced by /cdd-bootstrap in a downstream project; the CDD repo's own
 # overview lives at doc/architecture/overview.md instead.
 doc/knowledge_base/project-overview.md
+# The check runner /cdd-bootstrap writes into a downstream project; this repo's is scripts/ci.sh.
+scripts/check.sh
 
 # The ADR filename *pattern* the process doc states (doc/architecture/adr/NNNN-short-title.md),
 # not a file. NNNN is a placeholder the check's own placeholder filter cannot see, since it

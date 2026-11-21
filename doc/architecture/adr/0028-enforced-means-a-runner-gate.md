@@ -1,6 +1,6 @@
 # 0028: Enforced means a runner gate
 
-**Status:** Accepted
+**Status:** Accepted; amended by [0029](0029-ship-the-practices-checker.md)
 
 ## Context
 
@@ -46,7 +46,8 @@ the downstream CDD projects found it drifting:
 - A "partially enforced" marker: see decision 3.
 - Counting a hook as Enforced: see decision 4.
 - A downstream checker now: of eight downstream projects only two have a runner with a `list`
-  mode, which is required only when CI fans out. It needs `list` made mandatory first.
+  mode, which is required only when CI fans out. It needs `list` made mandatory first — done,
+  and the checker shipped, by ADR 0029.
 - The reverse check (every registered gate named by some row): #89 does not ask for it, and it
   would force guard and meta gates into rows for no reader benefit.
 - Per-bullet markers instead of heading markers: they break the seam check's heading parse,
@@ -56,8 +57,8 @@ the downstream CDD projects found it drifting:
 ## Consequences
 
 - This repo's contract cannot claim Enforced without a registered gate behind it.
-- Downstream contracts are honest by convention, plus `/cdd-retrofit` proposing a re-marking
-  against the project's runner, until a downstream checker lands.
+- Downstream contracts were honest by convention, plus `/cdd-retrofit` proposing a re-marking
+  against the project's runner, until ADR 0029 shipped the checker downstream.
 - The contract stays project-owned: the new preamble reaches existing projects through retrofit's
   three-way merge, and re-marking rows is proposed per file, never batched.
 - An Upheld practice is weaker than an Enforced one by design; moving it to Enforced means landing
