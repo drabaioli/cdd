@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The shipped contract checker's own contract (template/scripts/practices-check.sh; process
-# doc §2.12, ADR 0029): how it is invoked, how it fails, and that a bootstrapped tree carries
-# it. Its scan rules prove themselves on every run (its self-check); this covers the rest.
+# doc §2.12, ADR 0029): this repo's scripts/practices-check.sh is identical to it, how it is
+# invoked, how it fails, and that a bootstrapped tree carries it. Its scan rules prove themselves on every run (its self-check); this covers the rest.
 #
 # Each case runs a copy of the checker in its own sandbox tree, against a fixture contract
 # and a stub runner whose `list` mode the case controls.
@@ -19,6 +19,10 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 pass() { echo "ok: $*"; }
 
 command -v jq >/dev/null 2>&1 || fail "jq is required and not installed"
+
+cmp -s "$CHECKER" "$REPO_ROOT/scripts/practices-check.sh" \
+  || fail "scripts/practices-check.sh differs from template/scripts/practices-check.sh; edit both alike"
+pass "this repo's checker is identical to the shipped one"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT

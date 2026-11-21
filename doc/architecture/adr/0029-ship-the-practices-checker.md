@@ -13,9 +13,9 @@ downstream runners had a `list` mode, which was required only when CI fans out (
 1. **`list` is mandatory.** Every check runner prints its gate names one per line, the name as
    the line's first field, and runs one gate by name (process doc §2.14).
 2. **The checker ships in the template** as `scripts/practices-check.sh`, CDD-managed: a project
-   does not edit it, and `/cdd-retrofit` carries CDD's changes into it. This repo's
-   `scripts/practices-check.sh` is a relative symlink to the template copy, so one implementation
-   checks both.
+   does not edit it, and `/cdd-retrofit` carries CDD's changes into it. This repo runs its own
+   `scripts/practices-check.sh`, and the `practices-contract` gate fails unless the two copies are
+   identical — the `install-deps.sh` precedent.
 3. **The runner is the argument.** `scripts/practices-check.sh <runner command>…` runs
    `<runner command> list` from the repo root. No argument is a usage error (exit 2); a `list` that
    fails or prints nothing fails, naming the command; a missing contract fails. A missing input
@@ -39,8 +39,12 @@ downstream runners had a `list` mode, which was required only when CI fans out (
 - A `/cdd-pre-pr` step: CI never runs it, and gates stay gates (process doc §2.19).
 - A runner skeleton in the template: it reverses "CDD ships the practice, not a script" (§2.14) and
   collides with an existing project's runner on retrofit.
-- A second copy here kept equal by a check, as `install-deps.sh` is: a symlink gives one file and
-  no check.
+- A symlink from this repo's `scripts/` to the template copy: symlinks break on Windows checkouts.
+- This repo's gate running the template copy directly: CDD's own tooling would then live in
+  `template/`.
+- Keeping the only copy in this repo's `scripts/` and copying it out at bootstrap: the bootstrap
+  script would need a special case outside `template/`, and retrofit's three-way merge, which
+  renders the old template, would never see the file.
 - Registering the gate on retrofit install: the contract is unfilled then, so CI would fail until
   the first task fills it.
 
