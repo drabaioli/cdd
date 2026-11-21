@@ -270,7 +270,7 @@ git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
 Every file the template ships is compared, in one of two sets:
 
 - **Project-owned** — the template files a project fills with its own content: `CLAUDE.md`, `doc/knowledge_base/roadmap.md`, `doc/knowledge_base/engineering-practices.md`, `doc/knowledge_base/project-overview.md`.
-- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json`, the four `index.md` files under `doc/`, `doc/architecture/adr/0000-template.md` and `doc/features/feature-template.md`. A file the template adds later joins this set by default.
+- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/settings.json`, the four `index.md` files under `doc/`, `doc/architecture/adr/0000-template.md`, `doc/features/feature-template.md` and `scripts/practices-check.sh`. A file the template adds later joins this set by default.
 
 (The worktree helper is in neither set: it is installed once per machine, not shipped per project.)
 

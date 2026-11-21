@@ -36,7 +36,8 @@ After bootstrap, the new project directory contains:
 │       ├── roadmap.md                        # central workflow artifact, Phase 1 pre-filled
 │       └── index.md                          # explains the knowledge base
 └── scripts/
-    └── install-deps.sh                       # installs CDD's required tools + this project's (fill its project block)
+    ├── install-deps.sh                       # installs CDD's required tools + this project's (fill its project block)
+    └── practices-check.sh                    # CDD's engineering-practices contract checker; register it as a runner gate
 ```
 
 (No `tools/` directory: the worktree helper is a single project-independent script you install once — see below — not a per-project file. Likewise `.cdd/` holds only the backend choice and its coordinates; the adapter code is installed once per machine with the helper.)
