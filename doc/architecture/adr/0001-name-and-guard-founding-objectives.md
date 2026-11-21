@@ -1,6 +1,6 @@
 # 0001: Name and guard CDD's under-guarded founding objectives
 
-**Status:** Accepted
+**Status:** Accepted; amended by [0030](0030-code-level-rules-for-agent-failure-modes.md)
 
 ## Context
 

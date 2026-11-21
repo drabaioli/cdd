@@ -97,6 +97,19 @@ Make CDD adaptable to a project's tracker and code host without editing a shippe
 
 **Milestone:** a project can run CDD with Jira as its tracker without editing a single shipped prompt, and `/cdd-retrofit` can migrate an existing project's local prompt edits onto the extension points.
 
+## Phase 15: Code-level engineering practices
+
+Carry the engineering floor from process level to code level: short generic rules aimed at documented agent failure modes, backed by checks rather than prose. Research and proposal in GitHub issue #153.
+
+- [x] ADR revising ADR 0001's "not prescription" stance: ship short generic agent rules, each with its counterweight, in "Writing changes" (#153)
+- [ ] Narrow `/cdd-pre-pr`'s code review to correctness, the requirements and the agent rules; drop the open-ended "design issues" bullet (#153)
+- [ ] Add generic contract rows: static analysis / security scan fed back in `/cdd-implement`, and a duplicate-block check on the diff (#153)
+- [ ] Protect existing tests: ship a hook or deny rule against changing them without plan approval (#153)
+- [ ] Add mutation testing as an Expected engineering-practices contract row (#153)
+- [ ] Decide whether the template `CLAUDE.md` keeps its module-layout and architecture overviews, given context files' measured cost (#153)
+
+**Milestone:** code-level rules aimed at documented agent failure modes ship in the template, backed by checks rather than prose.
+
 ## Annotation conventions
 
 **Every item — pending or completed — fits in 200 characters.** That is a PR-title-shaped description plus, at most, one short trailing clause after a semicolon. The cap is the whole line, `- [x] ` prefix included, and it is enforced mechanically by `scripts/roadmap-length-check.sh` (the `roadmap-length` gate), so it is not a matter of judgement. Pending items are not exempt: a task too big to state in a line is a task whose scope belongs somewhere else.

@@ -101,6 +101,15 @@ Correctness outranks brevity — if a point cannot be made both plainly and corr
 
 Write every change in the least code, prose and structure that still delivers the best solution. Bloat is repeated code, abstractions nothing needs yet, handling for errors that can't happen, comments or docs that only restate the code, and wordy prose. This is about how each change is written, not how much a task touches: fixing an unrelated bug or improving quality along the way stays welcome.
 
+Coding agents go wrong in a few documented ways. Each rule below names one, and stops where following it further would add code:
+
+- **Duplicated helpers.** Before writing a helper, look for one the project already has and use it if it fits as is. Don't reshape working code just to share it.
+- **Hidden failures.** Don't swallow an error or fall back silently: what the code can't handle surfaces. Validate input where it enters from outside (users, files, the network, other services), and trust it after.
+- **Gamed or bug-locking tests.** A test checks what the code should do: take its expected values from the requirement, not from what the code returns, and don't weaken, skip or special-case a test to make it pass. If a test or the task looks wrong, stop and say so. A test may change with behaviour that is meant to change; say which.
+- **Made-up dependencies.** Before adding a package, check on its registry that it exists and is the one you mean, and that nothing the project already uses covers the need. Hand-rolling what an established library does is not the alternative.
+
+Language-specific rules belong in the project's linter config and coding standard, not here.
+
 ## Workflow
 
 This project uses CDD on itself. Every CDD session is a fresh context doing exactly one job (see process doc section 3 for the session taxonomy).
