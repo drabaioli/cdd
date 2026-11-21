@@ -69,6 +69,15 @@
             "command": "jq -e '.agent_type == \"cdd-researcher\"' >/dev/null && echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"allow\",\"permissionDecisionReason\":\"fetch by the cdd-researcher subagent\"}}' || true"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/cdd-test-guard.sh\""
+          }
+        ]
       }
     ]
   }

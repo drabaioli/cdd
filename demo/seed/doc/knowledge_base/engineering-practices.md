@@ -45,6 +45,12 @@ A clone detector that checks each change for new duplicated blocks is *expected*
 
 - Duplicate check command: *none yet — expected*
 
+## Test protection — Upheld
+
+An edit to an existing test file asks the human first, unless the approved plan's `## File map` names it, so a test cannot be quietly rewritten to make the code pass; a new test file is not held. Upheld by the test-guard hook CDD ships (`.claude/hooks/cdd-test-guard.sh`, wired in `.claude/settings.json`), which reads the patterns below. Edits made through the shell are not held; `/cdd-pre-pr`'s code review of the diff is the backstop.
+
+- Test paths: `tests/*`
+
 ## Dependency & toolchain hygiene — Expected
 
 `requirements.txt` lists dependencies; pinning them to exact versions and documenting the Python toolchain version is *expected*.

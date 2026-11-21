@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Render-then-diff drift check between the CDD repo's own .claude/commands/,
-# .claude/agents/ and .claude/settings.json and the template/.claude/ copies it ships.
+# .claude/agents/, .claude/hooks/ and .claude/settings.json and the template/.claude/ copies
+# it ships.
 #
 # The template is rendered via tools/bootstrap-cdd-project.sh --stage with this repo's own
 # identifier (dir "cdd"), so expected substitution drift cancels out mechanically
 # and only real divergence survives. Remaining divergence is a defect unless the file is
-# listed in scripts/command-drift-whitelist.txt (one-sided by design; command and agent
-# entries match by basename). There is no finer-grained exception: this repo's additions
+# listed in scripts/command-drift-whitelist.txt (one-sided by design; command, agent and
+# hook entries match by basename). There is no finer-grained exception: this repo's additions
 # to a shipped command live in .cdd/extensions/, like a downstream project's (ADR 0020).
 #
 # Also asserts:
@@ -44,9 +45,9 @@ whitelisted() {
 
 fail=0
 
-# Commands and agent definitions get the same treatment. A directory missing on one
+# Commands, agent definitions and hooks get the same treatment. A directory missing on one
 # side reads as empty, so every file on the other side is reported as one-sided.
-for sub in commands agents; do
+for sub in commands agents hooks; do
   repo_dir=".claude/$sub"
   rendered_dir="$TMP/render/.claude/$sub"
   mapfile -t names < <(
