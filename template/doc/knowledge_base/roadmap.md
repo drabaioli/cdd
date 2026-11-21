@@ -51,6 +51,7 @@ Slot these into the phases above where they fit — usually spread across the ea
 
 - Set up CI: build + tests on every PR.
 - Add linting and a format check (and a pre-commit hook if wanted).
+- Add static analysis (and a security scanner where the language has one) and a duplicate-block check on the diff.
 - Establish coding guidelines (under `doc/knowledge_base/`), if the language or team needs them.
 - Add unit tests; add integration tests once there are module boundaries worth crossing.
 - Write or refresh the README: what the project is, how to build and run it.
