@@ -14,6 +14,8 @@
 #
 # Usage: scripts/test-guard-assert.sh   (provisions and tears down its own temp tree)
 
+# The fixtures write Markdown, whose backticks are literal.
+# shellcheck disable=SC2016
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
