@@ -102,7 +102,7 @@ Make CDD adaptable to a project's tracker and code host without editing a shippe
 Carry the engineering floor from process level to code level: short generic rules aimed at documented agent failure modes, backed by checks rather than prose. Research and proposal in GitHub issue #153.
 
 - [x] ADR revising ADR 0001's "not prescription" stance: ship short generic agent rules, each with its counterweight, in "Writing changes" (#153)
-- [ ] Narrow `/cdd-pre-pr`'s code review to correctness, the requirements and the agent rules; drop the open-ended "design issues" bullet (#153)
+- [x] Narrow `/cdd-pre-pr`'s code review to correctness, the requirements and the agent rules; drop the open-ended "design issues" bullet (#153)
 - [ ] Add generic contract rows: static analysis / security scan fed back in `/cdd-implement`, and a duplicate-block check on the diff (#153)
 - [ ] Protect existing tests: ship a hook or deny rule against changing them without plan approval (#153)
 - [ ] Add mutation testing as an Expected engineering-practices contract row (#153)

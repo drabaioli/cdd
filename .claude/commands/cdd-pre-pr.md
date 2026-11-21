@@ -59,9 +59,8 @@ Read the changed source files from the step 1 diff that fall inside the code rev
 Review for:
 
 - Correctness and logic bugs.
-- Design issues (coupling, responsibility boundaries, API shape).
 - Compliance with the project coding standard linked from CLAUDE.md.
-- Bloat, as "Writing changes" in CLAUDE.md defines it.
+- The rules in "Writing changes" in CLAUDE.md.
 
 Fix a clear defect yourself — one with a single obvious fix inside the branch's scope — and rerun the gates it touches; it rides in step 10's commit. Flag only what needs a judgement call: a design change, wider scope, or more than one reasonable fix. If the change establishes a convention that should become the project norm, update the coding standard accordingly.
 
