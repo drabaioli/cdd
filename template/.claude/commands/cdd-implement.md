@@ -47,7 +47,9 @@ Rationale lives once: where the change touches a rule whose argument already has
 
 ## 5. Verify
 
-Run what the plan's `## Verification` names — the check runner `CLAUDE.md` declares (with none declared, each gate it lists under Build & test; with none listed either, say so — nothing verified the change), plus any assertions or tests the plan says to add or extend. Report failures with their output, not a summary of them.
+Run what the plan's `## Verification` names — the check runner `CLAUDE.md` declares (with none declared, each gate it lists under Build & test; with none listed either, say so — nothing verified the change), plus any assertions or tests the plan says to add or extend.
+
+When a gate fails, fix what it reports and re-run that gate; once it passes, run the runner whole again. Fix a failure only when it has one clear fix inside this change. Leave it failing and report it when it predates this change, lies outside it, or needs a judgement call — silencing the check (a suppression, a skipped or weakened test), departing from the plan (step 2), or more than one reasonable fix. Stop after three rounds on a gate that still fails. Report every failure left with its output, not a summary of it.
 
 ## 6. Commit
 

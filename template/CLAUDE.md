@@ -49,6 +49,9 @@ The individual gates the runner should call:
 <integration test command>
 <format check command>
 <lint command>
+<static analysis command>
+<security scan command>
+<duplicate check command>
 scripts/practices-check.sh <check runner command>
 ```
 

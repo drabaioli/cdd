@@ -6,7 +6,7 @@ The engineering floor this repo — the CDD meta-project — commits to. CDD dis
 - **Upheld** — held on every change by a named mechanism other than a runner gate, such as `/cdd-pre-pr`'s reconciliation.
 - **Expected** — committed to but not yet mechanized here; tracked as a roadmap task until it becomes enforced.
 
-An Enforced section carries a ``- Gates: `<gate>`, …`` line naming its gates as `./scripts/ci.sh list` registers them; only an Enforced section carries one. A section whose practices differ splits its marker into parts, its `Gates:` line backing the Enforced part(s). The `practices` gate checks this file.
+An Enforced section carries a ``- Gates: `<gate>`, …`` line naming its gates as `./scripts/ci.sh list` registers them; only an Enforced section carries one. A section whose practices differ splits its marker into parts, its `Gates:` line backing the Enforced part(s). The `practices` gate checks this file. The template's duplicate-block row is dropped here: the deliberate copies (the template's mirrors of this repo's commands and scripts, held identical by the `drift` and `practices-contract` gates) would drown any real finding.
 
 This repo is documentation and shell scripts: there is no compiled build, so "build" and "tests" take the shape of shell-syntax checks, the bootstrap smoke, and the command-drift check rather than a compiler and a unit-test runner. Every gate below runs from one command, `./scripts/ci.sh` — see `CLAUDE.md` → "Build & test".
 
@@ -52,6 +52,12 @@ New behaviour in a script or the bootstrap path ships with the relevant smoke or
 
 - Lint: `shellcheck` over all repo shell scripts, as the runner's `shellcheck` gate.
 - Format: no automated formatter for Markdown or shell is enforced yet. *Expected.*
+- Gates: `shellcheck`
+
+## Static analysis & security scanning — Enforced
+
+`shellcheck` is the static analyser, as the runner's `shellcheck` gate (the lint gate above). No separate security scanner: the repo is shell with no package dependencies, and shellcheck already reports the quoting and word-splitting bugs that make shell injectable.
+
 - Gates: `shellcheck`
 
 ## Dependency & toolchain hygiene — Enforced (dependency posture, host-tool portability); Expected (version pinning)

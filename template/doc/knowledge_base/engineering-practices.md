@@ -36,6 +36,21 @@ Build and checks run on every PR, and every gate below is reachable from **one c
 - Format check command: `<format check command>`
 - Gates: <the runner gate(s) that run lint and the format check>
 
+## Static analysis & security scanning — <Enforced once the check runner registers a static-analysis or security-scan gate; Expected until then>
+
+A static analyser, and a security scanner where the language has one, check every change; the implementing session fixes what they report and re-runs them. The tools are the project's choice; a linter that already does this analysis may back this row too, its gate named under both.
+
+- Static analysis command: `<static analysis command>`
+- Security scan command: `<security scan command>`
+- Gates: <the runner gate(s) that run them>
+
+## Duplicate-block check — <Enforced once the check runner registers a gate that checks the diff for duplicated blocks; Expected until then>
+
+A change that adds a block duplicating code already in the project is caught on the diff, so it reuses the existing code or says why it copies. Scoped to new duplication, not the whole codebase: most existing duplicates are harmless; the risk is a new copy drifting from its original. The clone detector is the project's choice.
+
+- Duplicate check command: `<duplicate check command>`
+- Gates: <the runner gate that runs it>
+
 ## Dependency & toolchain hygiene — Expected
 
 Dependencies are pinned or locked; toolchain versions are documented, including the host tools the check runner's scripts assume and any of their behaviours that differ between machines and so are off-limits.
