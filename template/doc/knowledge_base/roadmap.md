@@ -54,6 +54,7 @@ Slot these into the phases above where they fit — usually spread across the ea
 - Add static analysis (and a security scanner where the language has one) and a duplicate-block check on the diff.
 - Establish coding guidelines (under `doc/knowledge_base/`), if the language or team needs them.
 - Add unit tests; add integration tests once there are module boundaries worth crossing.
+- Add mutation testing once the test suite is substantial.
 - Declare the test paths in the engineering-practices contract, so the test guard holds existing tests.
 - Write or refresh the README: what the project is, how to build and run it.
 - Pin or lock dependencies; document the toolchain versions.

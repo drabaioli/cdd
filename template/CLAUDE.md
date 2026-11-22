@@ -52,6 +52,7 @@ The individual gates the runner should call:
 <static analysis command>
 <security scan command>
 <duplicate check command>
+<mutation test command>
 scripts/practices-check.sh <check runner command>
 ```
 

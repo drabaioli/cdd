@@ -51,6 +51,12 @@ An edit to an existing test file asks the human first, unless the approved plan'
 
 - Test paths: `tests/*`
 
+## Mutation testing — Expected
+
+A mutation tool for the Python code (`mutmut`, say) checking that the tests catch planted faults is *expected*, once the renderer's suite is substantial.
+
+- Mutation test command: *none yet — expected*
+
 ## Dependency & toolchain hygiene — Expected
 
 `requirements.txt` lists dependencies; pinning them to exact versions and documenting the Python toolchain version is *expected*.
