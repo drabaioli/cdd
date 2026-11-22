@@ -20,6 +20,16 @@ one output per action
 
 The **actions pipeline** is the central structural idea. `ACTIONS` is a single ordered registry; each action declares a button label and a function that turns the rendered HTML into one user-facing output. The UI iterates the registry to render the toolbar, so adding an output means adding one registry entry and one button — never a new bespoke route. This is the seam every roadmap phase past Phase 1 extends, and the reason Phases 2 and 3 (built in parallel) edit the same registry region and the same toolbar region.
 
+## Module layout
+
+| Directory        | Purpose                                                            |
+| ---------------- | ------------------------------------------------------------------ |
+| `app/`           | Flask app: routes, render entry point, the actions pipeline        |
+| `app/actions/`   | One module per action (copy-rendered, email-safe copy, export, …)  |
+| `app/templates/` | The single-page UI (paste box, live preview, actions toolbar)      |
+| `app/static/`    | Preview CSS and client-side clipboard/copy JavaScript              |
+| `tests/`         | Unit tests (render, escaping, each action) + `tests/integration/`  |
+
 ## Key interfaces
 
 - **`ACTIONS` registry** (`app/`): the ordered list of actions. New actions are inserted into the existing region of this list.

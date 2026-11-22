@@ -14,9 +14,9 @@ Get the CDD substrate to reflect reality: survey what exists, write the initial 
 
 On a greenfield project, write architecture guidelines and intentions rather than a survey, and expect `doc/features/` to start out empty. On an existing project, fold in what is already written — a README, design docs, feature notes — rather than starting from scratch.
 
-- [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape, plus per-topic docs as warranted.
+- [ ] Survey the codebase and draft the initial architecture docs under `doc/architecture/`: an `overview.md` with the high-level shape and module layout, plus per-topic docs as warranted.
 - [ ] Write the initial feature docs under `doc/features/`: one doc per existing user-visible capability.
-- [ ] Fill in the project charter (`doc/knowledge_base/project-overview.md`) and the `CLAUDE.md` stubs: what the project is, goals, non-goals, constraints, build/test commands, module layout.
+- [ ] Fill in the project charter (`doc/knowledge_base/project-overview.md`) and the `CLAUDE.md` stubs: what the project is, goals, non-goals, constraints, build/test commands.
 - [ ] Fill in the engineering-practices contract (`doc/knowledge_base/engineering-practices.md`): mark each practice *enforced*, *upheld* or *expected*, and fill the command placeholders that apply.
 - [ ] Register `scripts/practices-check.sh <check runner command>` as a check-runner gate once the contract above is filled and the runner has a `list` mode.
 - [ ] Fill in this roadmap: replace the placeholder phases below with the project's real plan, slotting in items from "Suggested infrastructure tasks" where they fit.
