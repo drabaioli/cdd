@@ -103,9 +103,9 @@ The queue holds exactly:
 - files the project deleted, and CDD sections of `CLAUDE.md` it deleted or renamed (section 4.4);
 - new files still carrying residual `<...>` placeholders after the best-effort fill (section 4.4);
 - local hunks that swap in another backend — migrate into `.cdd/` (section 4.4);
-- local edits to a shipped command — should move to an extension point (section 4.4; transitional);
-- a check runner lacking a `list` mode — propose adding one (section 3.3; on upgrade, section 4.4, transitional);
-- registering the practices gate in the check runner (section 4.4; transitional);
+- local edits to a shipped command — should move to an extension point (section 4.4) — `TRANSITIONAL(#148)`;
+- a check runner lacking a `list` mode — propose adding one (section 3.3; on upgrade, section 4.4 — `TRANSITIONAL(#166)`);
+- registering the practices gate in the check runner (section 4.4) — `TRANSITIONAL(#166)`;
 - template changes to a project-owned file the project has also changed — the project's own sections of `CLAUDE.md`, the roadmap, the filled-in knowledge-base docs (section 4.4);
 - template renames (section 4.4) — asked before the batch, above, not again;
 - legacy-sweep patches and the legacy helper (section 4.5);
@@ -229,6 +229,23 @@ There is no fallback mode. A marker that is missing, reads `unknown`, or names a
 
 Never guess a baseline.
 
+**Upgrade stops.** A usable baseline must also be past every stop below (why: process doc §2.20). Each PR that retires marked pieces adds a row.
+
+| Stop (CDD commit) | Retires | Removed in |
+| --- | --- | --- |
+
+None yet.
+
+For each stop, oldest first, run in this CDD repo:
+
+```bash
+git merge-base --is-ancestor <stop> <baseline>
+```
+
+- Exit 0: past it.
+- Exit 1: stop the run here, before anything is created, in one line naming the stop, with the route: `git worktree add --detach <dir> <stop>` in this CDD repo, then `/cdd-retrofit <target>` from a `claude` session in `<dir>`; land that PR, then rerun here.
+- Any other exit: report the error and stop.
+
 ### 4.2 Recover the target's identifiers
 
 Recover each from two of the project's rendered files:
@@ -274,7 +291,7 @@ Every file the template ships is compared, in one of two sets:
 
 (The worktree helper is in neither set: it is installed once per machine, not shipped per project.)
 
-**DEPRECATION SEAM — the plan/implement split reaches a project only through `CLAUDE.md`'s Workflow section (CDD sections, below the table); make sure that section's entry carries it, and never list it as `no-op`. Delete this paragraph once every project has been retrofitted past the split — issue #90, which also covers the matching fallback in `cdd-worktree.sh`.** When the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — the Workflow section's entry must include the edit: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Adapt the current template's `CLAUDE.md` Workflow bullets for the wording.
+**`TRANSITIONAL(#90)` — the plan/implement split reaches a project only through `CLAUDE.md`'s Workflow section (CDD sections, below the table); make sure that section's entry carries it, and never list it as `no-op`.** When the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — the Workflow section's entry must include the edit: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Adapt the current template's `CLAUDE.md` Workflow bullets for the wording.
 
 **Template path renames.** The comparison table has no rename row, so resolve each row below against the target *first*, then compare on the new path only.
 
@@ -287,7 +304,7 @@ Every file the template ships is compared, in one of two sets:
 - **both present** → do not guess: report both and ask which to keep.
 - **neither present** → fall through to the table's "file absent in target" row on the new path.
 
-**Land a rename in the template, add a row.** Rows are transitional: retire one once every project is past it (#93).
+**Land a rename in the template, add a row.** Every row is `TRANSITIONAL(#93)`.
 
 For each file, with `old` = staged old render, `current` = staged current render, `target` = the project's file **read from `$WT`** (HEAD — uncommitted edits are not seen; section 1):
 
@@ -339,9 +356,9 @@ Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not 
 
 **Migrate into `.cdd/` — the third verdict.** A local hunk (the "local customization" or "both changed" rows) that swaps `gh issue …` / `gh pr …` for another backend (`jira`, `acli`, `glab`, `curl …atlassian.net/…`) is a backend to bind, not a customization to keep. Check for it before a both-changed file can join the batch. Propose, per file: restore the template's hunk and bind the capability instead — a shipped adapter if CDD has one (section 2.6), otherwise a project adapter written against `doc/architecture/capability-adapters.md`. If declined, preserve it like any customization.
 
-**Move to an extension point — the fourth verdict. TRANSITIONAL: this migrates edits made before CDD had extension points (#127). Delete this paragraph, its section 2.7 queue line, its section 4.6 sentence and its section 5 summary line once every project has migrated past it (removal tracked by issue #148).** Any local hunk left in a `.claude/commands/cdd-*.md` file — the "local customization" row, or the local side of a "both changed" one — after the backend-swap check above, goes per file: never batched, never auto-merged. Propose restoring the template's text and moving the hunk: a runner or gate list → `CLAUDE.md`'s Build & test (a gate the runner lacks → propose it as a gate); a narrowing of what is reviewed → `CLAUDE.md`'s Code review scope line; an added step → `.cdd/extensions/<command>.md` under the title of the step it attaches to. A hunk that removes or weakens a step — a checkpoint above all — has no extension form: say so, and offer to keep it as a customization or drop it. If declined, preserve it like any customization and list it.
+**Move to an extension point — the fourth verdict. `TRANSITIONAL(#148)`: this migrates edits made before CDD had extension points.** Any local hunk left in a `.claude/commands/cdd-*.md` file — the "local customization" row, or the local side of a "both changed" one — after the backend-swap check above, goes per file: never batched, never auto-merged. Propose restoring the template's text and moving the hunk: a runner or gate list → `CLAUDE.md`'s Build & test (a gate the runner lacks → propose it as a gate); a narrowing of what is reviewed → `CLAUDE.md`'s Code review scope line; an added step → `.cdd/extensions/<command>.md` under the title of the step it attaches to. A hunk that removes or weakens a step — a checkpoint above all — has no extension form: say so, and offer to keep it as a customization or drop it. If declined, preserve it like any customization and list it.
 
-**Check-runner `list` mode and the practices gate. TRANSITIONAL: this brings runners that predate the mandatory `list` mode (#164) up to it. Delete this paragraph, its section 2.7 queue lines' upgrade parts and its section 5 summary line's upgrade part once every project has been upgraded past it (removal tracked by issue #166).** If the project's check runner lacks a `list` mode, propose adding one, per file, as section 3.3 does. If it registers no gate running `scripts/practices-check.sh`, propose registering one that passes the runner's own invocation, per file. Never batched. A contract the checker then fails is covered by the re-marking proposal below.
+**Check-runner `list` mode and the practices gate. `TRANSITIONAL(#166)`: this brings runners that predate the mandatory `list` mode up to it.** If the project's check runner lacks a `list` mode, propose adding one, per file, as section 3.3 does. If it registers no gate running `scripts/practices-check.sh`, propose registering one that passes the runner's own invocation, per file. Never batched. A contract the checker then fails is covered by the re-marking proposal below.
 
 **Added files — reconcile fill-in skeletons, don't ship them raw.** For every file you propose adding:
 
@@ -359,7 +376,7 @@ Batch rows are collected, not written. Once every file is classified, apply sect
 
 Section 4.4 migrated the CDD-managed files; this sweep finds anything **else** still naming a pre-migration path or command, across every tracked text file, not just `*.md` — `tools/*.sh` especially, where a pre-#24 per-project worktree helper lives. Upgrade mode only.
 
-**DEPRECATION SEAM — every row below is transitional.** Retire a row once every project on every machine is past that migration (removal tracked by issue #93). The step itself stays until issue #80's fleet-versioning layer subsumes it (process doc §6); do not build version negotiation here. **Land a rename or a path migration in CDD, add a row.** (`/bootstrap`, `/retrofit` and `/quick-create` are deliberately absent: they have always been CDD-repo-only.)
+**Every row below is `TRANSITIONAL(#93)`; the step itself is permanent.** Do not build version negotiation here (process doc §6). **Land a rename or a path migration in CDD, add a row.** (`/bootstrap`, `/retrofit` and `/quick-create` are deliberately absent: they have always been CDD-repo-only.)
 
 | Legacy token | Migrated to | Landed in |
 | --- | --- | --- |
@@ -391,7 +408,7 @@ Either way, section 5 reports it.
 
 ### 4.6 Upstream candidates
 
-For each preserved local customization in a CDD-managed file — including the local hunks an `auto-merged` file kept — judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Collect the general ones into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as a new shipped adapter**, not a prompt change. A declined fourth-verdict hunk (section 4.4) is assessed like any preserved customization. Do not auto-apply anything to the CDD repo in this session.
+For each preserved local customization in a CDD-managed file — including the local hunks an `auto-merged` file kept — judge whether it is project-specific (mentions the project's name/slug/domain, encodes its build commands) or **general** (a workflow improvement any CDD project would want). Collect the general ones into a report — file, hunk, why it looks upstreamable — and present it at the end as candidates to port into `template/` (and the process doc) via a normal CDD task in this repo. A general one that reaches a backend CDD ships no adapter for (typically a declined "migrate into `.cdd/`" hunk) is instead a candidate to **propose as a new shipped adapter**, not a prompt change. `TRANSITIONAL(#148)`: a declined fourth-verdict hunk (section 4.4) is assessed like any preserved customization. Do not auto-apply anything to the CDD repo in this session.
 
 ### 4.7 Update the marker and commit
 
@@ -429,8 +446,8 @@ Report, in both modes:
 - **Legacy migration** (upgrade mode): the sweep's outcome as its own category, apart from the file lists — *swept* (what was found, including the historical hits deliberately left alone), *patched* (files brought back into agreement, listed), and *recommended for removal* (a project-local worktree/state helper, with the exact shell rc line the user still has to delete by hand). An empty sweep says so in one line.
 - **Install-deps script**: whether `scripts/install-deps.sh` was added (or folded into the project's own installer), the tools its project block lists, and any left out for want of a package name.
 - **Capability bindings**: each `.cdd/<capability>` written (with its evidence), declined, or already present; each "no adapter for this backend" line; any upgrade-mode "migrate into `.cdd/`" hunk and its outcome; for Jira, the env vars the user sets; and, if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing on this machine, that the bound capability stops until `./tools/cdd-worktree.sh install` runs.
-- **Check runner**: whether a `list` mode was proposed and its outcome; in upgrade mode, whether the practices gate was registered — flagged transitional.
-- **Command edits to move** (upgrade mode): each fourth-verdict hunk (section 4.4) — where it moved, or kept or dropped and why; flagged transitional.
+- **Check runner**: whether a `list` mode was proposed and its outcome; in upgrade mode, whether the practices gate was registered — `TRANSITIONAL(#166)`.
+- **Command edits to move** (upgrade mode), `TRANSITIONAL(#148)`: each fourth-verdict hunk (section 4.4) — where it moved, or kept or dropped and why.
 - The marker value written.
 - Upstream candidates surfaced (upgrade mode), each with its destination (port into `template/`, or propose as a new shipped adapter), with a pointer to file them as a roadmap item in the CDD repo.
 - Any gitignore warnings from step 1.

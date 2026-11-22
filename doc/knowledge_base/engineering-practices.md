@@ -10,11 +10,11 @@ An Enforced section carries a ``- Gates: `<gate>`, …`` line naming its gates a
 
 This repo is documentation and shell scripts: there is no compiled build, so "build" and "tests" take the shape of shell-syntax checks, the bootstrap smoke, and the command-drift check rather than a compiler and a unit-test runner. Every gate below runs from one command, `./scripts/ci.sh` — see `CLAUDE.md` → "Build & test".
 
-## Documentation — Upheld (reconciliation); Enforced (roadmap length)
+## Documentation — Upheld (reconciliation); Enforced (roadmap length, transitional markers)
 
-The process doc, template, architecture/feature docs, and roadmap are reconciled against the diff by `/cdd-pre-pr` (documentation reconciliation), and the two-layer consistency rule — process-doc-first, then template — is part of every change. A change isn't done until the docs match it. Roadmap items additionally obey a hard length cap, enforced as a gate rather than reconciled by judgement (see below, and ADR 0005).
+The process doc, template, architecture/feature docs, and roadmap are reconciled against the diff by `/cdd-pre-pr` (documentation reconciliation), and the two-layer consistency rule — process-doc-first, then template — is part of every change. A change isn't done until the docs match it. Roadmap items additionally obey a hard length cap, enforced as a gate rather than reconciled by judgement (see below, and ADR 0005). Every transitional piece carries a well-formed `TRANSITIONAL(#<issue>)` marker naming its removal issue (process doc §2.20).
 
-- Gates: `roadmap-length`
+- Gates: `roadmap-length`, `transitional`
 
 ## Tested behaviour — Enforced (the suites); Upheld (new behaviour ships with a test)
 

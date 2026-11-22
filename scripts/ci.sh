@@ -91,6 +91,7 @@ GATES=(
   "seams||prompt-seam contracts between the repo's own prompts"
   "seams-contract||the prompt-seam checker's own contract (mutation-tested)"
   "roadmap-length||roadmap item length: the 200-char cap"
+  "transitional||transitional markers: each names its removal issue, none in template/, no retired seam token"
   "staging||gate commands stage by name: no git add -A/--all/. in a command's or agent's shell blocks"
   "posture||every command -v in tools/ declares its dependency posture; the required-tools blocks and the install-deps scripts agree"
   "practices||every Enforced row of the engineering-practices contract names a gate this runner registers"
@@ -172,6 +173,10 @@ gate_seams_contract() {
 
 gate_roadmap_length() {
   ./scripts/roadmap-length-check.sh
+}
+
+gate_transitional() {
+  ./scripts/transitional-check.sh
 }
 
 gate_staging() {

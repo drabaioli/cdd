@@ -20,6 +20,13 @@ For both: apply fixes only on user approval, and do not auto-edit either tree fr
 
 Every part of `CLAUDE.md` that is not specific to CDD — "Talking to the human", "Writing changes", the Workflow bullets other than the CDD-specific ones — is the same in `template/CLAUDE.md`. Where the diff changes such a part in one file, make the same change in the other (ADR 0026).
 
+Each `TRANSITIONAL(#<issue>)` marker the branch adds must name an open issue (process doc §2.20); a closed or missing one is a finding:
+
+```bash
+git diff "$BASE_BRANCH"...HEAD | grep '^+' | grep -o 'TRANSITIONAL(#[0-9]*)' | sort -u | sed 's/[^0-9]//g' \
+  | while read -r n; do echo "#$n $(gh issue view "$n" --json state -q .state 2>&1)"; done
+```
+
 ## Workflow improvement check (conditional)
 
 This repo *is* CDD, so the "general enough that any CDD project would want it" route has no upstream to reach: a general improvement discovered here is a normal roadmap item (or an issue on this repo) plus the matching process-doc and template change.
