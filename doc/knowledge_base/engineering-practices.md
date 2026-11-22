@@ -67,6 +67,12 @@ An edit to an existing file under the paths below asks the human first unless th
 
 - Test paths: `scripts/*-assert.sh`, `scripts/*-check.sh`, `scripts/*-whitelist.txt`
 
+## Mutation testing — Enforced (the guards' mutation harnesses)
+
+The guards (checkers whose failure mode is a silent "clean") are mutation-tested on every change: each harness breaks one thing at a time in a throwaway copy and requires its checker to fail and name what it caught (why: `doc/architecture/overview.md`). The scope stops there. Some other asserts were mutation-checked by hand when written (noted on their lines under Tested behaviour), and no mutation tool runs over the shell scripts as a whole, since each mutant would rerun the sandboxed asserts.
+
+- Gates: `seams-contract`, `drift-contract`, `adapter-conformance-contract`
+
 ## Dependency & toolchain hygiene — Enforced (dependency posture, host-tool portability); Expected (version pinning)
 
 - Gates: `posture`, `portability`

@@ -57,6 +57,13 @@ An edit to an existing test file asks the human first, unless the approved plan'
 
 - Test paths: `<test path pattern>`
 
+## Mutation testing — <Enforced once the check runner registers a mutation-testing gate; Expected until then>
+
+A mutation tool plants small faults (mutants) in the code and runs the tests against each; a mutant the tests do not catch is a gap in them, closed with a test or recorded as not worth one. It pays once the project has a test suite worth measuring, so a new project usually leaves it Expected, its roadmap task in a later phase. The tool, and whether it runs over the whole codebase or only the code a change touches, are the project's choice.
+
+- Mutation test command: `<mutation test command>`
+- Gates: <the runner gate that runs it>
+
 ## Dependency & toolchain hygiene — Expected
 
 Dependencies are pinned or locked; toolchain versions are documented, including the host tools the check runner's scripts assume and any of their behaviours that differ between machines and so are off-limits.

@@ -19,7 +19,7 @@ Have a conversation to define the project. No rigid questionnaire: ask in natura
 - **Constraints** — language/platform, hard technical limits, regulatory/business constraints, compatibility, deadlines.
 - **Architecture intentions** — intended high-level shape: major components, how they relate, external boundaries, structural principles the project commits to.
 - **Audience** — who consumes it (end users, other services, a team, future-you).
-- **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, static analysis & security scanning, duplicate-block check, test protection (which paths hold the tests), and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch; the answers are commitments, and most will honestly be *expected*.
+- **Engineering floor** — what the project commits to for tested behaviour, continuous integration, lint & format, static analysis & security scanning, duplicate-block check, test protection (which paths hold the tests), mutation testing, and dependency & toolchain hygiene (the negotiable rows of the template contract). Ask this as one batch; the answers are commitments, and most will honestly be *expected*.
 - **Toolchain** — the tools the project's build, test, lint and run need (a compiler, a runtime, a package manager, …), with their apt and Homebrew package names where known. They become entries in the project's `scripts/install-deps.sh` (step 4).
 - **Where issues and code review live** — the tracker (where issues live) and the code host (where pull requests are reviewed). Always ask; never assume. Offer GitHub (Issues + pull requests) as the default. The answer becomes the project's capability bindings in `.cdd/` (process doc Section 2.16), written by the bootstrap script in step 5:
   - **GitHub** — bind both to the shipped GitHub adapters.
@@ -35,7 +35,7 @@ Where the user has no firm answer, capture intent and mark the area open rather 
 
 ## 2. Draft the initial roadmap
 
-From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Every practice the engineering floor leaves *expected* becomes one task, phrased so closing it flips that row to *enforced* or *upheld*; the template's suggested infrastructure tasks (README, coding guidelines, release/versioning) cover the rest. One set, not two.
+From the discovery, propose a thin but real roadmap: three to five phases, a handful of tasks each, every phase ending in a milestone statement. Every practice the engineering floor leaves *expected* becomes one task, phrased so closing it flips that row to *enforced* or *upheld*; mutation testing's task lands in a later phase, once there are tests for it to measure; the template's suggested infrastructure tasks (README, coding guidelines, release/versioning) cover the rest. One set, not two.
 
 Do **not** include the template's pre-filled "Phase 1: CDD bootstrap" survey phase; the roadmap starts at the project's real first phase.
 
