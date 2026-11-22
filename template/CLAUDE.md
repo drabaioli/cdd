@@ -4,15 +4,15 @@
 
 ## Key references
 
-| Topic                            | Location                                          |
-| -------------------------------- | ------------------------------------------------- |
-| Project overview (charter)       | `doc/knowledge_base/project-overview.md`          |
-| Documentation map                | `doc/index.md`                                    |
-| System architecture & design     | `doc/architecture/index.md`                       |
-| Decision records (ADRs)          | `doc/architecture/adr/` (Nygard style)            |
-| Feature documentation            | `doc/features/index.md`                           |
-| Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
-| Engineering practices            | `doc/knowledge_base/engineering-practices.md`     |
+| Topic                                       | Location                                      |
+| ------------------------------------------- | --------------------------------------------- |
+| Project overview (charter)                  | `doc/knowledge_base/project-overview.md`      |
+| Documentation map                           | `doc/index.md`                                |
+| System architecture, module layout & design | `doc/architecture/index.md`                   |
+| Decision records (ADRs)                     | `doc/architecture/adr/` (Nygard style)        |
+| Feature documentation                       | `doc/features/index.md`                       |
+| Implementation roadmap                      | `doc/knowledge_base/roadmap.md`               |
+| Engineering practices                       | `doc/knowledge_base/engineering-practices.md` |
 
 Each doc directory keeps an `index.md` pointer list: read the index, then load only the documents you need. **`index.md` files are pointer lists only — content belongs in named subdocuments, not in the index itself.**
 **Rationale lives once.** A decision's reasoning goes in its ADR (`doc/architecture/adr/`), mechanics in code comments and `doc/architecture/`; everywhere else states the rule and points there.
@@ -59,19 +59,6 @@ scripts/practices-check.sh <check runner command>
 `scripts/install-deps.sh` installs what the project needs, CDD's required tools included (`--check` only reports); add a tool to its project block when the project starts needing one.
 
 Keep the runner the **single source of the gate sequence**: CI delegates to it — whole, or fanned out one job per gate over its `list` mode when gates are slow — and CDD's commands (`/cdd-pre-pr`, `/cdd-merge-base`, `/cdd-implement`, `/cdd-small-change`) run the runner named in this block, its one declaration, so a gate is never listed twice. A missing tool fails its gate, never skips it. Every runner has the `list` mode and runs one gate by name; `scripts/practices-check.sh` (CDD's, do not edit) reads that list to check `doc/knowledge_base/engineering-practices.md`.
-
-## Module layout
-
-| Directory   | Purpose                  |
-| ----------- | ------------------------ |
-| `<dir>/`    | <what lives here>        |
-| `<dir>/`    | <what lives here>        |
-
-## Architecture
-
-<2–4 sentences describing the high-level shape: how modules talk to each other, what the main data flow is, where the boundary with external systems sits. Pointer to the full doc.>
-
-See `doc/architecture/index.md` for the full picture.
 
 ## Talking to the human
 

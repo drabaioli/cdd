@@ -106,7 +106,7 @@ Carry the engineering floor from process level to code level: short generic rule
 - [x] Add generic contract rows: static analysis / security scan fed back in `/cdd-implement`, and a duplicate-block check on the diff (#153)
 - [x] Protect existing tests: ship a hook or deny rule against changing them without plan approval (#153)
 - [x] Add mutation testing as an Expected engineering-practices contract row (#153)
-- [ ] Decide whether the template `CLAUDE.md` keeps its module-layout and architecture overviews, given context files' measured cost (#153)
+- [x] Decide whether the template `CLAUDE.md` keeps its module-layout and architecture overviews, given context files' measured cost (#153)
 
 **Milestone:** code-level rules aimed at documented agent failure modes ship in the template, backed by checks rather than prose.
 

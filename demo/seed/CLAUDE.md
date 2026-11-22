@@ -6,7 +6,7 @@ Markdown Renderer is a small local web app: paste Markdown into a box, see it re
 
 | Topic                            | Location                                          |
 | -------------------------------- | ------------------------------------------------- |
-| System architecture & design     | `doc/architecture/` (start with `index.md`)       |
+| System architecture & layout     | `doc/architecture/` (start with `index.md`)       |
 | Feature documentation            | `doc/features/` (start with `index.md`)           |
 | Implementation roadmap           | `doc/knowledge_base/roadmap.md`                   |
 | Engineering practices            | `doc/knowledge_base/engineering-practices.md`     |
@@ -35,22 +35,6 @@ pytest tests/integration               # integration tests (render → action ou
 python -m pyflakes app                 # lint
 black --check app tests                # format check
 ```
-
-## Module layout
-
-| Directory        | Purpose                                                            |
-| ---------------- | ------------------------------------------------------------------ |
-| `app/`           | Flask app: routes, render entry point, the actions pipeline        |
-| `app/actions/`   | One module per action (copy-rendered, email-safe copy, export, …)  |
-| `app/templates/` | The single-page UI (paste box, live preview, actions toolbar)      |
-| `app/static/`    | Preview CSS and client-side clipboard/copy JavaScript              |
-| `tests/`         | Unit tests (render, escaping, each action) + `tests/integration/`  |
-
-## Architecture
-
-A render request flows: raw Markdown → `markdown.markdown()` → an ordered **actions pipeline** (`ACTIONS = [...]`) of post-processors that each produce one user-facing output (rendered HTML for preview, email-safe HTML, downloadable files). The single-page UI renders one toolbar button per registered action inside `<div class="actions">`. The email-safety transform `inline_styles()` rewrites `<style>`-based formatting into inline `style="..."` attributes so output survives email clients.
-
-See `doc/architecture/index.md` for the full picture.
 
 ## Workflow
 

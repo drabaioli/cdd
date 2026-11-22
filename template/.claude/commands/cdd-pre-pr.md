@@ -85,7 +85,7 @@ Check and **update** documentation based on the changes:
 
 - **Architecture docs** (`doc/architecture/`): if module structure, data flow, key interfaces, threading model, or external boundaries changed, update the relevant doc. Edit directly.
 - **Feature docs** (`doc/features/`): if user-visible behaviour changed or a new feature landed, update or add the relevant feature doc. Edit directly.
-- **CLAUDE.md**: if module layout, build commands, or top-level constraints changed, update it. Edit directly. Keep it an index: do not add detail a slash command already injects into the sessions that need it.
+- **CLAUDE.md**: if build commands or top-level constraints changed, update it. Edit directly. Keep it an index: do not add detail a slash command already injects into the sessions that need it.
 - **README.md**: if anything it states — quick start, layout, status, links — went stale relative to the change, update it. Edit directly.
 - **Roadmap** (`doc/knowledge_base/roadmap.md`):
   1. Tick any newly completed checkboxes directly.

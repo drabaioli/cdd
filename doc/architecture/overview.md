@@ -15,6 +15,9 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 ├── CLAUDE.md                                 # this repo's Claude Code context
 ├── LICENSE                                   # MIT (repo-root only; not shipped in template/)
 ├── README.md                                 # repo entry point
+├── .cdd/
+│   ├── code-host, tracker                    # adapter bindings: relative symlinks to tools/adapters/*/github.sh
+│   └── extensions/                           # this repo's command extensions (cdd-pre-pr.md, cdd-process-pr.md)
 ├── .claude/
 │   ├── commands/                             # this repo's slash commands
 │   ├── agents/                               # this repo's subagent definitions (cdd-researcher, spawned by /cdd-plan)
@@ -31,13 +34,19 @@ Changes flow process-first, template-second. A PR that touches the process doc b
 │   ├── architecture/                         # how this repo is structured
 │   ├── features/                             # what this repo provides
 │   └── knowledge_base/                       # process doc, roadmap, engineering practices
-├── scripts/                                  # ci.sh (the check runner) + the gate scripts it calls: smoke assertions, drift check, prompt-seam check, roadmap-length check (with whitelists), staging check, host-tool portability check, posture check, adapter-conformance check + its mutation harness; install-deps.sh (installs this repo's tools; not a gate)
+├── scripts/                                  # ci.sh (the check runner: the gate registry) + the gate scripts it calls: smoke assertions, install smoke, toolchain-sync assertion, drift check, prompt-seam check, roadmap-length check (with whitelists), staging check, host-tool portability check, posture check, engineering-practices contract check (identical to the template's) + its assertion, adapter-conformance check + its mutation harness, code-host ladder assertion, adapter-bindings assertion; install-deps.sh (installs this repo's tools; tested by its own workflow, not a gate)
 ├── template/                                 # copy-paste material for new projects
+│   ├── .claude/commands/                     # slash commands shipped to new projects
+│   ├── .claude/agents/                       # subagent definitions shipped to new projects (cdd-researcher, web-only)
+│   ├── .claude/hooks/                        # hooks shipped to new projects (cdd-test-guard.sh: asks before an edit to an existing test the plan does not name)
+│   ├── scripts/                              # install-deps.sh skeleton (CDD-owned part + a project block bootstrap/retrofit fill); practices-check.sh, the CDD-owned contract checker the project's runner registers as a gate
+│   ├── doc/                                  # doc skeletons shipped to new projects
+│   └── BOOTSTRAP.md                          # bootstrap recipe (not copied into the bootstrapped tree)
 └── tools/
     ├── bootstrap-cdd-project.sh              # non-interactive bootstrap for new projects
-    ├── cdd-worktree.sh                       # shared worktree helper (self-installing)
-    ├── cdd-state.sh                          # shared task-state helper (installed by cdd-worktree.sh install)
-    └── adapters/                             # capability adapters, one dir per capability (mirrors ~/.cdd/adapters/); cdd-worktree.sh install copies them to the ~/.cdd/tools/adapters/ library, never a rung
+    ├── cdd-worktree.sh                       # shared worktree helper (self-installing, self-updating)
+    ├── cdd-state.sh                          # shared task-state helper (installed by cdd-worktree.sh install; self-updating)
+    └── adapters/                             # capability adapters, one dir per capability (mirrors ~/.cdd/adapters/); cdd-worktree.sh install copies them to the ~/.cdd/tools/adapters/ library that downstream .cdd/ shims exec, never a rung
         ├── tracker/
         │   ├── github.sh                     # GitHub backend, the reference implementation
         │   ├── jira.sh                       # Jira Cloud backend (curl + jq, env-configured)

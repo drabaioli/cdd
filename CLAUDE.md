@@ -10,7 +10,7 @@ CDD is a human-in-the-loop workflow for evolving software projects together with
 | Implementation roadmap                               | `doc/knowledge_base/roadmap.md`                   |
 | Engineering practices (enforced, upheld, expected)         | `doc/knowledge_base/engineering-practices.md`     |
 | Documentation map                                    | `doc/index.md`                                    |
-| Architecture of this repo                            | `doc/architecture/index.md`                       |
+| Architecture and layout of this repo                 | `doc/architecture/index.md`                       |
 | Capability adapter contract (tracker and code-host verbs, shapes) | `doc/architecture/capability-adapters.md`         |
 | Decision records (ADRs, every kind of decision)      | `doc/architecture/adr/` (Nygard style)            |
 | Features of this repo                                | `doc/features/index.md`                           |
@@ -50,43 +50,6 @@ This repo is documentation and shell scripts; there is no build step. Every chec
 `scripts/ci.sh` is the **single source of the gate sequence** (process doc §2.14): CI (Ubuntu and macOS) and `/cdd-pre-pr` both call it, and neither holds a gate list. The 33 gates are the registry at the top of the script, one line each saying what it checks; each gate's script under `scripts/` also runs standalone. Needs bash >= 4, `shellcheck`, `jq` and `tar` (the runner stubs `claude` itself) — **a missing tool fails its gate, never skips it**. `scripts/install-deps.sh` installs this repo's tools: CDD's required set plus `gh`, `shellcheck` and `tar` (`--check` only reports). The run is not fail-fast. Mechanics: `doc/architecture/overview.md`.
 
 What `/cdd-pre-pr` adds in this repo — the macOS caveat and how to triage the `drift` and `seams` gates — lives in `.cdd/extensions/cdd-pre-pr.md`.
-
-## Module layout
-
-| Directory                          | Purpose                                                   |
-| ---------------------------------- | --------------------------------------------------------- |
-| `doc/knowledge_base/`              | Process doc, roadmap, engineering practices               |
-| `doc/architecture/`                | How this repo is structured                               |
-| `doc/features/`                    | What this repo provides (process + template)              |
-| `template/`                        | Copy-paste material for new projects                      |
-| `template/.claude/commands/`       | Slash commands shipped to new projects                    |
-| `template/.claude/agents/`         | Subagent definitions shipped to new projects (`cdd-researcher`, web-only) |
-| `template/.claude/hooks/`          | Hooks shipped to new projects (`cdd-test-guard.sh`, wired in `settings.json`: asks before an edit to an existing test the plan does not name) |
-| `template/scripts/`                | `install-deps.sh` skeleton shipped to new projects (CDD-owned part + a project block bootstrap/retrofit fill); `practices-check.sh`, the CDD-owned contract checker the project's runner registers as a gate |
-| `template/doc/`                    | Doc skeletons shipped to new projects                     |
-| `template/BOOTSTRAP.md`            | Bootstrap recipe (not copied into the bootstrapped tree)  |
-| `tools/bootstrap-cdd-project.sh`   | Non-interactive bootstrap script                          |
-| `tools/adapters/tracker/github.sh` | Tracker capability adapter, GitHub backend (the reference implementation) |
-| `tools/adapters/tracker/jira.sh`   | Tracker capability adapter, Jira Cloud backend (curl + jq, env-configured) |
-| `tools/adapters/tracker/gitlab.sh` | Tracker capability adapter, GitLab backend (curl + jq, REST v4, env-configured; gitlab.com or self-managed) |
-| `tools/adapters/code-host/github.sh` | Code-host capability adapter, GitHub backend (the reference implementation) |
-| `tools/adapters/code-host/gitlab.sh` | Code-host capability adapter, GitLab backend (curl + jq, REST v4, env-configured; gitlab.com or self-managed) |
-| `demo/`                            | Demo / dogfooding subsystem (third artifact)              |
-| `demo/seed/`                       | Filled-in "Markdown Renderer" project content (not template) |
-| `demo/{setup,teardown}.sh`         | Create/teardown demo & dogfood instances; `lib.sh` shared |
-| `scripts/`                         | `ci.sh` (the check runner: the gate registry) + the gate scripts it calls — smoke assertions, install smoke, toolchain-sync assertion, host-tool portability check, command-set drift check, prompt-seam check, roadmap-length check (with whitelists), staging check, posture check, engineering-practices contract check (identical to the template's copy) and its own assertion, adapter-conformance check, code-host ladder assertion, adapter-bindings assertion; plus `install-deps.sh` (installs this repo's tools; tested by its own workflow, not a gate) |
-| `.github/workflows/`               | CI: `template-smoke.yml` delegates to `scripts/ci.sh`; `install-deps.yml` tests the install-deps script when it changes |
-| `.claude/commands/`                | This repo's own slash commands                            |
-| `.claude/agents/`                  | This repo's own subagent definitions (`cdd-researcher`, spawned by `/cdd-plan`) |
-| `.claude/hooks/`                   | This repo's own hooks (`cdd-test-guard.sh`, identical to the template's) |
-| `.cdd/`                            | This repo's own capability-adapter bindings: `code-host` and `tracker`, relative symlinks to the GitHub adapters under `tools/adapters/`; and `extensions/`, its command extensions (`cdd-pre-pr.md`, `cdd-process-pr.md`) |
-| `tools/`                           | Bootstrap script + the canonical shared helpers (`cdd-worktree.sh`, `cdd-state.sh`; one install, `cdd-worktree.sh install`, installs both; both self-updating) + the capability adapters under `adapters/<capability>/<backend>.sh` (mirroring `~/.cdd/adapters/<capability>`; none installs as a rung — `cdd-worktree.sh install` copies them to the `~/.cdd/tools/adapters/` library that downstream `.cdd/` shims exec) |
-
-## Architecture
-
-Two layers. The process doc describes the workflow abstractly: artifacts, lifecycle, edit rules, checkpoints. The template instantiates the workflow as concrete files a new project can copy. Changes should land in the process doc first, then propagate to the template, never the other way around. A third artifact, `demo/`, instantiates a concrete project from a filled-in seed to both demo and dogfood the workflow; it is downstream of the template and never feeds back into it. Architecture docs for this repo will grow as the structure stabilizes; for now, the layout above is the architecture.
-
-See `doc/knowledge_base/claude-driven-development.md` for the full picture.
 
 ## Talking to the human
 
