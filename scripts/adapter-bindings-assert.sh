@@ -18,6 +18,10 @@
 #   - unsupported backends and malformed Jira or GitLab coordinates are refused before
 #     any write
 #   - --stage renders the shims too; a bare bootstrap writes no .cdd/
+#   - --recover-bindings reads an outdated shim's backend and coordinates back, so the
+#     current script refreshes its text and a baseline script reproduces it exactly (the
+#     /cdd-retrofit upgrade path, ADR 0036); a shim it did not write, or two GitLab shims
+#     that disagree, is not recovered
 #
 # The conformance checker is deliberately not run on these shims: it probes with an
 # empty HOME, where no library exists by construction.
@@ -216,5 +220,88 @@ BARE="$WORK/bare"
 HOME="$HOME_A" "$BOOTSTRAP" --name "Bare" --path "$BARE" >/dev/null || fail "bare bootstrap failed"
 [[ ! -e "$BARE/.cdd" ]] || fail "a bootstrap without binding flags wrote .cdd/"
 pass "--stage renders the shims; a bare bootstrap writes no .cdd/"
+
+# --- 9. retrofit upgrade: an outdated shim is recovered and refreshed ----------
+# recover <dir>: run --recover-bindings; stdout to $OUT, stderr to $WORK/err, exit to $RC.
+recover() {
+  RC=0
+  OUT="$("$BOOTSTRAP" --recover-bindings "$1" 2>"$WORK/err")" || RC=$?
+}
+
+# A baseline CDD whose shims still carry the pre-#155 hint (curl one adapter file), built
+# from a scratch copy: CI's shallow checkout has no history to take the old script from.
+OLD_CDD="$WORK/old-cdd"
+mkdir -p "$OLD_CDD"
+cp -R "$REPO_ROOT/tools" "$REPO_ROOT/template" "$OLD_CDD/"
+# shellcheck disable=SC2016  # $cap, $backend, $lib are the script's own text, not expansions
+sed -e 's#or without a CDD checkout: curl .* update" >&2#or: curl -fsSL https://raw.githubusercontent.com/drabaioli/cdd/main/tools/adapters/$cap/$backend.sh --create-dirs -o \\"\\$lib\\" \&\& chmod +x \\"\\$lib\\"" >\&2#' \
+  "$REPO_ROOT/tools/bootstrap-cdd-project.sh" > "$OLD_CDD/tools/bootstrap-cdd-project.sh"
+# shellcheck disable=SC2016
+grep -qF 'tools/adapters/$cap/$backend.sh --create-dirs' "$OLD_CDD/tools/bootstrap-cdd-project.sh" \
+  || fail "recovery: could not synthesize the pre-#155 shim hint in the baseline script"
+OLD_FLAGS=(--tracker jira --jira-site acme.atlassian.net --jira-key ABC
+           --code-host gitlab --gitlab-project grp/proj --gitlab-url gitlab.example.com/root/)
+"$OLD_CDD/tools/bootstrap-cdd-project.sh" --stage --dir outdated --name "Outdated" \
+  --path "$WORK/outdated-render" "${OLD_FLAGS[@]}" >/dev/null || fail "recovery: the baseline render failed"
+OUTDATED="$WORK/outdated"
+mkdir -p "$OUTDATED"
+cp -R "$WORK/outdated-render/.cdd" "$OUTDATED/"
+
+EXPECTED='--tracker jira --code-host gitlab --jira-site https://acme.atlassian.net --jira-key ABC --gitlab-url https://gitlab.example.com/root --gitlab-project grp/proj'
+recover "$OUTDATED"
+[[ $RC -eq 0 && ! -s "$WORK/err" ]] || fail "recovery: expected a clean exit 0, got $RC: $(cat "$WORK/err")"
+[[ "$OUT" == "$EXPECTED" ]] || fail "recovery: expected '$EXPECTED', got '$OUT'"
+read -r -a BIND <<<"$OUT"
+
+# The baseline script reproduces the target exactly (so it reads as untouched), and the
+# current script refreshes its text under the same backend and coordinates.
+"$OLD_CDD/tools/bootstrap-cdd-project.sh" --stage --dir outdated --name "Outdated" \
+  --path "$WORK/old-shims" "${BIND[@]}" >/dev/null || fail "recovery: the baseline shim render failed"
+"$BOOTSTRAP" --stage --dir outdated --name "Outdated" --path "$WORK/refreshed" "${BIND[@]}" >/dev/null \
+  || fail "recovery: the current render with the recovered flags failed"
+for cap in tracker code-host; do
+  cmp -s "$OUTDATED/.cdd/$cap" "$WORK/old-shims/.cdd/$cap" \
+    || fail "recovery: the baseline script did not reproduce the outdated .cdd/$cap"
+  for prefix in 'lib=' 'export '; do
+    [[ "$(grep "^$prefix" "$OUTDATED/.cdd/$cap")" == "$(grep "^$prefix" "$WORK/refreshed/.cdd/$cap")" ]] \
+      || fail "recovery: the refreshed .cdd/$cap changed its '$prefix' line"
+  done
+  ! cmp -s "$OUTDATED/.cdd/$cap" "$WORK/refreshed/.cdd/$cap" || fail "recovery: .cdd/$cap text was not refreshed"
+  grep -qF 'cdd-worktree.sh update' "$WORK/refreshed/.cdd/$cap" \
+    || fail "recovery: the refreshed .cdd/$cap lacks the current install hint"
+  if grep -nF -- "--create-dirs -o \"\$lib\"" "$WORK/refreshed/.cdd/$cap"; then
+    fail "recovery: the refreshed .cdd/$cap still carries the pre-#155 hint"
+  fi
+done
+recover "$WORK/refreshed"
+[[ "$OUT" == "$EXPECTED" ]] || fail "recovery: the refreshed shims should read back the same flags, got '$OUT'"
+pass "an outdated Jira and GitLab shim is recovered exactly and refreshed under the same coordinates"
+
+recover "$PROJ"
+[[ $RC -eq 0 && "$OUT" == "--tracker github --code-host github" ]] \
+  || fail "recovery: GitHub shims should read back as '--tracker github --code-host github', got $RC '$OUT'"
+
+MIXED="$WORK/project-adapter"
+mkdir -p "$MIXED/.cdd"
+printf '#!/bin/sh\nexec my-tracker "$@"\n' > "$MIXED/.cdd/tracker"
+cp "$PROJ/.cdd/code-host" "$MIXED/.cdd/code-host"
+recover "$MIXED"
+[[ $RC -eq 0 && "$OUT" == "--code-host github" ]] \
+  || fail "recovery: a project adapter should be left out, got $RC '$OUT'"
+grep -qF '.cdd/tracker' "$WORK/err" || fail "recovery: stderr should name the unrecoverable .cdd/tracker"
+
+SPLIT="$WORK/gitlab-split"
+mkdir -p "$SPLIT"
+cp -R "$WORK/gl-both/.cdd" "$SPLIT/"
+sed -e "s#GITLAB_PROJECT='[^']*'#GITLAB_PROJECT='other/proj'#" "$WORK/gl-both/.cdd/code-host" > "$SPLIT/.cdd/code-host"
+recover "$SPLIT"
+[[ $RC -eq 0 && "$OUT" != *gitlab* ]] || fail "recovery: disagreeing GitLab shims should not be recovered, got $RC '$OUT'"
+[[ "$(grep -c . "$WORK/err")" == 1 ]] || fail "recovery: expected one note for the GitLab mismatch: $(cat "$WORK/err")"
+
+recover "$WORK/stage"
+[[ $RC -eq 0 && -z "$OUT" ]] || fail "recovery: a directory with no .cdd/ should print an empty line, got $RC '$OUT'"
+recover "$OUTDATED/.cdd/tracker"
+[[ $RC -eq 2 ]] || fail "recovery: a non-directory should exit 2, got $RC"
+pass "a shim CDD did not write, or GitLab shims that disagree, are reported and left out"
 
 echo "adapter bindings: all assertions passed"

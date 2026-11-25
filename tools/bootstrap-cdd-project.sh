@@ -9,6 +9,7 @@
 #     [--tracker BACKEND] [--code-host BACKEND] [--jira-site HOST --jira-key KEY] \
 #     [--gitlab-project PATH [--gitlab-url URL]] \
 #     [--stage --dir dir-slug] [--template-dir DIR]
+#   bootstrap-cdd-project.sh --recover-bindings DIR
 #
 # The basename of --path becomes the directory slug (<PROJECT_DIR>). The path
 # may be absolute or relative; it must not exist, or must be an empty directory.
@@ -37,6 +38,13 @@
 # (exit 2). Opt-in: no flag, no .cdd/. Honoured under --stage too, which is how
 # /cdd-retrofit renders bindings for approval.
 #
+# --recover-bindings DIR is the inverse, a mode of its own that writes nothing: it reads
+# DIR/.cdd/tracker and DIR/.cdd/code-host and prints, on one line, the binding flags that
+# render them again (backend from the shim's lib= line, Jira/GitLab coordinates from its
+# export line). A shim it cannot read back -- not one this script wrote, or two GitLab
+# shims naming different projects -- gets one stderr note and is left out of the flags.
+# /cdd-retrofit upgrade mode uses it to refresh an existing shim's text (ADR 0036).
+#
 # In both modes the script writes a one-line baseline marker, .claude/cdd-baseline,
 # holding the CDD repo commit hash the template was rendered from (or "unknown"
 # when this script does not live in a git checkout). /cdd-retrofit upgrade mode uses
@@ -56,6 +64,7 @@ usage: bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug [
          [--tracker BACKEND] [--code-host BACKEND] [--jira-site HOST --jira-key KEY]
          [--gitlab-project PATH [--gitlab-url URL]]
          [--stage --dir dir-slug] [--template-dir DIR]
+       bootstrap-cdd-project.sh --recover-bindings DIR
 
   --name          Display name; may contain spaces. E.g. "Sprint Planning Automation POC".
   --path          Path where the project will be created (absolute or relative). The basename
@@ -84,6 +93,9 @@ usage: bootstrap-cdd-project.sh --name "Display Name" --path /path/to/dir-slug [
                   basename of --path. Required with --stage.
   --template-dir  Substitute from this directory instead of the repo-root template/.
                   Used by /cdd-retrofit upgrade mode to render an old template snapshot.
+  --recover-bindings
+                  Write nothing; print the binding flags that render DIR's existing .cdd/
+                  shims again. Used by /cdd-retrofit upgrade mode.
 EOF
   exit 2
 }
@@ -100,6 +112,8 @@ JIRA_SITE=""
 JIRA_KEY=""
 GITLAB_URL=""
 GITLAB_PROJECT=""
+RECOVER=""
+RECOVER_FROM=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -115,10 +129,74 @@ while [[ $# -gt 0 ]]; do
     --jira-key)     JIRA_KEY="${2:-}";              shift 2 ;;
     --gitlab-url)   GITLAB_URL="${2:-}";            shift 2 ;;
     --gitlab-project) GITLAB_PROJECT="${2:-}";      shift 2 ;;
+    --recover-bindings) RECOVER=1; RECOVER_FROM="${2:-}"; shift 2 ;;
     -h|--help) usage ;;
     *) echo "unknown arg: $1" >&2; usage ;;
   esac
 done
+
+# Resolve template/ relative to this script's location so the script works from
+# any CWD; --template-dir overrides it (e.g. an old template snapshot). The script
+# lives in tools/, so template/ is one level up at the repo root.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The coordinate shapes a binding accepts, shared by the flag validation below and by
+# --recover-bindings, which must read back exactly what the validation lets through.
+JIRA_KEY_RE='^[A-Z][A-Z0-9_]+$'
+JIRA_HOST_RE='^[A-Za-z0-9.-]+$'
+GITLAB_PROJECT_RE='^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$'
+GITLAB_HOST_RE='^[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~-]+)*$'   # after the scheme
+
+# --recover-bindings: the inverse of write_binding below, so it changes with it.
+if [[ -n "$RECOVER" ]]; then
+  [[ -d "$RECOVER_FROM" ]] || { echo "error: --recover-bindings needs a directory (got: $RECOVER_FROM)" >&2; exit 2; }
+  flags="" jira="" gl_tracker="" gl_code_host=""
+  for cap in tracker code-host; do
+    f="$RECOVER_FROM/.cdd/$cap"
+    [[ -e "$f" ]] || continue
+    # shellcheck disable=SC2016  # $HOME is literal shim text, not an expansion
+    lib_re='^lib="\$HOME/\.cdd/tools/adapters/'"$cap"'/([a-z0-9][a-z0-9_-]*)\.sh"$'
+    jira_re="^export JIRA_BASE_URL='https://([^']+)' JIRA_PROJECT_KEY='([^']+)'\$"
+    gitlab_re="^export GITLAB_URL='(https?://[^']+)' GITLAB_PROJECT='([^']+)'\$"
+    backend="" coords="" coords_for=""
+    while IFS= read -r line; do
+      if [[ "$line" =~ $lib_re ]]; then
+        backend="${BASH_REMATCH[1]}"
+      elif [[ "$line" =~ $jira_re ]]; then
+        site="${BASH_REMATCH[1]}" key="${BASH_REMATCH[2]}"
+        if [[ "$site" =~ $JIRA_HOST_RE && "$key" =~ $JIRA_KEY_RE ]]; then
+          coords_for=jira coords="--jira-site https://$site --jira-key $key"
+        fi
+      elif [[ "$line" =~ $gitlab_re ]]; then
+        url="${BASH_REMATCH[1]}" project="${BASH_REMATCH[2]}"
+        if [[ "${url#*://}" =~ $GITLAB_HOST_RE && "$project" =~ $GITLAB_PROJECT_RE ]]; then
+          coords_for=gitlab coords="--gitlab-url $url --gitlab-project $project"
+        fi
+      fi
+    done < "$f"
+    # A recovered backend is a shipped adapter, and Jira and GitLab carry their coordinates.
+    if [[ -z "$backend" || ! -f "$SCRIPT_DIR/adapters/$cap/$backend.sh" ]] \
+       || [[ ( "$backend" == jira || "$backend" == gitlab ) && "$coords_for" != "$backend" ]]; then
+      echo "note: .cdd/$cap: binding not recoverable; not a shim this script wrote" >&2
+      continue
+    fi
+    case "$backend" in
+      jira) jira="$coords" ;;
+      gitlab) if [[ "$cap" == tracker ]]; then gl_tracker="$coords"; else gl_code_host="$coords"; fi ;;
+    esac
+    flags+=" --$cap $backend"
+  done
+  # One set of GitLab coordinates serves both capabilities: two shims that disagree
+  # cannot both be rendered again, so neither is recovered.
+  if [[ -n "$gl_tracker" && -n "$gl_code_host" && "$gl_tracker" != "$gl_code_host" ]]; then
+    echo "note: .cdd/tracker and .cdd/code-host bind different GitLab projects; neither recovered" >&2
+    flags="${flags/ --tracker gitlab/}" flags="${flags/ --code-host gitlab/}" gl_tracker="" gl_code_host=""
+  fi
+  gitlab="${gl_tracker:-$gl_code_host}"
+  flags+="${jira:+ $jira}${gitlab:+ $gitlab}"
+  printf '%s\n' "${flags# }"
+  exit 0
+fi
 
 [[ -n "$PROJECT_NAME" ]] || { echo "error: --name is required" >&2; usage; }
 [[ -n "$TARGET"       ]] || { echo "error: --path is required" >&2; usage; }
@@ -143,10 +221,6 @@ if ! [[ "$PROJECT_DIR" =~ ^[A-Za-z][A-Za-z0-9_-]*$ ]]; then
   exit 2
 fi
 
-# Resolve template/ relative to this script's location so the script works from
-# any CWD; --template-dir overrides it (e.g. an old template snapshot). The script
-# lives in tools/, so template/ is one level up at the repo root.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # CDD's required tools (process doc section 2.18), before anything is written. The bash
@@ -183,7 +257,7 @@ elif [[ -n "$JIRA_SITE$JIRA_KEY" ]]; then
   echo "error: --jira-site / --jira-key apply only with --tracker jira" >&2
   exit 2
 fi
-if [[ -n "$JIRA_KEY" ]] && ! [[ "$JIRA_KEY" =~ ^[A-Z][A-Z0-9_]+$ ]]; then
+if [[ -n "$JIRA_KEY" ]] && ! [[ "$JIRA_KEY" =~ $JIRA_KEY_RE ]]; then
   echo "error: --jira-key must match ^[A-Z][A-Z0-9_]+\$ (got: $JIRA_KEY)" >&2
   exit 2
 fi
@@ -191,7 +265,7 @@ if [[ -n "$JIRA_SITE" ]]; then
   # Normalize to https://<host>: the scheme and a trailing slash may be given or not.
   JIRA_SITE="${JIRA_SITE#https://}"
   JIRA_SITE="${JIRA_SITE%/}"
-  if ! [[ "$JIRA_SITE" =~ ^[A-Za-z0-9.-]+$ ]]; then
+  if ! [[ "$JIRA_SITE" =~ $JIRA_HOST_RE ]]; then
     echo "error: --jira-site must be a bare host such as acme.atlassian.net (got: $JIRA_SITE)" >&2
     exit 2
   fi
@@ -204,7 +278,7 @@ elif [[ -n "$GITLAB_URL$GITLAB_PROJECT" ]]; then
   echo "error: --gitlab-url / --gitlab-project apply only with --tracker gitlab or --code-host gitlab" >&2
   exit 2
 fi
-if [[ -n "$GITLAB_PROJECT" ]] && ! [[ "$GITLAB_PROJECT" =~ ^[A-Za-z0-9_][A-Za-z0-9_.-]*(/[A-Za-z0-9_][A-Za-z0-9_.-]*)+$ ]]; then
+if [[ -n "$GITLAB_PROJECT" ]] && ! [[ "$GITLAB_PROJECT" =~ $GITLAB_PROJECT_RE ]]; then
   echo "error: --gitlab-project must be a project path such as group/project (got: $GITLAB_PROJECT)" >&2
   exit 2
 fi
@@ -214,7 +288,7 @@ if [[ -n "$GITLAB_PROJECT" ]]; then
   GITLAB_URL="${GITLAB_URL:-https://gitlab.com}"
   GITLAB_URL="${GITLAB_URL%/}"
   [[ "$GITLAB_URL" == http://* || "$GITLAB_URL" == https://* ]] || GITLAB_URL="https://$GITLAB_URL"
-  if ! [[ "${GITLAB_URL#*://}" =~ ^[A-Za-z0-9.-]+(:[0-9]+)?(/[A-Za-z0-9._~-]+)*$ ]]; then
+  if ! [[ "${GITLAB_URL#*://}" =~ $GITLAB_HOST_RE ]]; then
     echo "error: --gitlab-url must be a host such as gitlab.example.com, optionally with a port and a path (got: $GITLAB_URL)" >&2
     exit 2
   fi
@@ -291,7 +365,9 @@ trap - EXIT
 # from a clone on any machine that ran `cdd-worktree.sh install`; where the library is
 # missing it exits 4 with the install command, which the resolution ladder treats as
 # a broken adapter (a stop, never a silent fallback). Written after substitution so no
-# placeholder pass touches it; never over an existing file.
+# placeholder pass touches it; never over an existing file. --recover-bindings above
+# reads these shims back, line for line: a change to the shim's lib= or export lines
+# changes it too.
 BOUND=""
 write_binding() {
   local cap="$1" backend="$2" f="$TARGET/.cdd/$1"

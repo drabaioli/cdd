@@ -65,7 +65,7 @@ BASE="$(git -C <target> symbolic-ref --quiet --short HEAD)"   # the branch the w
 
 ## 2.6 Capability bindings
 
-Both modes offer a `.cdd/tracker` / `.cdd/code-host` binding to a shipped adapter (process doc Section 2.16), for each capability the project does not already bind. Detect the backends and show the evidence with each proposal:
+Both modes offer a `.cdd/tracker` / `.cdd/code-host` binding to a shipped adapter (process doc Section 2.16), for each capability the project does not already bind. In upgrade mode, also run the detection for each capability the project already binds — proposing nothing, only to compare with the bound backend in section 4.4. Detect the backends and show the evidence with each proposal:
 
 ```bash
 git -C <target> remote get-url origin 2>/dev/null
@@ -75,7 +75,7 @@ git -C <target> log -n 500 --format='%D %s %b'
 - **Origin host** containing `github` → propose GitHub for both. Containing `gitlab` → propose GitLab for both, deriving `--gitlab-url https://<host>` and `--gitlab-project <path>` from the remote (`git@host:grp/proj.git`, `ssh://git@host[:port]/grp/proj.git`, `https://host/grp/proj.git`: strip `.git`, drop an SSH port; for an `http(s)` remote ask whether a leading path segment is the instance's sub-path root rather than a group). Never ask for a credential: the user sets `GITLAB_TOKEN` in their own shell. Another host → ask which backend it is (it may be a self-managed GitLab); for a backend CDD ships no adapter for (Bitbucket, …) say in one line that no binding is written and the commands needing it skip. No origin → ask, as `/cdd-bootstrap` does.
 - **Jira** → a key prefix recurring in branch names or commit subjects (`ABC-123`, several distinct numbers, not look-alikes like `UTF-8`) proposes the Jira tracker with that key; take the site from any `atlassian.net` URL, otherwise ask. Never ask for a credential: the user sets `JIRA_EMAIL` and `JIRA_API_TOKEN` in their own shell.
 
-Approve each binding as its own file, render it with the matching flags on the section 3.2 / 4.3 render (never hand-write one), and never overwrite an existing `.cdd/<capability>`.
+Approve each binding as its own file, render it with the matching flags on the section 3.2 / 4.3 render (never hand-write one), and never overwrite an existing `.cdd/<capability>` with a new binding; upgrade mode compares an existing one in section 4.4 instead. A new GitLab binding beside an existing GitLab shim takes that shim's recovered coordinates (section 4.3), not re-derived ones.
 
 ## 2.7 The batch and the per-file queue
 
@@ -110,6 +110,7 @@ The queue holds exactly:
 - template renames (section 4.4) — asked before the batch, above, not again;
 - legacy-sweep patches and the legacy helper (section 4.5);
 - capability bindings (section 2.6) — asked before the batch, above, not again;
+- binding shims that are hand-edited, missing from the old render, unrecoverable, or bound against detection (section 4.4);
 - install-mode collisions other than `.claude/settings.json` — `CLAUDE.md`, pre-existing `doc/` files, anything else (section 3.3);
 - anything the user pulled out of the batch.
 
@@ -259,35 +260,50 @@ If the recovered `<PROJECT_DIR>` differs from the target's folder name, warn in 
 
 ### 4.3 Render both template versions with the target's identifiers
 
-Current template:
+First recover the flags of the project's existing bindings:
+
+```bash
+BIND=$(./tools/bootstrap-cdd-project.sh --recover-bindings "$WT")   # stderr names any shim it cannot recover
+```
+
+Current template, with `$BIND` and the new bindings approved per section 2.6:
 
 ```bash
 STAGE=$(mktemp -d)
 ./tools/bootstrap-cdd-project.sh --stage \
   --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
   --path "$STAGE/current" \
-  --tracker github --code-host github   # the bindings approved per section 2.6; omit any declined
+  $BIND   # then the flags of each new binding approved per section 2.6, e.g. --code-host github
 ```
-
-Binding flags go on this current render only, never the old one; bindings are proposed per section 2.6, not compared in section 4.4.
 
 Old (baseline) template, extracted from this repo's history and rendered through the same substitution path:
 
 ```bash
 OLD_TPL=$(mktemp -d)
-git archive <baseline-hash> template | tar -x -C "$OLD_TPL"
+git archive <baseline-hash> template tools | tar -x -C "$OLD_TPL"
 ./tools/bootstrap-cdd-project.sh --stage \
   --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
   --template-dir "$OLD_TPL/template" \
   --path "$STAGE/old"
 ```
 
+When `$BIND` is non-empty, render the old shims with the baseline's own script and add them to the old render:
+
+```bash
+if "$OLD_TPL/tools/bootstrap-cdd-project.sh" --stage --name "<PROJECT_NAME>" --dir <PROJECT_DIR> \
+     --path "$STAGE/old-bindings" $BIND >/dev/null; then
+  mkdir -p "$STAGE/old/.cdd" && cp "$STAGE/old-bindings/.cdd/"* "$STAGE/old/.cdd/"
+fi
+```
+
+If it fails, the old render has no shim (section 4.4's "file absent in old render").
+
 ### 4.4 Three-way comparison, per template file
 
 Every file the template ships is compared, in one of two sets:
 
 - **Project-owned** — the template files a project fills with its own content: `CLAUDE.md`, `doc/knowledge_base/roadmap.md`, `doc/knowledge_base/engineering-practices.md`, `doc/knowledge_base/project-overview.md`.
-- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/hooks/cdd-test-guard.sh`, `.claude/settings.json`, the four `index.md` files under `doc/`, `doc/architecture/adr/0000-template.md`, `doc/features/feature-template.md` and `scripts/practices-check.sh`. A file the template adds later joins this set by default.
+- **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/hooks/cdd-test-guard.sh`, `.claude/settings.json`, the four `index.md` files under `doc/`, `doc/architecture/adr/0000-template.md`, `doc/features/feature-template.md` and `scripts/practices-check.sh`, and the target's `.cdd/tracker` / `.cdd/code-host` shims, under the binding-shim rule below. A file the template adds later joins this set by default.
 
 (The worktree helper is in neither set: it is installed once per machine, not shipped per project.)
 
@@ -346,6 +362,8 @@ jq -n --slurpfile o "$STAGE/old/.claude/settings.json" \
 ```
 
 Exit 0 is a clean merge. Any other exit — a conflict, or a file that does not parse — goes per file.
+
+**Binding shims** keep the project's backend and coordinates; only their text is CDD's (ADR 0036). Target == current → skip silently. Target == old, current != old → batch `upgrade`, unless its backend differs from what section 2.6 detection proposes. Everything else — hand-edited, absent from the old render, a shim `--recover-bindings` could not recover, or a backend detection disagrees with — goes per file, never auto-merged: show the diff (an unrecoverable shim alone) and propose the refresh keeping its backend. An unrecoverable shim is kept as is by default (it may be a project adapter); the user may instead name a shipped backend, rendered with its flags as in section 2.6. Shims skip the third and fourth verdicts and section 4.6.
 
 **Project-owned files** go through the same table, with two differences (`CLAUDE.md`'s CDD sections excepted — below):
 
@@ -445,7 +463,7 @@ Report, in both modes:
 - **Added — needs reconciliation** (upgrade mode): any added file that still contains residual `<...>` placeholders or provisional status markers after all approved edits, listed by path — a category apart from clean adds, as an action item the user must finish.
 - **Legacy migration** (upgrade mode): the sweep's outcome as its own category, apart from the file lists — *swept* (what was found, including the historical hits deliberately left alone), *patched* (files brought back into agreement, listed), and *recommended for removal* (a project-local worktree/state helper, with the exact shell rc line the user still has to delete by hand). An empty sweep says so in one line.
 - **Install-deps script**: whether `scripts/install-deps.sh` was added (or folded into the project's own installer), the tools its project block lists, and any left out for want of a package name.
-- **Capability bindings**: each `.cdd/<capability>` written (with its evidence), declined, or already present; each "no adapter for this backend" line; any upgrade-mode "migrate into `.cdd/`" hunk and its outcome; for Jira, the env vars the user sets; and, if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing on this machine, that the bound capability stops until `./tools/cdd-worktree.sh install` runs.
+- **Capability bindings**: each `.cdd/<capability>` written (with its evidence), declined, or already present; each existing shim upgraded or left behind, and why; each "no adapter for this backend" line; any upgrade-mode "migrate into `.cdd/`" hunk and its outcome; for Jira, the env vars the user sets; and, if `~/.cdd/tools/adapters/<capability>/<backend>.sh` is missing on this machine, that the bound capability stops until `./tools/cdd-worktree.sh install` runs.
 - **Check runner**: whether a `list` mode was proposed and its outcome; in upgrade mode, whether the practices gate was registered — `TRANSITIONAL(#166)`.
 - **Command edits to move** (upgrade mode), `TRANSITIONAL(#148)`: each fourth-verdict hunk (section 4.4) — where it moved, or kept or dropped and why.
 - The marker value written.
