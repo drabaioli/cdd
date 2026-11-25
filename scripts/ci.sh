@@ -110,7 +110,7 @@ GATES=(
   "code-host-ladder|jq|code-host resolution: missing, broken and working adapters at every helper call site"
   "issue-close|jq|post-merge issue close from cdd-worktree-done and cdd-worktree-gc"
   "worktree-done|jq|cdd-worktree-done's removal and branch-deletion paths"
-  "adapter-bindings|jq|bootstrap with adapter bindings: .cdd/ shims resolve and pass describe from a fresh clone (offline)"
+  "adapter-bindings|jq|bootstrap with adapter bindings: .cdd/ shims resolve and pass describe from a fresh clone (offline); an outdated shim's backend and coordinates are recovered and its text refreshed"
   "bootstrap|jq|end-to-end bootstrap into a tmpdir"
   "bootstrap-camelcase|jq|bootstrap with a CamelCase directory slug"
   "stage-render|jq|render-only staging (--stage), no git tree"
