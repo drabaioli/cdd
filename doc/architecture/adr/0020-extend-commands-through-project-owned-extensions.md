@@ -1,6 +1,6 @@
 # 0020: Extend commands through project-owned extensions
 
-**Status:** Accepted
+**Status:** Accepted; partially superseded by [0037](0037-declare-the-first-upgrade-stop.md) (the transitional fourth verdict retired)
 
 ## Context
 
