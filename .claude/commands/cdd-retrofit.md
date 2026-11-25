@@ -397,7 +397,7 @@ None yet.
 
 **With no rows, skip the sweep.**
 
-**Sweep.** One narrow pattern per row, over tracked files only, so `.git/` and gitignored paths are out of scope; `-I` skips binaries: `git -C "$WT" grep -nI -F -e '<token>'`, or `-E` with explicit boundaries where the token could match ordinary text. Keep each pattern narrow: a wide one matches ordinary text. If `$WT` is **not a git repo** (section 2.5's fallback, or a hand-copied install), `git grep` fails — degrade rather than skip: rerun each as `grep -rnI ... "$WT"`, and report in section 5 that the sweep covered the whole tree, so gitignored and build-output paths may appear among the hits.
+**Sweep.** One pattern per row, over tracked files only, so `.git/` and gitignored paths are out of scope; `-I` skips binaries: `git -C "$WT" grep -nI -F -e '<token>'`, or `-E` with explicit boundaries where the token could match ordinary text. Keep each pattern narrow. If `$WT` is **not a git repo** (section 2.5's fallback, or a hand-copied install), `git grep` fails — degrade rather than skip: rerun each as `grep -rnI ... "$WT"`, and report in section 5 that the sweep covered the whole tree, so gitignored and build-output paths may appear among the hits.
 
 **Classify every hit; suppress none** — a hit you don't act on is still reported. **Actionable** (a live reference a project-owned script, doc or `.claude/settings.json` actually follows) → propose the patch, approved per file (section 2.7). **Historical** (a changelog, ADR or roadmap line *recording* the old name rather than using it) → report it, propose nothing, let the human judge. **Surviving in a CDD-managed file** → say so plainly: 4.4 should have migrated it, so that is a defect in this command, not in the project.
 
