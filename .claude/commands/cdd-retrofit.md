@@ -232,7 +232,7 @@ Never guess a baseline.
 
 | Stop (CDD commit) | Retires | Removed in |
 | --- | --- | --- |
-| `287ad438848a16e9c63f0e57d1097fb55de1d89b` | #148 the fourth verdict; #166 the upgrade-path `list`-mode and practices-gate proposals; #93 the legacy-token and template-rename rows | #148, #166, #93 |
+| `287ad438848a16e9c63f0e57d1097fb55de1d89b` | #148 the fourth verdict; #166 the upgrade-path `list`-mode and practices-gate proposals; #93 the legacy-token and template-rename rows; #90 the plan/implement split's `CLAUDE.md` Workflow edit | #148, #166, #93, #90 |
 
 For each stop, oldest first, run in this CDD repo:
 
@@ -303,8 +303,6 @@ Every file the template ships is compared, in one of two sets:
 - **CDD-managed** — every other file the template ships. Today that is `.claude/commands/*.md`, `.claude/agents/*.md`, `.claude/hooks/cdd-test-guard.sh`, `.claude/settings.json`, the four `index.md` files under `doc/`, `doc/architecture/adr/0000-template.md`, `doc/features/feature-template.md` and `scripts/practices-check.sh`, and the target's `.cdd/tracker` / `.cdd/code-host` shims, under the binding-shim rule below. A file the template adds later joins this set by default.
 
 (The worktree helper is in neither set: it is installed once per machine, not shipped per project.)
-
-**`TRANSITIONAL(#90)` — the plan/implement split reaches a project only through `CLAUDE.md`'s Workflow section (CDD sections, below the table); make sure that section's entry carries it, and never list it as `no-op`.** When the target's baseline predates the split — check whether `.claude/commands/cdd-plan.md` existed in it before this run — the Workflow section's entry must include the edit: `cdd-worktree <branch>` now opens on `/cdd-plan`, which writes a plan file and stops, and a fresh session then runs `/cdd-implement`; and `cdd-worktree-resume` sends a task parked at `plan_written` to `/cdd-implement`. Adapt the current template's `CLAUDE.md` Workflow bullets for the wording.
 
 **Template path renames.** The comparison table has no rename row, so resolve each row below against the target *first*, then compare on the new path only.
 

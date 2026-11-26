@@ -21,7 +21,7 @@
 #     a worktree carrying .claude/commands/cdd-plan.md is launched on /cdd-plan as an
 #     ordinary session (NOT in plan mode — the checkpoint is /cdd-plan's own approval
 #     ask); one without it gets the pre-split prose prompt, in plan mode as before,
-#     naming the handoff (that case is TRANSITIONAL(#90)). Plus the reverse
+#     naming the handoff (that case is TRANSITIONAL(#181)). Plus the reverse
 #     skew — a retrofitted project against a cdd-state that predates `plan_written`
 #     prints one warning line and still launches
 #   - the small-change lane's routing marker: `cdd-state lane <branch> small` records
@@ -194,7 +194,7 @@ WT_DEF="$WORK/${REPO_NAME}-feat_default"
   || fail "feat_default should have been cut from the default branch (main_only.txt missing)"
 [[ ! -f "$WT_DEF/dev_only.txt" ]] \
   || fail "feat_default (no recorded base) must not be cut from develop"
-# TRANSITIONAL(#90): the pre-split prompt assertions below, through the "first prompt" pass.
+# TRANSITIONAL(#181): the pre-split prompt assertions below, through the "first prompt" pass.
 grep -qF "and follow the Implementation prompt." "$CLAUDE_STUB_LOG" \
   || fail "a project without .claude/commands/cdd-plan.md must get the pre-split prose prompt. Log: $(cat "$CLAUDE_STUB_LOG")"
 grep -qF "/cdd-plan" "$CLAUDE_STUB_LOG" \
