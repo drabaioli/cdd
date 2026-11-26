@@ -338,10 +338,10 @@ cdd-state() {
   # dispatched before the jq check too.
   case "${1:-}" in
     stages) cdd-state-stages; return 0 ;;
-    install|"") shift 2>/dev/null; cdd-state-install "$@"; return ;;
-    -h|--help|help)
+    install) shift; cdd-state-install "$@"; return ;;
+    ""|-h|--help|help)
       echo "usage: cdd-state {seed <branch> [--base <branch>] | lane <branch> <small|standard> | issue-refs <branch> <ref>... | partial-refs [<ref>...] | set <stage> [--pr N] | set-field <x-key> <json-value> [--branch <branch>] | get <field> | stages | install}" >&2
-      return 0 ;;
+      [[ -n "${1:-}" ]] || return 2; return 0 ;;
   esac
 
   # jq is a required tool (process doc §2.18): every other verb reads or writes the
