@@ -246,14 +246,14 @@ git merge-base --is-ancestor <stop> <baseline>
 
 ### 4.2 Recover the target's identifiers
 
-Recover each from two of the project's rendered files:
+Recover each from the project's rendered files:
 
-- `<PROJECT_DIR>`: the handoff path rendered into `$WT/.claude/commands/cdd-next-step.md` (`~/.cdd/handoffs/<dir>/`), cross-checked against the `Read(~/.cdd/handoffs/<dir>/**)` entry in `$WT/.claude/settings.json`.
+- `<PROJECT_DIR>`: the `Read(~/.cdd/handoffs/<dir>/**)` entry in `$WT/.claude/settings.json`, cross-checked against the handoff path in `$WT/.claude/commands/cdd-next-step.md` (`~/.cdd/handoffs/<dir>/`) only when that file still names a literal directory — a newer one says `~/.cdd/handoffs/<repo>/`, which is no source.
 - `<PROJECT_NAME>`: the title of `$WT/CLAUDE.md` (`# <name> — Claude Code Context`), cross-checked against the title of `$WT/doc/knowledge_base/roadmap.md` (`# <name> Implementation Roadmap`).
 
 When a value is found and its sources agree, use it without waiting for confirmation, and state both in one line: "Identifiers (from the project's files): name <X>, dir <Y> — say if either is wrong." Ask only for a value that cannot be recovered, or whose sources disagree (a hand-retitled `CLAUDE.md`, say).
 
-If the recovered `<PROJECT_DIR>` differs from the target's folder name, warn in one line: CDD keys the handoff directory on the folder name, so the project's handoff permissions and rendered paths point somewhere else. Warn only; this run does not fix it.
+If the recovered `<PROJECT_DIR>` differs from the target's folder name, warn in one line: CDD keys the handoff directory on the folder name, so the project's handoff permissions point somewhere else. Warn only; this run does not fix it.
 
 ### 4.3 Render both template versions with the target's identifiers
 

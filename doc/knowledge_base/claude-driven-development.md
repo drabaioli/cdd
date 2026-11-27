@@ -149,7 +149,7 @@ Both helpers' `install` refuses on a machine missing one of CDD's required tools
 Every CDD project carries two distinct identifiers, and the template encodes them as separate placeholders so substitution can't conflate them:
 
 - **`<PROJECT_NAME>`** — the display name. Human-readable, may contain spaces and mixed case. Example: `Sprint Planning Automation POC`. Used in document titles and prose references to the project.
-- **`<PROJECT_DIR>`** — the directory and repo slug. Used as the working tree's directory name and, at runtime, as the handoff-directory namespace (`~/.cdd/handoffs/<PROJECT_DIR>/`). May be CamelCase (e.g. `PyGroundControl`) to match the actual repository folder.
+- **`<PROJECT_DIR>`** — the directory and repo slug, used as the working tree's directory name. May be CamelCase (e.g. `PyGroundControl`) to match the actual repository folder. The handoff-directory namespace (`~/.cdd/handoffs/<repo>/`) is the main checkout's folder name, derived at runtime; `<PROJECT_DIR>` survives only in the template's settings permission paths, which match while the folder keeps its bootstrap name.
 
 The angle brackets keep both unambiguous, and the bootstrap script replaces them wherever they appear. (A third, per-project shell-command slug existed before the worktree helper was unified into the single project-independent `cdd-worktree`, §2.8, and was removed with it.)
 
