@@ -1,6 +1,13 @@
 Scope the next roadmap task and produce a handoff file for a fresh plan session.
 
-The exploratory session. Run on the main worktree. It modifies **no** file in the repo; its only artifact is the handoff file under `~/.cdd/handoffs/cdd/`, consumed later by an isolated plan session (`/cdd-plan`).
+The exploratory session. Run on the main worktree. It modifies **no** file in the repo; its only artifact is the handoff file under `~/.cdd/handoffs/<repo>/`, consumed later by an isolated plan session (`/cdd-plan`).
+
+Derive the handoff directory from git — the main checkout's folder name:
+
+```bash
+repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+echo "handoffs: ~/.cdd/handoffs/$repo/"
+```
 
 **Project extension.** First, check for `.cdd/extensions/cdd-next-step.md`. If it exists, read it and follow it alongside this command: it adds steps under `##` headings that name, by title rather than number, the step of this command each one attaches to. It cannot remove, skip, reorder or weaken anything here — least of all a point where this command waits for the human. Where it would, follow this command and say so in one line; never resolve the conflict silently. If it names a step this command does not have, say so in one line and ask where it goes. With no file, carry on.
 
@@ -71,7 +78,7 @@ Several references mean one task, not several. If the items describe unrelated w
 
 ```bash
 <adapter> issue-list
-jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/cdd/*.state.json 2>/dev/null   # already-started issues, by state record
+jq -r '.issue_refs // [] | .[]' ~/.cdd/handoffs/<repo>/*.state.json 2>/dev/null   # already-started issues, by state record
 ```
 
 The state records are the only exclusion source. Compare after stripping any leading `#`. The exclusion is advisory — the records are local to this machine and reaped once a PR merges — so when presenting the list say in one line that finding no record is not proof the issue is unstarted.
@@ -91,7 +98,7 @@ Read `doc/knowledge_base/roadmap.md` in full. Skim `doc/architecture/index.md` a
 List existing handoff files:
 
 ```bash
-ls ~/.cdd/handoffs/cdd/ 2>/dev/null
+ls ~/.cdd/handoffs/<repo>/ 2>/dev/null
 ```
 
 The handoffs are the `<branch>.md` files. Skip their siblings — `<branch>.plan.md`, `<branch>.state.json` — and the per-repo `repo.json`.
@@ -102,7 +109,7 @@ For each handoff `<branch>.md`, check whether the branch still exists locally:
 git branch --list <branch>
 ```
 
-If the branch is gone, the handoff is stale. For each stale handoff, ask the user inline whether to delete it with its siblings (`rm -f ~/.cdd/handoffs/cdd/<branch>.md ~/.cdd/handoffs/cdd/<branch>.plan.md ~/.cdd/handoffs/cdd/<branch>.state.json`). Never delete without explicit confirmation. `cdd-worktree-list` adds each one's worktree and PR status.
+If the branch is gone, the handoff is stale. For each stale handoff, ask the user inline whether to delete it with its siblings (`rm -f ~/.cdd/handoffs/<repo>/<branch>.md ~/.cdd/handoffs/<repo>/<branch>.plan.md ~/.cdd/handoffs/<repo>/<branch>.state.json`). Never delete without explicit confirmation. `cdd-worktree-list` adds each one's worktree and PR status.
 
 ## 3. Propose the next task (roadmap-driven mode)
 
@@ -207,7 +214,7 @@ Show the draft for approval. Iterate if needed.
 
 ## 7. Write the handoff file
 
-On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
+On approval, write `~/.cdd/handoffs/<repo>/<branch>.md` with this structure:
 
 ```markdown
 # Task: <short title>
@@ -236,7 +243,7 @@ On approval, write `~/.cdd/handoffs/cdd/<branch>.md` with this structure:
 Create the per-repo handoff directory if it doesn't exist:
 
 ```bash
-mkdir -p ~/.cdd/handoffs/cdd
+mkdir -p ~/.cdd/handoffs/<repo>
 ```
 
 Then seed the task **state record** beside the handoff, with the **base branch** agreed in §4 (substitute it for the `$(…)` default when the task stacks on a branch not checked out here). The second call runs **on the small-change lane only** (it is what `cdd-worktree` routes on; on the standard lane do not call it — an absent marker *is* the standard lane). The third runs **in issue-driven mode only**, with the references in the order given, each exactly as the tracker reports it (the adapter's `.ref`):
@@ -254,7 +261,7 @@ Run each as its own call, not chained, so a `cdd-state` too old for `lane` or `i
 After writing, print exactly:
 
 ```
-Handoff written: ~/.cdd/handoffs/cdd/<branch>.md
+Handoff written: ~/.cdd/handoffs/<repo>/<branch>.md
 Next: cdd-worktree <branch>   (opens a plan session on /cdd-plan; /cdd-implement follows in a fresh session)
                               (small-change lane: opens on /cdd-small-change, which does the whole build)
 ```

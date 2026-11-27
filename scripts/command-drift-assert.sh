@@ -171,10 +171,10 @@ expect_pass "control: a whitelisted one-sided command passes"
 
 # --- Check 6: this repo's handoff slug hardcoded in the template ---------------
 # Only the template copy changes, and it renders back to what the repo copy says, so the
-# command-set diff stays clean and the slug scan is the only thing that can fail.
+# settings diff stays clean and the slug scan is the only thing that can fail.
 fresh_sandbox
 sandbox_awk '!done && sub(/handoffs\/<PROJECT_DIR>/, "handoffs/cdd") { done = 1 } { print }' \
-  "template/.claude/commands/cdd-next-step.md"
+  "$TPL_SETTINGS"
 expect_fail "check 6 catches this repo's handoff directory hardcoded in the template" \
   "handoff directory (handoffs/cdd) is hardcoded in template/"
 
