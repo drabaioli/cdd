@@ -47,14 +47,14 @@ violations() {
 self_check() {
   local got want
   got="$(printf '%s\n' \
-    ".claude/commands/a.md:1:drop it TRANSITIONAL(#148) here" \
+    ".claude/commands/a.md:1:drop it TRANSITIONAL(#0) here" \
     "doc/a.md:2:mark it TRANSITIONAL(#<issue>)" \
     "doc/a.md:3:list: git grep -o 'TRANSITIONAL(#[0-9]*)'" \
     "doc/a.md:4:TRANSITIONAL: no issue" \
     "doc/a.md:5:TRANSITIONAL(#) empty" \
     "doc/a.md:6:TRANSITIONAL(#12a) junk" \
     "doc/a.md:7:DEPRECATION SEAM — old token" \
-    "template/a.md:8:TRANSITIONAL(#148)" \
+    "template/a.md:8:TRANSITIONAL(#0)" \
     ".claude/commands/a.md:9:a transitional step" | violations)"
   want="$(printf '%s\n' \
     "doc/a.md:4: malformed marker, want TRANSITIONAL(#<issue>)" \

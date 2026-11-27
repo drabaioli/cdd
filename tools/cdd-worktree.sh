@@ -590,7 +590,7 @@ cdd-worktree() {
     [[ "$lane" == "small" && -f .claude/commands/cdd-small-change.md ]] \
       && launch=("/cdd-small-change")
   else
-    # TRANSITIONAL(#90): pre-split flow, whose checkpoint was plan mode; needs
+    # TRANSITIONAL(#181): pre-split flow, whose checkpoint was plan mode; needs
     # `## Implementation prompt`.
     launch=(--permission-mode plan "Read ${handoff} and follow the Implementation prompt.")
   fi

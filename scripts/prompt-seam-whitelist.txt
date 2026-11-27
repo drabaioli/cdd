@@ -16,11 +16,6 @@
 # Smoke-test temp dir (/tmp/cdd-demo-smoke in demo/README.md), not a command.
 # The check runner provisions its own scratch dir, so /tmp/cdd-smoke is gone.
 /cdd-demo-smoke
-# Retired command name, kept only where it is recorded rather than used: the
-# roadmap completion annotations documenting the /cdd-merge-main ->
-# /cdd-merge-base rename (#31), and the legacy-token table in
-# .claude/commands/cdd-retrofit.md section 4.5. Historical.
-/cdd-merge-main
 
 # --- Downstream paths absent from the CDD repo (check 3: path existence) ---
 # Produced by /cdd-bootstrap in a downstream project; the CDD repo's own
@@ -33,9 +28,3 @@ scripts/check.sh
 # not a file. NNNN is a placeholder the check's own placeholder filter cannot see, since it
 # rejects <>*~${} and not bare uppercase.
 doc/architecture/adr/NNNN-short-title.md
-
-# The pre-#73 knowledge-base index path, recorded in cdd-retrofit.md's section 4.4
-# rename table and section 4.5 legacy-token table so already-bootstrapped projects
-# are carried across the rename. Historical: the repo's own copy is
-# doc/knowledge_base/index.md.
-doc/knowledge_base/README.md

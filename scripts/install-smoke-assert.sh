@@ -17,6 +17,8 @@
 #     defining the function, the shim exits 127 with a reinstall hint
 #   - the helper refuses bash < 4 before defining any function: positionally on every
 #     host, and behaviourally (sourced and as install) where a bash 3.2 exists — macOS
+#   - a bare `cdd-state` prints usage and exits 2, installing nothing (an install is
+#     only ever the explicit `install` verb)
 #   - `cdd-state stages` answers with no jq on PATH: it is the capability probe
 #     cdd-worktree's skew check reads, so it must sit BEFORE cdd-state's jq check
 #   - a missing required tool stops (process doc §2.18): any other cdd-state verb with
@@ -389,6 +391,18 @@ grep -qx plan_written <<<"$stages_out" \
 grep -qx scoped <<<"$stages_out" \
   || fail "cdd-state stages printed no enum without jq (answered behind the jq check?); got: $stages_out"
 pass "cdd-state stages answers the full lifecycle enum with no jq on PATH (before the jq check)"
+
+# A bare `cdd-state` is a usage request, not an install: against an empty HOME it must
+# print usage, exit 2 and write nothing (no rc file, no shim, no ~/.cdd).
+BARE_HOME="$(mktemp -d)"
+bare_rc=0
+bare_out="$(bounded 20 env -i HOME="$BARE_HOME" PATH="$PROBE_SYS_PATH" \
+  "${NOSHELLRC[@]}" -c "source '$REPO_ROOT/tools/cdd-state.sh' && cdd-state" </dev/null 2>&1)" || bare_rc=$?
+[[ "$bare_rc" -eq 2 ]] || fail "bare cdd-state must exit 2; got $bare_rc: $bare_out"
+grep -qF "usage: cdd-state" <<<"$bare_out" || fail "bare cdd-state printed no usage; got: $bare_out"
+[[ -z "$(ls -A "$BARE_HOME")" ]] || fail "bare cdd-state wrote into HOME: $(ls -A "$BARE_HOME")"
+rm -rf "$BARE_HOME"
+pass "bare cdd-state prints usage, exits 2 and installs nothing"
 
 # Every other verb needs jq, a required tool (process doc §2.18): with none on PATH it
 # stops with exit 4 and names jq, where it used to print an advisory line and return 0.

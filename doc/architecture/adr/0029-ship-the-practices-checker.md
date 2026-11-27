@@ -1,6 +1,6 @@
 # 0029: Ship the practices checker
 
-**Status:** Accepted
+**Status:** Accepted; partially superseded by [0037](0037-declare-the-first-upgrade-stop.md) (the upgrade-path `list`-mode and practices-gate proposals retired)
 
 ## Context
 
